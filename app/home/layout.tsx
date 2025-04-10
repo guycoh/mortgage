@@ -2,7 +2,7 @@
 
 
 import {Footer}from "./components/footer";
-
+import { Nav } from "./components/nav";
 
 export default function HomeLayout({
   children,
@@ -17,6 +17,7 @@ export default function HomeLayout({
   <div className="min-h-screen flex flex-col">
   
    <main className="flex-grow">
+   <Nav/>
    {children}
    </main>
    <Footer/>
