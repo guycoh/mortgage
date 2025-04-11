@@ -1,5 +1,4 @@
-'use client'
-
+"use client"
 
 import {Footer}from "./components/footer";
 import { Nav } from "./components/nav";
