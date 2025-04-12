@@ -48,13 +48,66 @@ export default function SideMenu({ triggerButton }: { triggerButton: (onClick: (
               <Link
                 href={href}
                 onClick={() => setIsOpen(false)}
-                className="block text-[#1d75a1] hover:text-[#007bff] font-bold text-[15px]"
+                className="block text-[#1d75a1] hover:text-[#007bff] font-bold text-[20px]"
               >
                 {text}
               </Link>
             </li>
           ))}
         </ul>
+
+        <ul className="space-y-4 mt-12 text-right">
+
+            <li >
+                  <Link
+                    href="/home/schedule"                
+                    className="block text-[#1d75a1] hover:text-[#007bff] font-bold text-[20px]"              >
+                   קביעת זום
+                  </Link>
+            </li>
+            <li >
+              <Link
+                href="/login"                
+                className="block text-[#1d75a1] hover:text-[#007bff] font-bold text-[20px]"              >
+                כניסה למערכת
+              </Link>
+            </li>
+            <li >
+              <Link
+                href="/signup"                
+                className="block text-[#1d75a1] hover:text-[#007bff] font-bold text-[20px]"              >
+                הרשמה
+              </Link>
+            </li>
+            <li >
+              <Link
+                href="/private/crm"                
+                className="block text-[#1d75a1] hover:text-[#007bff] font-bold text-[20px]"              >
+                 CRM
+              </Link>
+            </li>
+
+            <li >
+              <Link
+                href="/private/admin/dashboard"                
+                className="block text-[#1d75a1] hover:text-[#007bff] font-bold text-[20px]"              >
+                DASHBOARD
+              </Link>
+            </li>
+
+
+
+
+         
+        </ul>
+
+
+
+
+
+        
+
+
       </aside>
     </>
   )
