@@ -3,14 +3,18 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 
+// יצירת לקוח Supabase
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
 // GET
-export async function GET(req: NextRequest, context: { params: { id: string } }) {
-  const { id } = context.params
+export async function GET(
+  request: NextRequest,
+  context: { params: { id: string } }
+): Promise<Response> {
+  const id = context.params.id
 
   const { data, error } = await supabase.from('leadweb').select('*').eq('id', id).single()
 
@@ -20,6 +24,7 @@ export async function GET(req: NextRequest, context: { params: { id: string } })
 
   return NextResponse.json(data, { status: 200 })
 }
+
 
 // PUT
 export async function PUT(req: NextRequest, context: { params: { id: string } }) {
