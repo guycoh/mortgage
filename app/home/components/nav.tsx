@@ -1,34 +1,6 @@
 "use client"
 import Link from "next/link";
-
-import CalculatorIcon from "@/app/svgFiles/calculator";
-
-
-
-
 import { useState } from "react";
-
-
-
-
-// export default function Navbar() {
-//   const { user, login, logout } = useAuth();
-
-//   return (
-//     <nav className="p-4 flex justify-between bg-gray-800 text-white">
-//       <span>Morgi</span>
-//       {user ? (
-//         <div className="flex items-center gap-4">
-//           <span>{user.full_name} ({user.role_id === 1 ? "Admin" : "User"})</span>
-//           <button onClick={logout} className="bg-red-500 px-3 py-1 rounded">Logout</button>
-//         </div>
-//       ) : (
-//         <button onClick={() => login("test@example.com", "password")} className="bg-blue-500 px-3 py-1 rounded">Login</button>
-//       )}
-//     </nav>
-//   );
-// }
-
 
 export const Nav = () => {
   
@@ -48,8 +20,8 @@ export const Nav = () => {
 
     <section className='py-2 bg-[#1d75a1] text-[#e5e4e3] text-right px-10'>
       <p className='text-sm'><strong className="mx-3" >מורגי - המרכז הישראלי למשכנתא ופיננסיםא</strong>
-      <strong className="mx-3">צור קשר
-        </strong>1800333665</p>
+          <strong className="mx-3">צור קשר
+          </strong>052-3684844</p>
     </section>
 
     <div className='flex flex-wrap items-center justify-between gap-4 px-10 py-4 bg-[#e5e4e3] min-h-[70px] relative'>
@@ -101,7 +73,7 @@ export const Nav = () => {
           <li className='max-lg:border-b max-lg:py-3 px-3'>
                <Link href="/home/contact"  className='hover:text-[#007bff] text-[#1d75a1] block font-bold text-[15px]'>צור קשר</Link>            
           </li>
-
+        
          
          
           {/* <li className='max-lg:border-b max-lg:py-3 px-3'>          

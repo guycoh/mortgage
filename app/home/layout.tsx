@@ -2,6 +2,8 @@
 
 import {Footer}from "./components/footer";
 import { Nav } from "./components/nav";
+import SideMenu from "./components/sidebar_mobile";
+
 
 export default function HomeLayout({
   children,
@@ -17,6 +19,7 @@ export default function HomeLayout({
   
    <main className="flex-grow">
    <Nav/>
+   <SideMenu/>
    {children}
    </main>
    <Footer/>
