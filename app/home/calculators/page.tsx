@@ -4,9 +4,10 @@ import Link from "next/link";
 
 
 const calculators = [
+    { title: "מחשבון פשוט", description: "חשב את ההחזר החודשי ", link: "/home/calculators/simple_calculator" },
     { title: "מחשבון משכנתא", description: "חשב את ההחזר החודשי והיכולת הכלכלית שלך.", link: "/home/calculators/mortgage_calculator" },
     { title: "מחשבון כדאיות מחזור", description: "בדוק האם משתלם לך למחזר את המשכנתא.", link: "/home/calculators/refinance-calculator" },
-    { title: "מחשבון מחיר למשתכן", description: "חשב את ההוצאות והתנאים לזכאות.", link: "/affordable-housing-calculator" },
+    { title: "מחשבון מחיר למשתכן", description: "חשב את ההוצאות והתנאים לזכאות.", link: "/home/calculators/mechir_la_mishtaken" },
     { title: "מחשבון מס רכישה", description: "בדוק כמה מס רכישה תצטרך לשלם.", link: "/home/calculators/purchase_tax_calculator" },
     { title: "מחשבון כמה משכנתא אוכל לקבל", description: "הערכת סכום המשכנתא האפשרי עבורך.", link: "/home/calculators/mortgage_capability" },
   ];
