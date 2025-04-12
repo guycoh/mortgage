@@ -1,22 +1,30 @@
 // app/api/categorytype/leadweb/[id]/route.ts
-
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 
-// יצירת לקוח Supabase
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
+type Context = {
+  params: {
+    id: string
+  }
+}
+
 // GET
 export async function GET(
-  request: NextRequest,
-  context: { params: { id: string } }
-): Promise<Response> {
-  const id = context.params.id
+  req: NextRequest,
+  context: Context
+) {
+  const { id } = context.params
 
-  const { data, error } = await supabase.from('leadweb').select('*').eq('id', id).single()
+  const { data, error } = await supabase
+    .from('leadweb')
+    .select('*')
+    .eq('id', id)
+    .single()
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 })
