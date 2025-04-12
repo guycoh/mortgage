@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 import NameIcon from "@/app/svgFiles/name";
 import MorgyIco from "@/app/svgFiles/morgy";
 import MailIcon from "@/app/svgFiles/mail";
-//import PhoneIcon from "@/app/svgFiles/phone";
+
 
 import { useSearchParams } from 'next/navigation';
 
@@ -193,7 +193,7 @@ const handleTextChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
           {/* טלפון*/}
           <div className="relative" >            
           < div className="absolute bottom-1 left-1  w-[36px] h-[36px]">
-                <PhoneIcon/>          
+                     
           </div>
             <label
               htmlFor="cell"
