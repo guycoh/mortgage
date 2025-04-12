@@ -1,44 +1,43 @@
-"use client"
-import Image from "next/image";
-import Link from "next/link";
+'use client';
 
+import Image from 'next/image';
+import Link from 'next/link';
 
 const calculators = [
-    { title: "מחשבון פשוט", description: "חשב את ההחזר החודשי ", link: "/home/calculators/simple_calculator" },
-    { title: "מחשבון משכנתא", description: "חשב את ההחזר החודשי והיכולת הכלכלית שלך.", link: "/home/calculators/mortgage_calculator" },
-    { title: "מחשבון כדאיות מחזור", description: "בדוק האם משתלם לך למחזר את המשכנתא.", link: "/home/calculators/refinance-calculator" },
-    { title: "מחשבון מחיר למשתכן", description: "חשב את ההוצאות והתנאים לזכאות.", link: "/home/calculators/mechir_la_mishtaken" },
-    { title: "מחשבון מס רכישה", description: "בדוק כמה מס רכישה תצטרך לשלם.", link: "/home/calculators/purchase_tax_calculator" },
-    { title: "מחשבון כמה משכנתא אוכל לקבל", description: "הערכת סכום המשכנתא האפשרי עבורך.", link: "/home/calculators/mortgage_capability" },
-  ];
-  
-  export default function CalculatorsPage() {
-    return (
-      <div className="min-h-screen bg-gray-100 p-6">
-        <div className="max-w-6xl mx-auto">
-          <h1 className="text-2xl font-bold text-center mb-6">מחשבונים</h1>
-          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {calculators.map((calc, index) => (
-              <Link href={calc.link} key={index}>
-                <div className="bg-white p-4 rounded-2xl shadow-lg flex flex-col items-center text-center hover:shadow-xl transition cursor-pointer h-44">
-                <Image src="/assets/svgFiles/calculator.svg" alt="calculator" className="text-blue-500 text-4xl mb-2 "width={50} height={50}  />
+  { title: "מחשבון פשוט", description: "חשב את ההחזר החודשי", link: "/home/calculators/simple_calculator" },
+  { title: "מחשבון משכנתא", description: "חשב את ההחזר החודשי והיכולת הכלכלית שלך.", link: "/home/calculators/mortgage_calculator" },
+  { title: "מחשבון כדאיות מחזור", description: "בדוק האם משתלם לך למחזר את המשכנתא.", link: "/home/calculators/refinance-calculator" },
+  { title: "מחשבון מחיר למשתכן", description: "חשב את ההוצאות והתנאים לזכאות.", link: "/home/calculators/mechir_la_mishtaken" },
+  { title: "מחשבון מס רכישה", description: "בדוק כמה מס רכישה תצטרך לשלם.", link: "/home/calculators/purchase_tax_calculator" },
+  { title: "?מחשבון כמה משכנתא אוכל לקבל", description:"", link: "/home/calculators/mortgage_capability" },
+];
 
-      
-                  <div className="flex flex-col justify-between h-full">
-                    <h2 className="text-lg font-semibold">{calc.title}</h2>
-                    <p className="text-gray-600 text-sm">{calc.description}</p>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
+export default function CalculatorsPage() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-sky-50 via-white to-emerald-50 p-6">
+      <div className="max-w-6xl mx-auto">
+        <h1 className="text-3xl font-bold text-center text-gray-700 mb-10">מחשבונים</h1>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          {calculators.map((calc, index) => (
+            <Link href={calc.link} key={index}>
+              <div className="bg-white/80 backdrop-blur-sm p-5 rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 cursor-pointer flex flex-col items-center text-center h-48 hover:bg-white/90 transform hover:scale-105">
+                <Image
+                  src="/assets/svgFiles/calculator.svg"
+                  alt="calculator"
+                  width={50}
+                  height={50}
+                  className="mb-4"
+                />
+                <h2 className="text-lg font-semibold text-gray-800 mb-1">{calc.title}</h2>
+                <p className="text-sm text-gray-600">{calc.description}</p>
+              </div>
+            </Link>
+          ))}
         </div>
       </div>
-    );
-  }
-
-
-
+    </div>
+  );
+}
 
 
 
