@@ -1,29 +1,18 @@
+
 'use client'
 
 import Link from 'next/link'
 import { useState } from 'react'
 
-export default function SideMenu() {
+export default function SideMenu({ triggerButton }: { triggerButton: (onClick: () => void, isOpen: boolean) => React.ReactNode }) {
   const [isOpen, setIsOpen] = useState(false)
 
   return (
     <>
-      {/* כפתור פתיחה - יופיע רק במסכים קטנים מ-md */}
-      <button
-        onClick={() => setIsOpen(true)}
-        className={`fixed top-20 right-4 z-[60] bg-white rounded-full p-2 shadow-md transition-all duration-200 
-          md:hidden ${isOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}
-        `}
-        aria-label="פתח תפריט"
-      >
-        <div className="space-y-1">
-          <span className="block w-6 h-0.5 bg-[#1d75a1]"></span>
-          <span className="block w-6 h-0.5 bg-[#1d75a1]"></span>
-          <span className="block w-6 h-0.5 bg-[#1d75a1]"></span>
-        </div>
-      </button>
+      {/* כפתור פתיחה – נשלח כ־prop */}
+      {triggerButton(setIsOpen.bind(null, true), isOpen)}
 
-      {/* רקע כהה מאחורי התפריט */}
+      {/* רקע כהה */}
       {isOpen && (
         <div
           className="fixed inset-0 bg-black/40 z-40"
@@ -33,14 +22,14 @@ export default function SideMenu() {
 
       {/* תפריט צד מימין */}
       <aside
-        className={`fixed top-0 right-0 z-50 h-full bg-white w-72 max-w-full shadow-md p-6 transform transition-transform duration-300 ease-in-out 
+        className={`fixed top-4 right-0 z-50 h-full bg-white w-72 max-w-full shadow-md p-6 transform transition-transform duration-300 ease-in-out 
           ${isOpen ? 'translate-x-0' : 'translate-x-full'}
         `}
       >
-        {/* כפתור סגירה - בצד שמאל וגדול */}
+        {/* כפתור סגירה */}
         <button
           onClick={() => setIsOpen(false)}
-          className="absolute top-4 left-4 text-gray-500 hover:text-[#1d75a1] text-3xl"
+          className="absolute top-4 left-4 text-gray-500 hover:text-[#1d75a1] text-5xl"
           aria-label="סגור תפריט"
         >
           &times;
@@ -48,21 +37,23 @@ export default function SideMenu() {
 
         {/* קישורים */}
         <ul className="space-y-4 mt-12 text-right">
-          <li>
-            <Link href="/home" className="block text-[#1d75a1] hover:text-[#007bff] font-bold text-[15px]">בית</Link>
-          </li>
-          <li>
-            <Link href="/home/about" className="block text-[#1d75a1] hover:text-[#007bff] font-bold text-[15px]">אודות</Link>
-          </li>
-          <li>
-            <Link href="/home/calculators" className="block text-[#1d75a1] hover:text-[#007bff] font-bold text-[15px]">מחשבונים</Link>
-          </li>
-          <li>
-            <Link href="/home/concepts" className="block text-[#1d75a1] hover:text-[#007bff] font-bold text-[15px]">מושגים במשכנתא</Link>
-          </li>
-          <li>
-            <Link href="/home/contact" className="block text-[#1d75a1] hover:text-[#007bff] font-bold text-[15px]">צור קשר</Link>
-          </li>
+          {[
+            ['בית', '/home'],
+            ['אודות', '/home/about'],
+            ['מחשבונים', '/home/calculators'],
+            ['מושגים במשכנתא', '/home/concepts'],
+            ['צור קשר', '/home/contact'],
+          ].map(([text, href]) => (
+            <li key={href}>
+              <Link
+                href={href}
+                onClick={() => setIsOpen(false)}
+                className="block text-[#1d75a1] hover:text-[#007bff] font-bold text-[15px]"
+              >
+                {text}
+              </Link>
+            </li>
+          ))}
         </ul>
       </aside>
     </>
@@ -77,62 +68,288 @@ export default function SideMenu() {
 
 
 
-// "use client"
 
-// import { useState } from 'react';
-// import Link from 'next/link';
 
-// export default function Sidebar_admin() {
-//   const [isOpen, setIsOpen] = useState(false);
 
-//   const toggleSidebar = () => {
-//     setIsOpen((prev) => !prev);
-//   };
+
+
+
+
+
+
+
+
+
+
+
+// 'use client'
+
+// import Link from 'next/link'
+// import { useState } from 'react'
+
+// export default function SideMenu() {
+//   const [isOpen, setIsOpen] = useState(false)
 
 //   return (
-//     <div className="relative" dir="rtl">
-//       {/* Sidebar */}
-//       <div
-//         className={`fixed top-0 right-0 h-full bg-gray-800 text-white transition-transform duration-300 ${
-//           isOpen ? 'translate-x-0' : 'translate-x-full'
-//         } w-64`}
+//     <>
+//       {/* כפתור פתיחה – רק מתחת ל-md */}
+//       <button
+//         onClick={() => setIsOpen(true)}
+//         className={`fixed top-20 right-4 z-[60] bg-white rounded-full p-2 shadow-md transition-all duration-200 
+//           md:hidden ${isOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}
+//         `}
+//         aria-label="פתח תפריט"
 //       >
-//         <div className="flex justify-between items-center p-4 bg-gray-900">
-//           <h1 className="text-lg font-bold">תפריט</h1>
-//           <button
-//             onClick={toggleSidebar}
-//             className="text-gray-400 hover:text-white"
-//           >
-//             ✖️
-//           </button>
+//         <div className="space-y-1">
+//           <span className="block w-6 h-0.5 bg-[#1d75a1]"></span>
+//           <span className="block w-6 h-0.5 bg-[#1d75a1]"></span>
+//           <span className="block w-6 h-0.5 bg-[#1d75a1]"></span>
 //         </div>
-//         <ul className="p-4 space-y-2">
-//           <li className="hover:bg-gray-700 p-2 rounded"> <Link href="/admin/dashboard" > 🏠 דף הבית </Link></li>
-//           <li className="hover:bg-gray-700 p-2 rounded"> <Link href="/private/admin/dashboard/concepts" > 🏠 מושגים משכנתא</Link></li>
-          
-//           <li className="hover:bg-gray-700 p-2 rounded"> <Link href="/private/admin/users" > 👥 משתמשים</Link></li>
-//           <li className="hover:bg-gray-700 p-2 rounded"> <Link href="/private/admin/premissions" > 🔐 סוגי הרשאות</Link></li>           
-//           <li className="hover:bg-gray-700 p-2 rounded"> טבלאות מערכת</li>
-//           <li className="hover:bg-gray-700 p-2 rounded"> <Link href="/private/admin/status_call" > 📞 טבלת סטטוס שיחה</Link></li>       
-//           <li className="hover:bg-gray-700 p-2 rounded"> <Link href="/private/admin/reason_not_intrested" > 😒 סיבת לא נסגר</Link></li>
-//           <li className="hover:bg-gray-700 p-2 rounded">📧 יצירת קשר</li>       
-//           <li className="hover:bg-gray-700 p-2 rounded"> <Link href="/admin/setting" > ⚙️ הגדרות</Link></li>
-//           ✒️🔐📊📄
+//       </button>
+
+//       {/* רקע כהה */}
+//       {isOpen && (
+//         <div
+//           className="fixed inset-0 bg-black/40 z-40"
+//           onClick={() => setIsOpen(false)}
+//         />
+//       )}
+
+//       {/* תפריט צד מימין */}
+//       <aside
+//         className={`fixed top-0 right-0 z-50 h-full bg-white w-72 max-w-full shadow-md p-6 transform transition-transform duration-300 ease-in-out 
+//           ${isOpen ? 'translate-x-0' : 'translate-x-full'}
+//         `}
+//       >
+//         {/* כפתור סגירה */}
+//         <button
+//           onClick={() => setIsOpen(false)}
+//           className="absolute top-4 left-4 text-gray-500 hover:text-[#1d75a1] text-3xl"
+//           aria-label="סגור תפריט"
+//         >
+//           &times;
+//         </button>
+
+//         {/* קישורים – כל אחד סוגר את התפריט */}
+//         <ul className="space-y-4 mt-12 text-right">
+//           <li>
+//             <Link href="/home" onClick={() => setIsOpen(false)} className="block text-[#1d75a1] hover:text-[#007bff] font-bold text-[15px]">
+//               בית
+//             </Link>
+//           </li>
+//           <li>
+//             <Link href="/home/about" onClick={() => setIsOpen(false)} className="block text-[#1d75a1] hover:text-[#007bff] font-bold text-[15px]">
+//               אודות
+//             </Link>
+//           </li>
+//           <li>
+//             <Link href="/home/calculators" onClick={() => setIsOpen(false)} className="block text-[#1d75a1] hover:text-[#007bff] font-bold text-[15px]">
+//               מחשבונים
+//             </Link>
+//           </li>
+//           <li>
+//             <Link href="/home/concepts" onClick={() => setIsOpen(false)} className="block text-[#1d75a1] hover:text-[#007bff] font-bold text-[15px]">
+//               מושגים במשכנתא
+//             </Link>
+//           </li>
+//           <li>
+//             <Link href="/home/contact" onClick={() => setIsOpen(false)} className="block text-[#1d75a1] hover:text-[#007bff] font-bold text-[15px]">
+//               צור קשר
+//             </Link>
+//           </li>
+//         </ul>
+//       </aside>
+//     </>
+//   )
+// }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// "use client"
+// import Link from "next/link"
+// import { forwardRef, useImperativeHandle, useState, useEffect } from "react"
+
+// export type SidebarHandle = {
+//   open: () => void
+// }
+
+// const Sidebar = forwardRef<SidebarHandle>((_, ref) => {
+//   const [isOpen, setIsOpen] = useState(false)
+
+//   useImperativeHandle(ref, () => ({
+//     open: () => setIsOpen(true),
+//   }))
+
+//   const closeSidebar = () => setIsOpen(false)
+
+//   useEffect(() => {
+//     document.body.style.overflow = isOpen ? 'hidden' : ''
+//     return () => { document.body.style.overflow = '' }
+//   }, [isOpen])
+
+//   return (
+//     <>
+//       {isOpen && (
+//         <div
+//           className="fixed inset-0 z-40 bg-black bg-opacity-50"
+//           onClick={closeSidebar}
+//         />
+//       )}
+
+//       <div className={`fixed top-0 right-0 z-50 h-full w-3/4 max-w-[300px] bg-white shadow-md transform transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : 'translate-x-full'} lg:hidden`}>
+//         <button
+//           onClick={closeSidebar}
+//           className="absolute top-4 left-4 z-50"
+//         >
+//           <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 fill-black" viewBox="0 0 24 24">
+//             <path d="M18 6L6 18M6 6l12 12" />
+//           </svg>
+//         </button>
+
+//         <ul className="mt-16 space-y-4 p-6">
+//           {[
+//             { href: "/home", label: "בית" },
+//             { href: "/home/about", label: "אודות" },
+//             { href: "/home/calculators", label: "מחשבונים" },
+//             { href: "/home/concepts", label: "מושגים במשכנתא" },
+//             { href: "/home/contact", label: "צור קשר" },
+//             { href: "/home/schedule", label: "קבע פגישת זום", className: "text-white bg-[#1d75a1] rounded-lg px-4 py-2 block text-center" },
+//             { href: "/login", label: "אזור אישי", className: "text-white bg-[#1d75a1] rounded-lg px-4 py-2 block text-center" },
+//             { href: "/signup", label: "הרשמה", className: "text-white bg-[#1d75a1] rounded-lg px-4 py-2 block text-center" },
+//           ].map(({ href, label, className = "" }) => (
+//             <li key={href} className="border-b py-3 px-3">
+//               <Link
+//                 href={href}
+//                 className={`hover:text-[#1d75a1] text-[#1d75a1] block font-bold text-[15px] ${className}`}
+//                 onClick={closeSidebar}
+//               >
+//                 {label}
+//               </Link>
+//             </li>
+//           ))}
 //         </ul>
 //       </div>
+//     </>
+//   )
+// })
 
-//       {/* Open Button */}
-//       {!isOpen && (
-//         <button
-//           onClick={toggleSidebar}
-//           className="fixed top-4 right-4 p-2 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-700 focus:outline-none"
-//         >
-//           ☰
-//         </button>
+// Sidebar.displayName = "Sidebar"
+// export default Sidebar
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// 'use client'
+
+// import Link from 'next/link'
+// import { useState } from 'react'
+
+// export default function SideMenu() {
+//   const [isOpen, setIsOpen] = useState(false)
+
+//   return (
+//     <>
+//       {/* כפתור פתיחה – רק מתחת ל-md */}
+//       <button
+//         onClick={() => setIsOpen(true)}
+//         className={`fixed top-20 right-4 z-[60] bg-white rounded-full p-2 shadow-md transition-all duration-200 
+//           md:hidden ${isOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}
+//         `}
+//         aria-label="פתח תפריט"
+//       >
+//         <div className="space-y-1">
+//           <span className="block w-6 h-0.5 bg-[#1d75a1]"></span>
+//           <span className="block w-6 h-0.5 bg-[#1d75a1]"></span>
+//           <span className="block w-6 h-0.5 bg-[#1d75a1]"></span>
+//         </div>
+//       </button>
+
+//       {/* רקע כהה */}
+//       {isOpen && (
+//         <div
+//           className="fixed inset-0 bg-black/40 z-40"
+//           onClick={() => setIsOpen(false)}
+//         />
 //       )}
-//     </div>
-//   );
+
+//       {/* תפריט צד מימין */}
+//       <aside
+//         className={`fixed top-0 right-0 z-50 h-full bg-white w-72 max-w-full shadow-md p-6 transform transition-transform duration-300 ease-in-out 
+//           ${isOpen ? 'translate-x-0' : 'translate-x-full'}
+//         `}
+//       >
+//         {/* כפתור סגירה */}
+//         <button
+//           onClick={() => setIsOpen(false)}
+//           className="absolute top-4 left-4 text-gray-500 hover:text-[#1d75a1] text-3xl"
+//           aria-label="סגור תפריט"
+//         >
+//           &times;
+//         </button>
+
+//         {/* קישורים – כל אחד סוגר את התפריט */}
+//         <ul className="space-y-4 mt-12 text-right">
+//           <li>
+//             <Link href="/home" onClick={() => setIsOpen(false)} className="block text-[#1d75a1] hover:text-[#007bff] font-bold text-[15px]">
+//               בית
+//             </Link>
+//           </li>
+//           <li>
+//             <Link href="/home/about" onClick={() => setIsOpen(false)} className="block text-[#1d75a1] hover:text-[#007bff] font-bold text-[15px]">
+//               אודות
+//             </Link>
+//           </li>
+//           <li>
+//             <Link href="/home/calculators" onClick={() => setIsOpen(false)} className="block text-[#1d75a1] hover:text-[#007bff] font-bold text-[15px]">
+//               מחשבונים
+//             </Link>
+//           </li>
+//           <li>
+//             <Link href="/home/concepts" onClick={() => setIsOpen(false)} className="block text-[#1d75a1] hover:text-[#007bff] font-bold text-[15px]">
+//               מושגים במשכנתא
+//             </Link>
+//           </li>
+//           <li>
+//             <Link href="/home/contact" onClick={() => setIsOpen(false)} className="block text-[#1d75a1] hover:text-[#007bff] font-bold text-[15px]">
+//               צור קשר
+//             </Link>
+//           </li>
+
+
+
+          
+//         </ul>
+//       </aside>
+//     </>
+//   )
 // }
+
+
+
+
+
+
 
 
 
