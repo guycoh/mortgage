@@ -1,40 +1,67 @@
 "use client"
 
-const About = () => {
-  return (
-    <section className="bg-gray-50 py-12 px-6 md:px-16 text-[#4a473e] " >
-      <div className="max-w-7xl mx-auto text-center">
-        <h1 className="text-3xl font-semibold text-gray-800 mb-4">אודות מורגי</h1>
-        <p className="text-xl text-gray-600 mb-8">
-          במורגי, אנו מבינים שמשכנתא היא לא רק הלוואה, אלא צעד משמעותי בדרך לבית שלך. אנו מציעים ייעוץ מקצועי,
-          פתרונות מותאמים אישית ושירות אישי שמלווה אותך בכל תהליך לקיחת המשכנתא.
-        </p>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-          <div className="text-right">
-            <h2 className="text-2xl font-semibold text-gray-700 mb-4">המשימה שלנו</h2>
-            <p className="text-lg text-gray-600">
-              אנחנו במורגי מחויבים להעניק לך את השירות המקצועי ביותר, תוך הבנת הצרכים האישיים שלך ויצירת פתרונות
-              פיננסיים שמתאימים לך. כל לקוח הוא סיפור ייחודי, ואנחנו כאן כדי לעזור לך להפוך את החלום לבית למציאות.
-            </p>
-          </div>
-          <div className="text-right">
-            <h2 className="text-2xl font-semibold text-gray-700 mb-4">למה לבחור בנו?</h2>
-            <ul className="list-disc list-inside text-lg text-gray-600">
-              <li>ייעוץ מקצועי ומדויק על פי הצרכים האישיים שלך.</li>
-              <li>גישה מותאמת אישית עם תמיכה צמודה לאורך כל הדרך.</li>
-              <li>פתרונות יצירתיים שמתאימים לכל מצב פיננסי.</li>
-              <li>שירות מהיר ואמין שמלווה אותך בשלבי הגשת הבקשה והאישור.</li>
-            </ul>
-          </div>
-        </div>
-        <div className="mt-12">
-          <p className="text-lg text-gray-600">
-            בחר במורגי – בחר בתהליך פשוט, מקצועי ויעיל לקבלת המשכנתא שמתאימה לך.
-          </p>
-        </div>
-      </div>
-    </section>
-  );
-};
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import Image from "next/image";
 
-export default About;
+
+interface CategoryType {
+  id: number;
+  category_type: string;
+  link?: string;
+}
+
+export default function CategoryPage() {
+  const [categories, setCategories] = useState<CategoryType[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/categorytype")
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error("Failed to fetch categories");
+        }
+        return response.json();
+      })
+      .then((data) => setCategories(data))
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <p className="text-center">Loading...</p>;
+  if (error) return <p className="text-center text-red-500">Error: {error}</p>;
+
+  return (
+    <div className="p-6">
+      <h1 className="text-2xl font-bold mb-4">איזה משכנתא מתאימה לי?</h1>
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        {categories.map((category) => (
+          <div key={category.id} className="p-4 shadow-md border rounded-lg">
+            <h2 className="text-lg font-semibold">{category.category_type}</h2>      
+            
+            <div className="flex items-center justify-center h-16 w-16 rounded-full bg-blue-100 mx-auto mb-4">
+              
+              <Image src="/assets/images/svg/home.svg"
+                     alt="home"
+                     width={100} height={100}
+              />
+            </div>
+            
+            
+               
+                <Link href={`/home/${category.link}`}  >
+                <div className="mt-4 bg-[#1d75a1] hover:bg-[#a39d8f] text-[#e5e4e3] font-bold py-2 px-4 rounded-full w-full transition-colors" >
+               
+                למידע נוסף 
+                </div>
+               
+                </Link>
+             
+           
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
