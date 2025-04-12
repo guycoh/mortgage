@@ -48,14 +48,14 @@ export default function MortgageForAnyPurpose() {
           </div>
         </div>
         
-          <div className="text-center mt-10">
-              <Link
-                href="/home/schedule"
-                className="inline-block w-full sm:w-auto bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-6 rounded-lg text-lg shadow-md transition duration-300 text-center"
-              >
-                קבעו פגישה עם מומחה למשכנתאות
-              </Link>
-          </div>
+        <div className="mt-10 flex justify-center">
+          <Link
+            href="/home/schedule"
+            className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-6 rounded-lg text-lg shadow-md transition duration-300 whitespace-nowrap max-w-[90vw] overflow-hidden text-ellipsis"
+          >
+            קבעו פגישה עם מומחה למשכנתאות
+          </Link>
+        </div>
       </div>
     </div>
   );
