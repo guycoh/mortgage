@@ -66,7 +66,7 @@ export default function CreateLeadForm() {
             zoom: 1, 
         };
 
-        const response = await fetch("/api/leadweb", {
+        const response = await fetch("/api/v1/leadweb", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(formattedData),
