@@ -14,10 +14,10 @@ const calculators = [
 
 export default function CalculatorsPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-sky-50 via-white to-emerald-50 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-sky-50 via-white to-emerald-50 p-6 text-[#1d75a1]">
       <div className="max-w-6xl mx-auto">
-        <h1 className="text-3xl font-bold text-center text-gray-700 mb-10">מחשבונים</h1>
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+        <h1 className="text-3xl font-bold text-center mb-10">מחשבונים</h1>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
           {calculators.map((calc, index) => (
             <Link href={calc.link} key={index}>
               <div className="bg-white/80 backdrop-blur-sm p-5 rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 cursor-pointer flex flex-col items-center text-center h-48 hover:bg-white/90 transform hover:scale-105">
@@ -26,10 +26,10 @@ export default function CalculatorsPage() {
                   alt="calculator"
                   width={50}
                   height={50}
-                  className="mb-4"
+                  className="mb-4 invert-[34%] sepia-[58%] saturate-[582%] hue-rotate-[159deg] brightness-[91%] contrast-[93%]"
                 />
-                <h2 className="text-lg font-semibold text-gray-800 mb-1">{calc.title}</h2>
-                <p className="text-sm text-gray-600">{calc.description}</p>
+                <h2 className="text-lg font-semibold mb-1">{calc.title}</h2>
+                <p className="text-sm">{calc.description}</p>
               </div>
             </Link>
           ))}
@@ -38,6 +38,3 @@ export default function CalculatorsPage() {
     </div>
   );
 }
-
-
-
