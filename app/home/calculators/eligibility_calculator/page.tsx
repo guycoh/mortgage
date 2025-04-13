@@ -1,201 +1,157 @@
 "use client"
-import { useState } from "react";
+import { useState } from 'react'
 
-const EligibilityCalculator = () => {
-  const [yearsMarried, setYearsMarried] = useState<number>(0);
-  const [numChildren, setNumChildren] = useState<number>(0);
-  const [militaryService, setMilitaryService] = useState<boolean>(false);
-  const [preferredArea, setPreferredArea] = useState<boolean>(false);
-  const [age, setAge] = useState<number>(0);
-  const [disabilityPercentage, setDisabilityPercentage] = useState<number>(0);
-  const [husbandSiblings, setHusbandSiblings] = useState<number>(0);
-  const [wifeSiblings, setWifeSiblings] = useState<number>(0);
-  const [eligibilityScore, setEligibilityScore] = useState<number | null>(null);
-  const [loanAmount, setLoanAmount] = useState<number | null>(null);
+export default function EligibilityCalculator() {
+  const [form, setForm] = useState({
+    marriageYears: '',
+    children: '',
+    husbandSiblings: '',
+    wifeSiblings: '',
+    husbandService: '',
+    wifeService: '',
+    law10Plus: false,
+  })
 
-  const calculateEligibility = () => {
-    let score = 0;
+  const [score, setScore] = useState<number | null>(null)
+  const [result, setResult] = useState<string>('')
 
-    // ניקוד שנות נישואין
-    score += Math.min(yearsMarried, 15) * 20;
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value, type, checked } = e.target
+    setForm((prev) => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value,
+    }))
+  }
 
-    // ניקוד מספר ילדים
-    score += numChildren * 50;
+  const calculateScore = () => {
+    const {
+      marriageYears,
+      children,
+      husbandSiblings,
+      wifeSiblings,
+      husbandService,
+      wifeService,
+      law10Plus,
+    } = form
 
-    // ניקוד שירות צבאי/לאומי
-    if (militaryService) {
-      score += 100;
-    }
+    const score =
+      Math.min(Number(marriageYears) * 2, 20) +
+      Math.min(Number(children) * 10, 30) +
+      Math.min((Number(husbandSiblings) + Number(wifeSiblings)) * 2, 10) +
+      Number(husbandService) * 0.25 +
+      Number(wifeService) * 0.25 +
+      (law10Plus ? 10 : 0)
 
-    // ניקוד אזור מועדף
-    if (preferredArea) {
-      score += 50;
-    }
+    setScore(score)
 
-    // ניקוד גיל
-    if (age >= 21 && age <= 30) {
-      score += 30;
-    } else if (age > 30 && age <= 40) {
-      score += 20;
-    }
+    let estimatedAmount = 0
+    if (score >= 60) estimatedAmount = 100000
+    else if (score >= 50) estimatedAmount = 85000
+    else if (score >= 40) estimatedAmount = 70000
+    else if (score >= 30) estimatedAmount = 50000
+    else estimatedAmount = 0
 
-    // ניקוד נכות
-    if (disabilityPercentage > 0) {
-      score += Math.min(disabilityPercentage, 100) * 2;
-    }
-
-    // ניקוד אחים ואחיות
-    score += husbandSiblings * 30; // ניקוד עבור אחים של הבעל
-    score += wifeSiblings * 30; // ניקוד עבור אחים של האישה
-
-    // תוכנית 10+
-    if (yearsMarried >= 10 && numChildren >= 3) {
-      score += 100;
-    }
-
-    // חישוב סכום ההלוואה
-    const loanBaseAmount = 500000; // בסיס להלוואה (לדוגמה)
-    const loan = loanBaseAmount + score * 1000;
-
-    setEligibilityScore(score);
-    setLoanAmount(loan);
-  };
+    setResult(
+      estimatedAmount > 0
+        ? `הניקוד שלך הוא ${score.toFixed(
+            2
+          )}, ייתכן ואת/ה זכאי/ת לסיוע של כ-${estimatedAmount.toLocaleString()} ש"ח.`
+        : `הניקוד שלך הוא ${score.toFixed(
+            2
+          )}. לא נמצאה זכאות על פי הנתונים שהוזנו.`
+    )
+  }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="bg-white shadow-md rounded-lg p-6 w-full max-w-lg">
-        <h1 className="text-2xl font-bold mb-4 text-center text-blue-600">
-          מחשבון זכאות משכנתא
-        </h1>
+    <div className="max-w-xl mx-auto p-4 bg-white rounded-2xl shadow">
+      <h2 className="text-2xl font-bold mb-4 text-center">מחשבון זכאות</h2>
 
-        {/* שנות נישואין */}
-        <div className="mb-4">
-          <label className="block text-gray-700 text-sm font-bold mb-2">
-            שנות נישואין:
-          </label>
-          <input
-            type="number"
-            className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-            value={yearsMarried}
-            onChange={(e) => setYearsMarried(Number(e.target.value))}
-          />
-        </div>
+      <div className="space-y-4">
+        <Field
+          label="שנות נישואין"
+          name="marriageYears"
+          value={form.marriageYears}
+          onChange={handleChange}
+        />
+        <Field
+          label="מספר ילדים"
+          name="children"
+          value={form.children}
+          onChange={handleChange}
+        />
+        <Field
+          label="מספר אחים לבעל"
+          name="husbandSiblings"
+          value={form.husbandSiblings}
+          onChange={handleChange}
+        />
+        <Field
+          label="מספר אחים לאישה"
+          name="wifeSiblings"
+          value={form.wifeSiblings}
+          onChange={handleChange}
+        />
+        <Field
+          label="חודשי שירות צבאי/לאומי לבעל"
+          name="husbandService"
+          value={form.husbandService}
+          onChange={handleChange}
+        />
+        <Field
+          label="חודשי שירות צבאי/לאומי לאישה"
+          name="wifeService"
+          value={form.wifeService}
+          onChange={handleChange}
+        />
 
-        {/* מספר ילדים */}
-        <div className="mb-4">
-          <label className="block text-gray-700 text-sm font-bold mb-2">
-            מספר ילדים:
-          </label>
-          <input
-            type="number"
-            className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-            value={numChildren}
-            onChange={(e) => setNumChildren(Number(e.target.value))}
-          />
-        </div>
-
-        {/* שירות צבאי/לאומי */}
-        <div className="mb-4">
-          <label className="block text-gray-700 text-sm font-bold mb-2">
-            האם שירתת בצבא/שירות לאומי?
-          </label>
-          <input
-            type="checkbox"
-            checked={militaryService}
-            onChange={(e) => setMilitaryService(e.target.checked)}
-            className="mr-2"
-          />
-        </div>
-
-        {/* אזור מועדף */}
-        <div className="mb-4">
-          <label className="block text-gray-700 text-sm font-bold mb-2">
-            האם מדובר באזור מגורים מועדף?
-          </label>
+        <label className="flex items-center gap-2">
           <input
             type="checkbox"
-            checked={preferredArea}
-            onChange={(e) => setPreferredArea(e.target.checked)}
-            className="mr-2"
+            name="law10Plus"
+            checked={form.law10Plus}
+            onChange={handleChange}
           />
-        </div>
-
-        {/* גיל */}
-        <div className="mb-4">
-          <label className="block text-gray-700 text-sm font-bold mb-2">
-            גיל:
-          </label>
-          <input
-            type="number"
-            className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-            value={age}
-            onChange={(e) => setAge(Number(e.target.value))}
-          />
-        </div>
-
-        {/* אחוזי נכות */}
-        <div className="mb-4">
-          <label className="block text-gray-700 text-sm font-bold mb-2">
-            אחוזי נכות (אם קיימים):
-          </label>
-          <input
-            type="number"
-            className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-            value={disabilityPercentage}
-            onChange={(e) => setDisabilityPercentage(Number(e.target.value))}
-          />
-        </div>
-
-        {/* מספר אחים של הבעל */}
-        <div className="mb-4">
-          <label className="block text-gray-700 text-sm font-bold mb-2">
-            מספר אחים של הבעל:
-          </label>
-          <input
-            type="number"
-            className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-            value={husbandSiblings}
-            onChange={(e) => setHusbandSiblings(Number(e.target.value))}
-          />
-        </div>
-
-        {/* מספר אחים של האישה */}
-        <div className="mb-4">
-          <label className="block text-gray-700 text-sm font-bold mb-2">
-            מספר אחים של האישה:
-          </label>
-          <input
-            type="number"
-            className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-            value={wifeSiblings}
-            onChange={(e) => setWifeSiblings(Number(e.target.value))}
-          />
-        </div>
+          משתתף/ת בתוכנית 10+ (חוק הנגב)
+        </label>
 
         <button
-          onClick={calculateEligibility}
-          className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline w-full"
+          onClick={calculateScore}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl w-full"
         >
           חשב זכאות
         </button>
 
-        {eligibilityScore !== null && loanAmount !== null && (
-          <div className="mt-4 p-4 bg-gray-100 rounded shadow">
-            <h2 className="text-lg font-bold text-gray-700">
-              ניקוד הזכאות שלך:
-            </h2>
-            <p className="text-gray-900 text-xl">{eligibilityScore} נקודות</p>
-            <h2 className="text-lg font-bold text-gray-700 mt-4">
-              סכום הלוואה משוער:
-            </h2>
-            <p className="text-gray-900 text-xl">
-              {loanAmount.toLocaleString()} ש"ח
-            </p>
+        {result && (
+          <div className="mt-4 p-3 bg-gray-100 rounded-xl text-center text-lg font-medium">
+            {result}
           </div>
         )}
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default EligibilityCalculator;
+function Field({
+  label,
+  name,
+  value,
+  onChange,
+}: {
+  label: string
+  name: string
+  value: string
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void
+}) {
+  return (
+    <label className="block">
+      {label}:
+      <input
+        type="number"
+        name={name}
+        value={value}
+        onChange={onChange}
+        className="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+      />
+    </label>
+  )
+}

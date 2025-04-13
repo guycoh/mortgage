@@ -61,21 +61,28 @@ export default function SideMenu({ triggerButton }: { triggerButton: (onClick: (
             <li >
                   <Link
                     href="/home/schedule"                
-                    className="block text-[#1d75a1] hover:text-[#007bff] font-bold text-[20px]"              >
+                    className="block text-[#1d75a1] hover:text-[#007bff] font-bold text-[20px]"             
+                    onClick={() => setIsOpen(false)}
+                    >
+                  
                    קביעת זום
                   </Link>
             </li>
             <li >
               <Link
                 href="/login"                
-                className="block text-[#1d75a1] hover:text-[#007bff] font-bold text-[20px]"              >
+                className="block text-[#1d75a1] hover:text-[#007bff] font-bold text-[20px]" 
+                onClick={() => setIsOpen(false)}
+                >
                 כניסה למערכת
               </Link>
             </li>
             <li >
               <Link
                 href="/signup"                
-                className="block text-[#1d75a1] hover:text-[#007bff] font-bold text-[20px]"              >
+                className="block text-[#1d75a1] hover:text-[#007bff] font-bold text-[20px]"
+                onClick={() => setIsOpen(false)}
+                >
                 הרשמה
               </Link>
             </li>

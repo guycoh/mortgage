@@ -6,9 +6,9 @@ export const Nav = ({ onOpenMenu, isMenuOpen }: { onOpenMenu: () => void, isMenu
     <div>
       <header className="shadow-md font-sans tracking-wide relative z-50">
 
-        {/* פס עליון */}
-        <section className="py-2 bg-[#1d75a1] text-[#e5e4e3] text-right px-10">
-          <p className="text-sm">
+       {/* פס עליון */}
+        <section className="py-2 bg-[#1d75a1] text-[#e5e4e3] px-10 flex justify-center items-center">
+          <p className="text-sm text-center">
             <strong className="mx-3">מורגי - המרכז הישראלי למשכנתא ופיננסים</strong>
           </p>
         </section>

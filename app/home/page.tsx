@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-
+import Spinner from "./components/spinner";
 
 interface CategoryType {
   id: number;
@@ -29,7 +29,14 @@ export default function CategoryPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <p className="text-center">Loading...</p>;
+  if (loading) return
+  <div>
+<Spinner/>
+
+  </div>;
+   
+    
+   
   if (error) return <p className="text-center text-red-500">Error: {error}</p>;
 
   return (
@@ -39,7 +46,7 @@ export default function CategoryPage() {
         {categories.map((category) => (
           <div key={category.id} className="p-4 shadow-md border rounded-lg">
             <h2 className="text-lg font-semibold">{category.category_type}</h2>      
-            
+      
             <div className="flex items-center justify-center h-16 w-16 rounded-full bg-blue-100 mx-auto mb-4">
               
               <Image src="/assets/images/svg/home.svg"

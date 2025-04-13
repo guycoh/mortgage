@@ -3,6 +3,8 @@
 const About = () => {
   return (
     <section className="bg-gray-50 py-12 px-6 md:px-16 text-[#4a473e] " >
+      
+          
       <div className="max-w-7xl mx-auto text-center">
         <h1 className="text-3xl font-semibold text-gray-800 mb-4">אודות מורגי</h1>
         <p className="text-xl text-gray-600 mb-8">
