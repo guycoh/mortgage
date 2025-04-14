@@ -1,10 +1,14 @@
 "use client"
-import SignupForm from './form'
+//import SignupForm from './form'
 
 export default function SignupPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-100 to-indigo-200">
-      <SignupForm />
+     
+{/*      
+      <SignupForm /> */}
+<p>קובץ ישן שעשה בעיות</p>
+      
     </div>
   )
 }
