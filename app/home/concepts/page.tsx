@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import Spinner from "../components/spinner" 
 
 interface DataItem {
   id: number
@@ -76,7 +77,15 @@ const GlossaryPage: React.FC = () => {
     ? [...filtered].sort((a, b) => a.concept.localeCompare(b.concept))
     : filtered
 
-  if (loading) return <div className="text-center p-10">טוען נתונים...</div>
+    if (loading)
+      return (
+        <div>
+          <Spinner />
+        </div>
+      );
+
+
+
   if (error) return <div className="text-red-500 text-center mt-10">שגיאה: {error}</div>
   if (!data) return <div className="text-center mt-10">אין נתונים להציג.</div>
 

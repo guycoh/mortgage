@@ -5,18 +5,19 @@ import { createClient } from "@/utils/supabase/server";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
-export const signUpAction = async (formData: FormData) => {
-  const email = formData.get("email")?.toString();
-  const password = formData.get("password")?.toString();
+// הגדרת טיפוס עבור תוצאת הפונקציה
+type SignUpResponse = 
+  | { success: true }
+  | { success: false, error: string };
+
+// הפונקציה signUpAction
+export const signUpAction = async (formData: Record<string, string>): Promise<SignUpResponse> => {
+  const { email, password, fullName, phone } = formData;
   const supabase = await createClient();
   const origin = (await headers()).get("origin");
 
   if (!email || !password) {
-    return encodedRedirect(
-      "error",
-      "/sign-up",
-      "Email and password are required",
-    );
+    return { success: false, error: "Email and password are required" };
   }
 
   const { error } = await supabase.auth.signUp({
@@ -24,20 +25,24 @@ export const signUpAction = async (formData: FormData) => {
     password,
     options: {
       emailRedirectTo: `${origin}/auth/callback`,
+      data: {
+        full_name: fullName,
+        role: "user",
+        phone: phone,
+      },
     },
   });
 
   if (error) {
     console.error(error.code + " " + error.message);
-    return encodedRedirect("error", "/sign-up", error.message);
+    return { success: false, error: error.message };
   } else {
-    return encodedRedirect(
-      "success",
-      "/sign-up",
-      "Thanks for signing up! Please check your email for a verification link.",
-    );
+    return { success: true };
   }
 };
+
+
+
 
 export const signInAction = async (formData: FormData) => {
   const email = formData.get("email") as string;

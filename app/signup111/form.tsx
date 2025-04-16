@@ -1,18 +1,9 @@
-import React from 'react'
-
-const form = () => {
-  return (
-    <div>form</div>
-  )
-}
-
-export default form
-
 // "use client"
 
 // import Image from 'next/image'
 // import { useState } from 'react'
-// //import { signUp } from './action'
+// import { signup } from './actions'
+// import { signup } from '../login/actions'
 
 // export default function SignupForm() {
 //   const [message, setMessage] = useState('')

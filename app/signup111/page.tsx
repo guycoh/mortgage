@@ -1,17 +1,17 @@
-"use client"
-//import SignupForm from './form'
+// "use client"
+// //import SignupForm from './form'
 
-export default function SignupPage() {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-100 to-indigo-200">
+// export default function SignupPage() {
+//   return (
+//     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-100 to-indigo-200">
      
-{/*      
-      <SignupForm /> */}
-<p>קובץ ישן שעשה בעיות</p>
+// {/*      
+//       <SignupForm /> */}
+// <p>קובץ ישן שעשה בעיות</p>
       
-    </div>
-  )
-}
+//     </div>
+//   )
+// }
 
 
 

@@ -1,5 +1,7 @@
 "use client"
 import Link from "next/link"
+import UserInfo from "./logoutButton"
+
 
 export const Nav = ({ onOpenMenu, isMenuOpen }: { onOpenMenu: () => void, isMenuOpen: boolean }) => {
   return (
@@ -46,8 +48,13 @@ export const Nav = ({ onOpenMenu, isMenuOpen }: { onOpenMenu: () => void, isMenu
                 <Link href="/login" className="text-white bg-[#1d75a1] rounded-lg text-sm px-5 py-2.5">אזור אישי</Link>
               </li>
               <li>
-                <Link href="/signup" className="text-white bg-[#1d75a1] rounded-lg text-sm px-5 py-2.5">הרשמה</Link>
+                <Link href="/register" className="text-white bg-[#1d75a1] rounded-lg text-sm px-5 py-2.5">הרשמה</Link>
               </li>
+              <li>
+                <UserInfo />
+              </li>
+            
+            
             </ul>
           </div>
         </div>
