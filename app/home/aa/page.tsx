@@ -239,7 +239,7 @@ export default function MortgageSimulatorForm() {
               </div>
               {formData.hasPartner === 'yes' && (
                 <div>
-                  <label htmlFor="spouseHasLongLoans" className="block text-[#1d75a1] font-semibold mb-2">בן זוג </label>
+                  <label htmlFor="spouseHasLongLoans" className="block text-[#1d75a1] font-semibold mb-2">בן זוג הלוואות מעל 18 חודשים </label>
                   <input
                     type="number"
                     name="spouseHasLongLoans"

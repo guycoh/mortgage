@@ -23,7 +23,13 @@ interface MortgageResultsModalProps {
 
 const MortgageResultsModal: FC<MortgageResultsModalProps> = ({ isOpen, onClose, data }) => {
   if (!isOpen) return null;
+  
+  const monthlyInterest = (data.annualInterest / 100) / 12;
 
+  const monthlyPayment = 
+    (data.finalMortgage * monthlyInterest) /
+    (1 - Math.pow(1 + monthlyInterest, -data.loanMonths));
+  
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
       <div className="bg-white rounded-lg p-6 max-w-4xl w-full relative overflow-y-auto max-h-[90vh]">
@@ -53,6 +59,13 @@ const MortgageResultsModal: FC<MortgageResultsModalProps> = ({ isOpen, onClose, 
                <strong> הון עצמי נדרש לעסקה:</strong>
                 ₪{Math.round((data.finalMortgage / (data.maxFinancePercent / 100)) - data.finalMortgage).toLocaleString()}
               </p>
+              <p className="text-lg text-[#1d75a1] font-bold border-t pt-2" >
+                תשלום חודשי עבור משכנתא זו: ₪
+                {Math.round(
+                    (data.finalMortgage * ((data.annualInterest / 100) / 12)) /
+                    (1 - Math.pow(1 + ((data.annualInterest / 100) / 12), -data.loanMonths))
+                ).toLocaleString()}
+                </p>
 
               <p className="text-lg text-[#1d75a1] font-bold border-t pt-2" >
                <strong>לפי ריבית:</strong>
