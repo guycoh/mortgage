@@ -4,12 +4,14 @@ import Image from 'next/image';
 import Link from 'next/link';
 
 const calculators = [
+  { title: "מחשבון כדאיות מחזור", description: "בדוק האם משתלם לך למחזר את המשכנתא.", link: "/home/calculators/refinance-calculator" },
+  
   { title: "מחשבון פשוט", description: "חשב את ההחזר החודשי", link: "/home/calculators/simple_calculator" },
-  { title: "?מחשבון כמה משכנתא אוכל לקבל", description:"", link: "/home/calculators/mortgage_capability" },
+  { title: "?מחשבון כמה משכנתא אוכל לקבל", description:"", link: "/home/calculators/mortgage_capability" }, 
   { title: "מחשבון מס רכישה", description: "בדוק כמה מס רכישה תצטרך לשלם.", link: "/home/calculators/purchase_tax_calculator" },
   { title: "מחשבון זכאות", description: "חשב זכאות משרד השיכון", link: "/home/calculators/eligibility_calculator" },
-  { title: "מחשבון משכנתא", description: "חשב את ההחזר החודשי והיכולת הכלכלית שלך.", link: "/home/calculators/mortgage_calculator" },
-  { title: "מחשבון כדאיות מחזור", description: "בדוק האם משתלם לך למחזר את המשכנתא.", link: "/home/calculators/refinance-calculator" },
+  { title: "מחשבון משכנתא", description: "חשב את ההחזר החודשי שלך.", link: "/home/calculators/refinance-calculator" },
+  
   { title: "מחשבון מחיר למשתכן", description: "חשב את ההוצאות והתנאים לזכאות.", link: "/home/calculators/mechir_la_mishtaken" },
 
   
