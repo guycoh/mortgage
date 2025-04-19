@@ -1,506 +1,365 @@
-'use client'
-import { useState,useEffect  } from 'react'
-import MortgageResultsModal from './MortgageResultsModal'
+"use client"
 
-export default function MortgageSimulatorForm() {
-  const [formData, setFormData] = useState({
-    fullName: '',
-    mortgagePurpose: '',
-    hasPartner: '',
-    age: '',
-    spouseAge: '',
-    monthlyIncome: '',
-    spouseMonthlyIncome: '',
-    additionalIncome: '',
-    spouseAdditionalIncome: '',
-    hasLongLoans: '',
-    spouseHasLongLoans: '',
-    equity: '',
-    loanMonths: 360,
-    annualInterest:5,
-  });
- 
-  const [errors, setErrors] = useState({
-    mortgagePurpose: '',
-    age: '',
-    monthlyIncome: '',
-    equity: '',
-    loanMonths: '',
-    annualInterest: '',
-  });
-  
- 
-  const [displayData, setDisplayData] = useState({
-    monthlyIncome: '',
-    spouseMonthlyIncome: '',
-    additionalIncome: '',
-    spouseAdditionalIncome: '',
-    hasLongLoans: '',
-    spouseHasLongLoans: '',
-    equity: '',
-
-
-  });
-
-  const [isFormValid, setIsFormValid] = useState(false);
+import React, { useState } from "react";
+import AmortizationSchedule from "./components/AmortizationSchedule";
+import { Modal } from "./components/Modal";
 
 
 
-  const [isModalOpen, setIsModalOpen] = useState(false);
-
-  function formatWithCommas(value: string): string {
-    const numeric = value.replace(/[^\d]/g, '');
-    return numeric.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  }
-  
-  function extractNumeric(value: string): number {
-    const cleaned = value.replace(/,/g, '');
-    return parseFloat(cleaned) || 0;
-  }
-
-  const validateForm = () => {
-    const newErrors: typeof errors = {
-      mortgagePurpose: '',
-      age: '',
-      monthlyIncome: '',
-      equity: '',
-      loanMonths: '',
-      annualInterest: '',
-    };
-  
-    let isValid = true;
-  
-    if (!formData.mortgagePurpose) {
-      newErrors.mortgagePurpose = 'יש לבחור מטרה למשכנתא';
-      isValid = false;
-    }
-  
-    if (!formData.age || isNaN(Number(formData.age)) || Number(formData.age) <= 0) {
-      newErrors.age = 'יש להזין גיל תקין';
-      isValid = false;
-    }
-  
-    if (!formData.monthlyIncome || isNaN(Number(formData.monthlyIncome)) || Number(formData.monthlyIncome) <= 0) {
-      newErrors.monthlyIncome = 'יש להזין הכנסה חודשית תקינה';
-      isValid = false;
-    }
-  
-    if (!formData.equity || isNaN(Number(formData.equity)) || Number(formData.equity) < 0) {
-      newErrors.equity = 'יש להזין הון עצמי תקין';
-      isValid = false;
-    }
-  
-    if (!formData.loanMonths || isNaN(Number(formData.loanMonths)) || Number(formData.loanMonths) <= 0) {
-      newErrors.loanMonths = 'יש להזין תקופת הלוואה בחודשים';
-      isValid = false;
-    }
-  
-    if (!formData.annualInterest || isNaN(Number(formData.annualInterest)) || Number(formData.annualInterest) <= 0) {
-      newErrors.annualInterest = 'יש להזין ריבית שנתית תקינה';
-      isValid = false;
-    }
-  
-    setErrors(newErrors);
-    setIsFormValid(isValid);
-    return isValid;
-  };
-  
-  useEffect(() => {
-    validateForm();
-  }, [formData]);
-  
-    
-  
-  
-  
-    const handleChangeWithCommas = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    const formatted = formatWithCommas(value);
-    const numeric = extractNumeric(formatted);
-
-    setDisplayData(prev => ({ ...prev, [name]: formatted }));
-    setFormData(prev => ({ ...prev, [name]: numeric }));
-  };
-  
-  
-  
-  
-  
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
-  ) => {
-    const { name, value } = e.target
-    setFormData(prev => ({ ...prev, [name]: value }))
-  }
-
-
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!validateForm()) {
-      console.log("Validation failed");
-      return;
-    }
-    setIsModalOpen(true);
-    // המשך טיפול בטופס...
-    console.log("Form is valid!", formData);
-  };
-  
-
-
-
-
-
-
-  // חישובים
-  const income = parseFloat(formData.monthlyIncome || '0')
-  const spouseIncome = parseFloat(formData.spouseMonthlyIncome || '0')
-  const additional = parseFloat(formData.additionalIncome || '0')
-  const spouseAdditional = parseFloat(formData.spouseAdditionalIncome || '0')
-  const totalIncome = income + spouseIncome + additional + spouseAdditional
-  const loansCount =
-    parseFloat(formData.hasLongLoans || '0') +
-    parseFloat(formData.spouseHasLongLoans || '0')
-
- 
- 
-    // אחוז מימון מקסימלי לפי מטרת המשכנתא
-  let maxFinancePercent = 0
-  switch (formData.mortgagePurpose) {
-    case 'single':
-      maxFinancePercent = 75
-      break
-    case 'replacement':
-      maxFinancePercent = 70
-      break
-    case 'additional':
-      maxFinancePercent = 50
-      break
-    default:
-      maxFinancePercent = 0
-  }
-  const minEquityPercent = 100 - maxFinancePercent
-  const equity = parseFloat(formData.equity || '0')
-  const maxPurchasePrice = minEquityPercent > 0 ? equity / (minEquityPercent / 100) : 0
-  const maxMortgageAmount = maxPurchasePrice * (maxFinancePercent / 100);
-  const disposableIncome = totalIncome - loansCount;
-  const maxRepayment = disposableIncome * 0.4; // יחס החזר מקסימלי
-  const recommendedRepayment = disposableIncome * 0.36; // יחס החזר מומלץ
-  
-  const maxLoan36 = calculateMaxMortgageByIncome(formData.annualInterest, recommendedRepayment, formData.loanMonths);
-  const maxLoan40 = calculateMaxMortgageByIncome(formData.annualInterest, maxRepayment, formData.loanMonths);
-  
-  const finalMortgage = Math.min(maxMortgageAmount, maxLoan40);
-
-
-
-
-  function calculateMaxMortgageByIncome(annualInterest: number, maxRepayment: number, loanMonths: number): number {
-    const monthlyRate = annualInterest / 12 / 100;
-    const pow = Math.pow(1 + monthlyRate, -loanMonths);
-    const loanAmount = maxRepayment * ((1 - pow) / monthlyRate);
-    
-    return Math.round(loanAmount); // עיגול לסכום שלם
- 
-
-
-
-
-
+interface LoanRow {
+  id: number;
+  loanAmount: number;
+  annualInterestRate: number;
+  monthlyInterestRate: number;
+  months: number;
+  endDate: string;
+  monthlyPayment: number;
+  loanType: number;
+  isIndexed: boolean; // הוספת שדה צמוד
+  showSchedule: boolean;
 }
+
+
+
+const LoanTable = () => {
+  const [rows, setRows] = useState<LoanRow[]>([]);
+  const [openModal, setOpenModal] = useState<LoanRow | null>(null); // שורה פתוחה
+  const [expectedIndex,setExpectedIndex]=useState(2.8);
+
+
+  const loanTypes = [
+    { code: 1, name: "פריים", isIndexed: false },
+    { code: 2, name: "קבוע לא צמוד", isIndexed: false },
+    { code: 3, name: "קבוע צמוד", isIndexed: true },
+    { code: 11, name: "משתנה צמודה כל שנה", isIndexed: true },
+    { code: 12, name: "משתנה צמודה כל 2.5", isIndexed: true },
+    { code: 13, name: "משתנה צמודה כל 3", isIndexed: true },
+    { code: 14, name: "משתנה צמודה כל 5", isIndexed: true },
+    { code: 15, name: "משתנה צמודה כל 7", isIndexed: true },
+    { code: 16, name: "משתנה צמודה כל 10", isIndexed: true },
+    { code: 21, name: "משתנה לא צמוד כל שנה", isIndexed: false },
+    { code: 22, name: "משתנה לא צמוד כל 2.5", isIndexed: false },
+    { code: 23, name: "משתנה לא צמוד כל 3", isIndexed: false },
+    { code: 24, name: "משתנה לא צמוד כל 5", isIndexed: false },
+    { code: 25, name: "משתנה לא צמוד כל 7", isIndexed: false },
+    { code: 26, name: "משתנה לא צמוד כל 10", isIndexed: false },
+    { code: 27, name: "עוגן מק", isIndexed: false },
+    { code: 31, name: "דולר", isIndexed: false },
+    { code: 32, name: "יורו", isIndexed: false },
+  ];
   
+  
+
+  const formatNumber = (num: number) => {
+    return num.toLocaleString("he-IL");
+  };
+
+  const parseNumber = (str: string) => {
+    return parseFloat(str.replace(/,/g, "")) || 0;
+  };
+
+  const calculateMonthlyInterestRate = (annualRate: number): number => {
+    return Math.pow(1 + annualRate / 100, 1 / 12) - 1;
+  };
+
+  const calculateMonths = (endDate: string) => {
+    const today = new Date();
+    const end = new Date(endDate);
+    const differenceInMonths =
+      (end.getFullYear() - today.getFullYear()) * 12 +
+      (end.getMonth() - today.getMonth());
+    return differenceInMonths > 0 ? differenceInMonths : 0;
+  };
+
+  
+    
+  const addRow = () => {
+    setRows([
+      ...rows,
+      {
+        id: Date.now(),
+        loanAmount: 0,
+        annualInterestRate: 0,
+        monthlyInterestRate: 0,
+        months: 0,
+        endDate: "",
+        monthlyPayment: 0,
+        loanType: loanTypes[0].code,
+        isIndexed: loanTypes[0].isIndexed, // ערך ברירת מחדל לפי סוג ההלוואה הראשון
+        showSchedule: false,
+      },
+    ]);
+  };  
+
+
+  const updateRow = (id: number, field: keyof LoanRow, value: any) => {
+    const updatedRows = rows.map((row) => {
+      if (row.id === id) {
+        const updatedRow = { ...row, [field]: value };
+  
+        if (field === "annualInterestRate") {
+          updatedRow.monthlyInterestRate = calculateMonthlyInterestRate(value);
+        }
+  
+        if (field === "endDate") {
+          updatedRow.months = calculateMonths(value);
+        }
+  
+        if (field === "loanType") {
+          const selectedLoanType = loanTypes.find((type) => type.code === value);
+          updatedRow.isIndexed = selectedLoanType?.isIndexed || false;
+        }
+  
+        if (
+          (field === "loanAmount" ||
+            field === "annualInterestRate" ||
+            field === "months" ||
+            field === "endDate") &&
+          updatedRow.loanAmount > 0 &&
+          updatedRow.monthlyInterestRate > 0 &&
+          updatedRow.months > 0
+        ) {
+          const { loanAmount, monthlyInterestRate, months } = updatedRow;
+          updatedRow.monthlyPayment = parseFloat(
+            (
+              (loanAmount * monthlyInterestRate) /
+              (1 - Math.pow(1 + monthlyInterestRate, -months))
+            ).toFixed(2)
+          );
+        }
+  
+        return updatedRow;
+      }
+      return row;
+    });
+    setRows(updatedRows);
+  };
+
+
+
+  const deleteRow = (id: number) => {
+    setRows(rows.filter((row) => row.id !== id));
+  };
+
+  const totalLoanAmount = rows.reduce((sum, row) => sum + row.loanAmount, 0);
+  const totalMonthlyPayment = rows.reduce(
+    (sum, row) => sum + row.monthlyPayment,
+    0
+  );
+
+  const todayDate = new Date().toISOString().split("T")[0];
 
   return (
-    <div className="min-h-screen bg-gray-50 py-10 px-4">
-      <div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-lg overflow-hidden">
-        <div className="p-8">
-          <h2 className="text-2xl font-bold text-[#1d75a1] mb-6 text-center">סימולטור כמה משכנתא אוכל לקבל? </h2>
-          <form onSubmit={handleSubmit} className="space-y-6">
+    <div className="min-h-screen bg-gray-100 p-3 ">
+      
+      <div className="max-w-full mx-auto bg-white shadow-md rounded-lg p-2">
+        <h1 className="text-2xl font-bold text-blue-600 mb-4">
+          ד"ר מורגי כדאיות מיחזור
+        </h1>
+        <div className="mb-4 text-right flex items-center gap-4">
+            <button
+              onClick={addRow}
+              className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+            >
+              הוסף מסלול חדש
+            </button>
 
-            
-
-            {/* שורה 2: מטרת המשכנתא */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 ">
-              <div>
-                <label htmlFor="mortgagePurpose" className="block text-[#1d75a1] font-semibold mb-2">מטרת המשכנתא</label>
-                <select
-                  name="mortgagePurpose"
-                  id="mortgagePurpose"
-                  value={formData.mortgagePurpose}
-                  onChange={handleChange}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#1d75a1] focus:bg-orange-100 text-gray-700"
-                >
-                  <option value="">בחר...</option>
-                  <option value="single">דירה יחידה</option>
-                  <option value="replacement">דירה חליפית (במקום דירה קיימת)</option>
-                  <option value="additional">דירה נוספת</option>
-                </select>
-              </div>
-                      
-            </div>        
-           {errors.mortgagePurpose && (<p className="text-red-500 text-sm mt-0 w-full">{errors.mortgagePurpose}</p>)}
-
-            {/* שורה 3: זוגיות */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <p className="text-[#1d75a1] font-semibold mb-2">האם יש בן/בת זוג או שותף?</p>
-                <div className="flex items-center gap-6">
-                  {['yes', 'no'].map(val => (
-                    <label key={val} className="flex items-center gap-2">
-                      <input
-                        type="radio"
-                        name="hasPartner"
-                        value={val}
-                        checked={formData.hasPartner === val}
-                        onChange={handleChange}
-                        className="focus:ring-[#1d75a1]"
-                      />
-                      <span className="text-[#1d75a1]">{val === 'yes' ? 'כן' : 'לא'}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* שורה 4: גיל */}
-            <div className="grid grid-cols-2 md:grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="age" className="block text-[#1d75a1] font-semibold mb-2">גיל</label>
-                <input
-                  type="number"
-                  name="age"
-                  id="age"
-                  value={formData.age}
-                  onChange={handleChange}
-                  placeholder="גיל"
-                  className="[appearance:textfield] w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#1d75a1] focus:bg-orange-100 text-gray-700"
-                  required
-                />
-              </div>
-             
-              {formData.hasPartner === 'yes' && (
-                <div>
-                  <label htmlFor="spouseAge" className="block text-[#1d75a1] font-semibold mb-2">גיל בן/בת זוג</label>
-                  <input
-                    type="number"
-                    name="spouseAge"
-                    id="spouseAge"
-                    value={formData.spouseAge}
-                    onChange={handleChange}
-                    placeholder="גיל"
-                    className=" [appearance:textfield] w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#1d75a1] focus:bg-orange-100 text-gray-700"
-                  />
-                </div>
-              )}
-            </div>
-            {errors.age && (<p className="text-red-500 text-sm mt-1 w-full">{errors.age}</p>)}
-
-
-
-
-
-
-
-            {/* שורה 5: הכנסות חודשיות */}
-            <div className="grid grid-cols-2 md:grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="monthlyIncome" className="block text-[#1d75a1] font-semibold mb-2">הכנסות חודשיות (₪)</label>
-                <input
-                  type="text"
-                  name="monthlyIncome"
-                  id="monthlyIncome"
-                  value={displayData.monthlyIncome}
-                  onChange={handleChangeWithCommas}
-                  placeholder="₪"
-                  className="[appearance:textfield] w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#1d75a1] focus:bg-orange-100 text-gray-700"
-                  required
-                />
-              </div>
-              {formData.hasPartner === 'yes' && (
-                <div>
-                  <label htmlFor="spouseMonthlyIncome" className="block text-[#1d75a1] font-semibold mb-2">בן/בת זוג </label>
-                  <input
-                    type="text"
-                    name="spouseMonthlyIncome"
-                    id="spouseMonthlyIncome"
-                    value={displayData.spouseMonthlyIncome}
-                    onChange={handleChangeWithCommas}
-                    placeholder="₪"
-                    className="[appearance:textfield] w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#1d75a1] focus:bg-orange-100 text-gray-700"
-                  />
-                </div>
-              )}
-            </div>
-            {errors.monthlyIncome && (<p className="text-red-500 text-sm mt-1 w-full">{errors.monthlyIncome}</p>)}
-
-
-
-            {/* שורה 6: הכנסות נוספות */}
-            <div className="grid grid-cols-2 md:grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="additionalIncome" className="block text-[#1d75a1] font-semibold mb-2">הכנסות נוספות (₪)</label>
-                <input
-                  type="text"
-                  name="additionalIncome"
-                  id="additionalIncome"
-                  value={displayData.additionalIncome}
-                  onChange={handleChangeWithCommas}
-                  placeholder="₪"
-                  className="[appearance:textfield] w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#1d75a1] focus:bg-orange-100 text-gray-700"
-                />
-              </div>
-              {formData.hasPartner === 'yes' && (
-                <div>
-                  <label htmlFor="spouseAdditionalIncome" className="block text-[#1d75a1] font-semibold mb-2">הכנסות נוספות בן זוג </label>
-                  <input
-                    type="text"
-                    name="spouseAdditionalIncome"
-                    id="spouseAdditionalIncome"
-                    value={displayData.spouseAdditionalIncome}
-                    onChange={handleChangeWithCommas}
-                    placeholder="₪"
-                    className="[appearance:textfield]  w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#1d75a1] focus:bg-orange-100 text-gray-700"
-                  />
-                </div>
-              )}
-            </div>
-
-            {/* שורה 7: הלוואות מעל 18 חודשים */}
-            <div className="grid grid-cols-2 md:grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="hasLongLoans" className="block text-[#1d75a1] font-semibold mb-2">הלוואות מעל 18 חודשים </label>
-                <input
-                 type="text"
-                  name="hasLongLoans"
-                  id="hasLongLoans"
-                  value={displayData.hasLongLoans}
-                  onChange={handleChangeWithCommas}
-                  placeholder="סכום חודשי"
-                  className="[appearance:textfield] w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#1d75a1] focus:bg-orange-100 text-gray-700"
-                />
-              </div>
-              {formData.hasPartner === 'yes' && (
-                <div>
-                  <label htmlFor="spouseHasLongLoans" className="block text-[#1d75a1] font-semibold mb-2">בן/בת זוג </label>
-                  <input
-                    type="text"
-                    name="spouseHasLongLoans"
-                    id="spouseHasLongLoans"
-                    value={displayData.spouseHasLongLoans}
-                    onChange={handleChangeWithCommas}
-                   placeholder="סכום חודשי"
-                    className="[appearance:textfield] w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#1d75a1] focus:bg-orange-100 text-gray-700"
-                  />
-                </div>
-              )}
-            </div>
-
-            {/* שורה 8: הון עצמי */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="equity" className="block text-[#1d75a1] font-semibold mb-2">הון עצמי (₪)</label>
-                <input
-                  type="text"
-                  name="equity"
-                  id="equity"
-                  value={displayData.equity}
-                  onChange={handleChangeWithCommas}
-                  placeholder="₪הון עצמי"
-                  className="[appearance:textfield] w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#1d75a1] focus:bg-orange-100 text-gray-700"
-                  required
-                />
-              </div>           
-            </div>
-            {errors.equity && (<p className="text-red-500 text-sm mt-1 w-full">{errors.equity}</p>)}
-
-            {/* שורה 9: מספר חודשים  */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-             <div>
-                <label htmlFor="loanMonths" className="block text-[#1d75a1] font-semibold mb-2">מספר חודשי הלוואה</label>
-                <input
+            <div className="flex items-center gap-2">
+              <label htmlFor="expectedIndex" className="text-sm text-gray-600">
+                מדד ממוצע צפוי:
+              </label>
+              <input
                 type="number"
-                name="loanMonths"
-                id="loanMonths"
-                value={formData.loanMonths}
-                onChange={handleChange}            
-                required
-                className="[appearance:textfield] w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#1d75a1] focus:bg-orange-100 text-gray-700"
-                />
+                name="expectedIndex"
+                value={expectedIndex}
+                readOnly
+                className="w-20 border border-gray-300 rounded px-2 py-1 bg-gray-100 text-gray-600 text-center"
+              />
             </div>
-            </div>
-            {errors.loanMonths && (<p className="text-red-500 text-sm mt-1 w-full">{errors.loanMonths}</p>)}
+        </div>
+
+     
+
+        <table className="w-full border-collapse border border-gray-300 text-right">
+        <thead className="hidden md:table-header-group bg-gray-100 text-right">
+            <tr>
+                <th className="p-2 border">סכום ההלוואה</th>
+                <th className="p-2 border">מסלול הלוואה</th>
+                <th className="p-2 border">ריבית שנתית</th>
+                <th className="p-2 border">צמוד</th>
+                <th className="p-2 border">תאריך סיום</th>
+                <th className="p-2 border">מספר חודשים</th>
+                <th className="p-2 border">תשלום חודשי</th>
+                <th className="p-2 border">סילוקין</th>
+                <th className="p-2 border">מחק</th>
+            </tr>
+        </thead>
+
+          <tbody>
+  {rows.map((row) => (
+    <tr key={row.id} className="flex flex-col md:table-row mb-4 md:mb-0 border md:border-0 rounded-md md:rounded-none overflow-hidden shadow-sm md:shadow-none">
+      
+      {/* סכום ההלוואה */}
+      <td className="p-2 border border-gray-300">
+        <label className="text-sm text-gray-600 block md:hidden">סכום ההלוואה (₪)</label>
+        <input
+          type="text"
+          className="w-full md:w-[150px] max-w-[15ch] border rounded px-2 py-1"
+          value={formatNumber(row.loanAmount)}
+          onChange={(e) =>
+            updateRow(row.id, "loanAmount", parseNumber(e.target.value))
+          }
+        />
+      </td>
+
+      {/* מסלול הלוואה */}
+      <td className="p-2 border border-gray-300">
+        <label className="text-sm text-gray-600 block md:hidden">מסלול הלוואה</label>
+        <select
+          className="w-full border rounded px-2 py-1"
+          value={row.loanType}
+          onChange={(e) => updateRow(row.id, "loanType", parseInt(e.target.value))}
+        >
+          {loanTypes.map((type) => (
+            <option key={type.code} value={type.code}>{type.name}</option>
+          ))}
+        </select>
+      </td>
+
+      {/* ריבית שנתית */}
+      <td className="p-2 border border-gray-300">
+        <label className="text-sm text-gray-600 block md:hidden">ריבית שנתית (%)</label>
+        <input
+          type="number"
+          step="0.01"
+          className="w-full md:w-[100px] max-w-[10ch] border rounded px-2 py-1"
+          value={row.annualInterestRate}
+          onChange={(e) =>
+            updateRow(row.id, "annualInterestRate", parseFloat(e.target.value))
+          }
+        />
+      </td>
+
+      {/* צמוד */}
+      <td className="p-2 border border-gray-300">
+        <label className="text-sm text-gray-600 block md:hidden">צמוד</label>
+        <input
+          type="checkbox"
+          checked={row.isIndexed}
+          onChange={(e) =>
+            updateRow(row.id, "isIndexed", e.target.checked)
+          }
+          disabled
+        />
+      </td>
+
+      {/* תאריך סיום */}
+      <td className="p-2 border border-gray-300">
+        <label className="text-sm text-gray-600 block md:hidden">תאריך סיום</label>
+        <input
+          type="date"
+          className="w-full md:w-[160px] border rounded px-2 py-1"
+          min={todayDate}
+          value={row.endDate}
+          onChange={(e) =>
+            updateRow(row.id, "endDate", e.target.value)
+          }
+        />
+      </td>
+
+      {/* מספר חודשים */}
+      <td className="p-2 border border-gray-300">
+        <label className="text-sm text-gray-600 block md:hidden">מספר חודשים</label>
+        <input
+          type="number"
+          className="w-full md:w-[60px] max-w-[4ch] border rounded px-2 py-1"
+          value={row.months}
+          onChange={(e) =>
+            updateRow(row.id, "months", parseInt(e.target.value))
+          }
+        />
+      </td>
+
+      {/* תשלום חודשי */}
+      <td className="p-2 border border-gray-300">
+        <label className="text-sm text-gray-600 block md:hidden">תשלום חודשי (₪)</label>
+        <input
+          type="number"
+          className="w-full md:w-[100px] max-w-[6ch] border rounded px-2 py-1"
+          value={row.monthlyPayment}
+          disabled
+        />
+      </td>
+
+      {/* כפתור סילוקין */}
+      <td className="p-2 border border-gray-300">
+        <button
+          className="w-full bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+          onClick={() => setOpenModal(row)}
+        >
+          סילוקין
+        </button>
+      </td>
+
+      {/* מחיקה */}
+      <td className="p-2 border border-gray-300">
+        <button
+          className="w-full bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
+          onClick={() => deleteRow(row.id)}
+        >
+          מחק
+        </button>
+      </td>
+    </tr>
+  ))}
+</tbody>
 
 
-           {/* שורה 10: ריבית   */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="annualInterest" className="block text-[#1d75a1] font-semibold mb-2">ריבית שנתית</label>
-              <div className="relative">
-                <input
-                  type="number"
-                  step="0.01"
-                  name="annualInterest"
-                  id="annualInterest"
-                  value={formData.annualInterest}
-                  onChange={handleChange}
-                  placeholder="לדוג׳ 3.75"
-                  required
-                  className="[appearance:textfield] w-full border border-gray-300 rounded-lg px-4 py-2 pr-10 focus:ring-2 focus:ring-[#1d75a1] focus:bg-orange-100 text-gray-700"
-                />
-                <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-lg">%</span>
-              </div>
-            </div>
-            </div>   
-            {errors.annualInterest && (<p className="text-red-500 text-sm mt-1 w-full">{errors.annualInterest}</p>)}
+          <tfoot className="bg-gray-100">
+            <tr>
+              <td className="border border-gray-300 p-2 font-bold">
+                סך הכול: {formatNumber(totalLoanAmount)} ₪
+              </td>
+              <td className="border border-gray-300 p-2"></td>
+              <td className="border border-gray-300 p-2"></td>
+              <td className="border border-gray-300 p-2"></td>
+              <td className="border border-gray-300 p-2 hidden"></td>
+              <td className="border border-gray-300 p-2"></td>
+              <td className="border border-gray-300 p-2"></td>
+              <td className="border border-gray-300 p-2 font-bold">
+                סך התשלום החודשי:{" "}
+                {formatNumber(Number(totalMonthlyPayment.toFixed(2)))} ₪
+              </td>
+              <td className="border border-gray-300 p-2"></td>
+            </tr>
+          </tfoot>
+        </table>
 
-
-            {/* כפתור */}
-            <div className="text-center">
-              <button
-                onClick={() => {
-                  if (validateForm()) setIsModalOpen(true);
-                }}
-                type="button"
-                disabled={!isFormValid}
-                className={`${
-                  isFormValid
-                    ? "bg-[#1d75a1] hover:bg-[#13577c]"
-                    : "bg-gray-400 cursor-not-allowed"
-                } text-white font-bold py-2 px-4 rounded transition`}
-              >
-                הצג תוצאות
-              </button>
-            </div>
-
-            
-            {/* ResultsModal */}
-            <MortgageResultsModal
-            isOpen={isModalOpen}
-            onClose={() => setIsModalOpen(false)}
-            data={{
-                totalIncome,
-                loansCount,
-                disposableIncome,
-                maxFinancePercent,
-                minEquityPercent,
-                maxPurchasePrice,
-                maxMortgageAmount,
-                maxRepayment,
-                recommendedRepayment,
-                maxLoan36,
-                maxLoan40,
-                finalMortgage,
-                loanMonths: formData.loanMonths, // ← מוסיף את זה כאן
-                annualInterest:formData.annualInterest,
-            }}
-            />
-
-          </form>
-
-          {/* תוצאה */}
-          
+        <div className="flex justify-center">
+          <button className="bg-green-500 mt-3 text-white px-6 py-2 rounded hover:bg-green-600">
+            בדיקת כדאיות מחזור
+          </button>
         </div>
       </div>
+   
+      <Modal
+          isOpen={!!openModal}
+          onClose={() => setOpenModal(null)}
+        >
+          {openModal && (
+            <AmortizationSchedule
+              loanAmount={openModal.loanAmount}
+              monthlyInterestRate={openModal.monthlyInterestRate}
+              months={openModal.months}
+              monthlyPayment={openModal.monthlyPayment}
+              inflationRate={expectedIndex/100}
+            />
+          )}
+     </Modal>
+
     </div>
-  )
-}
+  );
+};
+
+export default LoanTable;       
+
