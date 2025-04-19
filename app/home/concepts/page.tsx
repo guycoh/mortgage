@@ -21,7 +21,7 @@ const GlossaryPage: React.FC = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await fetch("/api/v1/concepts")
+        const response = await fetch("/api/concepts")
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`)
         const jsonData: DataItem[] = await response.json()
         setData(jsonData)

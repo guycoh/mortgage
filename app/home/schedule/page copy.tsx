@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation"; // ייבוא useRouter
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import Image from "next/image";
-import { useBooking } from "@/app/context/BookingContext";
 
 
 
@@ -21,11 +20,6 @@ export default function CreateLeadForm() {
     });
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState("");
-
-    const { setBooking } = useBooking();
-
-
-
 
     const handleDateChange = (date: Date | null) => {
         if (date?.getDay() === 6) {
@@ -72,7 +66,7 @@ export default function CreateLeadForm() {
             zoom: 1, 
         };
 
-        const response = await fetch("/api/leadweb", {
+        const response = await fetch("/api/v1/leadweb", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(formattedData),
@@ -82,15 +76,7 @@ export default function CreateLeadForm() {
         setLoading(false);
 
         if (response.ok) {
-            setBooking({
-                name: formData.lead_name,
-                phone: formData.cell_phone,
-                email: formData.email,
-                date: formattedData.date,
-                hour: formData.hour,})         
-
-            router.push("/home/schedule/success");
-                       
+            router.push(`/home/schedule/success?name=${formData.lead_name}&phone=${formData.cell_phone}&email=${formData.email}&date=${formattedData.date}&hour=${formData.hour}`);
         } else {
             setMessage(`Error: ${data.error}`);
         }

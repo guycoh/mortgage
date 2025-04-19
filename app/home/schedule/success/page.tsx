@@ -1,3 +1,76 @@
+
+'use client'
+import { useBooking } from "@/app/context/BookingContext"
+import Image from 'next/image'
+import { useEffect, useState } from 'react'
+
+export default function SuccessPage() {
+  const { booking } = useBooking()
+  const [showConfetti, setShowConfetti] = useState(false)
+
+  useEffect(() => {
+    setShowConfetti(true)
+    const timeout = setTimeout(() => setShowConfetti(false), 6000)
+    return () => clearTimeout(timeout)
+  }, [])
+
+  if (!booking) return <p className="text-center text-gray-500">טוען פרטי פגישה...</p>
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-orange-100 via-rose-50 to-pink-100 flex flex-col items-center justify-center p-6 relative overflow-hidden">
+
+      {showConfetti && (
+        <div className="absolute inset-0 z-10 pointer-events-none animate-fade-in">
+          <Image
+            src="/assets/images/confetti.gif"
+            alt="Success Animation"
+            fill
+            style={{ objectFit: 'cover' }}
+            className="opacity-50"
+          />
+        </div>
+      )}
+
+      <div className="z-20 w-full max-w-xl bg-white rounded-2xl shadow-2xl p-8 text-center relative">
+        <Image
+          src="/assets/images/svg/success.svg"
+          alt="Success"
+          width={80}
+          height={80}
+          className="mx-auto mb-4 animate-pop"
+        />
+        <h1 className="text-3xl font-bold text-green-600 mb-2">הפגישה תואמה בהצלחה!</h1>
+        <p className="text-gray-700 text-lg mb-6">
+          הי <strong>{booking.name}</strong>, קבענו עבורך פגישת זום ב־
+          <strong> {booking.date} </strong> בשעה <strong>{booking.hour}</strong>.
+        </p>
+
+        <div className="bg-gradient-to-r from-green-100 to-emerald-50 border border-green-200 rounded-xl p-4 text-right text-sm leading-relaxed text-gray-600 shadow-inner">
+          <p>📧 נשלחה הודעת אישור ל־<strong>{booking.email}</strong></p>
+          <p>📱 ניצור איתך קשר במספר <strong>{booking.phone}</strong></p>
+          <p className="mt-2 italic text-emerald-600">אנחנו כבר מחכים לשיחה שלנו ❤️</p>
+        </div>
+
+        <button
+          onClick={() => window.location.href = '/home'}
+          className="mt-6 bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-full transition-all text-lg shadow-md"
+        >
+          חזרה לדף הבית
+        </button>
+      </div>
+    </div>
+  )
+}
+
+
+
+
+
+
+
+
+
+
 // "use client"
 
 // import { useSearchParams } from "next/navigation";

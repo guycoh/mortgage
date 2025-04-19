@@ -17,7 +17,7 @@ export default function CategoryPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/v1/categorytype")
+    fetch("/api/categorytype")
       .then((response) => {
         if (!response.ok) {
           throw new Error("Failed to fetch categories");
