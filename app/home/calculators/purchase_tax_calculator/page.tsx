@@ -1,4 +1,3 @@
-
 "use client";
 import { useState } from "react";
 
@@ -113,45 +112,28 @@ const PurchaseTaxCalculator = () => {
         </button>
 
         {totalTax !== null && (
-          <div className="mt-6 bg-white rounded-xl p-6 shadow-xl border border-blue-200 animate-fade-in">
-            <h2 className="text-2xl font-bold text-[#1d75a1] mb-4">פירוט מס רכישה:</h2>
-            <div className="overflow-x-auto">
-              <table className="w-full text-right border-separate border-spacing-y-2">
-                <thead>
-                  <tr className="text-gray-700 bg-blue-100">
-                    <th className="p-2 rounded-tl-xl">מ-₪</th>
-                    <th>עד ₪</th>
-                    <th>שיעור מס</th>
-                    <th className="rounded-tr-xl">תשלום ₪</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {taxBreakdown.map((step, idx) => (
-                    <tr
-                      key={idx}
-                      className="bg-white hover:bg-blue-50 transition-all rounded-xl"
-                    >
-                      <td className="p-2">{step.from.toLocaleString()}</td>
-                      <td>{step.to.toLocaleString()}</td>
-                      <td>{(step.rate * 100).toFixed(1)}%</td>
-                      <td className="text-blue-800 font-semibold">
-                        {step.amount.toLocaleString()}
-                      </td>
-                    </tr>
-                  ))}
-                  <tr className="bg-blue-100 font-bold text-blue-900">
-                    <td colSpan={3} className="text-left p-2 rounded-bl-xl">
-                      סך הכל מס רכישה:
-                    </td>
-                    <td className="rounded-br-xl text-xl">
-                      {totalTax.toLocaleString()} ₪
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
+  <div className="mt-6 bg-white rounded-xl p-6 shadow-xl border border-blue-200 animate-fade-in">
+    <h2 className="text-2xl font-bold text-[#1d75a1] mb-4">פירוט מס רכישה:</h2>
+    <div className="space-y-4">
+      {taxBreakdown.map((step, idx) => (
+        <div
+          key={idx}
+          className="bg-blue-50 rounded-xl p-4 shadow-sm border border-blue-100 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2"
+        >
+          <div><span className="font-semibold text-gray-700">מ:</span> ₪{step.from.toLocaleString()}</div>
+          <div><span className="font-semibold text-gray-700">עד:</span> ₪{step.to.toLocaleString()}</div>
+          <div><span className="font-semibold text-gray-700">שיעור מס:</span> {(step.rate * 100).toFixed(1)}%</div>
+          <div className="text-blue-800 font-bold"><span className="font-semibold text-gray-700">תשלום:</span> ₪{step.amount.toLocaleString()}</div>
+        </div>
+      ))}
+
+      <div className="bg-[#e3f2fd] rounded-xl p-4 text-lg font-bold text-blue-900 text-center shadow-inner border-t-2 border-blue-300">
+        סך הכל מס רכישה: ₪{totalTax.toLocaleString()}
+      </div>
+    </div>
+  </div>
+)}
+
       </div>
     </div>
   );
