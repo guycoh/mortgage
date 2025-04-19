@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState,useEffect  } from 'react'
 import MortgageResultsModal from './MortgageResultsModal'
 
 export default function MortgageSimulatorForm() {
@@ -18,7 +18,18 @@ export default function MortgageSimulatorForm() {
     equity: '',
     loanMonths: 360,
     annualInterest:5,
-  })
+  });
+ 
+  const [errors, setErrors] = useState({
+    mortgagePurpose: '',
+    age: '',
+    monthlyIncome: '',
+    equity: '',
+    loanMonths: '',
+    annualInterest: '',
+  });
+  
+ 
   const [displayData, setDisplayData] = useState({
     monthlyIncome: '',
     spouseMonthlyIncome: '',
@@ -30,6 +41,10 @@ export default function MortgageSimulatorForm() {
 
 
   });
+
+  const [isFormValid, setIsFormValid] = useState(false);
+
+
 
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -43,17 +58,62 @@ export default function MortgageSimulatorForm() {
     return parseFloat(cleaned) || 0;
   }
 
-
-
-
-
-
-
-
-  const [submitted, setSubmitted] = useState(false)
-
+  const validateForm = () => {
+    const newErrors: typeof errors = {
+      mortgagePurpose: '',
+      age: '',
+      monthlyIncome: '',
+      equity: '',
+      loanMonths: '',
+      annualInterest: '',
+    };
   
-  const handleChangeWithCommas = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let isValid = true;
+  
+    if (!formData.mortgagePurpose) {
+      newErrors.mortgagePurpose = 'יש לבחור מטרה למשכנתא';
+      isValid = false;
+    }
+  
+    if (!formData.age || isNaN(Number(formData.age)) || Number(formData.age) <= 0) {
+      newErrors.age = 'יש להזין גיל תקין';
+      isValid = false;
+    }
+  
+    if (!formData.monthlyIncome || isNaN(Number(formData.monthlyIncome)) || Number(formData.monthlyIncome) <= 0) {
+      newErrors.monthlyIncome = 'יש להזין הכנסה חודשית תקינה';
+      isValid = false;
+    }
+  
+    if (!formData.equity || isNaN(Number(formData.equity)) || Number(formData.equity) < 0) {
+      newErrors.equity = 'יש להזין הון עצמי תקין';
+      isValid = false;
+    }
+  
+    if (!formData.loanMonths || isNaN(Number(formData.loanMonths)) || Number(formData.loanMonths) <= 0) {
+      newErrors.loanMonths = 'יש להזין תקופת הלוואה בחודשים';
+      isValid = false;
+    }
+  
+    if (!formData.annualInterest || isNaN(Number(formData.annualInterest)) || Number(formData.annualInterest) <= 0) {
+      newErrors.annualInterest = 'יש להזין ריבית שנתית תקינה';
+      isValid = false;
+    }
+  
+    setErrors(newErrors);
+    setIsFormValid(isValid);
+    return isValid;
+  };
+  
+  useEffect(() => {
+    validateForm();
+  }, [formData]);
+  
+    
+  
+  
+  
+    const handleChangeWithCommas = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     const formatted = formatWithCommas(value);
     const numeric = extractNumeric(formatted);
@@ -73,10 +133,24 @@ export default function MortgageSimulatorForm() {
     setFormData(prev => ({ ...prev, [name]: value }))
   }
 
+
+
   const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    setSubmitted(true)
-  }
+    e.preventDefault();
+    if (!validateForm()) {
+      console.log("Validation failed");
+      return;
+    }
+    setIsModalOpen(true);
+    // המשך טיפול בטופס...
+    console.log("Form is valid!", formData);
+  };
+  
+
+
+
+
+
 
   // חישובים
   const income = parseFloat(formData.monthlyIncome || '0')
@@ -146,7 +220,7 @@ export default function MortgageSimulatorForm() {
             
 
             {/* שורה 2: מטרת המשכנתא */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 ">
               <div>
                 <label htmlFor="mortgagePurpose" className="block text-[#1d75a1] font-semibold mb-2">מטרת המשכנתא</label>
                 <select
@@ -162,7 +236,9 @@ export default function MortgageSimulatorForm() {
                   <option value="additional">דירה נוספת</option>
                 </select>
               </div>
-            </div>
+                      
+            </div>        
+           {errors.mortgagePurpose && (<p className="text-red-500 text-sm mt-0 w-full">{errors.mortgagePurpose}</p>)}
 
             {/* שורה 3: זוגיות */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -198,8 +274,10 @@ export default function MortgageSimulatorForm() {
                   onChange={handleChange}
                   placeholder="גיל"
                   className="[appearance:textfield] w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#1d75a1] focus:bg-orange-100 text-gray-700"
+                  required
                 />
               </div>
+             
               {formData.hasPartner === 'yes' && (
                 <div>
                   <label htmlFor="spouseAge" className="block text-[#1d75a1] font-semibold mb-2">גיל בן/בת זוג</label>
@@ -215,7 +293,7 @@ export default function MortgageSimulatorForm() {
                 </div>
               )}
             </div>
-
+            {errors.age && (<p className="text-red-500 text-sm mt-1 w-full">{errors.age}</p>)}
 
 
 
@@ -235,6 +313,7 @@ export default function MortgageSimulatorForm() {
                   onChange={handleChangeWithCommas}
                   placeholder="₪"
                   className="[appearance:textfield] w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#1d75a1] focus:bg-orange-100 text-gray-700"
+                  required
                 />
               </div>
               {formData.hasPartner === 'yes' && (
@@ -252,6 +331,9 @@ export default function MortgageSimulatorForm() {
                 </div>
               )}
             </div>
+            {errors.monthlyIncome && (<p className="text-red-500 text-sm mt-1 w-full">{errors.monthlyIncome}</p>)}
+
+
 
             {/* שורה 6: הכנסות נוספות */}
             <div className="grid grid-cols-2 md:grid-cols-2 gap-4">
@@ -325,13 +407,13 @@ export default function MortgageSimulatorForm() {
                   onChange={handleChangeWithCommas}
                   placeholder="₪הון עצמי"
                   className="[appearance:textfield] w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#1d75a1] focus:bg-orange-100 text-gray-700"
+                  required
                 />
-              </div>
-           
+              </div>           
             </div>
+            {errors.equity && (<p className="text-red-500 text-sm mt-1 w-full">{errors.equity}</p>)}
 
-
-                 {/* שורה 9: מספר חודשים  */}
+            {/* שורה 9: מספר חודשים  */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
              <div>
                 <label htmlFor="loanMonths" className="block text-[#1d75a1] font-semibold mb-2">מספר חודשי הלוואה</label>
@@ -341,48 +423,57 @@ export default function MortgageSimulatorForm() {
                 id="loanMonths"
                 value={formData.loanMonths}
                 onChange={handleChange}            
-              
+                required
                 className="[appearance:textfield] w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#1d75a1] focus:bg-orange-100 text-gray-700"
                 />
             </div>
             </div>
+            {errors.loanMonths && (<p className="text-red-500 text-sm mt-1 w-full">{errors.loanMonths}</p>)}
 
+
+           {/* שורה 10: ריבית   */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-  <div>
-    <label htmlFor="annualInterest" className="block text-[#1d75a1] font-semibold mb-2">ריבית שנתית</label>
-    <div className="relative">
-      <input
-        type="number"
-        step="0.01"
-        name="annualInterest"
-        id="annualInterest"
-        value={formData.annualInterest}
-        onChange={handleChange}
-        placeholder="לדוג׳ 3.75"
-        
-        className="[appearance:textfield] w-full border border-gray-300 rounded-lg px-4 py-2 pr-10 focus:ring-2 focus:ring-[#1d75a1] focus:bg-orange-100 text-gray-700"
-      />
-      <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-lg">%</span>
-    </div>
-  </div>
-</div>
-
-            
-
-
-
+            <div>
+              <label htmlFor="annualInterest" className="block text-[#1d75a1] font-semibold mb-2">ריבית שנתית</label>
+              <div className="relative">
+                <input
+                  type="number"
+                  step="0.01"
+                  name="annualInterest"
+                  id="annualInterest"
+                  value={formData.annualInterest}
+                  onChange={handleChange}
+                  placeholder="לדוג׳ 3.75"
+                  required
+                  className="[appearance:textfield] w-full border border-gray-300 rounded-lg px-4 py-2 pr-10 focus:ring-2 focus:ring-[#1d75a1] focus:bg-orange-100 text-gray-700"
+                />
+                <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-lg">%</span>
+              </div>
+            </div>
+            </div>   
+            {errors.annualInterest && (<p className="text-red-500 text-sm mt-1 w-full">{errors.annualInterest}</p>)}
 
 
             {/* כפתור */}
             <div className="text-center">
-            <button
-                 onClick={() => setIsModalOpen(true)}
-                  className="bg-[#1d75a1] hover:bg-[#13577c] text-white font-bold py-2 px-4 rounded"
-              >      
-            הצג תוצאות
-            </button>
+              <button
+                onClick={() => {
+                  if (validateForm()) setIsModalOpen(true);
+                }}
+                type="button"
+                disabled={!isFormValid}
+                className={`${
+                  isFormValid
+                    ? "bg-[#1d75a1] hover:bg-[#13577c]"
+                    : "bg-gray-400 cursor-not-allowed"
+                } text-white font-bold py-2 px-4 rounded transition`}
+              >
+                הצג תוצאות
+              </button>
             </div>
 
+            
+            {/* ResultsModal */}
             <MortgageResultsModal
             isOpen={isModalOpen}
             onClose={() => setIsModalOpen(false)}
@@ -401,12 +492,8 @@ export default function MortgageSimulatorForm() {
                 finalMortgage,
                 loanMonths: formData.loanMonths, // ← מוסיף את זה כאן
                 annualInterest:formData.annualInterest,
-      }}
-      />
-
-
-
-
+            }}
+            />
 
           </form>
 
