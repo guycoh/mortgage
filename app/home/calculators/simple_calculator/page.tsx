@@ -2,66 +2,55 @@
 
 import { useState } from 'react';
 
-interface YearlyData {
-  year: number;
+interface MonthlyData {
+  month: number;
   principalPaid: number;
   interestPaid: number;
   totalPaid: number;
+  remainingBalance: number;
 }
 
 export default function LoanCalculator() {
   const [amount, setAmount] = useState(100000);
-  const [interest, setInterest] = useState(5);
-  const [years, setYears] = useState(10);
+  const [interest, setInterest] = useState(5.1);
+  const [months, setMonths] = useState(120);
 
   const monthlyRate = interest / 100 / 12;
-  const numberOfPayments = years * 12;
+  const monthlyPayment =
+    amount && monthlyRate
+      ? (amount * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -months))
+      : 0;
 
-  const monthlyPayment = amount
-    ? (amount * monthlyRate) /
-      (1 - Math.pow(1 + monthlyRate, -numberOfPayments))
-    : 0;
-
-  const getBreakdown = (): YearlyData[] => {
+  const getMonthlyBreakdown = (): MonthlyData[] => {
     let balance = amount;
-    const breakdown: YearlyData[] = [];
+    const breakdown: MonthlyData[] = [];
 
-    for (let y = 1; y <= years; y++) {
-      let interestPaid = 0;
-      let principalPaid = 0;
-
-      for (let m = 0; m < 12; m++) {
-        if (balance <= 0) break;
-
-        const interestPart = balance * monthlyRate;
-        const principalPart = monthlyPayment - interestPart;
-
-        interestPaid += interestPart;
-        principalPaid += principalPart;
-
-        balance -= principalPart;
-      }
+    for (let m = 1; m <= months; m++) {
+      const interestPart = balance * monthlyRate;
+      const principalPart = monthlyPayment - interestPart;
 
       breakdown.push({
-        year: y,
-        interestPaid,
-        principalPaid,
-        totalPaid: interestPaid + principalPaid,
+        month: m,
+        interestPaid: interestPart,
+        principalPaid: principalPart,
+        totalPaid: interestPart + principalPart,
+        remainingBalance: balance - principalPart,
       });
+
+      balance -= principalPart;
+      if (balance < 0) balance = 0;
     }
 
     return breakdown;
   };
 
-  const yearlyBreakdown = getBreakdown();
+  const breakdown = getMonthlyBreakdown();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-100 to-sky-100 flex flex-col items-center justify-center px-4 py-10 space-y-10">
       {/* מחשבון */}
       <div className="w-full max-w-md p-6 bg-white/70 backdrop-blur-sm border border-slate-200 rounded-2xl shadow-lg animate-fade-in-up">
-        <h1 className="text-3xl font-bold text-gray-800 mb-6 text-center">
-          מחשבון הלוואה 💸
-        </h1>
+        <h1 className="text-3xl font-bold text-gray-800 mb-6 text-center">מחשבון הלוואה 💸</h1>
 
         <div className="space-y-4">
           <div>
@@ -80,10 +69,10 @@ export default function LoanCalculator() {
                 if (!isNaN(num)) e.target.value = num.toLocaleString();
               }}
               onFocus={(e) => {
-                e.target.value = amount.toString(); // ללא פסיקים בזמן עריכה
+                e.target.value = amount.toString();
               }}
               inputMode="numeric"
-              className="w-full px-4 py-2 rounded-lg bg-white text-gray-800 border border-gray-300 focus:ring-2 focus:ring-sky-300 appearance-none"
+              className="w-full px-4 py-2 rounded-lg bg-white text-gray-800 border border-gray-300 focus:ring-2 focus:ring-sky-300"
             />
           </div>
 
@@ -94,17 +83,17 @@ export default function LoanCalculator() {
               step="0.1"
               value={interest}
               onChange={(e) => setInterest(Number(e.target.value))}
-              className="w-full px-4 py-2 rounded-lg bg-white text-gray-800 border border-gray-300 focus:ring-2 focus:ring-sky-300 appearance-none"
+              className="w-full px-4 py-2 rounded-lg bg-white text-gray-800 border border-gray-300 focus:ring-2 focus:ring-sky-300"
             />
           </div>
 
           <div>
-            <label className="block text-sm text-gray-700 mb-1">מספר שנים</label>
+            <label className="block text-sm text-gray-700 mb-1">מספר חודשי הלוואה</label>
             <input
               type="number"
-              value={years}
-              onChange={(e) => setYears(Number(e.target.value))}
-              className="w-full px-4 py-2 rounded-lg bg-white text-gray-800 border border-gray-300 focus:ring-2 focus:ring-sky-300 appearance-none"
+              value={months}
+              onChange={(e) => setMonths(Number(e.target.value))}
+              className="w-full px-4 py-2 rounded-lg bg-white text-gray-800 border border-gray-300 focus:ring-2 focus:ring-sky-300"
             />
           </div>
 
@@ -115,27 +104,31 @@ export default function LoanCalculator() {
         </div>
       </div>
 
-      {/* לוח שנתי מדויק */}
-      <div className="w-full max-w-3xl bg-white/70 p-6 rounded-xl shadow-md border border-slate-200 space-y-4">
-        <h2 className="text-xl font-bold text-gray-700 mb-2">פירוט שנתי מדויק 🧾</h2>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-right rtl:text-right text-gray-700">
+      
+
+      {/* טבלה חודשית */}
+      <div className="w-full max-w-4xl bg-white/70 p-6 rounded-xl shadow-md border border-slate-200 space-y-4">
+        <h2 className="text-xl font-bold text-gray-700 mb-2">פירוט חודשי 🧾</h2>
+        <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
+          <table className="w-full text-sm text-right text-gray-700">
             <thead className="text-xs text-gray-500 uppercase border-b">
               <tr>
-                <th className="px-3 py-2">שנה</th>
-                <th className="px-3 py-2">תשלום כולל</th>
-                <th className="px-3 py-2">ריבית</th>
-                <th className="px-3 py-2">קרן</th>
+                <th className="px-3 py-2">חודש</th>
+                <th className="px-3 py-2">תשלום חודשי</th>
+                <th className="px-3 py-2 text-rose-500">ריבית</th>
+                <th className="px-3 py-2 text-emerald-600">קרן</th>
+                <th className="px-3 py-2">יתרה</th>
               </tr>
             </thead>
             <tbody>
-              {yearlyBreakdown.map((row) => (
-                <tr key={row.year} className="border-b hover:bg-sky-50 transition">
-                  <td className="px-3 py-2">{row.year}</td>
+              {breakdown.map((row) => (
+                <tr key={row.month} className="border-b hover:bg-sky-50 transition">
+                  <td className="px-3 py-2">{row.month}</td>
                   <td className="px-3 py-2">{row.totalPaid.toFixed(0)}</td>
                   <td className="px-3 py-2 text-rose-500">{row.interestPaid.toFixed(0)}</td>
                   <td className="px-3 py-2 text-emerald-600">{row.principalPaid.toFixed(0)}</td>
+                  <td className="px-3 py-2">{row.remainingBalance.toFixed(0)}</td>
                 </tr>
               ))}
             </tbody>
