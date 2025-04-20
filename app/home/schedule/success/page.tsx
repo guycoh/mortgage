@@ -33,13 +33,13 @@ export default function SuccessPage() {
 
       <div className="z-20 w-full max-w-xl bg-white rounded-2xl shadow-2xl p-8 text-center relative">
         <Image
-          src="/assets/images/svg/success.svg"
+          src="/assets/images/svg/meeting.svg"
           alt="Success"
           width={80}
           height={80}
           className="mx-auto mb-4 animate-pop"
         />
-        <h1 className="text-3xl font-bold text-green-600 mb-2">הפגישה תואמה בהצלחה!</h1>
+        <h1 className="text-3xl font-bold text-[#1d75a1] mb-2">הפגישה תואמה בהצלחה!</h1>
         <p className="text-gray-700 text-lg mb-6">
           הי <strong>{booking.name}</strong>, קבענו עבורך פגישת זום ב־
           <strong> {booking.date} </strong> בשעה <strong>{booking.hour}</strong>.
@@ -53,7 +53,7 @@ export default function SuccessPage() {
 
         <button
           onClick={() => window.location.href = '/home'}
-          className="mt-6 bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-full transition-all text-lg shadow-md"
+          className="mt-6 bg-[#1d75a1] hover:bg-green-600 text-white px-6 py-3 rounded-full transition-all text-lg shadow-md"
         >
           חזרה לדף הבית
         </button>
