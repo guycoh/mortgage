@@ -10,7 +10,7 @@ import Phone from "@/public/assets/images/svg/phone";
 import WebIcon from "@/public/assets/images/svg/webIcon";
 import WhatsappIcon from "@/public/assets/images/svg/whatsapp";
 import WazeIcon from "@/public/assets/images/svg/wazeIcon";
-
+import LocationIcon from "@/public/assets/images/svg/location";
 
 export default function DigitalBusinessCard() {
   return (
@@ -46,8 +46,8 @@ export default function DigitalBusinessCard() {
         <button className="bg-main absolute top-8 right-6 text-white font-semibold px-6 py-3 rounded-2xl shadow-lg hover:bg-blue-900 transition duration-300 ease-in-out">
            קבע פגישה
            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-    <path d="M8 7V3m8 4V3m-9 4h10a2 2 0 012 2v11a2 2 0 01-2 2H7a2 2 0 01-2-2V9a2 2 0 012-2z" />
-  </svg>
+           <path d="M8 7V3m8 4V3m-9 4h10a2 2 0 012 2v11a2 2 0 01-2 2H7a2 2 0 01-2-2V9a2 2 0 012-2z" />
+           </svg>
         
         </button>
 
@@ -62,7 +62,7 @@ export default function DigitalBusinessCard() {
             />
           </div>
           <div className="absolute inset-0 flex justify-center items-end">
-            <div className="w-36 h-36 rounded-full overflow-hidden border-4 border-white shadow-xl transform translate-y-1/2 bg-white">
+            <div className="w-36 h-36 z-10 rounded-full overflow-hidden border-4 border-white shadow-xl transform translate-y-1/2 bg-white">
               <Image
                 src="/assets/images/imgFiles/my_image.jpg"
                 alt="גיא כהן"
@@ -75,11 +75,41 @@ export default function DigitalBusinessCard() {
         </div>
 
         {/* בטן הכרטיס — גרדיאנט סגול עם הצללה פנימית */}
-        <div className="bg-gradient-to-br from-purple-700 via-purple-600 to-purple-800 shadow-inner shadow-black/30 text-white flex flex-col items-center p-6">
+        <div className="relative bg-gradient-to-br from-purple-700 via-purple-600 to-purple-800 shadow-inner shadow-black/30 text-white flex flex-col items-center p-6">
+                        <button className="absolute text-xs top-4 right-4 w-24 h-24 bg-white text-purple-600 rounded-full flex flex-col items-center justify-center gap-1 shadow-md hover:shadow-lg transition">
+                  {/* אייקון */}
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-5 w-5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 4h10M5 11h14M5 19h14M5 15h14" />
+                  </svg>
+                  קבע פגישה
+                </button>
+         
           {/* שם ותפקיד */}
           <h1 className="mt-20 text-3xl font-bold tracking-tight">גיא כהן</h1>
-          <p className="text-purple-200 mt-2 text-base">יועץ משכנתאות בכיר </p>
-          <p className="text-purple-200 mt-2 text-base">052-3684844   guycoh@outlook.co.il     </p>
+          <p className="text-white mt-2">יועץ משכנתאות בכיר </p>         
+            <span className="text-white mt-2 flex items-center space-x-2">
+              <span>052-3684844</span>
+              <Phone size={14} color="white" />            
+              <span>guycoh@outlook.co.il</span>
+              <EmailIcon size={14} color="white" />
+            </span>
+
+            <span className="text-white mt-2 flex items-center space-x-2">
+              <LocationIcon size={14} color="white" />    
+              <span>שד' דוד המלך 2 , לוד</span>
+              <LocationIcon size={14} color="white" />        
+              <span>הרצל 92, רמלה</span>
+          
+            </span>
+
+
 
           {/* Grid של כפתורי יצירת קשר */}
         {/* Grid של כפתורים: יצירת קשר + מחשבונים */}  
