@@ -7,6 +7,10 @@ import Calculator2 from "public/assets/images/svg/Calculator2";
 import Calculator3 from "public/assets/images/svg/Calculator3";
 import Calculator4 from "public/assets/images/svg/Calculator4";
 import Phone from "@/public/assets/images/svg/phone";
+import WebIcon from "@/public/assets/images/svg/webIcon";
+import WhatsappIcon from "@/public/assets/images/svg/whatsapp";
+import WazeIcon from "@/public/assets/images/svg/wazeIcon";
+
 
 export default function DigitalBusinessCard() {
   return (
@@ -85,25 +89,30 @@ export default function DigitalBusinessCard() {
         <div>
         <h2 className="text-xl font-semibold mb-4">יצירת קשר</h2>
         <div className="grid grid-cols-4 gap-4">
-            <a href="tel:0501234567" className="flex flex-col items-center hover:opacity-80 transition">
+            <a href="tel:0523684844" className="flex flex-col items-center hover:opacity-80 transition">
             {/* טלפון */}
             <Phone size={40} color="white" />
             <span className="text-sm">התקשר</span>
             </a>
-
-            <a href="https://wa.me/972501234567" target="_blank" className="flex flex-col items-center hover:opacity-80 transition">
+           
+            <a href="https://wa.me/972523684844" target="_blank" className="flex flex-col items-center hover:opacity-80 transition">
             {/* וואטסאפ */}
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-7 h-7 mb-1" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M.057 24l1.687-6.163a11.867 11.867 0 01-1.587-5.945C.157 5.318 5.478 0 12.078 0c3.181 0 6.167 1.24 8.413 3.488a11.822 11.822 0 013.493 8.41c-.003 6.6-5.385 11.922-11.985 11.922a11.9 11.9 0 01-5.688-1.448L.057 24z"/><path d="M17.472 14.382l-2.745-.789a.578.578 0 00-.541.15l-.79.811a9.554 9.554 0 01-4.455-4.453l.811-.791a.568.568 0 00.15-.54l-.79-2.745a.568.568 0 00-.528-.396h-.888c-.297 0-.56.133-.743.364a2.58 2.58 0 00-.45 1.519c0 1.48.863 3.07 2.56 4.768 1.695 1.694 3.284 2.558 4.767 2.558a2.59 2.59 0 001.52-.449c.23-.185.364-.447.364-.744v-.889a.566.566 0 00-.397-.528z"/>
-            </svg>
+            <WhatsappIcon size={40} color="white" />
             <span className="text-sm">וואטסאפ</span>
             </a>
 
             <a href="mailto:guycoh@outlook.co.il" className="flex flex-col items-center hover:opacity-80 transition">
             {/* מייל */}
-            <EmailIcon size={32} color="white" /> {/* סגול */}
+            <EmailIcon size={40} color="white" />
             <span className="text-sm">מייל</span>
             </a>
+            <a href="https://morg-orcin.vercel.app/muhni" className="flex flex-col items-center hover:opacity-80 transition">
+            {/* מייל */}
+            <WebIcon size={40} color="white" /> {/* סגול */}
+            <span className="text-sm">אתר</span>
+            </a>
+
+
 
             {/* אפשר להשאיר ריבוע ריק או כפתור נוסף בעתיד */}
             <div></div>
@@ -140,7 +149,43 @@ export default function DigitalBusinessCard() {
         </div>
 
         {/* Footer */}
-        <div className="bg-gray-800/60 text-xs text-center text-gray-400 py-3">
+        <div className="bg-white text-xs text-center text-gray-400 py-3">
+
+
+        <div className="grid grid-cols-4 gap-4 p-4">
+              <a
+                href="https://waze.com/ul?q=הרצל+92+רמלה&navigate=yes"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="col-span-1 flex flex-col items-center justify-center  p-4 hover:shadow-lg transition"
+              >
+                 < WazeIcon size={40} />
+         
+                <span className="text-center text-sm font-semibold">הרצל 92, רמלה</span>
+              </a>
+
+              <a
+                href="https://waze.com/ul?q=שדרות+דוד+המלך+2+לוד&navigate=yes"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="col-span-1 flex flex-col items-center justify-center border rounded-2xl p-4 shadow hover:shadow-lg transition"
+              >
+                <Calculator1 className="w-10 h-10 mb-2 text-blue-500" />
+                <span className="text-center text-sm font-semibold">שדרות דוד המלך 2, לוד</span>
+              </a>
+
+              </div>
+
+
+
+
+
+
+
+
+
+
+
           כל הזכויות שמורות © {new Date().getFullYear()}
         </div>
       </div>
