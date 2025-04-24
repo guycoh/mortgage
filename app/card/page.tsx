@@ -43,14 +43,7 @@ export default function DigitalBusinessCard() {
         {/* Header לבן עם לוגו ותמונה */}
         <div className="relative h-52 bg-white w-full">
         
-        <button className="bg-main absolute top-8 right-6 text-white font-semibold px-6 py-3 rounded-2xl shadow-lg hover:bg-blue-900 transition duration-300 ease-in-out">
-           קבע פגישה
-           <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-           <path d="M8 7V3m8 4V3m-9 4h10a2 2 0 012 2v11a2 2 0 01-2 2H7a2 2 0 01-2-2V9a2 2 0 012-2z" />
-           </svg>
         
-        </button>
-
         
           <div className="absolute top-4 left-4 w-56 h-auto">
             <Image
@@ -76,9 +69,8 @@ export default function DigitalBusinessCard() {
 
         {/* בטן הכרטיס — גרדיאנט סגול עם הצללה פנימית */}
         <div className="relative bg-gradient-to-br from-purple-700 via-purple-600 to-purple-800 shadow-inner shadow-black/30 text-white flex flex-col items-center p-6">
-                        <button className="absolute text-xs top-4 right-4 w-24 h-24 bg-white text-purple-600 rounded-full flex flex-col items-center justify-center gap-1 shadow-md hover:shadow-lg transition">
-                  {/* אייקון */}
-                  <svg
+                <Link href="/muhni/schedule" className="absolute text-xs top-4 right-4 w-24 h-24 bg-white text-purple-600 rounded-full flex flex-col items-center justify-center gap-1 shadow-md hover:shadow-lg transition">
+                <svg
                     xmlns="http://www.w3.org/2000/svg"
                     className="h-5 w-5"
                     fill="none"
@@ -89,8 +81,12 @@ export default function DigitalBusinessCard() {
                     <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 4h10M5 11h14M5 19h14M5 15h14" />
                   </svg>
                   קבע פגישה
-                </button>
-         
+                </Link>
+
+               
+               
+                
+
           {/* שם ותפקיד */}
           <h1 className="mt-20 text-3xl font-bold tracking-tight">גיא כהן</h1>
           <p className="text-white mt-2">יועץ משכנתאות בכיר </p>         

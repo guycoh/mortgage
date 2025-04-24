@@ -11,7 +11,7 @@ export const Nav = ({ onOpenMenu, isMenuOpen }: { onOpenMenu: () => void, isMenu
        {/* פס עליון */}
         <section className="py-2 bg-main text-white px-10 flex justify-center items-center">
           <p className="text-sm text-center">
-            <strong className="mx-3">גיא כהן - יועץ המשכנתא שלך</strong>
+            <strong className="mx-3">גיא כהן - יועץ המשכנתא שלך 052-3684844</strong>
           </p>
         </section>
 

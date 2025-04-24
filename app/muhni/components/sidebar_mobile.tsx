@@ -48,7 +48,7 @@ export default function SideMenu({ triggerButton }: { triggerButton: (onClick: (
               <Link
                 href={href}
                 onClick={() => setIsOpen(false)}
-                className="block text-[#1d75a1] hover:text-[#007bff] font-bold text-[20px]"
+                className="block text-gray-500 hover:text-[#007bff] font-bold text-[20px]"
               >
                 {text}
               </Link>
@@ -86,22 +86,7 @@ export default function SideMenu({ triggerButton }: { triggerButton: (onClick: (
                 הרשמה
               </Link>
             </li>
-            <li >
-              <Link
-                href="/private/crm"                
-                className="block text-[#1d75a1] hover:text-[#007bff] font-bold text-[20px]"              >
-                 CRM
-              </Link>
-            </li>
-
-            <li >
-              <Link
-                href="/private/admin/dashboard"                
-                className="block text-[#1d75a1] hover:text-[#007bff] font-bold text-[20px]"              >
-                DASHBOARD
-              </Link>
-            </li>
-
+            
 
 
 
