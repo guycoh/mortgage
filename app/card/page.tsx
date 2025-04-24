@@ -1,6 +1,13 @@
 import Image from "next/image";
 import Link from "next/link";
 
+import EmailIcon from "public/assets/images/svg/EmailIcon";
+import Calculator1 from "public/assets/images/svg/Calculator1";
+import Calculator2 from "public/assets/images/svg/Calculator2";
+import Calculator3 from "public/assets/images/svg/Calculator3";
+import Calculator4 from "public/assets/images/svg/Calculator4";
+import Phone from "@/public/assets/images/svg/phone";
+
 export default function DigitalBusinessCard() {
   return (
     <div className="w-full min-h-screen bg-gradient-to-br from-purple-700 to-gray-900 text-white grid md:grid-cols-2">
@@ -67,7 +74,8 @@ export default function DigitalBusinessCard() {
         <div className="bg-gradient-to-br from-purple-700 via-purple-600 to-purple-800 shadow-inner shadow-black/30 text-white flex flex-col items-center p-6">
           {/* שם ותפקיד */}
           <h1 className="mt-20 text-3xl font-bold tracking-tight">גיא כהן</h1>
-          <p className="text-purple-200 mt-2 text-base">יועץ משכנתאות בכיר 💼</p>
+          <p className="text-purple-200 mt-2 text-base">יועץ משכנתאות בכיר </p>
+          <p className="text-purple-200 mt-2 text-base">052-3684844   guycoh@outlook.co.il     </p>
 
           {/* Grid של כפתורי יצירת קשר */}
         {/* Grid של כפתורים: יצירת קשר + מחשבונים */}  
@@ -79,9 +87,7 @@ export default function DigitalBusinessCard() {
         <div className="grid grid-cols-4 gap-4">
             <a href="tel:0501234567" className="flex flex-col items-center hover:opacity-80 transition">
             {/* טלפון */}
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-7 h-7 mb-1" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M6.62 10.79a15.05 15.05 0 006.59 6.59l2.2-2.2a1 1 0 011.05-.24 11.36 11.36 0 003.55.57 1 1 0 011 1v3.61a1 1 0 01-.91 1A19 19 0 015 5.91a1 1 0 011-0.91h3.61a1 1 0 011 1 11.36 11.36 0 00.57 3.55 1 1 0 01-.24 1.05z"/>
-            </svg>
+            <Phone size={40} color="white" />
             <span className="text-sm">התקשר</span>
             </a>
 
@@ -93,11 +99,9 @@ export default function DigitalBusinessCard() {
             <span className="text-sm">וואטסאפ</span>
             </a>
 
-            <a href="mailto:email@example.com" className="flex flex-col items-center hover:opacity-80 transition">
+            <a href="mailto:guycoh@outlook.co.il" className="flex flex-col items-center hover:opacity-80 transition">
             {/* מייל */}
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-7 h-7 mb-1" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
-            </svg>
+            <EmailIcon size={32} color="white" /> {/* סגול */}
             <span className="text-sm">מייל</span>
             </a>
 
@@ -110,31 +114,23 @@ export default function DigitalBusinessCard() {
         <div>
         <h2 className="text-xl font-semibold mb-4">מחשבוני משכנתא</h2>
         <div className="grid grid-cols-4 gap-4">
-            <Link href="/mortgage-calculator" className="flex flex-col items-center hover:opacity-80 transition">
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 mb-1" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M19 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V5a2 2 0 00-2-2zm-2 14H7v-2h10v2zm0-4H7v-2h10v2zm0-4H7V7h10v2z"/>
-            </svg>
-            <span className="text-sm text-center">מחשבון משכנתא</span>
+            <Link href="/home/calculators/simple_calculator" className="flex flex-col items-center hover:opacity-80 transition">
+              <Calculator1 size={40} color="white" />
+            <span className="text-sm text-center">מחשבון הלוואה</span>
             </Link>
 
-            <Link href="/eligibility-calculator" className="flex flex-col items-center hover:opacity-80 transition">
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 mb-1" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 2a10 10 0 100 20 10 10 0 000-20zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
-            </svg>
-            <span className="text-sm text-center">מחשבון זכאות</span>
+            <Link href="/home/calculators/mortgage_capability" className="flex flex-col items-center hover:opacity-80 transition">
+              <Calculator2 size={40} color="white" />
+            <span className="text-sm text-center">כמה משכנתא אוכל לקחת?</span>
             </Link>
 
-            <Link href="/amortization-schedule" className="flex flex-col items-center hover:opacity-80 transition">
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 mb-1" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zm0-8h14V7H7v2z"/>
-            </svg>
-            <span className="text-sm text-center">לוח סילוקין</span>
+            <Link href="/home/calculators/purchase_tax_calculator" className="flex flex-col items-center hover:opacity-80 transition">
+              <Calculator3 size={40} color="white" />
+            <span className="text-sm text-center">מס רכישה</span>
             </Link>
-
-            <Link href="/monthly-payment-calculator" className="flex flex-col items-center hover:opacity-80 transition">
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 mb-1" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M19 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V5a2 2 0 00-2-2zm0 16H5V5h14v14zM7 7h10v2H7V7zm0 4h10v2H7v-2zm0-8h2v2H7V3z"/>
-            </svg>
+          
+            <Link href="/home/calculators/purchase_tax_calculator" className="flex flex-col items-center hover:opacity-80 transition">
+            <Calculator4 size={40} color="white" />
             <span className="text-sm text-center">החזר חודשי</span>
             </Link>
         </div>

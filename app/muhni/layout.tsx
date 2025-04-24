@@ -9,7 +9,7 @@ import SideMenu from "./components/sidebar_mobile";
         <Nav onOpenMenu={onClick} isMenuOpen={isOpen} />
       )}
     />
-export default function HomeLayout({
+export default function MuhniLayout({
   children,
 
 
