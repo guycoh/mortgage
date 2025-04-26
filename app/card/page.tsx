@@ -16,40 +16,11 @@ export default function DigitalBusinessCard() {
   return (
     <div className="w-full min-h-screen bg-gradient-to-br text-white grid md:grid-cols-2">
      {/* —— צד שמאל (ברכת הבית) —— */}
-<div className="hidden md:flex flex-col justify-center items-center bg-white p-10 order-1 md:order-2 shadow-2xl rounded-3xl border border-gray-200">
-  <h2 className="text-3xl font-bold mb-6 text-gray-900">
-    ברוך הבא הביתה 💜
-  </h2>
-  <p className="text-gray-700 text-lg leading-relaxed text-center max-w-md font-medium relative">
-    <span className="block mb-4 text-purple-700 font-semibold text-xl">
-      ברכת הבית 🕊
-    </span>
-
-  </p>
+<div className="hidden md:flex flex-col justify-center items-center bg-white p-10 order-1 md:order-2 shadow-2xl  ">
+  
  
-    <div className="min-h-screen bg-gradient-to-br from-amber-100 to-yellow-200 flex items-center justify-center p-6">
-      <div className="max-w-2xl bg-white rounded-3xl shadow-2xl p-10 border-4 border-yellow-400 relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-full bg-[url('/pattern.png')] opacity-5 pointer-events-none" />
-        <h1 className="text-4xl font-extrabold text-yellow-700 text-center mb-6 tracking-wide">
-          ברכת הבית
-        </h1>
-        <ul className="text-right space-y-4 text-lg font-medium text-gray-700 leading-relaxed rtl">
-          <li>בבית זה לא תשרור מריבה</li>
-          <li>בבית זה תהיה ברכה ושלום</li>
-          <li>בבית זה תשרה שכינה</li>
-          <li>בבית זה לא תישמע תלונה</li>
-          <li>בבית זה תהיה שמחה</li>
-          <li>בבית זה ישרה אור</li>
-          <li>בבית זה תהיה אהבה</li>
-          <li>בבית זה תתקיים פרנסה טובה</li>
-          <li>בבית זה ישרור שקט ושלווה</li>
-          <li>בבית זה יגורו אורך ימים ושנים</li>
-          <li>בבית זה יתקיימו כל משאלות הלב לטובה</li>
-        </ul>
-        <p className="mt-8 text-center text-yellow-800 text-xl font-semibold">אמן כן יהי רצון</p>
-      </div>
-    </div>
  
+   
     <div
       className="min-h-screen bg-center bg-cover flex items-center justify-center p-6"
       style={{
@@ -62,7 +33,7 @@ export default function DigitalBusinessCard() {
         backgroundImage: "url('/silver-glitter.jpg')", // תמונה מלאה של נצנצים
       }}
     >
-      <div className="text-gray-800 text-center max-w-3xl space-y-6 bg-white/70 p-10 rounded-2xl shadow-lg backdrop-blur-sm">
+      <div className="text-gray-800 text-center max-w-3xl space-y-6 bg-[#C0C0C0] p-10 rounded-2xl shadow-lg backdrop-blur-sm">
         <h1 className="text-5xl font-extrabold">ברכת הבית</h1>
         <ul className="rtl text-right text-xl font-medium space-y-3 leading-relaxed">
           <li>בבית זה לא תשרור מריבה</li>
@@ -232,37 +203,38 @@ export default function DigitalBusinessCard() {
         </div>
 
         {/* Footer */}
-        <div className="bg-white text-xs text-center text-gray-400 ">
-
-
-        <div className="grid grid-cols-4 gap-4 ">
-              <div className="relative col-span-1 flex flex-col items-center justify-center border rounded-2xl p-4 shadow hover:shadow-lg transition">
+        <div className="bg-white text-xs text-center text-gray-400 p-6">
+          <div className="grid grid-cols-2 gap-6 mb-4">
+            <div className="flex flex-col items-center justify-center border rounded-2xl p-6 shadow hover:shadow-lg transition">
               <a
                 href="https://waze.com/ul?q=הרצל+92+רמלה&navigate=yes"
                 target="_blank"
                 rel="noopener noreferrer"
-              
+                className="flex flex-col items-center space-y-4"
               >
-                 < WazeIcon size={60} className="absolute top-1" />
-         
+                <WazeIcon size={60} />
                 <span className="text-center text-sm font-semibold">הרצל 92, רמלה</span>
               </a>
-              </div>
-              <div className="relative col-span-1 flex flex-col items-center justify-center border rounded-2xl p-4 shadow hover:shadow-lg transition ">
+            </div>
+            <div className="flex flex-col items-center justify-center border rounded-2xl p-6 shadow hover:shadow-lg transition">
               <a
                 href="https://waze.com/ul?q=שדרות+דוד+המלך+2+לוד&navigate=yes"
                 target="_blank"
                 rel="noopener noreferrer"
-                
+                className="flex flex-col items-center space-y-4"
               >
-                 < WazeIcon size={60}className="absolute top-1"   />
-                <span className=" text-center text-sm font-semibold">שדרות דוד המלך 2, לוד</span>
+                <WazeIcon size={60} />
+                <span className="text-center text-sm font-semibold">שדרות דוד המלך 2, לוד</span>
               </a>
-              </div>
-              </div>
+            </div>
+          </div>
 
-          כל הזכויות שמורות © {new Date().getFullYear()}
-        </div>
+  <div className="text-gray-400 text-xs">
+    כל הזכויות שמורות © {new Date().getFullYear()}
+  </div>
+</div>
+
+
       </div>
     </div>
   );
