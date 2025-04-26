@@ -20,12 +20,12 @@ const defaultUrl = process.env.VERCEL_URL
 
 export const metadata = {
   metadataBase: new URL(defaultUrl),
-  title: "מורגי-משכנתא",
+  title: "משכנתא",
   description: "The fastest way to build apps with Next.js and Supabase",
   icons: {
-    icon: '/assets/myLogo.svg',
+    icon: '/assets/images/svg/muhni_logo.svg',
   },
-
+ 
 };
 
 const geistSans = Geist({
