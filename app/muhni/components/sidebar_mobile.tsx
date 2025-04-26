@@ -38,11 +38,11 @@ export default function SideMenu({ triggerButton }: { triggerButton: (onClick: (
         {/* קישורים */}
         <ul className="space-y-4 mt-12 text-right">
           {[
-            ['בית', '/home'],
-            ['אודות', '/home/about'],
-            ['מחשבונים', '/home/calculators'],
-            ['מושגים במשכנתא', '/home/concepts'],
-            ['צור קשר', '/home/contact'],
+            ['בית', '/muhni'],
+            ['אודות', '/muhni/about'],
+            ['מחשבונים', '/muhni/calculators'],
+            ['מושגים במשכנתא', '/muhni/concepts'],
+            ['צור קשר', '/muhni/contact'],
           ].map(([text, href]) => (
             <li key={href}>
               <Link
@@ -60,7 +60,7 @@ export default function SideMenu({ triggerButton }: { triggerButton: (onClick: (
 
             <li >
                   <Link
-                    href="/home/schedule"                
+                    href="/muhni/schedule"                
                     className="block text-[#1d75a1] hover:text-[#007bff] font-bold text-[20px]"             
                     onClick={() => setIsOpen(false)}
                     >
