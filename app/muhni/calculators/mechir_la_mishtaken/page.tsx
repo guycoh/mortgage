@@ -40,6 +40,14 @@ const PriceGrantSimulator = () => {
   const [hasGrant, setHasGrant] = useState(false);
   const [selected, setSelected] = useState<{ name: string; grant: number } | null>(null);
  
+  const [monthlyIncome, setMonthlyIncome] = useState<number | ''>('');
+  const [interestRate, setInterestRate] = useState<number>(5);
+  const [loanMonths, setLoanMonths] = useState<number | ''>(360);
+  const [ownEquity, setOwnEquity] = useState<number | ''>('');
+
+
+
+
 
   const minimumEquityThreshold = hasGrant ? 60000 : 100000;
 
@@ -59,7 +67,8 @@ const PriceGrantSimulator = () => {
     const grantAmount = hasGrant && selected ? selected.grant : 0;
 
     const clientFundingAfterGrant = clientFundingBeforeGrant - grantAmount;
-
+    const requestedMortgage = contractPrice && ownEquity !== '' ? Number(contractPrice) - Number(ownEquity) : '';
+  
     
     const safeContractPrice = typeof contractPrice === 'number' ? contractPrice : 0;
  
@@ -70,6 +79,19 @@ const PriceGrantSimulator = () => {
    //  const minimumEquity = Math.max(minEquityCeiling, clientFundingAfterGrant);
    
    const maxMortgage = safeContractPrice - minimumEquity;
+  // פונקציה לחישוב תשלום חודשי
+    function calculateMonthlyPayment(
+      loanAmount: number,
+      annualInterestRate: number,
+      totalMonths: number
+    ): number {
+      if (loanAmount <= 0 || annualInterestRate <= 0 || totalMonths <= 0) return 0;
+
+      const monthlyRate = Math.pow(1 + annualInterestRate / 100, 1 / 12) - 1; // ריבית חודשית מחושבת בחזקה
+      const numerator = monthlyRate * Math.pow(1 + monthlyRate, totalMonths);
+      const denominator = Math.pow(1 + monthlyRate, totalMonths) - 1;
+      return loanAmount * (numerator / denominator);
+    }
 
  
   const formatNumber = (value: number | '') => {
@@ -190,18 +212,110 @@ const PriceGrantSimulator = () => {
           </div>
         </div>
       )}
-      {/* נתוני עזר - מציג רק מינימום הון עצמי ומשכנתא מקסימלית */}
-      {numericContractPrice !== 0 && numericPropertyValue !== 0 && (
-        <div className="bg-green-50 border border-green-200 p-4 rounded-xl mt-4">
-          <h3 className="text-green-700 font-semibold text-sm mb-2 text-right">
-            נתוני עזר
-          </h3>
-          <ul className="space-y-1 text-green-700 text-xs font-medium text-right">
-            <li>מינימום הון עצמי: {minimumEquity.toLocaleString()} ₪</li>
-            <li>משכנתא מקסימלית: {maxMortgage.toLocaleString()} ₪</li>
-          </ul>
-        </div>
-      )}
+
+        {/* נתוני עזר - מציג רק מינימום הון עצמי ומשכנתא מקסימלית */}
+        {numericContractPrice !== 0 && numericPropertyValue !== 0 && (
+          <div>
+            <div className="bg-green-50 border border-green-200 p-4 rounded-xl mt-4">
+              <h3 className="text-green-700 font-semibold text-sm mb-2 text-right">
+                נתוני עזר
+              </h3>
+              <ul className="space-y-1 text-green-700 text-xs font-medium text-right">
+                <li>מינימום הון עצמי: {minimumEquity.toLocaleString()} ₪</li>
+                <li>משכנתא מקסימלית: {maxMortgage.toLocaleString()} ₪</li>
+              </ul>
+            </div>
+
+            {/* מעבר ליכולת החזר */}
+            <div className="mt-8 text-right">
+              <p className="text-2xl font-bold text-orange-500 mb-6 animate-pulse">
+                ועכשיו נעבור ליכולת החזר 🔥
+              </p>
+
+              {/* שדה הכנסה חודשית */}
+              <div className="mb-4">
+                <label className="block mb-1 text-sm font-medium text-gray-700">הכנסה חודשית</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={formatNumber(monthlyIncome)}
+                  onChange={(e) => setMonthlyIncome(parseInput(e.target.value))}
+                  placeholder="₪ 0"
+                  className="w-full p-3 border rounded-xl text-right focus:outline-none focus:ring-2 focus:ring-orange-400 transition"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                {/* שדה הון עצמי */}
+                <div>
+                  <label className="block mb-1 text-sm font-medium text-gray-700">הון עצמי</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={formatNumber(ownEquity)}
+                    onChange={(e) => setOwnEquity(parseInput(e.target.value))}
+                    placeholder="₪ 0"
+                    className={`w-full p-3 border rounded-xl text-right focus:outline-none focus:ring-2 transition ${
+                      ownEquity !== '' && ownEquity < minimumEquity ? 'border-red-500 focus:ring-red-400' : 'focus:ring-orange-400'
+                    }`}
+                  />
+                  {/* הודעת שגיאה אם הון עצמי קטן מהמינימום */}
+                  {ownEquity !== '' && ownEquity < minimumEquity && (
+                    <div className="text-red-600 text-xs font-medium mt-1 animate-pulse text-right">
+                      הון עצמי חייב להיות גדול או שווה ל־{minimumEquity.toLocaleString()} ₪
+                    </div>
+                  )}
+                </div>
+
+                {/* שדה משכנתא מבוקשת */}
+                <div>
+                  <label className="block mb-1 text-sm font-medium text-gray-700">משכנתא מבוקשת</label>
+                  <input
+                    type="text"
+                    readOnly
+                    value={contractPrice && ownEquity !== '' ? formatNumber(contractPrice - ownEquity) : ''}
+                    placeholder="₪ 0"
+                    className="w-full p-3 border rounded-xl text-right bg-gray-100 text-gray-700 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* שדות ריבית לתחשיב וחודשי הלוואה בשורה אחת */}
+              <div className="grid grid-cols-2 gap-4">
+                {/* ריבית לתחשיב */}
+                <div>
+                  <label className="block mb-1 text-sm font-medium text-gray-700">ריבית לתחשיב (%)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={interestRate}
+                    onChange={(e) => setInterestRate(parseFloat(e.target.value))}
+                    placeholder="5.00"
+                    className="w-full p-3 border rounded-xl text-right focus:outline-none focus:ring-2 focus:ring-orange-400 transition"
+                  />
+                </div>
+
+                {/* חודשי הלוואה */}
+                <div>
+                  <label className="block mb-1 text-sm font-medium text-gray-700">מספר חודשי הלוואה</label>
+                  <input
+                    type="number"
+                    value={loanMonths}
+                    onChange={(e) => setLoanMonths(Number(e.target.value))}
+                    placeholder="360"
+                    className="w-full p-3 border rounded-xl text-right focus:outline-none focus:ring-2 focus:ring-orange-400 transition"                
+                  />
+
+
+
+
+                  
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
 
 
   
@@ -272,146 +386,3 @@ export default PriceGrantSimulator;
 
 
 
-
-
-
-
-// "use client"
-
-// import React, { useState } from "react";
-
-// const MortgageForm = () => {
-//   const [propertyValue, setPropertyValue] = useState(""); // שווי דירה
-//   const [contractAmount, setContractAmount] = useState(""); // סכום חתימת חוזה
-//   const [errorMessage, setErrorMessage] = useState(""); // הודעת שגיאה
-
-//   const MAX_PROPERTY_VALUE = 1800000; // תקרת שווי נכס לחישוב
-
-//   פונקציה להסרת מפרידי אלפים
-//   const removeSeparators = (value: string) => value.replace(/,/g, "");
-
-//   פונקציה להוספת מפרידי אלפים
-//   const formatWithSeparators = (value: string | number) =>
-//     Number(value).toLocaleString("he-IL");
-
-//   חישוב תקרת נכס קובעת
-//   const calculateDecidingPropertyCap = () => {
-//     const numericPropertyValue = Number(removeSeparators(propertyValue)) || 0;
-//     const numericContractAmount = Number(removeSeparators(contractAmount)) || 0;
-
-//     if (numericPropertyValue < MAX_PROPERTY_VALUE) {
-//       אם שווי הדירה קטן מ-1,800,000
-//       return Math.max(
-//         numericPropertyValue,
-//         numericContractAmount,
-//         MAX_PROPERTY_VALUE
-//       );
-//     } else {
-//       אם שווי הדירה גדול או שווה ל-1,800,000
-//       return Math.max(MAX_PROPERTY_VALUE, numericContractAmount);
-//     }
-//   };
-
-//   const decidingPropertyCap = calculateDecidingPropertyCap();
-
-//   עדכון שווי הדירה
-//   const handlePropertyValueChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-//     const rawValue = removeSeparators(e.target.value);
-//     if (!isNaN(Number(rawValue))) {
-//       setPropertyValue(formatWithSeparators(rawValue));
-//       setErrorMessage(""); // מנקה שגיאות במידת הצורך
-//     }
-//   };
-
-//   עדכון סכום חתימת חוזה
-//   const handleContractAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-//     const rawValue = removeSeparators(e.target.value);
-//     if (!isNaN(Number(rawValue))) {
-//       const numericPropertyValue = Number(removeSeparators(propertyValue));
-//       const numericContractAmount = Number(rawValue);
-
-//       if (numericContractAmount > numericPropertyValue) {
-//         setErrorMessage(
-//           "שגיאה: סכום חתימת החוזה לא יכול להיות גבוה משווי הדירה! השדה אופס."
-//         );
-//         setContractAmount(""); // איפוס סכום חתימת החוזה
-//       } else {
-//         setContractAmount(formatWithSeparators(rawValue));
-//         setErrorMessage(""); // ניקוי שגיאות
-//       }
-//     }
-//   };
-
-//   return (
-//     <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-//       <div className="bg-white shadow-md rounded-lg p-6 max-w-lg w-full">
-//         <h1 className="text-2xl font-bold text-blue-600 mb-4">
-//           טופס משכנתא - שווי דירה וסכום חתימת חוזה
-//         </h1>
-
-//         {/* שווי דירה */}
-//         <div className="mb-4">
-//           <label
-//             htmlFor="propertyValue"
-//             className="block text-gray-700 font-medium mb-2"
-//           >
-//             שווי דירה (₪):
-//           </label>
-//           <input
-//             type="text"
-//             id="propertyValue"
-//             className="w-full border rounded px-3 py-2"
-//             placeholder="הזן את שווי הדירה"
-//             value={propertyValue}
-//             onChange={handlePropertyValueChange}
-//           />
-//           <p className="text-sm text-gray-500 mt-1">
-//             תקרת שווי נכס לחישוב: {formatWithSeparators(MAX_PROPERTY_VALUE)} ₪
-//           </p>
-//         </div>
-
-//         {/* סכום חתימת חוזה */}
-//         <div className="mb-4">
-//           <label
-//             htmlFor="contractAmount"
-//             className="block text-gray-700 font-medium mb-2"
-//           >
-//             סכום חתימת חוזה (₪):
-//           </label>
-//           <input
-//             type="text"
-//             id="contractAmount"
-//             className="w-full border rounded px-3 py-2"
-//             placeholder="הזן את סכום חתימת החוזה"
-//             value={contractAmount}
-//             onChange={handleContractAmountChange}
-//           />
-//         </div>
-
-//         {/* תקרת נכס קובעת */}
-//         <div className="mb-4">
-//           <label
-//             htmlFor="decidingPropertyCap"
-//             className="block text-gray-700 font-medium mb-2"
-//           >
-//             תקרת נכס קובעת (₪):
-//           </label>
-//           <input
-//             type="text"
-//             id="decidingPropertyCap"
-//             className="w-full border rounded px-3 py-2 bg-gray-100"
-//             value={formatWithSeparators(decidingPropertyCap)}
-//             readOnly
-//           />
-//         </div>
-
-//         {/* הודעת שגיאה */}
-//         {errorMessage && (
-//           <div className="mt-4 text-red-500 font-medium">{errorMessage}</div>
-//         )}
-//       </div>
-//     </div>
-//   );
-// };
-
-// export default MortgageForm;

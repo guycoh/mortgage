@@ -206,22 +206,22 @@ export default function DigitalBusinessCard() {
         <div>
         <h2 className="text-xl font-semibold mb-4">מחשבוני משכנתא</h2>
         <div className="grid grid-cols-4 gap-4">
-            <Link href="/home/calculators/simple_calculator" className="flex flex-col items-center hover:opacity-80 transition">
+            <Link href="/muhni/calculators/simple_calculator" className="flex flex-col items-center hover:opacity-80 transition">
               <Calculator1 size={40} color="white" />
             <span className="text-sm text-center">מחשבון הלוואה</span>
             </Link>
 
-            <Link href="/home/calculators/mortgage_capability" className="flex flex-col items-center hover:opacity-80 transition">
+            <Link href="/muhni/calculators/mortgage_capability" className="flex flex-col items-center hover:opacity-80 transition">
               <Calculator2 size={40} color="white" />
             <span className="text-sm text-center">כמה משכנתא אוכל לקחת?</span>
             </Link>
 
-            <Link href="/home/calculators/purchase_tax_calculator" className="flex flex-col items-center hover:opacity-80 transition">
+            <Link href="/muhni/calculators/purchase_tax_calculator" className="flex flex-col items-center hover:opacity-80 transition">
               <Calculator3 size={40} color="white" />
             <span className="text-sm text-center">מס רכישה</span>
             </Link>
           
-            <Link href="/home/calculators/purchase_tax_calculator" className="flex flex-col items-center hover:opacity-80 transition">
+            <Link href="/muhni/calculators/purchase_tax_calculator" className="flex flex-col items-center hover:opacity-80 transition">
             <Calculator4 size={40} color="white" />
             <span className="text-sm text-center">החזר חודשי</span>
             </Link>

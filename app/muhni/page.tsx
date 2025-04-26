@@ -19,7 +19,7 @@ export default function MortgageCategories() {
       <h1 className="text-2xl font-bold mb-4 text-center">
         איזה משכנתא מתאימה לי? &nbsp;
         <Link
-          href={`/home/guide`}
+          href={`/muhni/guide`}
           className="text-blue-400 underline hover:text-blue-600 transition-colors"
         >
           למדריך המשכנתא
@@ -45,8 +45,8 @@ export default function MortgageCategories() {
               />
             </div>
 
-            <Link href={`/home/${category.link}`} className="w-full">
-              <div className="mt-auto bg-[#1d75a1] hover:bg-[#a39d8f] text-[#e5e4e3] font-bold py-2 px-4 rounded-full text-center transition-colors w-full">
+            <Link href={`/muhni/${category.link}`} className="w-full">
+              <div className="mt-auto bg-main hover:bg-[#a39d8f] text-[#e5e4e3] font-bold py-2 px-4 rounded-full text-center transition-colors w-full">
                 למידע נוסף
               </div>
             </Link>
