@@ -22,7 +22,8 @@ const config = {
         //צבעים שנקרא להם ב css
         main:'#7e22ce', // למשל כחול כהה
         second: '#F59E0B', // למשל כתום
-        
+        footer: '#f7adff', // למשל כתום
+     
         
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",

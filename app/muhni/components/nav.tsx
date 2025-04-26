@@ -50,7 +50,7 @@ export const Nav = ({ onOpenMenu, isMenuOpen }: { onOpenMenu: () => void, isMenu
             <ul className="flex gap-x-6">
               <li><Link href="/home" className="text-main font-bold text-[15px]">בית</Link></li>
               <li><Link href="/home/about" className="text-main font-bold text-[15px]">אודות</Link></li>
-              <li><Link href="/home/calculators" className="text-main font-bold text-[15px]">מחשבונים</Link></li>
+              <li><Link href="/muhni/calculators" className="text-main font-bold text-[15px]">מחשבונים</Link></li>
               <li><Link href="/home/concepts" className="text-main font-bold text-[15px]">מושגים במשכנתא</Link></li>
               <li><Link href="/home/contact" className="text-main font-bold text-[15px]">צור קשר</Link></li>
               <li>
