@@ -135,7 +135,7 @@ export default function DigitalBusinessCard() {
 
           {/* Grid של כפתורי יצירת קשר */}
         {/* Grid של כפתורים: יצירת קשר + מחשבונים */}  
-<div className="mt-6 w-full flex flex-col gap-10">
+<div className="mt-6 w-full flex flex-col gap-4">
 
         {/* — יצירת קשר — */}
         <div>
@@ -201,9 +201,9 @@ export default function DigitalBusinessCard() {
         </div>
 
         {/* Footer */}
-        <div className="bg-white text-xs text-center text-gray-400 p-6">
+        <div className="bg-gradient-to-br from-purple-700 via-purple-600 to-purple-800 text-xs text-center text-gray-400 p-6">
           <div className="grid grid-cols-2 gap-6 mb-4">
-            <div className="flex flex-col items-center justify-center border rounded-2xl p-6 shadow hover:shadow-lg transition">
+            <div className=" bg-white flex flex-col items-center justify-center border rounded-2xl p-6 shadow hover:shadow-lg transition">
               <a
                 href="https://waze.com/ul?q=הרצל+92+רמלה&navigate=yes"
                 target="_blank"
