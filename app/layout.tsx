@@ -24,12 +24,12 @@ export const metadata = {
   description: "משכנתאות",
   url: "https://morg-orcin.vercel.app/card",
   icons: {
-    icon: '/assets/images/svg/muhni_logo.svg',
+    icon: 'public/assets/images/svg/muhni_logo.svg',
   },
   //נוסף להציג תמונה בשליחה
   images: [
     {
-      url: "https://morg-orcin.vercel.app/assets/images/imgFiles/my_image.jpg", // כאן התמונה שתרצה שתוצג
+      url: "/assets/images/imgFiles/my_image.jpg", // כאן התמונה שתרצה שתוצג
       width: 1200,
       height: 630,
       alt: "תיאור אלטרנטיבי של התמונה",

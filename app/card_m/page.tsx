@@ -35,8 +35,7 @@ export default function CardPage() {
 
       <DigitalBusinessCard/>
       {/* כאן הקומפוננטה של הכרטיס שלך */}
-  
-      {/* ועוד תוכן */}
+      
     </main>
   );
 }
