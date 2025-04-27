@@ -3,8 +3,8 @@ import DigitalBusinessCardM from "./DigitalBusinessCard";
 
 
 export const metadata = {
-  title: "הכרטיס שלי - משה מוסיוב",
-  description: "הכרטיס הדיגיטלי של משה מוסיוב - משרדים בעפולה ",
+  title: "גיא כהן-יועץ משכנתא",
+  description: "הכרטיס הדיגיטלי של גיא כהן - משרדים בעפולה ",
   openGraph: {
     title: "הכרטיס שלי ",
     description: "לחצו כאן לנווט אלינו! הרב נחום לוין 7 עפולה .",
@@ -12,10 +12,10 @@ export const metadata = {
     siteName: "muhni",
     images: [
       {
-        url: "https://yourwebsite.com/images/card-preview.jpg", // לינק מלא לתמונה
+        url: "https://morg-orcin.vercel.app/public/assets/images/imgFiles/my_image.jpg", // לינק מלא לתמונה
         width: 1200,
         height: 630,
-        alt: "מורגי - משרדים בלוד וברמלה",
+        alt: "MUHNI - משרדים בלוד וברמלה",
       },
     ],
     locale: "he_IL",
