@@ -211,20 +211,10 @@ export default function DigitalBusinessCard() {
                 className="flex flex-col items-center space-y-4"
               >
                 <WazeIcon size={60} />
-                <span className="text-center text-sm font-semibold">הרצל 92, רמלה</span>
+                <span className="text-center text-sm font-semibold">הרב נחום לוין 7, עפולה</span>
               </a>
             </div>
-            <div className="flex flex-col items-center justify-center border rounded-2xl p-6 shadow hover:shadow-lg transition">
-              <a
-                href="https://waze.com/ul?q=שדרות+דוד+המלך+2+לוד&navigate=yes"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex flex-col items-center space-y-4"
-              >
-                <WazeIcon size={60} />
-                <span className="text-center text-sm font-semibold">שדרות דוד המלך 2, לוד</span>
-              </a>
-            </div>
+           
           </div>
 
   <div className="text-gray-400 text-xs">

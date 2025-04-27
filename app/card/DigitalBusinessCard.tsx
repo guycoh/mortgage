@@ -12,7 +12,7 @@ import WhatsappIcon from "@/public/assets/images/svg/whatsapp";
 import WazeIcon from "@/public/assets/images/svg/waze";
 import LocationIcon from "@/public/assets/images/svg/location";
 
-export default function DigitalBusinessCardM() {
+export default function DigitalBusinessCard() {
   return (
     <div className="w-full min-h-screen bg-gradient-to-br text-white grid md:grid-cols-2">
      {/* —— צד שמאל (ברכת הבית) —— */}
