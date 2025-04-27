@@ -12,7 +12,7 @@ export const metadata = {
     siteName: "muhni",
     images: [
       {
-        url: "https://morg-orcin.vercel.app/public/assets/images/imgFiles/my_image.jpg", // לינק מלא לתמונה
+        url: "https://morg-orcin.vercel.app/assets/images/imgFiles/my_image.jpg", // לינק מלא לתמונה
         width: 1200,
         height: 630,
         alt: "MUHNI - משרדים בלוד וברמלה",
@@ -23,7 +23,7 @@ export const metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "הכרטיס שלי",
+    title: "הכרטיס של גיא כהן - יועץ משכנתא MUHNI",
     description: "בקרו אותנו והתחילו דרך חדשה עם משכנתא חכמה!",
     images: ["https://yourwebsite.com/images/card-preview.jpg"],
   },
