@@ -1,15 +1,15 @@
 // app/card/page.tsx
-import DigitalBusinessCard from "./DigitalBusinessCard";
+import DigitalBusinessCardM from "./DigitalBusinessCard";
 
 
 export const metadata = {
-  title: "הכרטיס שלי - מורגי",
-  description: "הכרטיס הדיגיטלי של מורגי - משרדים ברמלה ולוד",
+  title: "הכרטיס שלי - משה מוסיוב",
+  description: "הכרטיס הדיגיטלי של משה מוסיוב - משרדים בעפולה ",
   openGraph: {
-    title: "הכרטיס שלי - מורגי",
-    description: "לחצו כאן לנווט אלינו! הרצל 92 רמלה או שדרות דוד המלך 2 לוד.",
-    url: "https://yourwebsite.com/card", // שנה לכתובת האמיתית שלך
-    siteName: "Morgi",
+    title: "הכרטיס שלי ",
+    description: "לחצו כאן לנווט אלינו! הרב נחום לוין 7 עפולה .",
+    url: "https://morg-orcin.vercel.app/", // שנה לכתובת האמיתית שלך
+    siteName: "muhni",
     images: [
       {
         url: "https://yourwebsite.com/images/card-preview.jpg", // לינק מלא לתמונה
@@ -23,7 +23,7 @@ export const metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "הכרטיס שלי - מורגי",
+    title: "הכרטיס שלי",
     description: "בקרו אותנו והתחילו דרך חדשה עם משכנתא חכמה!",
     images: ["https://yourwebsite.com/images/card-preview.jpg"],
   },
@@ -33,7 +33,7 @@ export default function CardPage() {
   return (
     <main >
 
-      <DigitalBusinessCard/>
+      <DigitalBusinessCardM/>
       {/* כאן הקומפוננטה של הכרטיס שלך */}
   
       {/* ועוד תוכן */}
