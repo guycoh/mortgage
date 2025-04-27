@@ -4,10 +4,10 @@ import DigitalBusinessCardM from "./DigitalBusinessCard";
 
 export const metadata = {
   title: "גיא כהן-יועץ משכנתא",
-  description: "הכרטיס הדיגיטלי של גיא כהן - משרדים בעפולה ",
+  description: "הכרטיס הדיגיטלי של גיא כהן - משרדים רמלה/לוד/תל אביב ",
   openGraph: {
     title: "הכרטיס שלי ",
-    description: "לחצו כאן לנווט אלינו! הרב נחום לוין 7 עפולה .",
+    description: "     ",
     url: "https://morg-orcin.vercel.app/", // שנה לכתובת האמיתית שלך
     siteName: "muhni",
     images: [

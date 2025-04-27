@@ -214,7 +214,7 @@ export default function MortgageSimulatorForm() {
     <div className="min-h-screen bg-gray-50 py-10 px-4">
       <div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-lg overflow-hidden">
         <div className="p-8">
-          <h2 className="text-2xl font-bold text-[#1d75a1] mb-6 text-center">סימולטור כמה משכנתא אוכל לקבל? </h2>
+          <h2 className="text-2xl font-bold text-main mb-6 text-center">סימולטור כמה משכנתא אוכל לקבל? </h2>
           <form onSubmit={handleSubmit} className="space-y-6">
 
             
@@ -222,13 +222,13 @@ export default function MortgageSimulatorForm() {
             {/* שורה 2: מטרת המשכנתא */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 ">
               <div>
-                <label htmlFor="mortgagePurpose" className="block text-[#1d75a1] font-semibold mb-2">מטרת המשכנתא</label>
+                <label htmlFor="mortgagePurpose" className="block text-main font-semibold mb-2">מטרת המשכנתא</label>
                 <select
                   name="mortgagePurpose"
                   id="mortgagePurpose"
                   value={formData.mortgagePurpose}
                   onChange={handleChange}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#1d75a1] focus:bg-orange-100 text-gray-700"
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-main focus:bg-orange-100 text-gray-700"
                 >
                   <option value="">בחר...</option>
                   <option value="single">דירה יחידה</option>
@@ -243,7 +243,7 @@ export default function MortgageSimulatorForm() {
             {/* שורה 3: זוגיות */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <p className="text-[#1d75a1] font-semibold mb-2">האם יש בן/בת זוג או שותף?</p>
+                <p className="text-main font-semibold mb-2">האם יש בן/בת זוג או שותף?</p>
                 <div className="flex items-center gap-6">
                   {['yes', 'no'].map(val => (
                     <label key={val} className="flex items-center gap-2">
@@ -253,9 +253,9 @@ export default function MortgageSimulatorForm() {
                         value={val}
                         checked={formData.hasPartner === val}
                         onChange={handleChange}
-                        className="focus:ring-[#1d75a1]"
+                        className="focus:ring-main"
                       />
-                      <span className="text-[#1d75a1]">{val === 'yes' ? 'כן' : 'לא'}</span>
+                      <span className="text-main">{val === 'yes' ? 'כן' : 'לא'}</span>
                     </label>
                   ))}
                 </div>
@@ -265,7 +265,7 @@ export default function MortgageSimulatorForm() {
             {/* שורה 4: גיל */}
             <div className="grid grid-cols-2 md:grid-cols-2 gap-4">
               <div>
-                <label htmlFor="age" className="block text-[#1d75a1] font-semibold mb-2">גיל</label>
+                <label htmlFor="age" className="block text-main font-semibold mb-2">גיל</label>
                 <input
                   type="number"
                   name="age"
@@ -273,14 +273,14 @@ export default function MortgageSimulatorForm() {
                   value={formData.age}
                   onChange={handleChange}
                   placeholder="גיל"
-                  className="[appearance:textfield] w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#1d75a1] focus:bg-orange-100 text-gray-700"
+                  className="[appearance:textfield] w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-main focus:bg-orange-100 text-gray-700"
                   required
                 />
               </div>
              
               {formData.hasPartner === 'yes' && (
                 <div>
-                  <label htmlFor="spouseAge" className="block text-[#1d75a1] font-semibold mb-2">גיל בן/בת זוג</label>
+                  <label htmlFor="spouseAge" className="block text-main font-semibold mb-2">גיל בן/בת זוג</label>
                   <input
                     type="number"
                     name="spouseAge"
@@ -288,7 +288,7 @@ export default function MortgageSimulatorForm() {
                     value={formData.spouseAge}
                     onChange={handleChange}
                     placeholder="גיל"
-                    className=" [appearance:textfield] w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#1d75a1] focus:bg-orange-100 text-gray-700"
+                    className=" [appearance:textfield] w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-main focus:bg-orange-100 text-gray-700"
                   />
                 </div>
               )}
@@ -304,7 +304,7 @@ export default function MortgageSimulatorForm() {
             {/* שורה 5: הכנסות חודשיות */}
             <div className="grid grid-cols-2 md:grid-cols-2 gap-4">
               <div>
-                <label htmlFor="monthlyIncome" className="block text-[#1d75a1] font-semibold mb-2">הכנסות חודשיות (₪)</label>
+                <label htmlFor="monthlyIncome" className="block text-main font-semibold mb-2">הכנסות חודשיות (₪)</label>
                 <input
                   type="text"
                   name="monthlyIncome"
@@ -312,13 +312,13 @@ export default function MortgageSimulatorForm() {
                   value={displayData.monthlyIncome}
                   onChange={handleChangeWithCommas}
                   placeholder="₪"
-                  className="[appearance:textfield] w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#1d75a1] focus:bg-orange-100 text-gray-700"
+                  className="[appearance:textfield] w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-main focus:bg-orange-100 text-gray-700"
                   required
                 />
               </div>
               {formData.hasPartner === 'yes' && (
                 <div>
-                  <label htmlFor="spouseMonthlyIncome" className="block text-[#1d75a1] font-semibold mb-2">בן/בת זוג </label>
+                  <label htmlFor="spouseMonthlyIncome" className="block text-main font-semibold mb-2">בן/בת זוג </label>
                   <input
                     type="text"
                     name="spouseMonthlyIncome"
@@ -326,7 +326,7 @@ export default function MortgageSimulatorForm() {
                     value={displayData.spouseMonthlyIncome}
                     onChange={handleChangeWithCommas}
                     placeholder="₪"
-                    className="[appearance:textfield] w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#1d75a1] focus:bg-orange-100 text-gray-700"
+                    className="[appearance:textfield] w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-main focus:bg-orange-100 text-gray-700"
                   />
                 </div>
               )}
@@ -338,7 +338,7 @@ export default function MortgageSimulatorForm() {
             {/* שורה 6: הכנסות נוספות */}
             <div className="grid grid-cols-2 md:grid-cols-2 gap-4">
               <div>
-                <label htmlFor="additionalIncome" className="block text-[#1d75a1] font-semibold mb-2">הכנסות נוספות (₪)</label>
+                <label htmlFor="additionalIncome" className="block text-main font-semibold mb-2">הכנסות נוספות (₪)</label>
                 <input
                   type="text"
                   name="additionalIncome"
@@ -346,12 +346,12 @@ export default function MortgageSimulatorForm() {
                   value={displayData.additionalIncome}
                   onChange={handleChangeWithCommas}
                   placeholder="₪"
-                  className="[appearance:textfield] w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#1d75a1] focus:bg-orange-100 text-gray-700"
+                  className="[appearance:textfield] w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-main focus:bg-orange-100 text-gray-700"
                 />
               </div>
               {formData.hasPartner === 'yes' && (
                 <div>
-                  <label htmlFor="spouseAdditionalIncome" className="block text-[#1d75a1] font-semibold mb-2">הכנסות נוספות בן זוג </label>
+                  <label htmlFor="spouseAdditionalIncome" className="block text-main font-semibold mb-2">הכנסות נוספות בן זוג </label>
                   <input
                     type="text"
                     name="spouseAdditionalIncome"
@@ -359,7 +359,7 @@ export default function MortgageSimulatorForm() {
                     value={displayData.spouseAdditionalIncome}
                     onChange={handleChangeWithCommas}
                     placeholder="₪"
-                    className="[appearance:textfield]  w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#1d75a1] focus:bg-orange-100 text-gray-700"
+                    className="[appearance:textfield]  w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-main focus:bg-orange-100 text-gray-700"
                   />
                 </div>
               )}
@@ -368,7 +368,7 @@ export default function MortgageSimulatorForm() {
             {/* שורה 7: הלוואות מעל 18 חודשים */}
             <div className="grid grid-cols-2 md:grid-cols-2 gap-4">
               <div>
-                <label htmlFor="hasLongLoans" className="block text-[#1d75a1] font-semibold mb-2">הלוואות מעל 18 חודשים </label>
+                <label htmlFor="hasLongLoans" className="block text-main font-semibold mb-2">הלוואות מעל 18 חודשים </label>
                 <input
                  type="text"
                   name="hasLongLoans"
@@ -376,12 +376,12 @@ export default function MortgageSimulatorForm() {
                   value={displayData.hasLongLoans}
                   onChange={handleChangeWithCommas}
                   placeholder="סכום חודשי"
-                  className="[appearance:textfield] w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#1d75a1] focus:bg-orange-100 text-gray-700"
+                  className="[appearance:textfield] w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-main focus:bg-orange-100 text-gray-700"
                 />
               </div>
               {formData.hasPartner === 'yes' && (
                 <div>
-                  <label htmlFor="spouseHasLongLoans" className="block text-[#1d75a1] font-semibold mb-2">בן/בת זוג </label>
+                  <label htmlFor="spouseHasLongLoans" className="block text-main font-semibold mb-2">בן/בת זוג </label>
                   <input
                     type="text"
                     name="spouseHasLongLoans"
@@ -389,7 +389,7 @@ export default function MortgageSimulatorForm() {
                     value={displayData.spouseHasLongLoans}
                     onChange={handleChangeWithCommas}
                    placeholder="סכום חודשי"
-                    className="[appearance:textfield] w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#1d75a1] focus:bg-orange-100 text-gray-700"
+                    className="[appearance:textfield] w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-main focus:bg-orange-100 text-gray-700"
                   />
                 </div>
               )}
@@ -398,7 +398,7 @@ export default function MortgageSimulatorForm() {
             {/* שורה 8: הון עצמי */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label htmlFor="equity" className="block text-[#1d75a1] font-semibold mb-2">הון עצמי (₪)</label>
+                <label htmlFor="equity" className="block text-main font-semibold mb-2">הון עצמי (₪)</label>
                 <input
                   type="text"
                   name="equity"
@@ -406,7 +406,7 @@ export default function MortgageSimulatorForm() {
                   value={displayData.equity}
                   onChange={handleChangeWithCommas}
                   placeholder="₪הון עצמי"
-                  className="[appearance:textfield] w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#1d75a1] focus:bg-orange-100 text-gray-700"
+                  className="[appearance:textfield] w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-main focus:bg-orange-100 text-gray-700"
                   required
                 />
               </div>           
@@ -416,7 +416,7 @@ export default function MortgageSimulatorForm() {
             {/* שורה 9: מספר חודשים  */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
              <div>
-                <label htmlFor="loanMonths" className="block text-[#1d75a1] font-semibold mb-2">מספר חודשי הלוואה</label>
+                <label htmlFor="loanMonths" className="block text-main font-semibold mb-2">מספר חודשי הלוואה</label>
                 <input
                 type="number"
                 name="loanMonths"
@@ -424,7 +424,7 @@ export default function MortgageSimulatorForm() {
                 value={formData.loanMonths}
                 onChange={handleChange}            
                 required
-                className="[appearance:textfield] w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#1d75a1] focus:bg-orange-100 text-gray-700"
+                className="[appearance:textfield] w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-main focus:bg-orange-100 text-gray-700"
                 />
             </div>
             </div>
@@ -434,7 +434,7 @@ export default function MortgageSimulatorForm() {
            {/* שורה 10: ריבית   */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label htmlFor="annualInterest" className="block text-[#1d75a1] font-semibold mb-2">ריבית שנתית</label>
+              <label htmlFor="annualInterest" className="block text-main font-semibold mb-2">ריבית שנתית</label>
               <div className="relative">
                 <input
                   type="number"
@@ -445,7 +445,7 @@ export default function MortgageSimulatorForm() {
                   onChange={handleChange}
                   placeholder="לדוג׳ 3.75"
                   required
-                  className="[appearance:textfield] w-full border border-gray-300 rounded-lg px-4 py-2 pr-10 focus:ring-2 focus:ring-[#1d75a1] focus:bg-orange-100 text-gray-700"
+                  className="[appearance:textfield] w-full border border-gray-300 rounded-lg px-4 py-2 pr-10 focus:ring-2 focus:ring-main focus:bg-orange-100 text-gray-700"
                 />
                 <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-lg">%</span>
               </div>
@@ -464,7 +464,7 @@ export default function MortgageSimulatorForm() {
                 disabled={!isFormValid}
                 className={`${
                   isFormValid
-                    ? "bg-[#1d75a1] hover:bg-[#13577c]"
+                    ? "bg-main hover:bg-[#13577c]"
                     : "bg-gray-400 cursor-not-allowed"
                 } text-white font-bold py-2 px-4 rounded transition`}
               >
