@@ -12,7 +12,7 @@ export const metadata = {
     siteName: "muhni",
     images: [
       {
-        url: "https://yourwebsite.com/images/card-preview.jpg", // לינק מלא לתמונה
+        url: "https://morg-orcin.vercel.app/assets/images/imgFiles/moshe.jpg", // לינק מלא לתמונה
         width: 1200,
         height: 630,
         alt: " משרדים בעפולה",

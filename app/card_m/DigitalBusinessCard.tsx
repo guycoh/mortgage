@@ -190,7 +190,7 @@ export default function DigitalBusinessCard() {
             <span className="text-sm text-center">מס רכישה</span>
             </Link>
           
-            <Link href="/muhni/calculators/purchase_tax_calculator" className="flex flex-col items-center hover:opacity-80 transition">
+            <Link href="/muhni/calculators/refinance-calculator" className="flex flex-col items-center hover:opacity-80 transition">
             <Calculator4 size={40} color="white" />
             <span className="text-sm text-center">החזר חודשי</span>
             </Link>
