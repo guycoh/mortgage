@@ -6,13 +6,13 @@ export const metadata = {
   title: "גיא כהן-יועץ משכנתא",
   description: "הכרטיס הדיגיטלי של גיא כהן - משרדים רמלה/לוד/תל אביב ",
   openGraph: {
-    title: "הכרטיס שלי ",
+    title: "הכרטיס של גיא כהן ",
     description: "     ",
     url: "https://morg-orcin.vercel.app/", // שנה לכתובת האמיתית שלך
     siteName: "muhni",
     images: [
       {
-        url: "https://morg-orcin.vercel.app/assets/images/imgFiles/my_image.jpg", // לינק מלא לתמונה
+        url: "https://morg-orcin.vercel.app/assets/images/imgFiles/guywhapp.jpg", // לינק מלא לתמונה
         width: 1200,
         height: 630,
         alt: "MUHNI - משרדים בלוד וברמלה",
