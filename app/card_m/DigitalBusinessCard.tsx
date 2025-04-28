@@ -110,18 +110,15 @@ export default function DigitalBusinessCard() {
                   </svg>
                   קבע פגישה
                 </Link>
-
-               
-               
-                
+ 
 
           {/* שם ותפקיד */}
           <h1 className="mt-20 text-3xl font-bold tracking-tight">משה מוסיוב</h1>
-          <p className="text-white mt-2">יועץ משכנתאות בכיר </p>         
+          <p className="text-white mt-2">יועץ משכנתאות</p>         
             <span className="text-white mt-2 flex items-center space-x-2">
               <span>050-2453345</span>
               <Phone size={14} color="white" />            
-              <span>"mmusayov@gmail.com"</span>
+              <span>mmusayov@gmail.com</span>
               <EmailIcon size={14} color="white" />
             </span>
 

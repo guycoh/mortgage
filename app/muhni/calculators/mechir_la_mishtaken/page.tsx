@@ -92,7 +92,7 @@ const PriceGrantSimulator = () => {
       const denominator = Math.pow(1 + monthlyRate, totalMonths) - 1;
       return loanAmount * (numerator / denominator);
     }
-
+  
  
   const formatNumber = (value: number | '') => {
     return value !== '' ? value.toLocaleString() : '';
@@ -107,6 +107,27 @@ const PriceGrantSimulator = () => {
     const found = settlements.find((s) => s.name === e.target.value);
     setSelected(found ?? null);
   }
+
+ 
+  //תשלום חודשי 
+      const annualRate = interestRate / 100;
+      const monthlyRate = Math.pow(1 + annualRate, 1 / 12) - 1;
+      
+      const isValidMortgage = typeof requestedMortgage === 'number' && requestedMortgage > 0;
+      const isValidMonths = typeof loanMonths === 'number' && loanMonths > 0;
+      
+      const monthlyPayment = isValidMortgage && isValidMonths
+        ? (monthlyRate === 0
+            ? requestedMortgage / loanMonths
+            : requestedMortgage * (monthlyRate * Math.pow(1 + monthlyRate, loanMonths)) / (Math.pow(1 + monthlyRate, loanMonths) - 1)
+          )
+        : 0;
+      
+      const formattedMonthlyPayment = monthlyPayment.toLocaleString('en-US', {
+        minimumFractionDigits: 1,
+        maximumFractionDigits: 1,
+      });
+ //תשלום חודשי end
 
   const showWarning =
     contractPrice !== '' &&
@@ -315,8 +336,8 @@ const PriceGrantSimulator = () => {
             </div>
           </div>
         )}
-
-
+ 
+ <p>תשלום חודשי: {formattedMonthlyPayment} ₪</p>
 
   
       {/* נתוני עזר

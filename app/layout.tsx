@@ -22,9 +22,9 @@ export const metadata = {
   metadataBase: new URL(defaultUrl),
   title: "משכנתא",
   description: "משכנתאות",
-  url: "https://morg-orcin.vercel.app/card",
+  url: "https://morg-orcin.vercel.app",
   icons: {
-    icon: 'public/assets/images/svg/muhni_logo.svg',
+    icon: '/assets/images/svg/m.svg',
   },
   //נוסף להציג תמונה בשליחה
   images: [
