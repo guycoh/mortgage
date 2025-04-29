@@ -20,11 +20,12 @@ const config = {
     extend: {
       colors: {
         //צבעים שנקרא להם ב css
-        main:'#7e22ce', // למשל כחול כהה
+        main:'#7e22ce', // למשל סגול
         second: '#F59E0B', // למשל כתום
         footer: '#1f1f2e', // למשל כתום
-      
-        
+        fonts:"#475569",// slate אפור
+        fontss1:"#546e7a",// כחול אפור מודגש
+   
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",

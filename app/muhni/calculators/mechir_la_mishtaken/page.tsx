@@ -10,23 +10,29 @@ type SettlementGrant = {
 
 const settlements: SettlementGrant[] = [
   { name: 'אופקים', grant: 60000 },
+  { name: 'אילת', grant: 40000 },
+  { name: 'אשקלון', grant: 40000 },
   { name: 'בית שאן', grant: 60000 },
   { name: 'דימונה', grant: 60000 },
+  { name: 'חריש', grant: 40000 },
   { name: 'טבריה', grant: 60000 },
   { name: 'ירוחם', grant: 60000 },
-  { name: 'מצפה רמון', grant: 60000 },
+  { name: 'נהריה', grant: 40000 },
   { name: 'נצרת', grant: 60000 },
   { name: 'נוף הגליל (נצרת עילית)', grant: 60000 },
   { name: 'נתיבות', grant: 60000 },
-  { name: 'אילת', grant: 40000 },
-  { name: 'אשקלון', grant: 40000 },
-  { name: 'חריש', grant: 40000 },
-  { name: 'נהריה', grant: 40000 },
   { name: 'עכו', grant: 40000 },
   { name: 'עפולה', grant: 40000 },
-  { name: 'שלומי', grant: 40000 },
+  { name: 'מצפה רמון', grant: 60000 },
   { name: 'קריית מלאכי', grant: 40000 },
+  { name: 'שלומי', grant: 40000 },
 ];
+
+
+
+
+
+
 
 const GRANT_CEILING = 1800000;
 
