@@ -108,7 +108,7 @@ const PriceGrantSimulator = () => {
     setSelected(found ?? null);
   }
 
- 
+  monthlyIncome
   //תשלום חודשי 
       const annualRate = interestRate / 100;
       const monthlyRate = Math.pow(1 + annualRate, 1 / 12) - 1;

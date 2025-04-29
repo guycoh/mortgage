@@ -89,7 +89,7 @@ export default function CreateLeadForm() {
                 date: formattedData.date,
                 hour: formData.hour,})         
 
-            router.push("/home/schedule/success");
+            router.push("/muhni/schedule/success");
                        
         } else {
             setMessage(`Error: ${data.error}`);
