@@ -9,7 +9,7 @@ import ConsolidationIcon from "@/public/assets/images/svg/motrgageType/Consolida
 import EligibleIcon from "@/public/assets/images/svg/motrgageType/EligibleIcon";
 import RefinancingIcon from  "@/public/assets/images/svg/motrgageType/RefinancingIcon";
 import InsuranceIcon from  "@/public/assets/images/svg/motrgageType/InsuranceIcon";
-
+import RefusedIcon from  "@/public/assets/images/svg/motrgageType/RefusedIcon";
 //import { HomeIcon, LoanIcon, ReverseIcon, InsuranceIcon, NonBankIcon, ConsolidationIcon, EligibleIcon, 
 // , RefusedIcon } from "@/components/icons";
 
@@ -17,12 +17,12 @@ const mortgageCategories = [
   { category: "משכנתא לדיור", link: "mortgage_for_housing", icon: <HomeIcon size={100} color="#475569"/> },
   { category: "הלוואה לכל מטרה", link: "mortgage_for_any_purpose", icon: <LoanIcon size={100} color="#475569"  /> },
   { category: "משכנתא הפוכה", link: "reverse_mortgage", icon: <ReverseIcon size={100} color="#475569" /> },  
-  { category: "משכנתא חוץ בנקאית", link: "non_bank_mortgage_info", icon: <IconGeneralMortgage size={100}/> },
   { category: "איחוד הלוואות", link: "loan_consolidation", icon: <ConsolidationIcon size={100} /> },
+  { category: "משכנתא חוץ בנקאית", link: "non_bank_mortgage_info", icon: <IconGeneralMortgage size={100}/> },
   { category: "מחיר למשתכן", link: "home_for_eligible_buyers", icon: <EligibleIcon size={100}/> },
   { category: "מיחזור משכנתא", link: "mortgage_refinancing", icon: <RefinancingIcon size={100} /> },
   { category: "ביטוח משכנתא", link: "mortgage_insurance", icon: <InsuranceIcon size={100} color="#475569"/> },
-  { category: "מסורבי בנקים", link: "mortgage_for_refused_clients", icon: <IconGeneralMortgage size={100} /> },
+  { category: "מסורבי בנקים", link: "mortgage_for_refused_clients", icon: <RefusedIcon size={100} /> },
  
 ];
 
