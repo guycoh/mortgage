@@ -59,7 +59,7 @@ export default function LoanConsolidation() {
          
         <div className="mt-10 flex justify-center">
           <Link
-            href="/home/schedule"
+            href="/muhni/schedule"
             className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-6 rounded-lg text-lg shadow-md transition duration-300 whitespace-nowrap max-w-[90vw] overflow-hidden text-ellipsis"
           >
             קבעו פגישה עם מומחה למשכנתאות
