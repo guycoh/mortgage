@@ -92,7 +92,7 @@ const GlossaryPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#f0f9ff] to-[#ffffff] dark:from-[#0f172a] dark:to-[#1e293b] text-gray-900 dark:text-white px-4 py-10">
       <div className="max-w-5xl mx-auto bg-white/90 dark:bg-slate-800/80 shadow-xl rounded-3xl px-6 py-8 relative overflow-hidden">
-        <h1 className="text-4xl font-bold text-center text-[#1d75a1] dark:text-[#00bcd4] mb-6">
+        <h1 className="text-4xl font-bold text-center text-main dark:text-[#00bcd4] mb-6">
           מושגים במשכנתא 🏦
         </h1>
 
@@ -122,7 +122,7 @@ const GlossaryPage: React.FC = () => {
 
           <button
             onClick={() => setSortAZ(!sortAZ)}
-            className="px-4 py-2 rounded-xl bg-[#1d75a1] text-white dark:bg-[#00bcd4] hover:bg-[#166089] transition-all"
+            className="px-4 py-2 rounded-xl bg-main text-white dark:bg-[#00bcd4] hover:bg-[#166089] transition-all"
           >
             מיון לפי א-ב {sortAZ ? "🔽" : "🔼"}
           </button>
@@ -149,7 +149,7 @@ const GlossaryPage: React.FC = () => {
         {showScrollTop && (
           <button
             onClick={scrollToTop}
-            className="fixed bottom-6 right-6 bg-[#1d75a1] hover:bg-[#155c84] text-white px-4 py-2 rounded-full shadow-lg transition-opacity duration-300"
+            className="fixed bottom-6 right-6 bg-main hover:bg-[#155c84] text-white px-4 py-2 rounded-full shadow-lg transition-opacity duration-300"
           >
             ⬆ חזור למעלה
           </button>

@@ -6,5 +6,5 @@
 import { redirect } from 'next/navigation';
 
 export default function NotFound() {
-  redirect('/home'); // מפנה לדף הבית
+  redirect('/muhni'); // מפנה לדף הבית
 }

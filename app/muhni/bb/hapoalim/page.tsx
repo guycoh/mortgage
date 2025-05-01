@@ -2,6 +2,7 @@
 import Phone from "@/public/assets/images/svg/phone";
 import WebIcon from "@/public/assets/images/svg/webIcon";
 import Image from "next/image";
+import WhatsAppButton from "../../components/WhatsAppButton";
 
 export default function MortgageClearanceInstructions() {
   return (
@@ -23,6 +24,7 @@ export default function MortgageClearanceInstructions() {
               className="rounded-xl mx-auto"
             />
           </div>
+         
 
           <div className="flex items-center gap-3 mb-4">
             <WebIcon className="h-6 w-6 text-red-600" />
@@ -58,7 +60,11 @@ export default function MortgageClearanceInstructions() {
         <div className="h-[1px] bg-red-300 mx-6" />
 
         {/* חלק 2 - מוקד טלפוני */}
-        <div className="p-6">
+        <div className="relative p-6">
+          <div className="absolute left-1 bottom-1">
+             <WhatsAppButton />
+          </div>
+         
           <div className="flex items-center gap-3 mb-4">
             <Phone className="h-6 w-6 text-red-600" />
             <h2 className="text-xl font-semibold text-text-fonts">2. דרך המוקד הטלפוני</h2>
@@ -75,6 +81,8 @@ export default function MortgageClearanceInstructions() {
             <li>שעות פעילות: 08:00–16:00</li>
           </ul>
         </div>
+   
+      
       </div>
     </div>
   );

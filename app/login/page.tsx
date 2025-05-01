@@ -6,6 +6,9 @@ import { createClient } from '@/utils/supabase/client';
 import Image from 'next/image';
 import Link from 'next/link';
 
+
+
+
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -33,15 +36,15 @@ export default function LoginPage() {
         
         <div className="flex justify-center mb-4">
           <Image
-            src="/assets/myLogo.svg"
+            src="/assets/images/svg/muhni_logo.svg"
             alt="Morgi Logo"
-            width={64}
-            height={64}
-            className="rounded-full"
+            width={200}
+            height={100}
+           
           />
         </div>
 
-        <h2 className="text-3xl font-bold text-center text-blue-800 dark:text-blue-300 mb-2">ברוך הבא ל-Morgi</h2>
+        <h2 className="text-3xl font-bold text-center text-blue-800 dark:text-blue-300 mb-2">ברוך הבא </h2>
         <p className="text-center text-gray-600 dark:text-gray-400 mb-6">התחבר לחשבון שלך כדי להמשיך</p>
 
         <form onSubmit={handleLogin} className="space-y-5">

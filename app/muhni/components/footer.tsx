@@ -40,22 +40,22 @@ export const Footer = () => {
 
           {/* עמודה 2 */}
           <div>
-            <h4 className="text-lg font-semibold mb-4">שירותים</h4>
+            <h4 className="text-lg font-semibold mb-4">מיחזור משכנתא</h4>
             <ul className="space-y-2">
               <li>
                 <Link
-                  href="/simulator"
+                  href="/muhni/mortgage_refinancing"
                   className="hover:underline hover:font-bold transition duration-200"
                 >
-                  סימולטור משכנתא
+                  מיחזור משכנתא
                 </Link>
               </li>
               <li>
                 <Link
-                  href="/eligibility"
+                  href="/muhni/mortgage_refinancing"
                   className="hover:underline hover:font-bold transition duration-200"
                 >
-                  בדיקת זכאות
+               מדריכים הוצאת דוח יתרות לסילוק
                 </Link>
               </li>
             </ul>
@@ -86,6 +86,43 @@ export const Footer = () => {
 
           {/* עמודה 4 */}
           <div>
+          <h4 className="text-lg font-semibold mb-4">כתובת</h4>
+            <ul className="space-y-2">
+              <li>
+                <a
+                  href="https://www.google.com/maps/search/?api=1&query=הרצל+92,+רמלה"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:underline hover:font-bold transition duration-200"
+                >
+                  הרצל 92, רמלה
+                </a>
+              </li>
+              <li>
+                <a
+                  href="https://www.google.com/maps/search/?api=1&query=שדרות+דוד+המלך+2,+לוד"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:underline hover:font-bold transition duration-200"
+                >
+                  שד' דוד המלך 2, לוד
+                </a>
+              </li>
+              <li>
+                <a
+                  href="https://www.google.com/maps/search/?api=1&query=הלוחמים+1,+תל+אביב"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:underline hover:font-bold transition duration-200"
+                >
+                  הלוחמים 1, תל אביב
+                </a>
+              </li>
+            </ul>
+
+
+
+
             <h4 className="text-lg font-semibold mb-4">יצירת קשר</h4>
             <ul className="space-y-2">
               <li>
