@@ -52,7 +52,7 @@ export const Footer = () => {
               </li>
               <li>
                 <Link
-                  href="/muhni/mortgage_refinancing"
+                  href="/muhni/bb"
                   className="hover:underline hover:font-bold transition duration-200"
                 >
                מדריכים הוצאת דוח יתרות לסילוק

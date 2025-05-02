@@ -24,7 +24,8 @@ export default function MortgageClearanceInstructions() {
             />
           </div>
 
-          <div className="flex items-center gap-3 mb-4">
+          {/* טקסט מתחיל מתחת ללוגו */}
+          <div className="flex items-center gap-3 mb-4 mt-20">
             <WebIcon className="h-6 w-6 text-[#F97316]" />
             <h2 className="text-xl font-semibold text-gray-700">1. דרך אתר הבנק</h2>
           </div>
@@ -32,14 +33,13 @@ export default function MortgageClearanceInstructions() {
             <p>
               <span className="font-medium">אם ברשותכם גם חשבון עו"ש בבנק – </span>
               <a
-                    href="https://www.mizrahi-tefahot.co.il/"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 font-bold hover:underline"
-                    >
-                    לחצו כאן
-               </a>
-
+                href="https://www.mizrahi-tefahot.co.il/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 font-bold hover:underline"
+              >
+                לחצו כאן
+              </a>
             </p>
             <ol className="list-decimal list-inside space-y-1">
               <li>לוחצים על כפתור כניסה לחשבון הנמצא בפינה השמאלית למעלה</li>
@@ -51,7 +51,16 @@ export default function MortgageClearanceInstructions() {
             <p className="pt-4">
               <span className="font-medium">אם ברשותכם רק משכנתא בבנק –</span>
               <br />
-              נכנסים לקישור "כניסה ללקוחות טפחות" באתר או באפליקציה. <br />
+              נכנסים לקישור{" "}
+              <a
+                href="https://sc.mizrahi-tefahot.co.il/TFHLogin/index.html#/login"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 font-bold hover:underline"
+              >
+                כניסה ללקוחות טפחות
+              </a>{" "}
+              באתר או באפליקציה. <br />
               לאחר הזנת נתוני הזיהוי, יתקבל קוד כניסה חד פעמי לטלפון הנייד – יש להזין אותו במקום הדרוש.
             </p>
           </div>
@@ -67,13 +76,12 @@ export default function MortgageClearanceInstructions() {
             <h2 className="text-xl font-semibold text-gray-700">2. דרך המוקד הטלפוני</h2>
           </div>
           <ul className="list-disc list-inside text-gray-700 space-y-1 leading-relaxed">
-          <li>
-            טלפון:{" "}
-            <a href="tel:*8860" className="font-bold text-[#F97316] hover:underline">
+            <li>
+              טלפון:{" "}
+              <a href="tel:*8860" className="font-bold text-[#F97316] hover:underline">
                 *8860
-            </a>
-          </li>
-
+              </a>
+            </li>
             <li>המרכז פעיל בימים א'–ה' בין השעות 08:00–18:30</li>
             <li>ביום ו' בשעות 08:00–13:00</li>
           </ul>
