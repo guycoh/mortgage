@@ -67,10 +67,10 @@ export default function SignUpPage() {
         {/* צד ימין - לוגו */}
         <div className="hidden md:flex items-center justify-center bg-blue-50 p-8 w-1/2">
           <Image
-            src="/assets/myLogo.svg"
+            src="/assets/images/svg/muhni_logo.svg"
             alt="Morgi Logo"
-            width={180}
-            height={180}
+            width={300}
+            height={300}
             className="object-contain"
           />
         </div>
@@ -81,7 +81,7 @@ export default function SignUpPage() {
           className="w-full md:w-1/2 p-8 space-y-6"
         >
           <h2 className="text-3xl font-extrabold text-center text-gray-800">
-            הירשמו למורגי
+            הירשמו אלינו
           </h2>
           <p className="text-center text-gray-500">
             התחילו את הדרך למשכנתא מושלמת.
@@ -129,7 +129,7 @@ export default function SignUpPage() {
 
           <button
             type="submit"
-            className="w-full bg-[#1d75a1] hover:bg-[#16628a] text-white py-3 rounded-xl font-semibold shadow-md transition"
+            className="w-full bg-main hover:bg-[#16628a] text-white py-3 rounded-xl font-semibold shadow-md transition"
           >
             הרשם עכשיו
           </button>

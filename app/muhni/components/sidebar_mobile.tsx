@@ -87,8 +87,24 @@ export default function SideMenu({ triggerButton }: { triggerButton: (onClick: (
               </Link>
             </li>
             
-
-
+            <li >
+              <Link
+                href="/private/crm"                
+                className="block text-[#1d75a1] hover:text-[#007bff] font-bold text-[20px]"
+                onClick={() => setIsOpen(false)}
+                >
+               CRM
+              </Link>
+            </li>
+            <li >
+              <Link
+                href="/private/admin"                
+                className="block text-[#1d75a1] hover:text-[#007bff] font-bold text-[20px]"
+                onClick={() => setIsOpen(false)}
+                >
+              ADMIN
+              </Link>
+            </li>
 
          
         </ul>

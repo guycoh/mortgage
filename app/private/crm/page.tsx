@@ -1,9 +1,21 @@
+"use client"
 
 
-const Crm = () => {
+
+export default function Sidebar() {
   return (
-    <div>CRM page</div>
-  )
+    <div className="sidebar p-4 bg-gray-100">
+      
+      {/* כאן תוכל להוסיף את התפריט שלך */}
+    </div>
+  );
 }
 
-export default Crm
+
+
+
+
+
+
+
+

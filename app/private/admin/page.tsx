@@ -1,9 +1,10 @@
+"use client"
 
+export default function Admin() {
+ 
+ 
 
-const Admin = () => {
   return (
-    <div>admin page</div>
-  )
+    <div>DASHBOARD </div>
+  );
 }
-
-export default Admin
