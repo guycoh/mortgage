@@ -16,7 +16,7 @@ export default function Sidebar_admin() {
   };
 
   return (
-    <div className="relative" dir="rtl">
+    <div className="z-20 relative" dir="rtl">
       {/* Sidebar */}
       <div
         className={`fixed top-0 right-0 h-full bg-gray-800 text-white transition-transform duration-300 ${
@@ -34,6 +34,8 @@ export default function Sidebar_admin() {
         </div>
         <ul className="p-4 space-y-2">
           <li className="hover:bg-gray-700 p-2 rounded"> <Link href="/admin/dashboard" > 🏠 דף הבית </Link></li>
+          <li className="hover:bg-gray-700 p-2 rounded"> <Link href="/private/admin/leadweb" > 👥 לידים מהאתר</Link></li>
+          
           <li className="hover:bg-gray-700 p-2 rounded"> <Link href="/private/admin/dashboard/concepts" > 🏠 מושגים משכנתא</Link></li>
           
           <li className="hover:bg-gray-700 p-2 rounded"> <Link href="/private/admin/users" > 👥 משתמשים</Link></li>
