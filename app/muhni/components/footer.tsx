@@ -82,12 +82,43 @@ export const Footer = () => {
                 </Link>
               </li>
             </ul>
+        
+            <h4 className="text-lg font-semibold mb-4">יצירת קשר</h4>
+            <ul className="space-y-2">
+              <li>
+                <Link
+                  href="/contact"
+                  className="hover:underline hover:font-bold transition duration-200"
+                >
+                  טופס יצירת קשר
+                </Link>
+              </li>
+              <li>
+                <a
+                  href="tel:0521234567"
+                  className="hover:underline hover:font-bold transition duration-200"
+                >
+                  052-1234567
+                </a>
+              </li>
+              <li>
+                <a
+                  href="mailto:info@example.com"
+                  className="hover:underline hover:font-bold transition duration-200"
+                >
+                  info@example.com
+                </a>
+              </li>
+            </ul>
+        
+        
+        
           </div>
 
           {/* עמודה 4 */}
           <div>
-          <h4 className="text-lg font-semibold mb-4">כתובת</h4>
-            <ul className="space-y-2">
+          <h4 className="text-lg font-semibold mb-1">כתובת</h4>
+            <ul className="space-y-1">
               <li>
                 <a
                   href="https://www.google.com/maps/search/?api=1&query=הרצל+92,+רמלה"
@@ -119,36 +150,24 @@ export const Footer = () => {
                 </a>
               </li>
             </ul>
-
-
-
-
-            <h4 className="text-lg font-semibold mb-4">יצירת קשר</h4>
-            <ul className="space-y-2">
+          
+            <ul className="space-y-4 mt-4">
               <li>
+              <Link
+                  href="/private/crm"
+                  className="w-32 border border-white px-4 py-2 rounded-lg hover:underline hover:font-bold transition duration-200 inline-block"
+                >
+                 CRM
+               </Link>
+              </li>
+             
                 <Link
-                  href="/contact"
-                  className="hover:underline hover:font-bold transition duration-200"
+                  href="/private/admin"
+                  className="w-32 border border-white px-4 py-2 rounded-lg hover:underline hover:font-bold transition duration-200 inline-block"
                 >
-                  טופס יצירת קשר
+                 ADMIN
                 </Link>
-              </li>
-              <li>
-                <a
-                  href="tel:0521234567"
-                  className="hover:underline hover:font-bold transition duration-200"
-                >
-                  052-1234567
-                </a>
-              </li>
-              <li>
-                <a
-                  href="mailto:info@example.com"
-                  className="hover:underline hover:font-bold transition duration-200"
-                >
-                  info@example.com
-                </a>
-              </li>
+             
             </ul>
           </div>
 
