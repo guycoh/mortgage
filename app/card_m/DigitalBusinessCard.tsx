@@ -112,6 +112,19 @@ export default function DigitalBusinessCard() {
                 </Link>
  
 
+                <a
+                    href="/contacts/guy-cohen.vcf"
+                    download="guy-cohen.vcf"
+                    className="mt-4 inline-flex items-center rounded-md bg-orange-500 px-4 py-2 text-white hover:bg-orange-600 transition"
+                  >
+                    הוסף אותי לאנשי הקשר
+                </a>
+
+
+
+
+
+
           {/* שם ותפקיד */}
           <h1 className="mt-20 text-3xl font-bold tracking-tight">משה מוסיוב</h1>
           <p className="text-white mt-2">יועץ משכנתאות</p>         

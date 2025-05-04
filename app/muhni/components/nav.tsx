@@ -18,14 +18,17 @@ export const Nav = ({ onOpenMenu, isMenuOpen }: { onOpenMenu: () => void, isMenu
         {/* אזור תפריט */}
         <div className="flex flex-wrap items-center justify-between gap-4 px-10 py-4 bg-white min-h-[70px] relative">
 
-        <div className="absolute top-1 left-1 w-36 h-auto">
+      <div className="absolute top-1 left-1 w-36 h-auto">
+        <Link href="/muhni" >
             <Image
               src="/assets/images/svg/muhni_logo.svg"
               alt="Logo"
               width={224}
               height={90}
-              className="object-contain"
+              className="object-contain"              
             />
+      </Link>
+
           </div>
 
 
