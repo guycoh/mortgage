@@ -9,11 +9,11 @@ export const Footer = () => {
           
           {/* עמודה 1 */}
           <div>
-            <h4 className="text-lg font-semibold mb-4">האתר</h4>
-            <ul className="space-y-2">
+            <h4 className="underline text-lg font-semibold mb-1">האתר</h4>
+            <ul className="space-y-1">
               <li>
                 <Link
-                  href="/about"
+                  href="/muhni/about"
                   className="hover:underline hover:font-bold transition duration-200"
                 >
                   אודותינו
@@ -21,103 +21,86 @@ export const Footer = () => {
               </li>
               <li>
                 <Link
-                  href="/muhni/bb"
+                  href="/muhni/calculators"
                   className="hover:underline hover:font-bold transition duration-200"
                 >
-                  מדריך להוצאת דוח יתרות
+                מחשבונים 
                 </Link>
               </li>
+
               <li>
                 <Link
-                  href="/blog"
-                  className="border border-white px-4 py-2 rounded-lg hover:underline hover:font-bold transition duration-200 inline-block"
+                  href="/muhni/concepts"
+                  className="hover:underline hover:font-bold transition duration-200"
                 >
-                  בלוג
+                מושגים במשכנתא
                 </Link>
               </li>
+            
             </ul>
           </div>
 
           {/* עמודה 2 */}
-          <div>
-            <h4 className="text-lg font-semibold mb-4">מיחזור משכנתא</h4>
-            <ul className="space-y-2">
-              <li>
-                <Link
-                  href="/muhni/mortgage_refinancing"
-                  className="hover:underline hover:font-bold transition duration-200"
-                >
+        
+          <div>          
+            <h4 className="underline text-lg font-semibold mb-1">מיחזור משכנתא</h4>
+                <ul className="space-y-1">
+                    <li>
+                    <Link
+                      href="/muhni/mortgage_refinancing"
+                      className="hover:underline hover:font-bold transition duration-200"
+                    >
                   מיחזור משכנתא
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/muhni/bb"
-                  className="hover:underline hover:font-bold transition duration-200"
-                >
-               מדריכים הוצאת דוח יתרות לסילוק
-                </Link>
-              </li>
-            </ul>
+                    </Link>
+                    </li>
+                  
+                    <li>
+                        <Link
+                          href="/muhni/bb"
+                          className="hover:underline hover:font-bold transition duration-200"
+                        >
+                          מדריכים הוצאת דוח יתרות לסילוק
+                        </Link>
+                    </li>
+                    
+                </ul>        
+                
           </div>
-
+        
           {/* עמודה 3 */}
-          <div>
-            <h4 className="text-lg font-semibold mb-4">משאבים</h4>
-            <ul className="space-y-2">
-              <li>
-                <Link
-                  href="/guides"
-                  className="hover:underline hover:font-bold transition duration-200"
-                >
-                  מדריכים
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/faq"
-                  className="hover:underline hover:font-bold transition duration-200"
-                >
-                  שאלות נפוצות
-                </Link>
-              </li>
-            </ul>
-        
-            <h4 className="text-lg font-semibold mb-4">יצירת קשר</h4>
-            <ul className="space-y-2">
-              <li>
-                <Link
-                  href="/contact"
-                  className="hover:underline hover:font-bold transition duration-200"
-                >
-                  טופס יצירת קשר
-                </Link>
-              </li>
-              <li>
-                <a
-                  href="tel:0521234567"
-                  className="hover:underline hover:font-bold transition duration-200"
-                >
-                  052-1234567
-                </a>
-              </li>
-              <li>
-                <a
-                  href="mailto:info@example.com"
-                  className="hover:underline hover:font-bold transition duration-200"
-                >
-                  info@example.com
-                </a>
-              </li>
-            </ul>
-        
-        
-        
+          <div>          
+            <h4 className="underline text-lg font-semibold mb-1">יצירת קשר</h4>
+                <ul className="space-y-1">
+                    <li>
+                    <Link
+                        href="/muhni/contact"
+                        className="hover:underline hover:font-bold transition duration-200"
+                      >
+                        טופס יצירת קשר
+                    </Link>
+                    </li>
+                  
+                    <li>
+                      <a
+                        href="tel:0523684844"
+                        className="hover:underline hover:font-bold transition duration-200"
+                      >
+                        052-3684844
+                      </a>
+                    </li>
+                    <li>
+                      <a
+                        href="guycoh@outlook.co.il"
+                        className="hover:underline hover:font-bold transition duration-200"                >
+                        guycoh@outlook.co.il
+                      </a>
+                    </li> 
+                </ul>        
+                
           </div>
-
           {/* עמודה 4 */}
           <div>
-          <h4 className="text-lg font-semibold mb-1">כתובת</h4>
+          <h4 className="underline text-lg font-semibold mb-1">כתובת</h4>
             <ul className="space-y-1">
               <li>
                 <a
