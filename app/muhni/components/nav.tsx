@@ -27,9 +27,25 @@ export const Nav = ({ onOpenMenu, isMenuOpen }: { onOpenMenu: () => void, isMenu
               height={90}
               className="object-contain"              
             />
-      </Link>
+        </Link>
+      </div>
 
-          </div>
+      <div className="absolute top-2 left-40 w-22 h-auto">
+        <Link href="/muhni" >
+            <Image
+              src="/assets/images/imgFiles/remax.png"
+              alt="Logo"
+              width={40}
+              height={40}
+              className="object-contain"              
+            />
+        </Link>
+
+      </div>
+
+
+
+
 
 
 
