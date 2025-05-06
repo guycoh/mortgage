@@ -57,12 +57,12 @@ export const Nav = ({ onOpenMenu, isMenuOpen }: { onOpenMenu: () => void, isMenu
               <li>
                 <Link href="/muhni/schedule" className="text-white bg-main rounded-lg text-sm px-5 py-2.5">קבע פגישה</Link>
               </li>
-              <li>
+              {/* <li>
                 <Link href="/login" className="text-white bg-main rounded-lg text-sm px-5 py-2.5">אזור אישי</Link>
               </li>
               <li>
                 <Link href="/register" className="text-white bg-main rounded-lg text-sm px-5 py-2.5">הרשמה</Link>
-              </li>
+              </li> */}
               <li>
                 <UserInfo />
               </li>

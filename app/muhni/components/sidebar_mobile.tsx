@@ -3,6 +3,7 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
+import UserInfo from "./logoutButton"
 
 export default function SideMenu({ triggerButton }: { triggerButton: (onClick: () => void, isOpen: boolean) => React.ReactNode }) {
   const [isOpen, setIsOpen] = useState(false)
@@ -68,25 +69,14 @@ export default function SideMenu({ triggerButton }: { triggerButton: (onClick: (
                    קביעת זום
                   </Link>
             </li>
-            <li >
-              <Link
-                href="/login"                
-                className="block text-[#1d75a1] hover:text-[#007bff] font-bold text-[20px]" 
-                onClick={() => setIsOpen(false)}
-                >
-                כניסה למערכת
-              </Link>
-            </li>
-            <li >
-              <Link
-                href="/signup"                
-                className="block text-[#1d75a1] hover:text-[#007bff] font-bold text-[20px]"
-                onClick={() => setIsOpen(false)}
-                >
-                הרשמה
-              </Link>
-            </li>
             
+            
+            <li >
+            <UserInfo />
+
+            </li>
+           
+      
             <li >
               <Link
                 href="/private/crm"                
