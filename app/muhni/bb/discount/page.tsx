@@ -4,33 +4,31 @@ import WebIcon from "@/public/assets/images/svg/webIcon";
 import Image from "next/image";
 import WhatsAppButton from "../../components/WhatsAppButton";
 
+
+
 export const metadata = {
-  title: "גיא כהן-יועץ משכנתא",
-  description: "הכרטיס הדיגיטלי של גיא כהן - משרדים רמלה/לוד/תל אביב ",
+  title: 'מדריך להוצאת דוח יתרות לסילוק – מזרחי טפחות',
+  description: 'הסבר פשוט ומדויק איך להוציא דוח יתרות לסילוק מבנק מזרחי טפחות.',
   openGraph: {
-    title: "הכרטיס של גיא כהן ",
-    description: "     ",
-    url: "https://morg-orcin.vercel.app/", // שנה לכתובת האמיתית שלך
-    siteName: "muhni",
+    title: 'מדריך להוצאת דוח יתרות לסילוק – מזרחי טפחות',
+    description: 'הסבר פשוט ומדויק איך להוציא דוח יתרות לסילוק מבנק מזרחי טפחות.',
+    url: 'https://morg-orcin.vercel.app/muhni/bb/mizrachi',
     images: [
       {
-        url: "https://morg-orcin.vercel.app/assets/images/imgFiles/guywhapp.jpg", // לינק מלא לתמונה
+        url: 'https://morg-orcin.vercel.app/og/mizrachi-guide.png',
         width: 1200,
         height: 630,
-        alt: "MUHNI - משרדים בלוד וברמלה",
+        alt: 'מדריך להוצאת דוח יתרות – מזרחי טפחות',
       },
     ],
-    locale: "he_IL",
-    type: "website",
   },
   twitter: {
-    card: "summary_large_image",
-    title: "הכרטיס של גיא כהן - יועץ משכנתא MUHNI",
-    description: "בקרו אותנו והתחילו דרך חדשה עם משכנתא חכמה!",
-    images: ["https://yourwebsite.com/images/card-preview.jpg"],
+    card: 'summary_large_image',
+    title: 'מדריך להוצאת דוח יתרות לסילוק – מזרחי טפחות',
+    description: 'הסבר פשוט ומדויק איך להוציא דוח יתרות לסילוק מבנק מזרחי טפחות.',
+    images: ['https://morg-orcin.vercel.app/assets/images/imgFiles/guywhapp.jpg'],
   },
 };
-
 
 
 
