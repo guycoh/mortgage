@@ -1,4 +1,4 @@
-"use client";
+
 import Phone from "@/public/assets/images/svg/phone";
 import WebIcon from "@/public/assets/images/svg/webIcon";
 import Image from "next/image";
