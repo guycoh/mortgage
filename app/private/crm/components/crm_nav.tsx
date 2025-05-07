@@ -17,22 +17,25 @@ const CrmNav = () => {
         </Link>
 
         {/* Desktop Navigation */}
-        <div className="hidden md:flex space-x-4">
-      
-          <Link href="/private/crm/leadweb"          
-          className="text-gray-300 hover:text-white">
-          לידים חדשים מהאתר
+        <div className="hidden md:flex items-center space-x-6 rtl:space-x-reverse">
+          <Link href="/private/crm/wa" className="text-white hover:text-orange-400 transition-colors duration-300 font-medium text-lg">
+          הודעות ווצאפ
           </Link>
-          <Link href="/about" className="text-gray-300 hover:text-white">
-           פגישות
+          
+          <Link href="/private/crm/leadweb" className="text-white hover:text-orange-400 transition-colors duration-300 font-medium text-lg">
+            לידים חדשים מהאתר
           </Link>
-          <Link href="/services" className="text-gray-300 hover:text-white">
-           לקוחות
+          <Link href="/about" className="text-white hover:text-orange-400 transition-colors duration-300 font-medium text-lg">
+            פגישות
+          </Link>p
+          <Link href="/services" className="text-white hover:text-orange-400 transition-colors duration-300 font-medium text-lg">
+            לקוחות
           </Link>
-          <Link href="/contact" className="text-gray-300 hover:text-white">
-          משכנתאות
+          <Link href="/contact" className="text-white hover:text-orange-400 transition-colors duration-300 font-medium text-lg">
+            משכנתאות
           </Link>
         </div>
+
 
         {/* Mobile Menu Button */}
         <div className="md:hidden">
