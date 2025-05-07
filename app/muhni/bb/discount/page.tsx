@@ -7,25 +7,25 @@ import WhatsAppButton from "../../components/WhatsAppButton";
 
 
 export const metadata = {
-  title: 'מדריך להוצאת דוח יתרות לסילוק – מזרחי טפחות',
-  description: 'הסבר פשוט ומדויק איך להוציא דוח יתרות לסילוק מבנק מזרחי טפחות.',
+  title: 'מדריך להוצאת דוח יתרות לסילוק – דיסקונט ',
+  description: 'הסבר פשוט ומדויק איך להוציא דוח יתרות לסילוק מבנק דיסקונט .',
   openGraph: {
-    title: 'מדריך להוצאת דוח יתרות לסילוק – מזרחי טפחות',
-    description: 'הסבר פשוט ומדויק איך להוציא דוח יתרות לסילוק מבנק מזרחי טפחות.',
+    title: 'מדריך להוצאת דוח יתרות לסילוק – דיסקונט ',
+    description: 'הסבר פשוט ומדויק איך להוציא דוח יתרות לסילוק מבנק דיסקונט .',
     url: 'https://morg-orcin.vercel.app/muhni/bb/mizrachi',
     images: [
       {
         url: 'https://morg-orcin.vercel.app/og/mizrachi-guide.png',
         width: 1200,
         height: 630,
-        alt: 'מדריך להוצאת דוח יתרות – מזרחי טפחות',
+        alt: 'מדריך להוצאת דוח יתרות – דיסקונט ',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'מדריך להוצאת דוח יתרות לסילוק – מזרחי טפחות',
-    description: 'הסבר פשוט ומדויק איך להוציא דוח יתרות לסילוק מבנק מזרחי טפחות.',
+    title: 'מדריך להוצאת דוח יתרות לסילוק – דיסקונט ',
+    description: 'הסבר פשוט ומדויק איך להוציא דוח יתרות לסילוק מבנק דיסקונט .',
     images: ['https://morg-orcin.vercel.app/assets/images/imgFiles/guywhapp.jpg'],
   },
 };
