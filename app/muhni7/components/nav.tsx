@@ -2,6 +2,7 @@
 import Link from "next/link"
 import UserInfo from "./logoutButton"
 import Image from "next/image";
+import GuidesDropdown from "./GuidesDropdown";
 
 export const Nav = ({ onOpenMenu, isMenuOpen }: { onOpenMenu: () => void, isMenuOpen: boolean }) => {
   return (
@@ -34,6 +35,12 @@ export const Nav = ({ onOpenMenu, isMenuOpen }: { onOpenMenu: () => void, isMenu
       <UserInfo />
     
       </div>
+      <div className="max-lg:hidden lg:!block absolute top-4 right-[480px] w-auto h-auto   3">
+           <GuidesDropdown />    
+      </div>
+      <div className="max-lg:hidden lg:!block absolute top-5.2 left-[420px] w-auto h-auto   3">
+           <Link href="/muhni7/schedule" className="text-white bg-main rounded-lg text-sm px-5 py-2.5">קבע פגישה</Link>
+      </div>
 
 
 
@@ -63,15 +70,7 @@ export const Nav = ({ onOpenMenu, isMenuOpen }: { onOpenMenu: () => void, isMenu
               <li><Link href="/muhni7/calculators" className="text-main font-bold text-[15px]">מחשבונים</Link></li>
               <li><Link href="/muhni7/concepts" className="text-main font-bold text-[15px]">מושגים במשכנתא</Link></li>
               <li><Link href="/muhni7/contact" className="text-main font-bold text-[15px]">צור קשר</Link></li>
-              <li>
-                <Link href="/muhni7/schedule" className="text-white bg-main rounded-lg text-sm px-5 py-2.5">קבע פגישה</Link>
-              </li>
-              {/* <li>
-                <Link href="/login" className="text-white bg-main rounded-lg text-sm px-5 py-2.5">אזור אישי</Link>
-              </li>
-              <li>
-                <Link href="/register" className="text-white bg-main rounded-lg text-sm px-5 py-2.5">הרשמה</Link>
-              </li> */}
+             
               
             
             

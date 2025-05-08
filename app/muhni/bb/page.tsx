@@ -2,7 +2,8 @@ import Link from "next/link";
 
 const MenuPage = () => {
   return (
-    <div className="bg-gradient-to-r from-white to-[#f8f8f8] min-h-screen flex flex-col justify-center items-center py-10">
+    <main className="bg-gradient-to-br from-purple-50 via-violet-100 to-purple-200 text-gray-700 leading-relaxed">
+    <div className=" from-white to-[#f8f8f8] min-h-screen flex flex-col justify-center items-center py-10">
       <div className="bg-white p-8 rounded-xl shadow-lg w-11/12 md:w-1/2 lg:w-1/3 text-center space-y-6 border border-gray-200">
         <h1 className="text-4xl font-bold text-gray-800 tracking-tight">
           מדריכים להוצאת יתרת סילוק
@@ -41,6 +42,8 @@ const MenuPage = () => {
         </div>
       </div>
     </div>
+    </main>
+
   );
 };
 

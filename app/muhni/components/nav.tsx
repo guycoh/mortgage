@@ -2,6 +2,9 @@
 import Link from "next/link"
 import UserInfo from "./logoutButton"
 import Image from "next/image";
+import GuidesDropdown from "./GuidesDropdown";
+
+
 
 export const Nav = ({ onOpenMenu, isMenuOpen }: { onOpenMenu: () => void, isMenuOpen: boolean }) => {
   return (
@@ -32,9 +35,13 @@ export const Nav = ({ onOpenMenu, isMenuOpen }: { onOpenMenu: () => void, isMenu
       <div className="max-lg:hidden lg:!block absolute top-4 left-52 w-auto h-auto   3">
          <UserInfo />
     
-       </div>
-
-
+      </div>
+      <div className="max-lg:hidden lg:!block absolute top-4 right-[480px] w-auto h-auto   3">
+           <GuidesDropdown />    
+      </div>
+      <div className="max-lg:hidden lg:!block absolute top-5.2 left-[420px] w-auto h-auto   3">
+           <Link href="/muhni/schedule" className="text-white bg-main rounded-lg text-sm px-5 py-2.5">קבע פגישה</Link>
+      </div>
 
 
 
@@ -63,9 +70,11 @@ export const Nav = ({ onOpenMenu, isMenuOpen }: { onOpenMenu: () => void, isMenu
               <li><Link href="/muhni/calculators" className="text-main font-bold text-[15px]">מחשבונים</Link></li>
               <li><Link href="/muhni/concepts" className="text-main font-bold text-[15px]">מושגים במשכנתא</Link></li>
               <li><Link href="/muhni/contact" className="text-main font-bold text-[15px]">צור קשר</Link></li>
-              <li>
+             
+              
+              {/* <li>
                 <Link href="/muhni/schedule" className="text-white bg-main rounded-lg text-sm px-5 py-2.5">קבע פגישה</Link>
-              </li>
+              </li> */}
               {/* <li>
                 <Link href="/login" className="text-white bg-main rounded-lg text-sm px-5 py-2.5">אזור אישי</Link>
               </li>
