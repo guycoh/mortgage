@@ -31,6 +31,7 @@ const mortgageCategories = [
 
 export default function MortgageCategories() {
   return (
+    <main className="bg-gradient-to-br from-purple-50 via-violet-100 to-purple-200 text-gray-700 ">
     <div className="p-6 animate-fade-in">
       <h1 className="text-2xl font-bold mb-4 text-center text-fontss1">
         איזה משכנתא מתאימה לי? &nbsp;
@@ -68,6 +69,9 @@ export default function MortgageCategories() {
     </div>
 
     </div>
+
+    </main>
+
   );
 }
 

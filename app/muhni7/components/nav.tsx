@@ -64,7 +64,7 @@ export const Nav = ({ onOpenMenu, isMenuOpen }: { onOpenMenu: () => void, isMenu
               <li><Link href="/muhni7/concepts" className="text-main font-bold text-[15px]">מושגים במשכנתא</Link></li>
               <li><Link href="/muhni7/contact" className="text-main font-bold text-[15px]">צור קשר</Link></li>
               <li>
-                <Link href="/muhni/schedule" className="text-white bg-main rounded-lg text-sm px-5 py-2.5">קבע פגישה</Link>
+                <Link href="/muhni7/schedule" className="text-white bg-main rounded-lg text-sm px-5 py-2.5">קבע פגישה</Link>
               </li>
               {/* <li>
                 <Link href="/login" className="text-white bg-main rounded-lg text-sm px-5 py-2.5">אזור אישי</Link>
