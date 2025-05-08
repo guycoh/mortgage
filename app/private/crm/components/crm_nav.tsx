@@ -21,6 +21,10 @@ const CrmNav = () => {
           <Link href="/private/crm/wa" className="text-white hover:text-orange-400 transition-colors duration-300 font-medium text-lg">
           הודעות ווצאפ
           </Link>
+
+          <Link href="/private/crm/leadweb" className="text-white hover:text-orange-400 transition-colors duration-300 font-medium text-lg">
+            לידים חדשים מהאתר
+          </Link>
           
           <Link href="/private/crm/leadweb" className="text-white hover:text-orange-400 transition-colors duration-300 font-medium text-lg">
             לידים חדשים מהאתר

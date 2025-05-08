@@ -155,7 +155,7 @@ export default function DigitalBusinessCard() {
             <EmailIcon size={40} color="white" />
             <span className="text-sm">מייל</span>
             </a>
-            <a href="https://morg-orcin.vercel.app/muhni" className="flex flex-col items-center hover:opacity-80 transition">
+            <a href="https://morg-orcin.vercel.app/muhni7" className="flex flex-col items-center hover:opacity-80 transition">
             {/* מייל */}
             <WebIcon size={40} color="white" /> {/* סגול */}
             <span className="text-sm">אתר</span>
@@ -172,22 +172,22 @@ export default function DigitalBusinessCard() {
         <div>
         <h2 className="text-xl font-semibold mb-4">מחשבוני משכנתא</h2>
         <div className="grid grid-cols-4 gap-4">
-            <Link href="/muhni/calculators/simple_calculator" className="flex flex-col items-center hover:opacity-80 transition">
+            <Link href="/muhni7/calculators/simple_calculator" className="flex flex-col items-center hover:opacity-80 transition">
               <Calculator1 size={40} color="white" />
             <span className="text-sm text-center">מחשבון הלוואה</span>
             </Link>
 
-            <Link href="/muhni/calculators/mortgage_capability" className="flex flex-col items-center hover:opacity-80 transition">
+            <Link href="/muhni7/calculators/mortgage_capability" className="flex flex-col items-center hover:opacity-80 transition">
               <Calculator2 size={40} color="white" />
             <span className="text-sm text-center">כמה משכנתא אוכל לקחת?</span>
             </Link>
 
-            <Link href="/muhni/calculators/purchase_tax_calculator" className="flex flex-col items-center hover:opacity-80 transition">
+            <Link href="/muhni7/calculators/purchase_tax_calculator" className="flex flex-col items-center hover:opacity-80 transition">
               <Calculator3 size={40} color="white" />
             <span className="text-sm text-center">מס רכישה</span>
             </Link>
           
-            <Link href="/muhni/calculators/refinance-calculator" className="flex flex-col items-center hover:opacity-80 transition">
+            <Link href="/muhni7/calculators/refinance-calculator" className="flex flex-col items-center hover:opacity-80 transition">
             <Calculator4 size={40} color="white" />
             <span className="text-sm text-center">החזר חודשי</span>
             </Link>
