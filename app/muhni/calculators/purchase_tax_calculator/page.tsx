@@ -65,9 +65,9 @@ const PurchaseTaxCalculator = () => {
   };
 
   return (
-    <div className="min-h-screen flex justify-center bg-gradient-to-b from-[#f9fafb] to-[#e3f2fd] py-16 px-6">
+    <div className="min-h-screen flex justify-center bg-gradient-to-br from-purple-50 via-violet-100 to-purple-200 py-16 px-6">
       <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl p-8 w-full max-w-2xl border border-white/40">
-        <h1 className="text-4xl text-center font-extrabold text-[#1d75a1] mb-6">
+        <h1 className="text-4xl text-center font-extrabold text-main mb-6">
           מחשבון מס רכישה 🏡
         </h1>
 
@@ -106,7 +106,7 @@ const PurchaseTaxCalculator = () => {
 
         <button
           onClick={calculateTax}
-          className="w-full py-3 mt-2 rounded-xl bg-[#1d75a1] text-white font-bold hover:bg-blue-800 transition-all shadow-lg text-xl"
+          className="w-full py-3 mt-2 rounded-xl bg-main text-white font-bold hover:bg-blue-800 transition-all shadow-lg text-xl"
         >
           חשב מס 💰
         </button>
