@@ -1,6 +1,5 @@
-'use client'
-
-import { useEffect, useState } from 'react'
+"use client"
+import { useState } from 'react'
 
 type CostItem = {
   label: string
@@ -26,7 +25,6 @@ export default function CostsCalculator() {
   const [items, setItems] = useState<CostItem[]>([
     { label: 'עורך דין', percentage: 0.5, amount: 0 },
     { label: 'תיווך', percentage: 2, amount: 0 },
-  
   ])
 
   const formatNumber = (num: number) =>
@@ -38,7 +36,6 @@ export default function CostsCalculator() {
     const numericValue = parseNumber(value)
     setPropertyPrice(numericValue)
     setPriceInput(formatNumber(numericValue))
-    // Update item amounts
     setItems((prev) =>
       prev.map((item) => ({
         ...item,
@@ -84,115 +81,116 @@ export default function CostsCalculator() {
   }, 0)
 
   return (
-    <div className="max-w-2xl mx-auto p-6 bg-white rounded-xl shadow-md space-y-6">
-      <h2 className="text-xl font-bold">מחשבון עלויות נלוות</h2>
-      <p className="text-sm text-red-600 font-semibold">
-        ⚠️ חשוב מאוד לדעת שההוצאות הנלוות אינן חלק מן ההון העצמי המחושב לצרכי משכנתא
-      </p>
+    <main className="min-h-screen bg-gradient-to-br from-purple-50 via-violet-100 to-purple-200 text-gray-700 flex justify-center items-start">
+      <div className="w-full md:max-w-[80%] mt-12 mb-12 p-6 bg-white rounded-xl shadow-md space-y-6">
+        <h2 className="text-xl font-bold">מחשבון עלויות נלוות</h2>
 
-      <div>
-        <label className="block mb-1 font-medium">מחיר הדירה (₪)</label>
-        <input
-          type="text"
-          className="w-full border rounded px-3 py-2 text-right focus:outline-none focus:ring-2 focus:ring-orange-400 bg-orange-50"
-          inputMode="numeric"
-          value={priceInput}
-          onChange={(e) => handlePriceChange(e.target.value)}
-        />
-      </div>
+        <p className="text-sm text-red-600 font-semibold">
+          ⚠️ חשוב מאוד לדעת שההוצאות הנלוות אינן חלק מן ההון העצמי המחושב לצרכי משכנתא
+        </p>
 
-      <div id="pdf-content">
-        <table className="w-full text-right border-t mt-4">
-          <thead>
-            <tr className="border-b bg-gray-100 text-sm">
-              <th className="p-2">סעיף</th>
-              <th className="p-2 w-24">אחוז מהנכס</th>
-              <th className="p-2 w-36">עלות משוערת (₪)</th>
-              <th className="p-2 w-36">כולל מע״מ</th>
-              <th className="p-2 w-12"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((item, i) => {
-              const itemVat =
-                item.label === 'מס רכישה'
-                  ? 0
-                  : Math.round(item.amount * (VAT_RATE / 100))
-              const totalWithVat = item.amount + itemVat
+        <button
+          onClick={addItem}
+          className="bg-green-500 hover:bg-green-600 text-white font-semibold px-4 py-2 rounded flex items-center gap-1"
+        >
+          <span className="text-white text-xl">+</span>
+          הוסף שורה
+        </button>
 
-              return (
-                <tr key={i} className="border-b">
-                  <td className="p-2">
-                    <select
-                      className="w-full border rounded px-2 py-1 bg-white"
-                      value={item.label}
-                      onChange={(e) => handleItemChange(i, 'label', e.target.value)}
-                    >
-                      <option value="">בחר סעיף</option>
-                      {options.map((opt) => (
-                        <option key={opt} value={opt}>
-                          {opt}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
+        <div>
+          <label className="block mb-1 font-medium">מחיר הדירה (₪)</label>
+          <input
+            type="text"
+            className="w-full border rounded px-3 py-2 text-right focus:outline-none focus:ring-2 focus:ring-orange-400 bg-orange-50"
+            inputMode="numeric"
+            value={priceInput}
+            onChange={(e) => handlePriceChange(e.target.value)}
+          />
+        </div>
 
-                  <td className="p-2">
-                    <div className="relative">
-                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 font-bold">
-                        %
-                      </span>
+        <div id="pdf-content" className="overflow-x-auto">
+          <table className="w-full min-w-[900px] table-fixed text-right border-t mt-4">
+            <thead>
+              <tr className="border-b bg-gray-100 text-sm">
+                <th className="p-2 w-[150px] max-w-[150px] truncate">סעיף</th>
+                <th className="p-2 w-[80px]">אחוז<br />מהנכס</th>
+                <th className="p-2 w-[150px]">עלות<br />משוערת (₪)</th>
+                <th className="p-2 w-[150px]">כולל<br />מע״מ</th>
+                <th className="p-2 w-[50px]"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((item, i) => {
+                const itemVat = item.label === 'מס רכישה' ? 0 : Math.round(item.amount * (VAT_RATE / 100));
+                const totalWithVat = item.amount + itemVat;
+
+                return (
+                  <tr key={i} className="border-b">
+                    <td className="p-2 max-w-[150px]">
+                      <select
+                        className="w-full border rounded px-2 py-1 bg-white truncate"
+                        value={item.label}
+                        onChange={(e) => handleItemChange(i, 'label', e.target.value)}
+                      >
+                        <option value="">בחר סעיף</option>
+                        {options.map((opt) => (
+                          <option key={opt} value={opt}>
+                            {opt.length > 15 ? opt.slice(0, 15) + '…' : opt}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+
+                    <td className="p-2">
+                      <div className="relative">
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 font-bold">%</span>
+                        <input
+                          type="number"
+                          step="0.1"
+                          inputMode="decimal"
+                          className="w-full border rounded px-6 py-1 text-right bg-orange-50"
+                          value={item.percentage.toString()}
+                          onChange={(e) => handleItemChange(i, 'percentage', e.target.value)}
+                        />
+                      </div>
+                    </td>
+
+                    <td className="p-2">
                       <input
-                        type="number"
-                        step="0.1"
-                        className="w-full border rounded px-6 py-1 text-right bg-orange-50"
-                        value={item.percentage.toFixed(1)}
-                        onChange={(e) =>
-                          handleItemChange(i, 'percentage', e.target.value)
-                        }
+                        type="text"
+                        inputMode="numeric"
+                        className="w-full border rounded px-3 py-1 text-right bg-orange-50"
+                        value={formatNumber(item.amount)}
+                        onChange={(e) => handleItemChange(i, 'amount', e.target.value)}
                       />
-                    </div>
-                  </td>
+                    </td>
 
-                  <td className="p-2">
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      className="w-full border rounded px-3 py-1 text-right bg-orange-50"
-                      value={formatNumber(item.amount)}
-                      onChange={(e) =>
-                        handleItemChange(i, 'amount', e.target.value)
-                      }
-                    />
-                  </td>
+                    <td className="p-2 text-green-700 font-semibold text-sm">
+                      {Math.round(totalWithVat).toLocaleString('he-IL', {
+                        style: 'currency',
+                        currency: 'ILS',
+                        maximumFractionDigits: 0,
+                      })}
+                    </td>
 
-                  <td className="p-2 text-green-700 font-semibold text-sm">
-                    {Math.round(totalWithVat).toLocaleString('he-IL', {
-                      style: 'currency',
-                      currency: 'ILS',
-                      maximumFractionDigits: 0,
-                    })}
-                  </td>
-
-                  <td className="p-2 text-center">
-                    <button
-                      onClick={() => removeItem(i)}
-                      className="text-red-500 hover:text-red-700 text-xl font-bold"
-                      title="מחק שורה"
-                    >
-                      🗑
-                    </button>
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-
-          <tfoot>
-            <tr className="font-bold border-t bg-gray-50">
-              <td className="p-2">סה״כ</td>
-              <td></td>
-              <td className="p-2 text-blue-700">
+                    <td className="p-2 text-center">
+                      <button
+                        onClick={() => removeItem(i)}
+                        className="text-red-500 hover:text-red-700 text-xl font-bold"
+                        title="מחק שורה"
+                      >
+                        🗑
+                      </button>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+            <tfoot>
+              <tr className="font-bold border-t bg-gray-50">
+                <td className="p-2">סה״כ</td>
+                <td></td>
+                <td className="p-2 text-blue-700">
                   {Math.round(totalCost).toLocaleString('he-IL', {
                     style: 'currency',
                     currency: 'ILS',
@@ -206,22 +204,22 @@ export default function CostsCalculator() {
                     maximumFractionDigits: 0,
                   })}
                 </td>
-              <td></td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
 
-      <div className="flex gap-4 mt-4">
-        <button
-          onClick={addItem}
-          className="bg-orange-500 hover:bg-orange-600 text-white font-semibold px-4 py-2 rounded"
-        >
-          ➕ הוסף שורה
-        </button>
+        <div className="flex gap-4 mt-4">
+          <button
+            onClick={addItem}
+            className="bg-green-500 hover:bg-green-600 text-white font-semibold px-4 py-2 rounded flex items-center gap-1"
+          >
+            <span className="text-white text-xl">+</span>
+            הוסף שורה
+          </button>
+        </div>
       </div>
-    </div>
+    </main>
   )
 }
-
-
