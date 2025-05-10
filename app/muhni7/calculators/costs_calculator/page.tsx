@@ -16,6 +16,8 @@ const options = [
   'יועץ משכנתא',
   'שמאי',
   'הובלות',
+  'שיפוץ',
+  'אחר',
 ]
 
 export default function CostsCalculator() {

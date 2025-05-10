@@ -16,6 +16,8 @@ const options = [
   'יועץ משכנתא',
   'שמאי',
   'הובלות',
+  'שיפוץ',
+  'אחר',
 ]
 
 export default function CostsCalculator() {
@@ -81,7 +83,7 @@ export default function CostsCalculator() {
   }, 0)
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-purple-50 via-violet-100 to-purple-200 text-gray-700 flex justify-center items-start">
+  
       <div className="w-full md:max-w-[80%] mt-12 mb-12 p-6 bg-white rounded-xl shadow-md space-y-6">
         <h2 className="text-xl font-bold">מחשבון עלויות נלוות</h2>
 
@@ -220,6 +222,8 @@ export default function CostsCalculator() {
           </button>
         </div>
       </div>
-    </main>
+  
   )
 }
+
+

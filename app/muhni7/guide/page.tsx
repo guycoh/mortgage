@@ -1,7 +1,12 @@
 'use client';
+import { useState } from "react";
+import PurchaseTaxModal from "../calculators/modal/PurchaseTaxModal";
 
 
 export default function MortgageGuide() {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isPurchaseTaxModalOpen, setIsPurchaseTaxModalOpen] = useState(false);
+ 
   return (
     <main className="bg-gradient-to-br from-purple-50 via-violet-100 to-purple-200 text-gray-700 px-6 py-12 sm:px-12 md:px-24 lg:px-32 leading-relaxed">
       <section className="max-w-4xl mx-auto space-y-12">
@@ -15,10 +20,44 @@ export default function MortgageGuide() {
         </header>
 
         <article className="space-y-10 text-base sm:text-lg text-gray-700">
-          <Section
+        <Section
             title="1. להבין מהי משכנתא – ולא למהר לחתום"
-            content="משכנתא היא הלוואה ענקית וארוכת טווח לצורך רכישת דירה. הבנק נותן לכם את הכסף – אבל משעבד את הנכס כבטוחה. תתייחסו לזה כמו חוזה נישואין פיננסי – חשוב להבין מה לוקחים ולמה."
+            content={
+              <>
+                <p className="mb-4 text-gray-700">
+                  משכנתא היא הלוואה ענקית וארוכת טווח לצורך רכישת דירה. הבנק נותן לכם את הכסף – אבל משעבד את הנכס כבטוחה. תתייחסו לזה כמו חוזה נישואין פיננסי – חשוב להבין מה לוקחים ולמה.
+                </p>
+                <p className="text-gray-700 font-medium mb-4">
+                  המשכנתא היא רק חלק מהתמונה. עלויות נלוות כמו מס רכישה, עו״ד, תיווך, שמאות והובלה עלולות להפתיע. אל תישארו בלי תקציב – השתמשו במחשבון מיוחד שיעזור לכם להבין את התמונה המלאה.
+                </p>
+                <div className="mt-2">
+                  <button
+                    onClick={() => setIsModalOpen(true)}
+                    className="bg-gray-700 text-white text-sm font-medium py-1.5 px-3 rounded-md shadow hover:bg-gray-800 transition mx-2"
+                  >
+                    🧾 מחשבון עלויות נלוות
+                  </button>
+                
+                  <button
+                    onClick={() => setIsPurchaseTaxModalOpen(true)}
+                    className="bg-gray-700 text-white text-sm font-medium py-1.5 px-3 rounded-md shadow hover:bg-gray-800 transition mx-2"
+                  >
+                    🧾 מחשבון מס רכישה
+                  </button>
+                
+                
+                      <PurchaseTaxModal
+                       isPurchaseTaxModalOpen={isPurchaseTaxModalOpen}
+                        onClose={() => setIsPurchaseTaxModalOpen(false)}
+                       />
+                
+                
+                
+                </div>
+              </>
+            }
           />
+
           <Section
             title="2. הון עצמי – כמה צריך להביא מהבית?"
             content="בדירה ראשונה הבנק ייתן עד 75% מימון – ואת השאר אתם צריכים להביא בעצמכם. אם הדירה שווה 1.5 מיליון, אתם צריכים לפחות 375,000 ש״ח הון עצמי."
@@ -40,8 +79,8 @@ export default function MortgageGuide() {
             content="זה אישור מהבנק שמעיד כמה משכנתא תוכלו לקבל. חובה לקבל לפני חתימה על חוזה. אחרת? אתם מסכנים הרבה כסף."
           />
           <Section
-            title="7. יועץ משכנתאות – מותר להיעזר"
-            content="יועץ עצמאי (ולא של הבנק) יכול לחסוך לכם עשרות אלפי ש״ח. רק ודאו שהוא מקצועי, אמין, ושאתם מבינים את ההמלצות שלו."
+            title="7. יועץ משכנתאות – חשוב מאוד להיעזר"
+            content=" יועץ עצמאי (ולא של הבנק) יכול לחסוך לכם עשרות ואפילו אלפי ש״ח. רק ודאו שהוא מקצועי ואמין,  ."
           />
           <Section
             title="8. ביטוחים – חובה לדעת מה ולמה"
@@ -77,11 +116,17 @@ export default function MortgageGuide() {
   );
 }
 
-function Section({ title, content }: { title: string; content: string }) {
+function Section({
+  title,
+  content,
+}: {
+  title: React.ReactNode;
+  content: React.ReactNode;
+}) {
   return (
     <div>
       <h2 className="text-xl sm:text-2xl font-bold text-purple-700 mb-2">{title}</h2>
-      <p className="text-gray-700">{content}</p>
+      <div>{content}</div>
     </div>
   );
 }

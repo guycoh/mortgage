@@ -39,6 +39,8 @@ const MenuPage = () => {
           >
             בנק בינלאומי
           </Link>
+         
+
         </div>
       </div>
     </div>
