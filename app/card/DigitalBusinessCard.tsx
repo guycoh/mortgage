@@ -15,55 +15,7 @@ import LocationIcon from "@/public/assets/images/svg/location";
 export default function DigitalBusinessCard() {
   return (
     <div className="w-full min-h-screen bg-gradient-to-br text-white grid md:grid-cols-2">
-     {/* —— צד שמאל (ברכת הבית) —— */}
-<div className="hidden md:flex flex-col justify-center items-center bg-white p-10 order-1 md:order-2 shadow-2xl  ">
   
- 
- 
-   
-    <div
-      className="min-h-screen bg-center bg-cover flex items-center justify-center p-6"
-      style={{
-        backgroundImage: "url('/silver-glitter.jpg')", // כאן תשים טקסטורת נצנצים כסופה
-      }}
-    >
-    <div
-      className="min-h-screen bg-center bg-cover bg-fixed flex items-center justify-center p-8"
-      style={{
-        backgroundImage: "url('/silver-glitter.jpg')", // תמונה מלאה של נצנצים
-      }}
-    >
-      <div className="text-gray-800 text-center max-w-3xl space-y-6 bg-[#C0C0C0] p-10 rounded-2xl shadow-lg backdrop-blur-sm">
-        <h1 className="text-5xl font-extrabold">ברכת הבית</h1>
-        <ul className="rtl text-right text-xl font-medium space-y-3 leading-relaxed">
-          <li>בבית זה לא תשרור מריבה</li>
-          <li>בבית זה תהיה ברכה ושלום</li>
-          <li>בבית זה תשרה שכינה</li>
-          <li>בבית זה לא תישמע תלונה</li>
-          <li>בבית זה תהיה שמחה</li>
-          <li>בבית זה ישרה אור</li>
-          <li>בבית זה תהיה אהבה</li>
-          <li>בבית זה תתקיים פרנסה טובה</li>
-          <li>בבית זה ישרור שקט ושלווה</li>
-          <li>בבית זה יגורו אורך ימים ושנים</li>
-          <li>בבית זה יתקיימו כל משאלות הלב לטובה</li>
-        </ul>
-        <p className="text-2xl font-bold">אמן כן יהי רצון</p>
-      </div>
-    </div>
-    </div>
-
-
-
-
-
-
-
-
-
-  {/* קישוט תחתון סגול */}
-  <div className="w-20 h-1 bg-purple-600 mt-6 rounded-full animate-pulse" />
-</div>
 
 
       {/* —— צד ימין (כרטיס) —— */}
