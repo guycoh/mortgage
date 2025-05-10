@@ -1,10 +1,10 @@
 'use client';
 import { useState } from "react";
-import PurchaseTaxModal from "../calculators/modal/PurchaseTaxModal";
+
 import Modal from "../calculators/components/modal";
 import LoanCalculator from "../calculators/simple_calculator/page";
 import CostsCalculator from "../calculators/costs_calculator/page";
-
+import PurchaseTaxForm from "../calculators/purchase_tax_calculator/page";
 
 
 export default function MortgageGuide() {
@@ -45,7 +45,8 @@ export default function MortgageGuide() {
                 </p>
                 <div className="mt-2">
                    <button
-                    onClick={() => setIsPurchaseTaxModalOpen(true)}
+                   
+                    onClick={() => openModalWith(<PurchaseTaxForm />)}
                     className="bg-gray-700 text-white text-sm font-medium py-1.5 px-3 rounded-md shadow hover:bg-gray-800 transition mx-2"
                    >
                     🧾 מחשבון מס רכישה
@@ -59,11 +60,6 @@ export default function MortgageGuide() {
                   </button>
                  
                  
-                
-                      <PurchaseTaxModal
-                       isPurchaseTaxModalOpen={isPurchaseTaxModalOpen}
-                        onClose={() => setIsPurchaseTaxModalOpen(false)}
-                       />
                 
                 
                 
