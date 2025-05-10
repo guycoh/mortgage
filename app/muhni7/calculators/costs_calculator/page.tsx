@@ -222,6 +222,9 @@ export default function CostsCalculator() {
           </button>
         </div>
       </div>
+
     </main>
+
+    
   )
 }

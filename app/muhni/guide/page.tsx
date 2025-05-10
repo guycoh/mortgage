@@ -1,11 +1,25 @@
 'use client';
 import { useState } from "react";
 import PurchaseTaxModal from "../calculators/modal/PurchaseTaxModal";
+import Modal from "../calculators/components/modal";
+import LoanCalculator from "../calculators/simple_calculator/page";
+import CostsCalculator from "../calculators/costs_calculator/page";
+
+
 
 export default function MortgageGuide() {
-  const [isModalOpen, setIsModalOpen] = useState(false);
+
   const [isPurchaseTaxModalOpen, setIsPurchaseTaxModalOpen] = useState(false);
  
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [modalContent, setModalContent] = useState<React.ReactNode>(null)
+
+  const openModalWith = (content: React.ReactNode) => {
+    setModalContent(content)
+    setIsModalOpen(true)
+  }
+
+
   return (
     <main className="bg-gradient-to-br from-purple-50 via-violet-100 to-purple-200 text-gray-700 px-6 py-12 sm:px-12 md:px-24 lg:px-32 leading-relaxed">
       <section className="max-w-4xl mx-auto space-y-12">
@@ -30,20 +44,21 @@ export default function MortgageGuide() {
                   המשכנתא היא רק חלק מהתמונה. עלויות נלוות כמו מס רכישה, עו״ד, תיווך, שמאות והובלה עלולות להפתיע. אל תישארו בלי תקציב – השתמשו במחשבון מיוחד שיעזור לכם להבין את התמונה המלאה.
                 </p>
                 <div className="mt-2">
-                  <button
-                    onClick={() => setIsModalOpen(true)}
-                    className="bg-gray-700 text-white text-sm font-medium py-1.5 px-3 rounded-md shadow hover:bg-gray-800 transition mx-2"
-                  >
-                    🧾 מחשבון עלויות נלוות
-                  </button>
-                
-                  <button
+                   <button
                     onClick={() => setIsPurchaseTaxModalOpen(true)}
                     className="bg-gray-700 text-white text-sm font-medium py-1.5 px-3 rounded-md shadow hover:bg-gray-800 transition mx-2"
-                  >
+                   >
                     🧾 מחשבון מס רכישה
+                  </button>             
+                  
+                  <button
+                      onClick={() => openModalWith(<CostsCalculator />)}
+                      className="bg-gray-700 text-white text-sm font-medium py-1.5 px-3 rounded-md shadow hover:bg-gray-800 transition mx-2"
+                    >
+                      🧾 מחשבון עלויות נלוות
                   </button>
-                
+                 
+                 
                 
                       <PurchaseTaxModal
                        isPurchaseTaxModalOpen={isPurchaseTaxModalOpen}
@@ -62,17 +77,33 @@ export default function MortgageGuide() {
             content="בדירה ראשונה הבנק ייתן עד 75% מימון – ואת השאר אתם צריכים להביא בעצמכם. אם הדירה שווה 1.5 מיליון, אתם צריכים לפחות 375,000 ש״ח הון עצמי."
           />
           <Section
-            title="3. מושגים שחייבים להכיר"
+               title="3. בדיקת יכולת החזר – המציאות מדברת"
+                content={
+                  <>
+                    <p className="text-gray-700 font-medium mb-4">
+                      הבנק יבדוק שאתם יכולים לעמוד בהחזרים. כלל אצבע: לא יותר מ-40% מההכנסה הפנויה. אתם? תכוונו ל-30-35% כדי לנשום.
+                    </p>
+                    <button
+                      onClick={() => openModalWith(<LoanCalculator />)}
+                      className="bg-gray-700 text-white text-sm font-medium py-1.5 px-3 rounded-md shadow hover:bg-gray-800 transition mx-2"
+                    >
+                      🧾 מחשבון הלוואה
+                    </button>
+                  </>
+                }
+              />
+
+
+
+          <Section
+            title="4. מושגים שחייבים להכיר"
             content="קרן, ריבית, לוח סילוקין, אחוז מימון... זה לא סינית. פשוט שפה פיננסית שכדאי להכיר. ככל שתבינו יותר – תשלמו פחות."
           />
           <Section
-            title="4. מסלולי ריבית – איפה מרוויחים או נופלים"
+            title="5. מסלולי ריבית – איפה מרוויחים או נופלים"
             content="פריים? קבועה? משתנה? לא לוקחים את כל הסיכון במסלול אחד. פזרו נכון בין המסלולים, התייעצו, ותזכרו – מה שזול היום יכול להיות יקר מחר."
           />
-          <Section
-            title="5. בדיקת יכולת החזר – המציאות מדברת"
-            content="הבנק יבדוק שאתם יכולים לעמוד בהחזרים. כלל אצבע: לא יותר מ-40% מההכנסה הפנויה. אתם? תכוונו ל-30-35% כדי לנשום."
-          />
+        
           <Section
             title="6. אישור עקרוני – לא קונים דירה בלעדיו"
             content="זה אישור מהבנק שמעיד כמה משכנתא תוכלו לקבל. חובה לקבל לפני חתימה על חוזה. אחרת? אתם מסכנים הרבה כסף."
@@ -101,7 +132,7 @@ export default function MortgageGuide() {
               <li>בדקו כמה אתם יכולים להחזיר</li>
               <li>השוו ריביות בין בנקים</li>
               <li>בחרו תמהיל ריביות חכם</li>
-              <li>בדקו אם כדאי להיעזר ביועץ</li>
+              <li>חשוב מאוד !!! להיעזר ביועץ</li>
               <li>אל תחתמו בלי להבין – זו ההתחייבות הכי חשובה שלכם</li>
             </ul>
           </div>
@@ -111,6 +142,10 @@ export default function MortgageGuide() {
           </footer>
         </article>
       </section>
+          <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
+                {modalContent}
+          </Modal>
+  
     </main>
   );
 }
