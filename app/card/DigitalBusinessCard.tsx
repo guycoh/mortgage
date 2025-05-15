@@ -101,8 +101,14 @@ export default function DigitalBusinessCard() {
         {/* Grid של כפתורים: יצירת קשר + מחשבונים */}  
         <div className="mt-6 w-full flex flex-col gap-4">
 
-        {/* — יצירת קשר — */}
+        {/* — יצירת קשר — */}       
+        
         <div className="w-full flex justify-center">
+        <div>
+        <h2 className="text-xl font-semibold mb-4">יצירת קשר</h2>
+         
+         
+         
           <div className="grid grid-cols-4 gap-8 max-w-md">
             {buttons.map((btn, idx) => (
               <a
@@ -121,6 +127,7 @@ export default function DigitalBusinessCard() {
                 <span className="absolute inset-0 bg-orange-100 opacity-0 group-hover:opacity-60 transition-opacity duration-500 z-0" />
               </a>
             ))}
+          </div>
           </div>
         </div>
 

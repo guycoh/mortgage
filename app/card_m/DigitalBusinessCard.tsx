@@ -13,6 +13,17 @@ import WazeIcon from "@/public/assets/images/svg/waze";
 import LocationIcon from "@/public/assets/images/svg/location";
 
 export default function DigitalBusinessCard() {
+ 
+  const buttons = [
+    { icon: <Phone size={40} />, label: 'התקשר', href: 'tel:0502453345' },
+    { icon: <WhatsappIcon size={40} />, label: 'ווצאפ', href: 'https://wa.me/972502453345' },
+    { icon: <EmailIcon size={40} />, label: 'שלח מייל', href: 'mailto:mmusayov@gmail.com' },   
+    { icon: <WebIcon size={40} />, label: 'אתר', href: 'https://morg-orcin.vercel.app/muhni7' },
+  ];
+ 
+ 
+ 
+ 
   return (
     <div className="w-full min-h-screen bg-gradient-to-br text-white grid md:grid-cols-2">
    
@@ -87,37 +98,32 @@ export default function DigitalBusinessCard() {
 <div className="mt-6 w-full flex flex-col gap-4">
 
         {/* — יצירת קשר — */}
+        <div className="w-full flex justify-center">
         <div>
         <h2 className="text-xl font-semibold mb-4">יצירת קשר</h2>
-        <div className="grid grid-cols-4 gap-4">
-            <a href="tel:0502453345" className="flex flex-col items-center hover:opacity-80 transition">
-            {/* טלפון */}
-            <Phone size={40} color="white" />
-            <span className="text-sm">התקשר</span>
-            </a>
-           
-            <a href="https://wa.me/972502453345" target="_blank" className="flex flex-col items-center hover:opacity-80 transition">
-            {/* וואטסאפ */}
-            <WhatsappIcon size={40} color="white" />
-            <span className="text-sm">וואטסאפ</span>
-            </a>
-
-            <a href="mailto:mmusayov@gmail.com" className="flex flex-col items-center hover:opacity-80 transition">
-            {/* מייל */}
-            <EmailIcon size={40} color="white" />
-            <span className="text-sm">מייל</span>
-            </a>
-            <a href="https://morg-orcin.vercel.app/muhni7" className="flex flex-col items-center hover:opacity-80 transition">
-            {/* מייל */}
-            <WebIcon size={40} color="white" /> {/* סגול */}
-            <span className="text-sm">אתר</span>
-            </a>
-
-
-
-            {/* אפשר להשאיר ריבוע ריק או כפתור נוסף בעתיד */}
-            <div></div>
-        </div>
+         
+         
+         
+          <div className="grid grid-cols-4 gap-8 max-w-md">
+            {buttons.map((btn, idx) => (
+              <a
+                key={idx}
+                href={btn.href}
+                target={btn.href.startsWith('http') || btn.href.startsWith('mailto') || btn.href.startsWith('tel') ? '_blank' : '_self'}
+                rel="noopener noreferrer"
+                className="group w-20 h-20 bg-white border-2 border-gray-300 rounded-xl shadow-md hover:shadow-xl hover:border-orange-500 transition-all duration-300 ease-in-out flex flex-col items-center justify-center relative overflow-hidden text-center"
+              >
+                <div className="transition-transform duration-500 group-hover:rotate-[15deg] group-hover:scale-110 z-10 text-[#7e22ce] group-hover:text-orange-500">
+                  {btn.icon}
+                </div>
+                <span className="mt-1 text-xs font-medium text-main group-hover:text-orange-500 z-10 transition-colors duration-300">
+                  {btn.label}
+                </span>
+                <span className="absolute inset-0 bg-orange-100 opacity-0 group-hover:opacity-60 transition-opacity duration-500 z-0" />
+              </a>
+            ))}
+          </div>
+          </div>
         </div>
 
         {/* — מחשבוני משכנתא — */}
