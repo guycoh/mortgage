@@ -10,9 +10,10 @@ import Calculator4 from "public/assets/images/svg/Calculator4";
 import Phone from "@/public/assets/images/svg/phone";
 import WebIcon from "@/public/assets/images/svg/webIcon";
 import WhatsappIcon from "@/public/assets/images/svg/whatsapp";
-//import WazeIcon from "@/public/assets/images/svg/waze";
+
 import LocationIcon from "@/public/assets/images/svg/location";
 import WazeIcon from "@/public/assets/images/svg/waze_icon";
+
 
 
 export default function DigitalBusinessCard() {
@@ -78,10 +79,11 @@ export default function DigitalBusinessCard() {
          
         </span>
   
+      
         <div className="w-full flex justify-center mt-10">
           <div className="w-full max-w-5xl">
-              {/* — יצירת קשר — */}
-            
+         
+             {/* — יצירת קשר — */}
             <h2 className="text-xl font-semibold mb-4 text-center">יצירת קשר</h2>
             <div className="grid grid-cols-4 gap-8">
               {buttons.map((btn, idx) => (
@@ -134,10 +136,8 @@ export default function DigitalBusinessCard() {
                 </Link>
               ))}
             </div>
-
-
-            {/* — כתובתנו  — */}
-            <h2 className="  border-t border-white/30           text-xl font-semibold mb-4 mt-12 text-center">כתובתנו </h2>
+          {/* — כתובתנו  — */}
+          <h2 className="  border-t border-white/30           text-xl font-semibold mb-4 mt-12 text-center">כתובתנו </h2>
             <div className="grid grid-cols-4 gap-8">    
              
 
@@ -150,7 +150,37 @@ export default function DigitalBusinessCard() {
                         <WazeIcon size={40} color="#7e22ce" className="hover:text-orange-500" />
                       </div>
                       <span className="text-xs font-medium text-main group-hover:text-orange-500 transition-colors duration-300 text-center leading-tight">
-                        הרב נחום לוין 7, עפולה
+                       הרצל 92 רמלה
+                      </span>
+                    </div>
+                    <span className="absolute inset-0 bg-orange-100 opacity-0 group-hover:opacity-60 transition-opacity duration-500 z-0" />
+                  </a>
+                 
+                  <a
+                    className="group w-full h-32 bg-white border-2 border-gray-300 rounded-xl shadow-md hover:shadow-xl hover:border-orange-500 transition-all duration-300 ease-in-out flex items-center justify-center relative overflow-hidden text-center px-2 py-4"
+                    href="waze://?q=הרב+נחום+לוין+7+עפולה&navigate=yes"
+                  >
+                    <div className="flex flex-col items-center justify-between h-full z-10">
+                      <div className="min-h-[40px] flex items-center justify-center">
+                        <WazeIcon size={40} color="#7e22ce" className="hover:text-orange-500" />
+                      </div>
+                      <span className="text-xs font-medium text-main group-hover:text-orange-500 transition-colors duration-300 text-center leading-tight">
+                      שד דוד המלך 2 לוד
+                      </span>
+                    </div>
+                    <span className="absolute inset-0 bg-orange-100 opacity-0 group-hover:opacity-60 transition-opacity duration-500 z-0" />
+                  </a>
+
+                  <a
+                    className="group w-full h-32 bg-white border-2 border-gray-300 rounded-xl shadow-md hover:shadow-xl hover:border-orange-500 transition-all duration-300 ease-in-out flex items-center justify-center relative overflow-hidden text-center px-2 py-4"
+                    href="waze://?q=הרב+נחום+לוין+7+עפולה&navigate=yes"
+                  >
+                    <div className="flex flex-col items-center justify-between h-full z-10">
+                      <div className="min-h-[40px] flex items-center justify-center">
+                        <WazeIcon size={40} color="#7e22ce" className="hover:text-orange-500" />
+                      </div>
+                      <span className="text-xs font-medium text-main group-hover:text-orange-500 transition-colors duration-300 text-center leading-tight">
+                      הלוחמים 1 תל אביב 
                       </span>
                     </div>
                     <span className="absolute inset-0 bg-orange-100 opacity-0 group-hover:opacity-60 transition-opacity duration-500 z-0" />
@@ -163,43 +193,30 @@ export default function DigitalBusinessCard() {
 
 
 
-                <a
-                 className="group w-full h-32 bg-white border-2 border-gray-300 rounded-xl shadow-md hover:shadow-xl hover:border-orange-500 transition-all duration-300 ease-in-out flex items-center justify-center relative overflow-hidden text-center px-2 py-4"
-                 href="waze://?q=הרצל+92+רמלה&navigate=yes"
-                  rel="noopener noreferrer"               
-                >            
-                 <div className="flex flex-col items-center justify-between h-full z-10">
-                    <div className="min-h-[40px] flex items-center justify-center">
-                    <WazeIcon size={40} color="#7e22ce" className="hover:text-orange-500" />
-                    </div>
-                    <span className="text-xs font-medium text-main group-hover:text-orange-500 transition-colors duration-300 text-center leading-tight">
-                 הרצל 92 רמלה
-                    </span>
-                  </div>
-                  <span className="absolute inset-0 bg-orange-100 opacity-0 group-hover:opacity-60 transition-opacity duration-500 z-0" />
-               
-               
-                </a>
+
+
+
            
             </div>
 
-
-
-
+                    
           </div>
         </div>
   
-        {/* Footer בתוך רקע סגול */}
-       
-                
+  
+      </div>
+
+          {/* Footer — תופס את כל הרוחב של כרטיס הביקור בלבד עם שוליים מלמעלה */}
+          <div className="w-full  mb-0  bg-gray-700">
+                <div className=" bg-gray-700 text-center text-white text-sm py-4 rounded-b-xl">
+                  כל הזכויות שמורות למורגי מערכות תוכנה© {new Date().getFullYear()}
+                </div>
           </div>
-          <div className="bg-gray-700 text-center text-white text-lg">
-            כל הזכויות שמורות למורגי מערכות תוכנה© {new Date().getFullYear()}
-          </div>
+
+
     </div>
   </div>
   
   );
 }
-
 
