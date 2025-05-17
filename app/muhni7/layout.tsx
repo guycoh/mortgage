@@ -3,6 +3,8 @@
 import {Footer}from "./components/footer";
 import { Nav } from "./components/nav";
 import SideMenu from "./components/sidebar_mobile";
+import CurrencyTicker from "./components/CurrencyTicker";
+
 
 <SideMenu
       triggerButton={(onClick, isOpen) => (
@@ -27,6 +29,8 @@ export default function MuhniLayout({
         <Nav onOpenMenu={onClick} isMenuOpen={isOpen} />
       )}
     />
+   <CurrencyTicker  /> 
+
    {children}
    </main>
    <Footer/>
