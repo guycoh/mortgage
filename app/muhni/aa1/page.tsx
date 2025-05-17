@@ -1,57 +1,99 @@
-'use client'
+'use client';
 
-import EmailIcon from "public/assets/images/svg/EmailIcon";
-import Calculator1 from "public/assets/images/svg/Calculator1";
-import Calculator2 from "public/assets/images/svg/Calculator2";
-import Calculator3 from "public/assets/images/svg/Calculator3";
-import Calculator4 from "public/assets/images/svg/Calculator4";
-import Phone from "@/public/assets/images/svg/phone";
-import WebIcon from "@/public/assets/images/svg/webIcon";
-import WhatsappIcon from "@/public/assets/images/svg/whatsapp";
-import WazeIcon from "@/public/assets/images/svg/waze";
-import LocationIcon from "@/public/assets/images/svg/location";
+import { useEffect, useRef, useState } from 'react';
 
-import Link from 'next/link';
+type Rate = {
+  key: string;
+  currentExchangeRate: number;
+  currentChange: number;
+  unit: number;
+};
 
+const getCountryCode = (currencyCode: string) => {
+  const map: Record<string, string> = {
+    USD: 'us', EUR: 'eu', GBP: 'gb', JPY: 'jp', AUD: 'au', CAD: 'ca', CHF: 'ch',
+    DKK: 'dk', NOK: 'no', SEK: 'se', ZAR: 'za', JOD: 'jo', LBP: 'lb', EGP: 'eg',
+  };
+  return map[currencyCode] || 'un';
+};
 
+export default function CurrencyTicker() {
+  const [rates, setRates] = useState<Rate[]>([]);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
 
-export default function Cube3D() {
-  const buttons = [
-    { icon: <Phone size={40} />, label: 'התקשר', href: 'tel:0500000000' },
-    { icon: <EmailIcon size={40} />, label: 'שלח מייל', href: 'mailto:test@example.com' },
-    { icon: <WhatsappIcon size={40} />, label: 'ווצאפ', href: '/about' },
-    { icon: <WebIcon size={40} />, label: 'אתר', href: '/map' },
-  ];
+  useEffect(() => {
+    const fetchRates = async () => {
+      try {
+        const res = await fetch('/api/exchange-rates');
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setRates(data);
+        } else {
+          setRates([]);
+        }
+      } catch (error) {
+        console.error('שגיאה בשליפת נתונים:', error);
+      }
+    };
+
+    fetchRates();
+    const interval = setInterval(fetchRates, 1000 * 60 * 10);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    let animationFrameId: number;
+    const speed = 0.5; // px per frame
+
+    const scroll = () => {
+      if (containerRef.current && contentRef.current) {
+        const container = containerRef.current;
+        const content = contentRef.current;
+
+        if (content.offsetWidth <= 0) return;
+
+        container.scrollLeft += speed;
+
+        if (container.scrollLeft >= content.scrollWidth / 2) {
+          container.scrollLeft = 0;
+        }
+      }
+
+      animationFrameId = requestAnimationFrame(scroll);
+    };
+
+    animationFrameId = requestAnimationFrame(scroll);
+    return () => cancelAnimationFrame(animationFrameId);
+  }, [rates]);
+
+  const tickerItems = rates.map((rate, idx) => (
+    <div key={idx} className="flex items-center gap-2 text-sm px-6 py-2 min-w-fit whitespace-nowrap">
+      <img
+        src={`https://flagcdn.com/h20/${getCountryCode(rate.key)}.png`}
+        alt={rate.key}
+        className="w-5 h-4 rounded-sm border"
+      />
+      <span className="font-semibold">{rate.key}</span>
+      <span className="text-gray-700">₪{rate.currentExchangeRate.toFixed(4)}</span>
+      <span className={`font-bold ${rate.currentChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+        {rate.currentChange >= 0 ? '▲' : '▼'} {(rate.currentChange).toFixed(2)}%
+      </span>
+    </div>
+  ));
 
   return (
- 
-    <div className="w-full flex justify-center bg-gray-100 py-8 px-4">
-      <div className="grid grid-cols-4 gap-4 max-w-md">
-        {buttons.map((btn, idx) => (
-          <a
-            key={idx}
-            href={btn.href}
-            target={btn.href.startsWith('http') || btn.href.startsWith('mailto') || btn.href.startsWith('tel') ? '_blank' : '_self'}
-            rel="noopener noreferrer"
-            className="group w-20 h-20 bg-white border-2 border-gray-300 rounded-xl shadow-md hover:shadow-xl hover:border-orange-500 transition-all duration-300 ease-in-out flex flex-col items-center justify-center relative overflow-hidden text-center"
-          >
-            <div className="transition-transform duration-500 group-hover:rotate-[15deg] group-hover:scale-110 z-10 text-[#7e22ce] group-hover:text-orange-500">
-              {btn.icon}
-            </div>
-            <span className="mt-1 text-xs font-medium text-gray-700 group-hover:text-orange-500 z-10 transition-colors duration-300">
-              {btn.label}
-            </span>
-            <span className="absolute inset-0 bg-orange-100 opacity-0 group-hover:opacity-60 transition-opacity duration-500 z-0" />
-          </a>
-        ))}
+    <div className="overflow-hidden bg-white border-y border-gray-300">
+      <div
+        ref={containerRef}
+        className="flex whitespace-nowrap overflow-hidden w-full"
+        style={{ direction: 'ltr' }}
+      >
+        <div ref={contentRef} className="flex">
+          {tickerItems}
+          {tickerItems}
+        </div>
       </div>
     </div>
   );
 }
-
-   
-
-
-
-
-

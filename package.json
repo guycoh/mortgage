@@ -23,7 +23,8 @@
     "react": "19.0.0",
     "react-datepicker": "^8.3.0",
     "react-dom": "19.0.0",
-    "react-number-format": "^5.4.4"
+    "react-number-format": "^5.4.4",
+    "xml2js": "^0.6.2"
   },
   "devDependencies": {
     "@types/node": "22.10.2",
