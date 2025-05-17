@@ -24,7 +24,22 @@ export default function DigitalBusinessCard() {
     { icon: <WebIcon size={40} />, label: 'אתר', href: 'https://morg-orcin.vercel.app/muhni' },
   ];
   
-    
+  const locations = [
+    {
+      name: "הרצל 92 רמלה",
+      coords: "31.936389,34.866111",
+    },
+    {
+      name: "שד דוד המלך 2 לוד",
+      coords: "31.951944,34.897222",
+    },
+    {
+      name: "הלוחמים 1 תל אביב",
+      coords: "32.046111,34.770833",
+    },
+  ];
+  
+
   return (
     <div className="w-full min-h-screen justify-center bg-gradient-to-br text-white grid md:grid-cols-2">
 
@@ -136,64 +151,53 @@ export default function DigitalBusinessCard() {
         
          {/* — כתובתנו  — */}
          <h2 className="  border-t border-white/30           text-xl font-semibold mb-4 mt-12 text-center">כתובתנו </h2>
-            <div className="grid grid-cols-4 gap-8">    
-             
-
-            <a
-              className="group w-full h-32 bg-white border-2 border-gray-300 rounded-xl shadow-md hover:shadow-xl hover:border-orange-500 transition-all duration-300 ease-in-out flex items-center justify-center relative overflow-hidden text-center px-2 py-4"
-              href="waze://?ll=31.936389,34.866111&navigate=yes"
-            >
-              <div className="flex flex-col items-center justify-between h-full z-10">
-                <div className="min-h-[40px] flex items-center justify-center">
-                  <WazeIcon size={40} color="#7e22ce" className="hover:text-orange-500" />
+                    <div className="grid grid-cols-4 gap-8">
+              <a
+                className="group w-full h-32 bg-white border-2 border-gray-300 rounded-xl shadow-md hover:shadow-xl hover:border-orange-500 transition-all duration-300 ease-in-out flex items-center justify-center relative overflow-hidden text-center px-2 py-4"
+                href="waze://?ll=31.936389,34.866111&navigate=yes"
+              >
+                <div className="flex flex-col items-center justify-between h-full z-10">
+                  <div className="min-h-[40px] flex items-center justify-center">
+                    <WazeIcon size={40} color="#7e22ce" className="hover:text-orange-500" />
+                  </div>
+                  <span className="text-xs font-medium text-main group-hover:text-orange-500 transition-colors duration-300 text-center leading-tight">
+                    הרצל 92 רמלה
+                  </span>
                 </div>
-                <span className="text-xs font-medium text-main group-hover:text-orange-500 transition-colors duration-300 text-center leading-tight">
-                  הרצל 92 רמלה
-                </span>
-              </div>
-              <span className="absolute inset-0 bg-orange-100 opacity-0 group-hover:opacity-60 transition-opacity duration-500 z-0" />
-            </a>
+                <span className="absolute inset-0 bg-orange-100 opacity-0 group-hover:opacity-60 transition-opacity duration-500 z-0" />
+              </a>
 
-            <a
-              className="group w-full h-32 bg-white border-2 border-gray-300 rounded-xl shadow-md hover:shadow-xl hover:border-orange-500 transition-all duration-300 ease-in-out flex items-center justify-center relative overflow-hidden text-center px-2 py-4"
-              href="waze://?ll=31.951944,34.897222&navigate=yes"
-            >
-              <div className="flex flex-col items-center justify-between h-full z-10">
-                <div className="min-h-[40px] flex items-center justify-center">
-                  <WazeIcon size={40} color="#7e22ce" className="hover:text-orange-500" />
+              <a
+                className="group w-full h-32 bg-white border-2 border-gray-300 rounded-xl shadow-md hover:shadow-xl hover:border-orange-500 transition-all duration-300 ease-in-out flex items-center justify-center relative overflow-hidden text-center px-2 py-4"
+                href="waze://?ll=31.951944,34.897222&navigate=yes"
+              >
+                <div className="flex flex-col items-center justify-between h-full z-10">
+                  <div className="min-h-[40px] flex items-center justify-center">
+                    <WazeIcon size={40} color="#7e22ce" className="hover:text-orange-500" />
+                  </div>
+                  <span className="text-xs font-medium text-main group-hover:text-orange-500 transition-colors duration-300 text-center leading-tight">
+                    שד דוד המלך 2 לוד
+                  </span>
                 </div>
-                <span className="text-xs font-medium text-main group-hover:text-orange-500 transition-colors duration-300 text-center leading-tight">
-                  שד דוד המלך 2 לוד
-                </span>
-              </div>
-              <span className="absolute inset-0 bg-orange-100 opacity-0 group-hover:opacity-60 transition-opacity duration-500 z-0" />
-            </a>
+                <span className="absolute inset-0 bg-orange-100 opacity-0 group-hover:opacity-60 transition-opacity duration-500 z-0" />
+              </a>
 
-            <a
-              className="group w-full h-32 bg-white border-2 border-gray-300 rounded-xl shadow-md hover:shadow-xl hover:border-orange-500 transition-all duration-300 ease-in-out flex items-center justify-center relative overflow-hidden text-center px-2 py-4"
-              href="waze://?ll=32.046111,34.770833&navigate=yes"
-            >
-              <div className="flex flex-col items-center justify-between h-full z-10">
-                <div className="min-h-[40px] flex items-center justify-center">
-                  <WazeIcon size={40} color="#7e22ce" className="hover:text-orange-500" />
+              <a
+                className="group w-full h-32 bg-white border-2 border-gray-300 rounded-xl shadow-md hover:shadow-xl hover:border-orange-500 transition-all duration-300 ease-in-out flex items-center justify-center relative overflow-hidden text-center px-2 py-4"
+                href="waze://?ll=32.046111,34.770833&navigate=yes"
+              >
+                <div className="flex flex-col items-center justify-between h-full z-10">
+                  <div className="min-h-[40px] flex items-center justify-center">
+                    <WazeIcon size={40} color="#7e22ce" className="hover:text-orange-500" />
+                  </div>
+                  <span className="text-xs font-medium text-main group-hover:text-orange-500 transition-colors duration-300 text-center leading-tight">
+                    הלוחמים 1 תל אביב
+                  </span>
                 </div>
-                <span className="text-xs font-medium text-main group-hover:text-orange-500 transition-colors duration-300 text-center leading-tight">
-                  הלוחמים 1 תל אביב
-                </span>
-              </div>
-              <span className="absolute inset-0 bg-orange-100 opacity-0 group-hover:opacity-60 transition-opacity duration-500 z-0" />
-            </a>
-
-
-
-           
+                <span className="absolute inset-0 bg-orange-100 opacity-0 group-hover:opacity-60 transition-opacity duration-500 z-0" />
+              </a>
             </div>
 
-        
-        
-        
-        
-        
         
           </div>
         </div>

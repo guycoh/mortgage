@@ -38,6 +38,25 @@ export default function GuidesDropdown() {
           >
             מדריך הוצאת דוח יתרות לסילוק
           </Link>
+
+          <Link
+            href="/muhni7/repositories"
+            className="block px-4 py-3 text-right text-gray-700 hover:bg-orange-100 transition"
+            onClick={() => setIsOpen(false)}
+          >
+              מאגרי מידע
+          </Link>
+
+
+
+
+
+
+
+
+
+
+
         </div>
       )}
     </div>
