@@ -201,8 +201,6 @@ export default function CurrencyTicker() {
 
 
 
-
-
 // 'use client';
 
 // import { useEffect, useRef, useState } from 'react';

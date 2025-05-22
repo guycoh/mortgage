@@ -14,6 +14,18 @@ export default function Cube3D() {
   return (
     <div className="flex items-center justify-center h-screen bg-gradient-to-br from-orange-50 to-orange-200">
       <div className="relative w-[250px] h-[250px] [perspective:1000px]">
+       
+      <iframe title="Data viewer" width="700" height="400" src="https://data.gov.il/dataset/metavhim/resource/a0f56034-88db-4132-8803-854bcdb01ca1/view/b1199e99-2847-4fee-a508-f3699736d613" frameBorder="0"></iframe>
+       
+       
+       
+       
+       
+       
+       
+       
+       
+       
         <div
           className="absolute w-full h-full transform-style-preserve-3d transition-transform duration-100"
           style={{ transform: `rotateY(${rotation}deg) rotateX(${rotation / 2}deg)` }}

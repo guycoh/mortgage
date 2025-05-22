@@ -38,16 +38,16 @@ const PurchaseTaxForm = () => {
       setTotalTax(null);
       return;
     }
-
+ 
     let tax = 0;
     const breakdown = [];
-
+ 
     const brackets = isSingleHome
       ? [
-          { limit: 1944000, rate: 0 },
-          { limit: 5175000, rate: 0.035 },
-          { limit: 17225000, rate: 0.05 },
-          { limit: 23607250, rate: 0.08 },
+          { limit: 1978745, rate: 0 },
+          { limit: 2347040, rate: 0.035 },
+          { limit: 6055070, rate: 0.05 },
+          { limit: 20183565, rate: 0.08 },
           { limit: Infinity, rate: 0.1 },
         ]
       : [

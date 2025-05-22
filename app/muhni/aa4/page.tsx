@@ -1,159 +1,174 @@
-'use client'
+'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
-import Pagination from '../components/Pagination';
+type Rate = {
+  key: string;
+  currentExchangeRate: number;
+  currentChange: number;
+  unit: number;
+};
 
-type RecordType = Record<string, any>;
-const PAGE_SIZE = 25;
+type InterestData = {
+  interest: number;
+  prime: number;
+  nextDate: string;
+};
 
-export default function CkanTablePage() {
-  const [records, setRecords] = useState<RecordType[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState(1);
-  const [filterYeshuv, setFilterYeshuv] = useState(''); // היישוב שנבחר לסינון
 
-  const resourceId = 'f65a0daf-f737-49c5-9424-d378d52104f5';
+const getCountryCode = (currencyCode: string) => {
+  const map: Record<string, string> = {
+    USD: 'us', EUR: 'eu', GBP: 'gb', JPY: 'jp', AUD: 'au', CAD: 'ca', CHF: 'ch',
+    DKK: 'dk', NOK: 'no', SEK: 'se', ZAR: 'za', JOD: 'jo', LBP: 'lb', EGP: 'eg',
+  };
+  return map[currencyCode] || 'un';
+};
 
-  useEffect(() => {
-    const fetchAllData = async () => {
-      let allRecords: RecordType[] = [];
-      let limit = 100;
-      let offset = 0;
+export default function CurrencyTicker() {
+  const [rates, setRates] = useState<Rate[]>([]);
+  const [interestData, setInterestData] = useState<InterestData | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const animationIdRef = useRef<number | null>(null);
 
-      try {
-        while (true) {
-          const url = `https://data.gov.il/api/3/action/datastore_search?resource_id=${resourceId}&limit=${limit}&offset=${offset}`;
-          const res = await fetch(url);
-          const data = await res.json();
-
-          if (!data.success) break;
-
-          const batch = data.result.records;
-          allRecords = [...allRecords, ...batch];
-
-          if (batch.length < limit) break;
-          offset += limit;
-        }
-        setRecords(allRecords);
-      } catch (err) {
-        console.error('API Error:', err);
-      } finally {
-        setLoading(false);
+  const fetchRates = async () => {
+    try {
+      const res = await fetch('/api/exchange-rates');
+      const data = await res.json();
+      if (Array.isArray(data) && data.every(item =>
+        'key' in item && 'currentExchangeRate' in item &&
+        'currentChange' in item && 'unit' in item)) {
+        setRates(data);
+      } else {
+        setRates([]);
       }
-    };
-
-    fetchAllData();
-  }, []);
-
-  const fieldTranslations: Record<string, string> = {
-    MisparMitham: 'מספר מתחם',
-    Yeshuv: 'יישוב',
-    SemelYeshuv: 'סמל יישוב',
-    ShemMitcham: 'שם מתחם',
-    YachadKayam: 'יח"ד קיים',
-    YachadTosafti: 'יח"ד תוספתי',
-    YachadMutza: 'יח"ד מוצע',
-    TaarichHachraza: 'תאריך הכרזה',
-    MisparTochnit: 'מספר תוכנית',
-    KishurLatar: 'קישור לאתר',
-    SachHeterim: 'סך היתרים',
-    KishurLaMapa: 'קישור למפה',
-    Maslul: 'מסלול',
-    ShnatMatanTokef: 'שנת מתן תוקף',
-    Bebitzua: 'בביצוע',
-    Status: 'סטטוס',
+    } catch (error) {
+      console.error('שגיאה בשליפת נתוני מטבע:', error);
+      setRates([]);
+    }
   };
 
-  if (loading) return <div className="p-4 text-center text-gray-500">טוען נתונים...</div>;
+  const fetchInterest = async () => {
+    try {
+      const res = await fetch('/api/interest');
+      const data = await res.json();
+      console.log('נתוני ריבית:', data);
+  
+      if ('interest' in data && 'prime' in data && 'nextDate' in data) {
+        setInterestData(data);
+      } else {
+        console.warn('מבנה לא תקין:', data);
+      }
+    } catch (error) {
+      console.error('שגיאה בשליפת ריבית:', error);
+    }
+  };
+  
 
-  if (!records.length) return <div className="p-4 text-center text-red-500">לא נמצאו נתונים</div>;
+  useEffect(() => {
+    fetchRates();
+    fetchInterest();
+    const interval = setInterval(fetchRates, 1000 * 60 * 10); // כל 10 דקות
+    return () => clearInterval(interval);
+  }, []);
 
-  // שמירת סדר השדות לפי רשומה ראשונה
-  const headers = Object.keys(records[0]);
+  useEffect(() => {
+    if (rates.length === 0) return;
+    const speed = 0.5;
+    const scroll = () => {
+      if (containerRef.current && contentRef.current) {
+        const container = containerRef.current;
+        const content = contentRef.current;
+        container.scrollLeft += speed;
+        if (container.scrollLeft >= content.scrollWidth / 2) {
+          container.scrollLeft = 0;
+        }
+      }
+      animationIdRef.current = requestAnimationFrame(scroll);
+    };
+    animationIdRef.current = requestAnimationFrame(scroll);
+    return () => {
+      if (animationIdRef.current) cancelAnimationFrame(animationIdRef.current);
+    };
+  }, [rates]);
 
-  // יצירת רשימת יישובים ייחודיים למטרת הבחירה בסינון
-  const uniqueYeshuvim = Array.from(new Set(records.map(r => r.Yeshuv))).sort();
+  const handleMouseEnter = () => {
+    if (animationIdRef.current) cancelAnimationFrame(animationIdRef.current);
+  };
 
-  // מסננים את הרשומות לפי היישוב הנבחר, אם יש
-  const filteredRecords = filterYeshuv
-    ? records.filter((r) => r.Yeshuv === filterYeshuv)
-    : records;
+  const handleMouseLeave = () => {
+    animationIdRef.current = requestAnimationFrame(() => {
+      const speed = 0.5;
+      const scroll = () => {
+        if (containerRef.current && contentRef.current) {
+          const container = containerRef.current;
+          const content = contentRef.current;
+          container.scrollLeft += speed;
+          if (container.scrollLeft >= content.scrollWidth / 2) {
+            container.scrollLeft = 0;
+          }
+        }
+        animationIdRef.current = requestAnimationFrame(scroll);
+      };
+      scroll();
+    });
+  };
 
-  const totalPages = Math.ceil(filteredRecords.length / PAGE_SIZE);
-  const start = (page - 1) * PAGE_SIZE;
-  const end = start + PAGE_SIZE;
-  const visibleRecords = filteredRecords.slice(start, end);
+  if (rates.length === 0) return null;
 
-  // אם שינוי בסינון - חוזרים לעמוד ראשון
-  function onFilterChange(newYeshuv: string) {
-    setFilterYeshuv(newYeshuv);
-    setPage(1);
-  }
+  const tickerItems = rates.map((rate) => (
+    <div key={rate.key} className="flex items-center gap-0.5 text-sm px-6 py-2 min-w-fit whitespace-nowrap">
+
+
+      <img
+        src={`https://flagcdn.com/w40/${getCountryCode(rate.key)}.png`}
+        srcSet={`https://flagcdn.com/w40/${getCountryCode(rate.key)}.png 1x, https://flagcdn.com/w80/${getCountryCode(rate.key)}.png 2x`}
+        alt={rate.key}
+        className="w-5 h-4 rounded-sm border"
+      />
+      <span className="font-semibold">{rate.key}</span>
+      <span className="text-gray-700">₪{rate.currentExchangeRate.toFixed(4)}</span>
+      <span className={`font-bold ${rate.currentChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+        {rate.currentChange >= 0 ? '▲' : '▼'} {rate.currentChange.toFixed(2)}%
+      </span>
+    </div>
+  ));
+
 
   return (
-    <div className="p-4 overflow-auto">
-      <h1 className="text-xl font-bold mb-4">  מתחמי התחדשות עירונית</h1>
-
-      <div className="mb-4 flex items-center space-x-2 justify-end">
-        <label htmlFor="yeshuvFilter" className="font-semibold">
-          סינון לפי יישוב:
-        </label>
-        <select
-          id="yeshuvFilter"
-          className="border border-gray-300 rounded px-2 py-1"
-          value={filterYeshuv}
-          onChange={(e) => onFilterChange(e.target.value)}
-        >
-          <option value="">הכל</option>
-          {uniqueYeshuvim.map((yeshuv) => (
-            <option key={yeshuv} value={yeshuv}>
-              {yeshuv}
-            </option>
-          ))}
-        </select>
+    <div className="overflow-hidden bg-white border-y border-gray-300 flex w-full flex-col md:flex-row">
+      {/* מטבעות - רק במסכים בינוניים ומעלה */}
+      <div
+        ref={containerRef}
+        className="hidden md:flex w-full md:w-[60%] whitespace-nowrap overflow-hidden"
+        style={{ direction: 'ltr' }}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+      >
+        <div ref={contentRef} className="flex">
+          {tickerItems}
+          {tickerItems}
+        </div>
       </div>
+  
+     {/* נתוני ריבית - תמיד מוצג */}
+        <div className="w-full md:w-[40%] bg-gray-50 flex items-center px-0 text-right">
+          <div className="w-full text-sm text-gray-800 whitespace-nowrap overflow-hidden text-ellipsis p-2">
+            {interestData ? (
+              <div className="flex gap-4 w-full justify-start md:justify-start">
+                <div className="text-right">ריבית בנק ישראל: <span className="font-bold">{interestData.interest.toFixed(2)}%</span></div>
+                <div className="text-right">פריים: <span className="font-bold">{interestData.prime.toFixed(2)}%</span></div>
+                <div className="text-right">עדכון הבא: <span className="font-medium">{new Date(interestData.nextDate).toLocaleDateString('he-IL')}</span></div>
+              </div>
+            ) : (
+              <div className="text-gray-400">טוען נתוני ריבית...</div>
+            )}
+          </div>
+        </div>
 
-      <table className="min-w-full border border-gray-300 text-sm">
-        <thead className="bg-gray-100 text-right">
-          <tr>
-            {headers.map((key) => (
-              <th key={key} className="border px-2 py-1 whitespace-nowrap">
-                {fieldTranslations[key] || key}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-            {visibleRecords.map((record, idx) => (
-                <tr key={idx} className="hover:bg-gray-50">
-                {headers.map((key) => (
-                    <td key={key} className="border px-2 py-1 whitespace-nowrap text-right">
-                    {key === 'KishurLatar' && record[key] ? (
-                        <a
-                        href={record[key]}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 underline"
-                        >
-                        קישור
-                        </a>
-                    ) : (
-                        String(record[key] ?? '')
-                    )}
-                    </td>
-                ))}
-                </tr>
-            ))}
-         </tbody>
 
-      </table>
-
-      <Pagination
-        currentPage={page}
-        totalPages={totalPages}
-        onPageChange={(newPage: number) => setPage(newPage)}
-      />
     </div>
   );
+  
+  
 }

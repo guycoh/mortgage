@@ -4,7 +4,7 @@ export default function DataRepositoriesPage() {
     const repositories = [
       { name: "מאגר שמאים", description: "שמאים", href: "/muhni/repositories/appraisers" },
       { name: "מתחמים בהתחדשות עירונית", description: "מתחמים להתחדשות עירונית", href: "/muhni/repositories/urban_renewal" },
-      { name: "מאגר מסלולים", description: "סוגי מסלולי משכנתא", href: "/repositories/routes" },
+      { name: "רשימת סניפי בנקים", description: "רשימת סניפי בנקים", href: "/muhni/repositories/banks" },
       { name: "מאגר טפסים", description: "טפסים חשובים להורדה וחתימה", href: "/repositories/forms" },
       { name: "מאגר מילון מונחים", description: "מושגים מעולם המשכנתאות", href: "/repositories/glossary" },
     ];
