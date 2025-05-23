@@ -78,18 +78,21 @@ export default function LoanCalculator() {
 
           <div>
             <label className="block text-sm text-gray-700 mb-1">ריבית שנתית (%)</label>
+          
             <input
-                  type="text"
-                  inputMode="decimal"
-                  pattern="[0-9]*[.,]?[0-9]*"
-                  value={interest.toString()}
-                  onChange={(e) => {
-                    const val = e.target.value.replace(',', '.');
-                    const num = Number(val);
-                    if (!isNaN(num)) setInterest(num);
-                  }}
-                className="w-full px-4 py-2 rounded-lg bg-white text-gray-800 border border-gray-300 focus:ring-2 focus:ring-sky-300"
-              />
+              type="text"
+              inputMode="decimal"
+              pattern="[0-9]*[.,]?[0-9]*"
+              value={interest === 0 ? '' : interest.toString()}
+              onChange={(e) => {
+                const raw = e.target.value.replace(',', '.');
+                // רק אם המשתמש מזין מספר חוקי או ריק (מאפשר הקלדה הדרגתית)
+                if (/^\d*\.?\d*$/.test(raw) || raw === '') {
+                  setInterest(raw === '' ? 0 : Number(raw));
+                }
+              }}
+              className="w-full px-4 py-2 rounded-lg bg-white text-gray-800 border border-gray-300 focus:ring-2 focus:ring-sky-300"
+            />
           </div>
 
           <div>
