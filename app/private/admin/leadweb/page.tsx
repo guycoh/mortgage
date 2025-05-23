@@ -70,6 +70,11 @@ export default function LeadTable() {
     setLeadToDelete(null)
   }
 
+
+
+
+
+  
   return (
     <div className="p-4 relative">
       <h2 className="text-2xl font-bold mb-4 text-center text-blue-700">לידים שהתקבלו מהאתר</h2>

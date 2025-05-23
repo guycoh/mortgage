@@ -62,7 +62,7 @@ const calculators = [
     href: '/muhni/calculators/mortgage_capability',
   },
   {
-    icon: '/assets/gal/calculators/capability.svg',
+    icon: '/assets/gal/calculators/tax.svg',
     label: 'דוא"ל',
     href: '/muhni/calculators/purchase_tax_calculator',
   },
@@ -209,10 +209,30 @@ const calculators = [
              </Link>
             </div>
 
-  {/* הפוטר עצמו */}
-  <div className="bg-white text-center text-main text-sm py-12 rounded-b-xl shadow-sm">
-    <p className="font-medium text-xl">הרב נחום לוין 10, עפולה</p>
-  </div>
+        {/* הפוטר עצמו */}
+        <div className="bg-white text-main text-sm py-12 rounded-b-xl shadow-sm text-right">
+              <div className="flex items-center justify-center gap-2">
+                
+                <p className="font-medium text-xl">הרב נחום לוין 10, עפולה</p>
+                <Image
+                  src="/assets/gal/waze.svg"
+                  alt="נווט עם Waze"
+                  width={56}
+                  height={56}
+                  className="object-contain"
+                />
+
+
+
+
+
+
+
+
+
+              </div>
+</div>
+
 </div>
 
 
