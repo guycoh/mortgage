@@ -12,7 +12,7 @@ interface MonthlyData {
 
 export default function LoanCalculator() {
   const [amount, setAmount] = useState(100000);
-  const [interest, setInterest] = useState(5.1);
+  const [interest, setInterest] = useState(5);
   const [months, setMonths] = useState(120);
 
   const monthlyRate = interest / 100 / 12;
@@ -79,12 +79,17 @@ export default function LoanCalculator() {
           <div>
             <label className="block text-sm text-gray-700 mb-1">ריבית שנתית (%)</label>
             <input
-              type="number"
-              step="0.1"
-              value={interest}
-              onChange={(e) => setInterest(Number(e.target.value))}
-              className="w-full px-4 py-2 rounded-lg bg-white text-gray-800 border border-gray-300 focus:ring-2 focus:ring-sky-300"
-            />
+                  type="text"
+                  inputMode="decimal"
+                  pattern="[0-9]*[.,]?[0-9]*"
+                  value={interest.toString()}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(',', '.');
+                    const num = Number(val);
+                    if (!isNaN(num)) setInterest(num);
+                  }}
+                className="w-full px-4 py-2 rounded-lg bg-white text-gray-800 border border-gray-300 focus:ring-2 focus:ring-sky-300"
+              />
           </div>
 
           <div>

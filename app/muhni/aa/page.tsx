@@ -19,13 +19,6 @@ export default function Cube3D() {
        
        
        
-       
-       
-       
-       
-       
-       
-       
         <div
           className="absolute w-full h-full transform-style-preserve-3d transition-transform duration-100"
           style={{ transform: `rotateY(${rotation}deg) rotateX(${rotation / 2}deg)` }}

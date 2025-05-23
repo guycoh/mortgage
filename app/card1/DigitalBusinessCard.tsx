@@ -50,9 +50,28 @@ const buttons = [
   },
 ];
 
-
-
-
+const calculators = [
+  {
+    icon: '/assets/gal/calculators/calculator.svg',
+    label: 'טלפון',
+    href: '/muhni/calculators/simple_calculator',
+  },
+  {
+    icon: '/assets/gal/calculators/capability.svg',
+    label: 'צ\'אט',
+    href: '/muhni/calculators/mortgage_capability',
+  },
+  {
+    icon: '/assets/gal/calculators/capability.svg',
+    label: 'דוא"ל',
+    href: '/muhni/calculators/purchase_tax_calculator',
+  },
+  {
+    icon: '/assets/gal/calculators/capability.svg',
+    label: 'אתר',
+    href: '/muhni/calculators/refinance-calculator',
+  },
+];
 
 
 
@@ -102,30 +121,16 @@ const buttons = [
           </div>
         </div>
       </div>
-  
+   
       {/* גוף הכרטיס — גרדיאנט סגול עם הצללה פנימית */}
       <div className="relative bg-gradient-to-br from-purple-700 via-purple-600 to-purple-800 shadow-inner shadow-black/30 text-white flex flex-col items-center p-6">
   
-        <Link href="/muhni/schedule" className="absolute text-xs top-4 right-4 w-24 h-24 bg-white text-purple-600 rounded-full flex flex-col items-center justify-center gap-1 shadow-md hover:shadow-lg transition">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 4h10M5 11h14M5 19h14M5 15h14" />
-          </svg>
-          קבע פגישה
-        </Link>
+      
   
         {/* שם ותפקיד */}
-        <h1 className="mt-20 text-3xl font-bold tracking-tight">גיא כהן</h1>
-        <p className="mt-2">יועץ משכנתאות בכיר</p>         
-        <span className="mt-2 flex items-center gap-2 text-sm">
-          <Phone size={14} color="white" /> 052-3684844
-          <EmailIcon size={14} color="white" /> guycoh@outlook.co.il
-        </span>
-  
-        <span className="mt-2 flex items-center gap-2 text-sm">
-          <LocationIcon size={14} color="white" /> שד' דוד המלך 2 , לוד
-          <LocationIcon size={14} color="white" /> הרצל 92, רמלה
-        </span>
-  
+        <h1 className="mt-20 text-5xl font-bold tracking-tight">גיא כהן</h1>
+        <p className="mt-2 text-3xl   ">יועץ משכנתאות </p>         
+        
         {/* — יצירת קשר — */}
         <div className="w-full flex justify-center mt-10">
           <div className="w-full max-w-5xl">
@@ -142,7 +147,7 @@ const buttons = [
                     <Image
                       src={btn.icon}
                       alt={btn.label}
-                      width={102}
+                      width={104}
                       height={136}
                       className="object-contain"
                     />
@@ -154,50 +159,55 @@ const buttons = [
           </div>
         </div>
 
- {/* — מחשבוני משכנתא — */}
- <h2 className="text-xl font-semibold mb-4 mt-12 text-center">מחשבוני משכנתא</h2>
-            <div className="grid grid-cols-4 gap-8 mb-96">
-              {[{ href: "/muhni/calculators/simple_calculator", icon: <Calculator1 color="#7e22ce" size={40} />, label: "מחשבון הלוואה" },
-                { href: "/muhni/calculators/mortgage_capability", icon: <Calculator2 color="#7e22ce" size={40} />, label: "כמה משכנתא אוכל לקחת?" },
-                { href: "/muhni/calculators/purchase_tax_calculator", icon: <Calculator3 color="#7e22ce" size={40} />, label: "מס רכישה" },
-                { href: "/muhni/calculators/refinance-calculator", icon: <Calculator4 color="#7e22ce" size={40} />, label: "החזר חודשי" },
-              ].map((btn, idx) => (
+
+        {/* — מחשבוני משכנתא — */}      
+        <div className="w-full flex justify-center mt-10 mb-36">
+            <div className="w-full max-w-5xl">
+               <div className="grid grid-cols-4 sm:grid-cols-4 gap-6 text-center">
+                {calculators.map((btn, idx) => (
+                
                 <Link
-                  key={idx}
-                  href={btn.href}
-                  className="group w-full h-32 bg-white border-2 border-gray-300 rounded-xl shadow-md hover:shadow-xl hover:border-orange-500 transition-all duration-300 ease-in-out flex items-center justify-center relative overflow-hidden text-center px-2 py-4"
-                >
-                  <div className="flex flex-col items-center justify-between h-full z-10">
-                    <div className="min-h-[40px] flex items-center justify-center">
-                      {btn.icon}
+                        key={idx}
+                        href={btn.href}
+                       className="group flex flex-col items-center justify-center transition duration-300"
+                      >
+                
+                
+              
+                    <div className="w-40 h-42 flex items-center justify-center hover:w-50 hover:h-54 transition">
+                      <Image
+                        src={btn.icon}
+                        alt={btn.label}
+                        width={102}
+                        height={136}
+                        className="object-contain"
+                      />
                     </div>
-                    <span className="text-xs font-medium text-main group-hover:text-orange-500 transition-colors duration-300 text-center leading-tight">
-                      {btn.label}
-                    </span>
-                  </div>
-                  <span className="absolute inset-0 bg-orange-100 opacity-0 group-hover:opacity-60 transition-opacity duration-500 z-0" />
+                   
                 </Link>
-              ))}
+                ))}
+              </div>
             </div>
-  
-      
-  
+        </div>
+
+
+
       </div>
           
           {/* Footer — תופס את כל הרוחב של כרטיס הביקור בלבד עם שוליים מלמעלה */}
-<div className="w-full relative ">
-  {/* אייקון בתוך עיגול שגולש לתוך הפוטר מלמעלה */}
-  <div className="absolute -top-20 left-1/2 transform -translate-x-1/2 z-10">
-    
-      <Image
-        src="/assets/gal/meeting.svg"
-        alt="פגישה"
-        width={142}
-        height={142}
-        className="object-contain"
-      />
-  
-  </div>
+          <div className="w-full relative ">
+            {/* אייקון בתוך עיגול שגולש לתוך הפוטר מלמעלה */}
+            <div className="absolute -top-20 left-1/2 transform -translate-x-1/2 z-10">
+            <Link href="/muhni/schedule" >
+                <Image
+                  src="/assets/gal/meeting.svg"
+                  alt="פגישה"
+                  width={142}
+                  height={142}
+                  className="object-contain"
+                />
+             </Link>
+            </div>
 
   {/* הפוטר עצמו */}
   <div className="bg-white text-center text-main text-sm py-12 rounded-b-xl shadow-sm">
