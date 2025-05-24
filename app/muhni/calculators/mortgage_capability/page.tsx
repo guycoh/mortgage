@@ -410,22 +410,6 @@ export default function MortgageSimulatorForm() {
             </div>
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
             {/* שורה 8: הון עצמי */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>

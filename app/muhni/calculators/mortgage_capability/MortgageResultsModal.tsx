@@ -43,7 +43,8 @@ const MortgageResultsModal: FC<MortgageResultsModalProps> = ({ isOpen, onClose, 
         </button>
 
         <h2 className="text-xl font-bold text-[#1d75a1] mb-6 text-right">תוצאות חישוב משכנתא</h2>
-
+        <p className="text-xs font-bold text-[#1d75a1] mb-6 text-right"  >החישוב אינו תחליף לייעוץ מקצועי , חשוב לקבל מידע מיועץ משכנתאות </p>
+       <p className="text-xs font-bold text-[#1d75a1] mb-6 text-right"  > ט.ל.ח</p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-right text-gray-800">
           {/* טור ראשון - עיקרי */}
           <div className="space-y-3">           
