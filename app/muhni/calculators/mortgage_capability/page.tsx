@@ -336,9 +336,13 @@ export default function MortgageSimulatorForm() {
 
 
             {/* שורה 6: הכנסות נוספות */}
+       
             <div className="grid grid-cols-2 md:grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="additionalIncome" className="block text-main font-semibold mb-2">הכנסות נוספות (₪)</label>
+              <div className="flex flex-col justify-between">
+                <label htmlFor="additionalIncome" className="block text-main font-semibold mb-2">
+                  הכנסות נוספות (₪)
+                </label>
+                <p className="text-xs text-gray-500 mb-1">(הכנסה חודשית כמו שכירות שמתקבלת קצבה קבועה וכיו"ב)</p>
                 <input
                   type="text"
                   name="additionalIncome"
@@ -349,9 +353,13 @@ export default function MortgageSimulatorForm() {
                   className="[appearance:textfield] w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-main focus:bg-orange-100 text-gray-700"
                 />
               </div>
+
               {formData.hasPartner === 'yes' && (
-                <div>
-                  <label htmlFor="spouseAdditionalIncome" className="block text-main font-semibold mb-2">הכנסות נוספות בן זוג </label>
+                <div className="flex flex-col justify-between">
+                  <label htmlFor="spouseAdditionalIncome" className="block text-main font-semibold mb-2">
+                    הכנסות נוספות בן זוג
+                  </label>
+                  <p className="text-xs text-gray-500 mb-1">(הכנסה חודשית כמו שכירות שמתקבלת קצבה קבועה וכיו"ב)</p>
                   <input
                     type="text"
                     name="spouseAdditionalIncome"
@@ -359,11 +367,27 @@ export default function MortgageSimulatorForm() {
                     value={displayData.spouseAdditionalIncome}
                     onChange={handleChangeWithCommas}
                     placeholder="₪"
-                    className="[appearance:textfield]  w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-main focus:bg-orange-100 text-gray-700"
+                    className="[appearance:textfield] w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-main focus:bg-orange-100 text-gray-700"
                   />
                 </div>
               )}
             </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
             {/* שורה 7: הלוואות מעל 18 חודשים */}
             <div className="grid grid-cols-2 md:grid-cols-2 gap-4">

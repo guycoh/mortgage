@@ -65,12 +65,11 @@ export const Nav = ({ onOpenMenu, isMenuOpen }: { onOpenMenu: () => void, isMenu
           {/* תפריט ניווט */}
           <div className="max-lg:hidden lg:!block">
             <ul className="flex gap-x-6">
-              <li><Link href="/muhni7" className="text-main font-bold text-[15px]">בית</Link></li>
-              <li><Link href="/muhni7/about" className="text-main font-bold text-[15px]">אודות</Link></li>
+              <li><Link href="/muhni7" className="text-main font-bold text-[15px]">בית</Link></li>             
               <li><Link href="/muhni7/calculators" className="text-main font-bold text-[15px]">מחשבונים</Link></li>
               <li><Link href="/muhni7/concepts" className="text-main font-bold text-[15px]">מושגים במשכנתא</Link></li>
               <li><Link href="/muhni7/contact" className="text-main font-bold text-[15px]">צור קשר</Link></li>
-             
+             <li><Link href="/muhni7/about" className="text-main font-bold text-[15px]">אודות</Link></li>
               
             
             
