@@ -38,7 +38,7 @@ export default function Sidebar_admin() {
           
           <li className="hover:bg-gray-700 p-2 rounded"> <Link href="/private/admin/concepts" > 🏠 מושגים משכנתא</Link></li>
           
-          <li className="hover:bg-gray-700 p-2 rounded"> <Link href="/private/admin/users" > 👥 משתמשים</Link></li>
+          <li className="hover:bg-gray-700 p-2 rounded"> <Link href="/private/admin/profile" > 👥 משתמשים</Link></li>
           <li className="hover:bg-gray-700 p-2 rounded"> <Link href="/private/admin/premissions" > 🔐 סוגי הרשאות</Link></li> 
           <li className="hover:bg-gray-700 p-2 rounded"> <Link href="/private/admin/receipts" > 📄 קבלות לקוחות</Link></li> 
           <li className="p-2 rounded cursor-pointer bg-gray-800 hover:bg-gray-700" onClick={toggleTables}>📊 טבלאות מערכת {isTablesOpen ? '▲' : '▼'}</li>
