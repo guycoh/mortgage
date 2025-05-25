@@ -25,23 +25,11 @@ const calculators = [
 ];
 
 
-{calculators.map((calc, index) => {
-  const Icon = calc.icon;
-  return (
-    <Link href={calc.link} key={index}>
-      <div className="bg-white/80 backdrop-blur-sm p-5 rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 cursor-pointer flex flex-col items-center text-center h-48 hover:bg-white/90 transform hover:scale-105">
-        <Icon className="mb-4 w-12 h-12" />
-        <h2 className="text-lg font-semibold mb-1">{calc.title}</h2>
-        <p className="text-sm">{calc.description}</p>
-      </div>
-    </Link>
-  );
-})}
 
 
 export default function CalculatorsPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#1e0036] to-[#3f0a6b] py-10 px-4">
+    <div className="min-h-screen bg-galbg py-10 px-4">
   <h1 className="text-center text-white text-3xl font-bold mb-10 tracking-wide drop-shadow-lg">
     מחשבוני משכנתא חכמים
   </h1>

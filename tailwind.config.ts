@@ -23,7 +23,7 @@ const config = {
         //main:'#7e22ce', // למשל סגול
         main:'#6929AC',
         second: '#F59E0B', // למשל כתום
-        footer: '#1f1f2e', // למשל כתום
+        footer: '#6929AC', // למשל כתום
         fonts:"#475569",// slate אפור
         fontss1:"#546e7a",// כחול אפור מודגש
    
