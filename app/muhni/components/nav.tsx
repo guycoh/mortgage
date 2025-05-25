@@ -21,12 +21,6 @@ export const Nav = ({ onOpenMenu, isMenuOpen }: { onOpenMenu: () => void, isMenu
   
   
   
-  
-  
-  
-  
-  
-  
   return (
     <div>
       <header className="shadow-md font-sans tracking-wide relative z-50">
@@ -124,12 +118,6 @@ export const Nav = ({ onOpenMenu, isMenuOpen }: { onOpenMenu: () => void, isMenu
                 })}
               </ul>
         </div>
-
-
-
-
-
-
 
         </div>
       </header>

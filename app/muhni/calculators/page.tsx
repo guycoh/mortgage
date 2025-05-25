@@ -29,25 +29,24 @@ const calculators = [
 
 export default function CalculatorsPage() {
   return (
-    <div className="min-h-screen bg-galbg py-10 px-4">
-  <h1 className="text-center text-white text-3xl font-bold mb-10 tracking-wide drop-shadow-lg">
-    מחשבוני משכנתא חכמים
+
+<div className="min-h-screen bg-galbg py-10 px-4 sm:px-8 md:px-16 lg:px-24 xl:px-32 2xl:px-40">
+  <h1 className="text-center text-gray-900 text-3xl font-bold mb-10 tracking-wide drop-shadow-lg">
+    מחשבוני משכנתא 
   </h1>
   <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
     {calculators.map((calc, index) => {
       const Icon = calc.icon;
       return (
         <Link href={calc.link} key={index}>
-          <div className="bg-[#240047]/60 backdrop-blur-md p-6 rounded-3xl border border-purple-500/30 hover:border-purple-400 transition-all duration-300 cursor-pointer flex flex-col items-center text-center h-60 hover:scale-[1.04] hover:shadow-purple-500/30 hover:shadow-2xl group">
-            <div className="bg-purple-600/30 rounded-full p-4 mb-4 shadow-md group-hover:rotate-[8deg] transition-transform duration-300">
-              <Icon size={42} color="#d8b4fe" className="w-12 h-12 drop-shadow-md" />
+          <div className="bg-white backdrop-blur-md p-6 rounded-3xl border border-main hover:border-main transition-all duration-300 cursor-pointer flex flex-col items-center text-center h-60 hover:scale-[1.04] hover:shadow-main/30 hover:shadow-2xl group">
+            <div className="bg-main/10 rounded-full p-4 mb-4 shadow-md group-hover:rotate-[8deg] transition-transform duration-300">
+              <Icon size={42} color="#4b0082" className="w-12 h-12 drop-shadow-md" />
             </div>
-            <h2 className="text-xl font-semibold text-purple-100 mb-2 tracking-wide drop-shadow-sm">
+            <h2 className="text-xl font-semibold text-gray-800 mb-2 tracking-wide drop-shadow-sm">
               {calc.title}
             </h2>
-            <p className="text-sm text-purple-200 opacity-80 leading-relaxed">
-              {calc.description}
-            </p>
+           
           </div>
         </Link>
       );
