@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import Spinner from "../components/spinner"
+import SearchIcon from "@/public/assets/images/svg/general/SearchIcon"
 
 interface DataItem {
   id: number
@@ -88,37 +89,45 @@ const GlossaryPage: React.FC = () => {
   if (!data || data.length === 0) return <div className="text-center mt-10">אין נתונים להציג.</div>
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#f0f9ff] to-[#ffffff] dark:from-[#0f172a] dark:to-[#1e293b] text-gray-900 dark:text-white px-4 py-10">
-      <div className="max-w-5xl mx-auto bg-white/90 dark:bg-slate-800/80 shadow-xl rounded-3xl px-6 py-8 relative overflow-hidden">
-        <h1 className="text-4xl font-bold text-center text-main dark:text-[#00bcd4] mb-6">
+    <div className="min-h-screen bg-galbg text-gray-900  px-4 py-10">
+      <div className="max-w-5xl mx-auto  px-6 py-8 relative overflow-hidden">
+        <h1 className="text-4xl font-bold text-center text-gray-900 mb-6">
           מושגים במשכנתא 🏦
         </h1>
 
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6 relative">
-          <div className="w-full sm:w-1/2 relative">
-            <input
-              type="text"
-              placeholder="חפש מושג..."
-              className="w-full p-3 rounded-xl bg-gray-100 dark:bg-slate-700 text-gray-800 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#ff9800] focus:bg-orange-50"
-              value={searchTerm}
-              onChange={(e) => handleSearchChange(e.target.value)}
-              aria-label="חיפוש מושג"
-            />
-            {suggestions.length > 0 && (
-              <ul className="absolute z-10 w-full bg-white dark:bg-slate-700 shadow-md rounded-b-xl border-t border-gray-200 dark:border-slate-600 max-h-60 overflow-y-auto">
-                {suggestions.map((suggestion) => (
-                  <li
-                    key={suggestion}
-                    className="px-4 py-2 hover:bg-orange-100 dark:hover:bg-slate-600 cursor-pointer text-sm"
-                    onClick={() => handleSuggestionClick(suggestion)}
-                    role="option"
-                  >
-                    {suggestion}
-                  </li>
-                ))}
-              </ul>
-            )}
+         
+         <div className="w-full sm:w-1/2 relative">
+         
+          {/* אייקון חיפוש בתוך השדה */}
+          <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-300 pointer-events-none">
+            <SearchIcon size={20} color="currentColor" />
           </div>
+
+          <input
+            type="text"
+            placeholder="חפש מושג..."
+            className="w-full text-xl pr-10 p-3 rounded-xl bg-'white' dark:bg-slate-700 text-gray-800 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#ff9800] focus:bg-orange-50"
+            value={searchTerm}
+            onChange={(e) => handleSearchChange(e.target.value)}
+            aria-label="חיפוש מושג"
+          />
+
+          {suggestions.length > 0 && (
+            <ul className="absolute z-10 w-full bg-white dark:bg-slate-700 shadow-md rounded-b-xl border-t border-gray-200 dark:border-slate-600 max-h-60 overflow-y-auto">
+              {suggestions.map((suggestion) => (
+                <li
+                  key={suggestion}
+                  className="px-4 py-2 hover:bg-orange-100 dark:hover:bg-slate-600 cursor-pointer text-sm"
+                  onClick={() => handleSuggestionClick(suggestion)}
+                  role="option"
+                >
+                  {suggestion}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
 
           <button
             onClick={() => setSortAZ(!sortAZ)}
@@ -134,9 +143,9 @@ const GlossaryPage: React.FC = () => {
             currentData.map((item) => (
               <div
                 key={item.id}
-                className="bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl p-5 shadow-md hover:shadow-lg transition-all duration-300"
+                className="bg-white dark:bg-slate-700 border border-main dark:border-slate-600 rounded-xl p-5 shadow-md hover:shadow-lg transition-all duration-300"
               >
-                <h2 className="text-xl font-semibold text-[#0d47a1] dark:text-[#4fc3f7] mb-2 underline decoration-[#00acc1] decoration-2">
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-[#4fc3f7] mb-2 underline decoration-gray-900 decoration-2">
                   {item.concept}
                 </h2>
                 <p className="text-gray-700 dark:text-gray-300 leading-relaxed">{item.commentary}</p>
