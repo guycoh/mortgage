@@ -112,122 +112,124 @@ export default function CreateLeadForm() {
     };
 
     return (
-        <div className="my-6">
-            <div className="flex flex-col md:flex-row max-w-6xl mx-auto p-6 bg-white shadow-lg rounded-lg">
-                <div className="md:w-1/2 space-y-6 px-4 md:px-8">
-                    <h2 className="text-2xl font-bold mb-6 text-center">קביעת פגישת זום עם יועץ משכנתאות</h2>
-                    {message && <p className="mb-6 text-center text-sm text-red-500">{message}</p>}
-                    <form onSubmit={handleSubmit} className="space-y-6">
-                        <DatePicker
-                            selected={formData.date}
-                            onChange={handleDateChange}
-                            dateFormat="dd/MM/yyyy"
-                            className="w-full p-3 h-[55px] text-lg border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-300 focus:bg-orange-50"
-                            placeholderText="בחר תאריך"
-                            minDate={new Date(new Date().setDate(new Date().getDate() + 1))}
-                            filterDate={(date) => date.getDay() !== 6}
-                        />
+       <div className="bg-galbg min-h-screen flex items-start py-6">
+  <div className="flex flex-col md:flex-row max-w-6xl mx-auto w-full px-4 md:px-6 bg-white shadow-lg rounded-lg">
+    <div className="md:w-1/2 space-y-6 px-4 md:px-8 py-6">
+      <h2 className="text-2xl font-bold mb-6 text-center">קביעת פגישת זום עם יועץ משכנתאות</h2>
+      {message && <p className="mb-6 text-center text-sm text-red-500">{message}</p>}
 
-                        {formData.date && (
-                            <select
-                                name="hour"
-                                value={formData.hour}
-                                onChange={handleTimeChange}
-                                className="w-full p-3 h-[55px] text-lg border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-300 focus:bg-orange-50"
-                                required
-                            >
-                                <option value="" disabled>
-                                    בחר שעה
-                                </option>
-                                {generateTimeSlots().map((time) => (
-                                    <option key={time} value={time}>
-                                        {time}
-                                    </option>
-                                ))}
-                            </select>
-                        )}
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <DatePicker
+          selected={formData.date}
+          onChange={handleDateChange}
+          dateFormat="dd/MM/yyyy"
+          className="w-full p-3 h-[55px] text-lg border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-300 focus:bg-orange-50"
+          placeholderText="בחר תאריך"
+          minDate={new Date(new Date().setDate(new Date().getDate() + 1))}
+          filterDate={(date) => date.getDay() !== 6}
+        />
 
-                        {formData.date && formData.hour && (
-                            <>
-                        <div className="relative w-full">
-                                <input
-                                   type="text"
-                                   name="lead_name"
-                                   placeholder="הכנס שם"
-                                   value={formData.lead_name}                                
-                                    onChange={handleChange}
-                                    className="w-full p-3 pr-10 h-[55px] text-lg border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-300 focus:bg-orange-50"
-                                    required
-                                />
-                            <Image
-                                src="/assets/images/svg/user.svg"
-                                alt="mail icon"
-                                width={25}
-                                height={25}
-                                className="absolute right-3 top-1/2 transform -translate-y-1/2"
-                            />
-                        </div>
+        {formData.date && (
+          <select
+            name="hour"
+            value={formData.hour}
+            onChange={handleTimeChange}
+            className="w-full p-3 h-[55px] text-lg border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-300 focus:bg-orange-50"
+            required
+          >
+            <option value="" disabled>
+              בחר שעה
+            </option>
+            {generateTimeSlots().map((time) => (
+              <option key={time} value={time}>
+                {time}
+              </option>
+            ))}
+          </select>
+        )}
 
-                        <div className="relative w-full">
-                                <input
-                                    type="tel"
-                                    name="cell_phone"
-                                    pattern="^05[0-9]-?[0-9]{7}$"
-                                    placeholder="   הכנס טלפון"
-                                    value={formData.cell_phone}
-                                    onChange={handleChange}
-                                    className="w-full p-3 h-[55px] text-lg border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-300 focus:bg-orange-50"
-                                    required
-                                />
-                                <Image
-                                src="/assets/images/svg/smart-phone.svg"
-                                alt="mail icon"
-                                width={25}
-                                height={25}
-                                className="absolute right-3 top-1/2 transform -translate-y-1/2"
-                                />
-                        </div>
-
-                         <div className="relative w-full">
-                                <input
-                                    type="email"
-                                    name="email"
-                                    placeholder="   דואר אלקטרוני"
-                                    value={formData.email}
-                                    onChange={handleChange}
-                                    className="w-full p-3 pr-10 h-[55px] text-lg border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-300 focus:bg-orange-50"
-                                    required
-                                />
-                            <Image
-                                src="/assets/images/svg/mail.svg"
-                                alt="mail icon"
-                                width={25}
-                                height={25}
-                                className="absolute right-3 top-1/2 transform -translate-y-1/2"
-                            />
-                        </div>
-                            </>
-                        )}
-
-                        <button
-                            type="submit"
-                            className="w-full bg-green-500 text-white p-3 h-[55px] rounded-lg hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-400 text-lg"
-                            disabled={loading}
-                        >
-                            {loading ? "מתאם פגישה..." : "קבע פגישה"}
-                        </button>
-                    </form>
-                </div>
-
-                <div className="md:w-1/2 hidden md:block">
-                    <img
-                        src="/assets/images/imgFiles/zoom-meeting.jpg"
-                        alt="Zoom Meeting"
-                        className="w-full h-auto object-cover rounded-lg"
-                    />
-                </div>
+        {formData.date && formData.hour && (
+          <>
+            <div className="relative w-full">
+              <input
+                type="text"
+                name="lead_name"
+                placeholder="הכנס שם"
+                value={formData.lead_name}
+                onChange={handleChange}
+                className="w-full p-3 pr-10 h-[55px] text-lg border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-300 focus:bg-orange-50"
+                required
+              />
+              <Image
+                src="/assets/images/svg/user.svg"
+                alt="user icon"
+                width={25}
+                height={25}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2"
+              />
             </div>
-        </div>
+
+            <div className="relative w-full">
+              <input
+                type="tel"
+                name="cell_phone"
+                pattern="^05[0-9]-?[0-9]{7}$"
+                placeholder="הכנס טלפון"
+                value={formData.cell_phone}
+                onChange={handleChange}
+                className="w-full p-3 h-[55px] text-lg border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-300 focus:bg-orange-50"
+                required
+              />
+              <Image
+                src="/assets/images/svg/smart-phone.svg"
+                alt="phone icon"
+                width={25}
+                height={25}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2"
+              />
+            </div>
+
+            <div className="relative w-full">
+              <input
+                type="email"
+                name="email"
+                placeholder="דואר אלקטרוני"
+                value={formData.email}
+                onChange={handleChange}
+                className="w-full p-3 pr-10 h-[55px] text-lg border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-300 focus:bg-orange-50"
+                required
+              />
+              <Image
+                src="/assets/images/svg/mail.svg"
+                alt="mail icon"
+                width={25}
+                height={25}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2"
+              />
+            </div>
+          </>
+        )}
+
+        <button
+          type="submit"
+          className="w-full bg-green-500 text-white p-3 h-[55px] rounded-lg hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-400 text-lg"
+          disabled={loading}
+        >
+          {loading ? "מתאם פגישה..." : "קבע פגישה"}
+        </button>
+      </form>
+    </div>
+
+    <div className="md:w-1/2 hidden md:block">
+      <img
+        src="/assets/images/imgFiles/zoom-meeting.jpg"
+        alt="Zoom Meeting"
+        className="w-full h-full object-cover rounded-r-lg"
+      />
+    </div>
+  </div>
+</div>
+
     );
 }
 
