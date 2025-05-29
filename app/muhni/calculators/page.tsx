@@ -9,6 +9,10 @@ import Calculator6 from "@/public/assets/images/svg/Calculator6";
 import Calculator7 from "@/public/assets/images/svg/Calculator7";
 import Calculator8 from "@/public/assets/images/svg/Calculator8";
 
+import FloatingButtons from "../components/FloatingButtons";
+
+
+
 import Link from 'next/link';
 
 
@@ -52,10 +56,15 @@ export default function CalculatorsPage() {
       );
     })}
   </div>
+
+{/* 
+< FloatingButtons /> */}
+
 </div>
 
         
-    
+
+
   );
 }
 

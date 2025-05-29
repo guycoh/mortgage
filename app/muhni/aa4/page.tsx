@@ -1,174 +1,49 @@
+// app/mortgage-types/page.tsx
+
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-
-type Rate = {
-  key: string;
-  currentExchangeRate: number;
-  currentChange: number;
-  unit: number;
-};
-
-type InterestData = {
-  interest: number;
-  prime: number;
-  nextDate: string;
-};
-
-
-const getCountryCode = (currencyCode: string) => {
-  const map: Record<string, string> = {
-    USD: 'us', EUR: 'eu', GBP: 'gb', JPY: 'jp', AUD: 'au', CAD: 'ca', CHF: 'ch',
-    DKK: 'dk', NOK: 'no', SEK: 'se', ZAR: 'za', JOD: 'jo', LBP: 'lb', EGP: 'eg',
-  };
-  return map[currencyCode] || 'un';
-};
-
-export default function CurrencyTicker() {
-  const [rates, setRates] = useState<Rate[]>([]);
-  const [interestData, setInterestData] = useState<InterestData | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const contentRef = useRef<HTMLDivElement>(null);
-  const animationIdRef = useRef<number | null>(null);
-
-  const fetchRates = async () => {
-    try {
-      const res = await fetch('/api/exchange-rates');
-      const data = await res.json();
-      if (Array.isArray(data) && data.every(item =>
-        'key' in item && 'currentExchangeRate' in item &&
-        'currentChange' in item && 'unit' in item)) {
-        setRates(data);
-      } else {
-        setRates([]);
-      }
-    } catch (error) {
-      console.error('שגיאה בשליפת נתוני מטבע:', error);
-      setRates([]);
-    }
-  };
-
-  const fetchInterest = async () => {
-    try {
-      const res = await fetch('/api/interest');
-      const data = await res.json();
-      console.log('נתוני ריבית:', data);
-  
-      if ('interest' in data && 'prime' in data && 'nextDate' in data) {
-        setInterestData(data);
-      } else {
-        console.warn('מבנה לא תקין:', data);
-      }
-    } catch (error) {
-      console.error('שגיאה בשליפת ריבית:', error);
-    }
-  };
-  
-
-  useEffect(() => {
-    fetchRates();
-    fetchInterest();
-    const interval = setInterval(fetchRates, 1000 * 60 * 10); // כל 10 דקות
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    if (rates.length === 0) return;
-    const speed = 0.5;
-    const scroll = () => {
-      if (containerRef.current && contentRef.current) {
-        const container = containerRef.current;
-        const content = contentRef.current;
-        container.scrollLeft += speed;
-        if (container.scrollLeft >= content.scrollWidth / 2) {
-          container.scrollLeft = 0;
-        }
-      }
-      animationIdRef.current = requestAnimationFrame(scroll);
-    };
-    animationIdRef.current = requestAnimationFrame(scroll);
-    return () => {
-      if (animationIdRef.current) cancelAnimationFrame(animationIdRef.current);
-    };
-  }, [rates]);
-
-  const handleMouseEnter = () => {
-    if (animationIdRef.current) cancelAnimationFrame(animationIdRef.current);
-  };
-
-  const handleMouseLeave = () => {
-    animationIdRef.current = requestAnimationFrame(() => {
-      const speed = 0.5;
-      const scroll = () => {
-        if (containerRef.current && contentRef.current) {
-          const container = containerRef.current;
-          const content = contentRef.current;
-          container.scrollLeft += speed;
-          if (container.scrollLeft >= content.scrollWidth / 2) {
-            container.scrollLeft = 0;
-          }
-        }
-        animationIdRef.current = requestAnimationFrame(scroll);
-      };
-      scroll();
-    });
-  };
-
-  if (rates.length === 0) return null;
-
-  const tickerItems = rates.map((rate) => (
-    <div key={rate.key} className="flex items-center gap-0.5 text-sm px-6 py-2 min-w-fit whitespace-nowrap">
-
-
-      <img
-        src={`https://flagcdn.com/w40/${getCountryCode(rate.key)}.png`}
-        srcSet={`https://flagcdn.com/w40/${getCountryCode(rate.key)}.png 1x, https://flagcdn.com/w80/${getCountryCode(rate.key)}.png 2x`}
-        alt={rate.key}
-        className="w-5 h-4 rounded-sm border"
-      />
-      <span className="font-semibold">{rate.key}</span>
-      <span className="text-gray-700">₪{rate.currentExchangeRate.toFixed(4)}</span>
-      <span className={`font-bold ${rate.currentChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-        {rate.currentChange >= 0 ? '▲' : '▼'} {rate.currentChange.toFixed(2)}%
-      </span>
-    </div>
-  ));
-
+export default function MortgageTypesPage() {
+  const cards = [
+    { title: 'לכל מטרה', icon: '💰' },
+    { title: 'משכנתא לדירה', icon: '🏢' },
+    { title: 'משכנתא הפוכה', icon: '📥' },
+    { title: 'איחוד הלוואות', icon: '🔄' },
+    { title: 'משכנתא פנסיונית', icon: '👴' },
+    { title: 'משכנתא לשיפוץ', icon: '🛠️' },
+    { title: 'בנייה עצמית', icon: '✏️' },
+    { title: 'משכנתא עסקית', icon: '💼' },
+    { title: 'משכנתא לנכסים מסחריים', icon: '🏬' },
+  ];
 
   return (
-    <div className="overflow-hidden bg-white border-y border-gray-300 flex w-full flex-col md:flex-row">
-      {/* מטבעות - רק במסכים בינוניים ומעלה */}
-      <div
-        ref={containerRef}
-        className="hidden md:flex w-full md:w-[60%] whitespace-nowrap overflow-hidden"
-        style={{ direction: 'ltr' }}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-      >
-        <div ref={contentRef} className="flex">
-          {tickerItems}
-          {tickerItems}
-        </div>
-      </div>
-  
-     {/* נתוני ריבית - תמיד מוצג */}
-        <div className="w-full md:w-[40%] bg-gray-50 flex items-center px-0 text-right">
-          <div className="w-full text-sm text-gray-800 whitespace-nowrap overflow-hidden text-ellipsis p-2">
-            {interestData ? (
-              <div className="flex gap-4 w-full justify-start md:justify-start">
-                <div className="text-right">ריבית בנק ישראל: <span className="font-bold">{interestData.interest.toFixed(2)}%</span></div>
-                <div className="text-right">פריים: <span className="font-bold">{interestData.prime.toFixed(2)}%</span></div>
-                <div className="text-right">עדכון הבא: <span className="font-medium">{new Date(interestData.nextDate).toLocaleDateString('he-IL')}</span></div>
-              </div>
-            ) : (
-              <div className="text-gray-400">טוען נתוני ריבית...</div>
-            )}
+    <main dir="rtl" className="min-h-screen bg-white px-4 py-8 text-purple-800">
+      {/* כותרת כללית */}
+      <section className="flex flex-col items-end max-w-6xl mx-auto mb-8">
+        <h2 className="text-red-600 text-xl font-bold leading-tight">
+          להוריד פנסיונית<br />
+          להוסיף משכנתא למורכבים
+        </h2>
+      </section>
+
+      {/* גריד הכרטיסים */}
+      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
+        {cards.map((card) => (
+          <div
+            key={card.title}
+            className="border border-purple-300 rounded-xl shadow-md hover:shadow-lg p-4 flex flex-col items-center text-center transition"
+          >
+            <button className="bg-purple-600 text-white text-sm font-bold px-4 py-1 rounded-full mb-4">
+              {card.title}
+            </button>
+
+            <div className="text-6xl mb-4">{card.icon}</div>
+
+            <a href="#" className="text-purple-700 underline font-semibold text-sm hover:text-purple-500">
+              למידע נוסף
+            </a>
           </div>
-        </div>
-
-
-    </div>
+        ))}
+      </section>
+    </main>
   );
-  
-  
 }

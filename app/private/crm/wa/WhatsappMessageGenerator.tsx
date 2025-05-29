@@ -44,6 +44,7 @@ export default function WhatsappMessageGenerator() {
     const msg = `היי ${clientName} 👋
 
 בהמשך לשיחתנו, מצרף לך קישור ל-*מדריך להוצאת דוח יתרות לסילוק*:
+יש להשיב להודעה זו כדי שהקישור ייפתח
 
 📄 ${bank}:
 ${bankLink}

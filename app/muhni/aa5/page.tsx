@@ -99,30 +99,46 @@ export default function PexelsGallery() {
           ))}
 
         {mediaType === 'images' &&
-  results.map(photo => (
-    <div key={photo.id} className="space-y-2">
-      {/* עטיפה בלינק לפתיחת ה-URL המלא */}
-      <a
-        href={photo.src.original}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="block rounded overflow-hidden shadow-md hover:scale-105 transition"
-      >
-        <img
-          src={photo.src.medium}
-          alt={photo.alt}
-          className="w-full h-auto"
-          loading="lazy"
-        />
-      </a>
+          results.map(photo => (
+            <div key={photo.id} className="space-y-2">
+              {/* כעת הלינק מוביל ישירות ל־src.original, בלי כל proxy */}
+              <a
+                href={photo.src.original}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block rounded overflow-hidden shadow-md hover:scale-105 transition"
+              >
+                <img
+                  src={photo.src.medium}
+                  alt={photo.alt}
+                  className="w-full h-auto"
+                  loading="lazy"
+                />
+              </a>
 
-      {/* תצוגה של ה-URL מתחת, שניתן גם להעתיק */}
-      <p className="text-xs font-mono break-all">
-        {photo.src.original}
-      </p>
-    </div>
-  ))
-}
+              {/* תצוגת הטקסט של אותו URL כדי שתוכל להעתיק */}
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  readOnly
+                  value={photo.src.original}
+                  className="flex-grow border rounded p-1 text-xs font-mono"
+                />
+                <button
+                  onClick={() => navigator.clipboard.writeText(photo.src.original)}
+                  className="bg-blue-600 text-white px-2 py-1 rounded text-xs"
+                >
+                  העתק
+                </button>
+              </div>
+            </div>
+          ))}
+
+
+
+
+
+
       </div>
 
       {hasMore && !loading && results.length > 0 && (
@@ -139,7 +155,6 @@ export default function PexelsGallery() {
     </div>
   );
 }
-
 
 
 
