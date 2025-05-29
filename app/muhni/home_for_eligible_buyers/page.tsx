@@ -6,7 +6,7 @@ import Link from "next/link";
 
 export default function AffordableHousing() {
   return (
-    <div className="bg-gray-50 min-h-screen py-12 px-6 sm:px-12 md:px-20">
+    <div className="bg-galbg min-h-screen py-12 px-6 sm:px-12 md:px-20">
       <div className="max-w-4xl mx-auto bg-white shadow-xl rounded-2xl p-8 sm:p-12">
         <h1 className="text-3xl sm:text-4xl font-bold text-gray-800 text-center mb-6">
           מחיר למשתכן - המדריך המלא לרוכשי דירות
