@@ -1,12 +1,12 @@
 import React from 'react';
 
-interface EmailiconProps {
+interface EmailIconProps {
   size?: number;
   color?: string;
   className?: string;
 }
 
-const EmailIcon: React.FC<EmailiconProps> = ({
+const EmailIcon: React.FC<EmailIconProps> = ({
   size = 24,
   color = 'currentColor',
   className = '',

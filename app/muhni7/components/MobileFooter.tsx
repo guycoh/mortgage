@@ -1,12 +1,15 @@
 // app/components/MobileFooter.tsx
 
+// import EmailIcon from "@/public/assets/images/svg/contact/Emailicon",
 import EmailIcon from "@/public/assets/images/svg/contact/EmailIcon";
+
+
 import WhatsappIcon from "@/public/assets/images/svg/contact/WhatsappIcon";
 import PhoneIcon from "@/public/assets/images/svg/contact/PhoneIcon";
 import CalendarIcon from "@/public/assets/images/svg/contact/CalendarIcon";
 import ContactIcon from "@/public/assets/images/svg/contact/ContactIcon"; 
-ContactIcon
 
+//ailicon
 
 export default function MobileFooter() {
   const buttonsData = [
