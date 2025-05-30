@@ -1,6 +1,6 @@
 // app/components/MobileFooter.tsx
 
-import EmailIcon from "@/public/assets/images/svg/contact/EmailIcon";
+
 import WhatsappIcon from "@/public/assets/images/svg/contact/WhatsappIcon";
 import PhoneIcon from "@/public/assets/images/svg/contact/PhoneIcon";
 import CalendarIcon from "@/public/assets/images/svg/contact/CalendarIcon";
@@ -33,7 +33,7 @@ export default function MobileFooter() {
     {
       id: "email",
       label: "שלח מייל",
-      Icon:EmailIcon,
+      Icon:PhoneIcon,
     },
   ];
 
