@@ -1,19 +1,17 @@
-// app/components/MobileFooter.tsx
-
 
 import WhatsappIcon from "@/public/assets/images/svg/contact/WhatsappIcon";
 import PhoneIcon from "@/public/assets/images/svg/contact/PhoneIcon";
 import CalendarIcon from "@/public/assets/images/svg/contact/CalendarIcon";
 import ContactIcon from "@/public/assets/images/svg/contact/ContactIcon"; 
-
+import HomeIcon from "@/public/assets/images/svg/general/HomeIcon";
 
 
 export default function MobileFooter() {
   const buttonsData = [
     {
-      id: "contact",
-      label: "יצירת קשר",
-      Icon: ContactIcon,
+      id: "home",
+      label: "דף הבית",
+      Icon: HomeIcon,
     },
     {
       id: "call",
@@ -31,9 +29,9 @@ export default function MobileFooter() {
       Icon: WhatsappIcon,
     },
     {
-      id: "email",
-      label: "שלח מייל",
-      Icon:PhoneIcon,
+      id: "contact",
+      label: "יצירת קשר",
+      Icon: ContactIcon,
     },
   ];
 
