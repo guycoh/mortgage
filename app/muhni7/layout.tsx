@@ -3,10 +3,15 @@
 
 import { usePathname } from "next/navigation";
 import { Footer } from "./components/footer";
+
 import { Nav } from "./components/nav";
 import SideMenu from "./components/sidebar_mobile";
 import CurrencyTicker from "./components/CurrencyTicker";
 import FloatingButtons from "./components/FloatingButtons";
+
+import MobileFooter from "./components/MobileFooter";
+
+
 
 export default function MuhniLayout({
   children,
@@ -47,6 +52,7 @@ export default function MuhniLayout({
       </main>
 
       <Footer />
+      <MobileFooter />
     </div>
   );
 }
