@@ -13,7 +13,7 @@ export default function FloatingButtons() {
       </div>
 
       <div className="flex flex-col items-center w-16 ml-4">
-        <Link href="/muhni/schedule">
+        <Link href="/muhni7/schedule">
           <button className="w-16 h-16 bg-white flex justify-center items-center rounded-full border border-[#6929AC] bg-transparent shadow-md hover:shadow-lg active:scale-95 transition-all duration-200 ease-out focus:outline-none focus:ring-4 focus:ring-[#6929AC]/30">
             <CalendarIcon size={38} color="#6929AC" />
           </button>
