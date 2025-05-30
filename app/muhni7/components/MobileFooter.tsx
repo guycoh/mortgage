@@ -1,11 +1,9 @@
-
 import Link from "next/link";
 import WhatsappIcon from "@/public/assets/images/svg/contact/WhatsappIcon";
 import PhoneIcon from "@/public/assets/images/svg/contact/PhoneIcon";
 import CalendarIcon from "@/public/assets/images/svg/contact/CalendarIcon";
 import ContactIcon from "@/public/assets/images/svg/contact/ContactIcon";
 import HomeIcon from "@/public/assets/images/svg/general/HomeIcon";
-
 
 const buttonsData = [
   {
@@ -20,7 +18,7 @@ const buttonsData = [
     label: "טלפן ליועץ",
     Icon: PhoneIcon,
     type: "a",
-    href: "tel:0502453345",
+    href: "tel:05502453345",
   },
   {
     id: "meeting",
@@ -64,13 +62,13 @@ export default function MobileFooter() {
 
           if (type === "link") {
             return (
-              <Link key={id} href={href} passHref legacyBehavior>
-                <a
-                  className="flex flex-col items-center justify-center"
-                  aria-label={label}
-                >
-                  {content}
-                </a>
+              <Link
+                key={id}
+                href={href}
+                className="flex flex-col items-center justify-center"
+                aria-label={label}
+              >
+                {content}
               </Link>
             );
           }

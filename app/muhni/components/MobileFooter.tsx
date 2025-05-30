@@ -62,13 +62,13 @@ export default function MobileFooter() {
 
           if (type === "link") {
             return (
-              <Link key={id} href={href} passHref legacyBehavior>
-                <a
-                  className="flex flex-col items-center justify-center"
-                  aria-label={label}
-                >
-                  {content}
-                </a>
+              <Link
+                key={id}
+                href={href}
+                className="flex flex-col items-center justify-center"
+                aria-label={label}
+              >
+                {content}
               </Link>
             );
           }
