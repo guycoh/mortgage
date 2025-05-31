@@ -29,7 +29,7 @@ const buttonsData = [
   },
   {
     id: "whatsapp",
-    label: "הודעת וואטסאפ",
+    label: "וואטסאפ",
     Icon: WhatsappIcon,
     type: "a",
     href: "https://wa.me/972523684844",
@@ -45,63 +45,65 @@ const buttonsData = [
 
 export default function MobileFooter() {
   return (
-<footer className="fixed bottom-0 left-0 w-full bg-gray-50 h-24 z-50 md:hidden">
-  {/* בור מרכזי – חצי אליפסה */}
-  <div
-    className="absolute top-0 left-1/2 -translate-x-1/2 w-28 h-20 bg-main z-10"
-    style={{ borderBottomLeftRadius: "100% 80%", borderBottomRightRadius: "100% 80%" }}
-  />
+      <footer className="fixed bottom-0 left-0 w-full bg-gray-50 h-24 z-50 md:hidden">
+        {/* בור מרכזי – חצי אליפסה */}
+        <div
+          className="absolute top-0 left-1/2 -translate-x-1/2 w-28 h-20 bg-main z-10"
+          style={{ borderBottomLeftRadius: "100% 80%", borderBottomRightRadius: "100% 80%" }}
+        />
 
-  {/* כפתור אמצעי */}
-  
-  <div className="absolute left-1/2 -translate-x-1/2 -top-12 z-30 flex flex-col items-center">
-    <div className="bg-white text-main border border-main w-24 h-24 rounded-full flex flex-col items-center justify-center shadow-md text-xs font-normal text-center leading-tight px-1">
-      <CalendarIcon className="w-8 h-8 text-main mb-1" />
-      קביעת<br />פגישה
-    </div>
-  </div>
-
-  {/* כפתורים צדדיים */}
-  <nav className="relative flex justify-between items-end h-full px-4 z-20">
-    {buttonsData.map(({ id, label, Icon, type, href }, index) => {
-      const isMiddle = index === 2;
-      if (isMiddle) return <div key={id} className="w-24" />; // להשאיר מקום לכפתור המרכזי
-
-      const button = (
-        <>
+        {/* כפתור אמצעי */}
         
-          <div className="bg-white border border-main text-main w-14 h-14 rounded-full flex items-center justify-center shadow-md">
-            <Icon className="w-6 h-6 text-main" />
+       <Link href="/muhni/schedule">
+          <div className="absolute left-1/2 -translate-x-1/2 -top-8 z-30 flex flex-col items-center cursor-pointer">
+            <div className="bg-white text-main border border-main w-24 h-24 rounded-full flex flex-col items-center justify-center shadow-md text-xs font-normal text-center leading-tight px-1">
+              <CalendarIcon className="w-8 h-8 text-main mb-1" />
+              קביעת<br />פגישה
+            </div>
           </div>
-          <span className="text-xs mt-1 text-main">{label}</span>
-        </>
-      );
+        </Link>
 
-      const classes = "flex flex-col items-center justify-center text-center";
+        {/* כפתורים צדדיים */}
+        <nav className="relative flex justify-between items-end h-full px-4 z-20">
+          {buttonsData.map(({ id, label, Icon, type, href }, index) => {
+            const isMiddle = index === 2;
+            if (isMiddle) return <div key={id} className="w-24" />; // להשאיר מקום לכפתור המרכזי
 
-      if (type === "link") {
-        return (
-          <Link key={id} href={href} className={classes} aria-label={label}>
-            {button}
-          </Link>
-        );
-      }
+            const button = (
+              <>
+              
+                <div className="bg-white border border-main text-main w-14 h-14 rounded-full flex items-center justify-center shadow-md">
+                  <Icon className="w-6 h-6 text-main " color="#6929AC"/>
+                </div>
+                <span className="text-xs mt-1 text-main">{label}</span>
+              </>
+            );
 
-      return (
-        <a
-          key={id}
-          href={href}
-          className={classes}
-          aria-label={label}
-          target={href.startsWith("http") ? "_blank" : undefined}
-          rel={href.startsWith("http") ? "noopener noreferrer" : undefined}
-        >
-          {button}
-        </a>
-      );
-    })}
-  </nav>
-</footer>
+            const classes = "flex flex-col items-center justify-center text-center";
+
+            if (type === "link") {
+              return (
+                <Link key={id} href={href} className={classes} aria-label={label}>
+                  {button}
+                </Link>
+              );
+            }
+
+            return (
+              <a
+                key={id}
+                href={href}
+                className={classes}
+                aria-label={label}
+                target={href.startsWith("http") ? "_blank" : undefined}
+                rel={href.startsWith("http") ? "noopener noreferrer" : undefined}
+              >
+                {button}
+              </a>
+            );
+          })}
+        </nav>
+      </footer>
   );
 }
 
