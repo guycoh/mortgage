@@ -10,6 +10,8 @@ import Link from "next/link";
 import "./globals.css";
 
 import { BookingProvider } from "./context/BookingContext";
+import { UserProvider } from './context/UserContext';
+
 
 //import { AuthProvider } from "./context/AuthContext";
 
@@ -56,14 +58,13 @@ export default function RootLayout({
     <html dir="rtl" className={geistSans.className} suppressHydrationWarning>
       <body>
           <div>
-          <BookingProvider>
-                {children}
-          </BookingProvider>
-         </div>
+          <UserProvider>
+              <BookingProvider>
+                    {children}
+              </BookingProvider>
+          </UserProvider>
+         </div>    
       
-      
-      
-       
       </body>
     </html>
   );

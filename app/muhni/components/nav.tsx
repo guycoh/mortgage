@@ -50,12 +50,13 @@ export const Nav = ({ onOpenMenu, isMenuOpen }: { onOpenMenu: () => void, isMenu
          <UserInfo />
     
       </div>
-      <div className="max-lg:hidden lg:!block absolute top-4 right-[480px] w-auto h-auto   3">
+      <div className="max-lg:hidden lg:!block absolute top-4 right-[500px] w-auto h-auto   3">
            <GuidesDropdown />    
       </div>
-      <div className="max-lg:hidden lg:!block absolute top-5.2 left-[520px] w-auto h-auto   3">
+      
+      {/* <div className="max-lg:hidden lg:!block absolute top-5.2 left-[520px] w-auto h-auto   3">
            <Link href="/muhni/schedule" className="text-white bg-main rounded-lg text-sm px-5 py-2.5">קבע פגישה</Link>
-      </div>
+      </div> */}
 
 
 

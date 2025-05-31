@@ -82,24 +82,7 @@ export const Footer = () => {
             </li>
           </ul>
 
-          <ul className="space-y-4 mt-4">
-            <li>
-              <Link
-                href="/private/crm"
-                className="w-32 border border-white px-4 py-2 rounded-lg hover:underline hover:font-bold transition duration-200 inline-block"
-              >
-                CRM
-              </Link>
-            </li>
-            <li>
-              <Link
-                href="/private/admin"
-                className="w-32 border border-white px-4 py-2 rounded-lg hover:underline hover:font-bold transition duration-200 inline-block"
-              >
-                ADMIN
-              </Link>
-            </li>
-          </ul>
+        
         </div>
 
       </div>
