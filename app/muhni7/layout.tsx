@@ -39,7 +39,7 @@ export default function MuhniLayout({
       {/* תוכן הדף עם סרגל צד שמאלי */}
       <main className="flex-grow grid grid-cols-1 md:grid-cols-[1fr_60px] gap-4 px-1 bg-galbg">
         {/* תוכן הדף */}
-        <div className="mb-24 md:mb-0">{children}</div>
+        <div className="mb-36 md:mb-0">{children}</div>
 
         {/* סרגל צד שמאלי */}
         {showSidebar ? (

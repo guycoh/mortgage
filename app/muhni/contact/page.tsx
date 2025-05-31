@@ -4,7 +4,7 @@ import Image from "next/image";
 
 const ContactPage = () => {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#f9fafb] to-[#e3f2fd] py-16 px-6">
+    <div className="min-h-screen bg-galbg py-16 px-6">
       <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-12 items-center">
         {/* תוכן וטופס */}
         <div className="space-y-8">
