@@ -16,7 +16,7 @@ export default function AffordableHousing() {
           התוכנית מאפשרת לקבל הנחות משמעותיות ברכישת דירה, בתנאים מיוחדים ומסובסדים.
         </p>
         <Image
-          src="/assets/images/imgFiles/affordable_housing.jpg"
+          src="/assets/images/imgFiles/home_for_eligible_buyers.jpg"
           alt="מחיר למשתכן"
           width={400}
           height={200}
