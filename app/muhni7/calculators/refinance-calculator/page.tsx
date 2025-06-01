@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from "react";
+import { useState, useEffect } from "react";
 import AmortizationSchedule from "./components/AmortizationSchedule";
 import { Modal } from "./components/Modal";
 
@@ -96,6 +96,9 @@ const LoanTable = () => {
     ]);
   };  
 
+useEffect(() => {
+  addRow();
+}, []);
 
   const updateRow = (id: number, field: keyof LoanRow, value: any) => {
     const updatedRows = rows.map((row) => {

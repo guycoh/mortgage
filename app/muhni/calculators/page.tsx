@@ -22,11 +22,14 @@ const calculators = [
   { title: "מחשבון מס רכישה", description: "בדוק כמה מס רכישה תצטרך לשלם.", link: "/muhni/calculators/purchase_tax_calculator", icon: Calculator4 },
   { title: "מחשבון מחיר למשתכן", description: "חשב את ההוצאות והתנאים לזכאות.", link: "/muhni/calculators/mechir_la_mishtaken", icon: Calculator7 },
   { title: "מחשבון עלויות נלוות", description: "בדוק מה העלויות הנלוות", link: "/muhni/calculators/costs_calculator", icon: Calculator8 },
+  { title: "מחשבון קרן שווה", description: "קרן שווה ", link: "/muhni/calculators/equal_principal", icon: Calculator8 },
+  
   { title: "מחשבון כדאיות מחזור", description: "בדוק האם משתלם לך למחזר את המשכנתא.", link: "/muhni/calculators/refinance-calculator", icon: Calculator1 },  
   { title: "מחשבון זכאות", description: "חשב זכאות משרד השיכון", link: "/muhni/calculators/eligibility_calculator", icon: Calculator5 },
   { title: "מחשבון משכנתא", description: "חשב את ההחזר החודשי שלך.", link: "/muhni/calculators/refinance-calculator", icon: Calculator6},
  
 ];
+
 
 
 

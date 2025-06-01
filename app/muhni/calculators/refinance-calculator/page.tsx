@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import AmortizationSchedule from "./components/AmortizationSchedule";
 import { Modal } from "./components/Modal";
 
@@ -31,6 +31,16 @@ const LoanTable = () => {
   const minSaving = 150000;
   const maxSaving = 200000;
   
+// בתוך הקומפוננטה LoanTable, אחרי הגדרת הפונקציות:
+useEffect(() => {
+  addRow();
+}, []);
+
+
+
+
+
+
 
   const loanTypes = [
     { code: 1, name: "פריים", isIndexed: false },
