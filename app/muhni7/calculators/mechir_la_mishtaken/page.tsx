@@ -141,7 +141,7 @@ const PriceGrantSimulator = () => {
     propertyValue < contractPrice;
 
   return (
-    <div className="relative max-w-md mx-auto mt-10 p-6 bg-white border border-gray-200 rounded-2xl shadow-xl transition-all duration-300 hover:shadow-2xl">
+    <div className="relative max-w-md mx-auto my-10 p-6 bg-white border border-gray-200 rounded-2xl shadow-xl transition-all duration-300 hover:shadow-2xl">
         <div className="absolute left-0 top-0 z-5  flex flex-col items-center ">
               {/* קריאה עם שליטה בגודל ובמיקום */}
          

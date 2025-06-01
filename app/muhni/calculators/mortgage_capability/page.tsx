@@ -211,7 +211,7 @@ export default function MortgageSimulatorForm() {
   
 
   return (
-    <div className="min-h-screen bg-gray-50 py-10 px-4">
+    <div className="min-h-screen bg-galbg py-10 px-4">
       <div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-lg overflow-hidden">
         <div className="p-8">
           <h2 className="text-2xl font-bold text-main mb-6 text-center">סימולטור כמה משכנתא אוכל לקבל? </h2>

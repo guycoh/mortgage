@@ -47,7 +47,7 @@ export default function LoanCalculator() {
   const breakdown = getMonthlyBreakdown();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-100 to-sky-100 flex flex-col items-center justify-center px-4 py-10 space-y-10">
+    <div className="min-h-screen bg-galbg flex flex-col items-center justify-center px-4 py-10 space-y-10">
       {/* מחשבון */}
       <div className="w-full max-w-md p-6 bg-white/70 backdrop-blur-sm border border-slate-200 rounded-2xl shadow-lg animate-fade-in-up">
         <h1 className="text-3xl font-bold text-gray-800 mb-6 text-center">מחשבון הלוואה 💸</h1>

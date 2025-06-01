@@ -21,10 +21,10 @@ async function getRoles() {
 export async function POST(req: NextRequest) {
     const body = await req.json();
     console.log('Received body:', body);  // להדפיס את מה שהשרת מקבל
-    return createRole(body);
+    return createLead(body);
 }
 
-async function createRole(body: any) {
+async function createLead(body: any) {
     const { data, error } = await supabase.from('leads').insert([body]);
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
     return NextResponse.json(data, { status: 201 });
