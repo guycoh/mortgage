@@ -20,7 +20,9 @@ const calculators = [
   { title: "מחשבון קרן שווה", description: "קרן שווה ", link: "/muhni7/calculators/equal_principal", icon: Calculator8 },
   { title: "מחשבון כדאיות מחזור", description: "בדוק האם משתלם לך למחזר את המשכנתא.", link: "/muhni7/calculators/refinance-calculator", icon: Calculator1 },  
   { title: "מחשבון זכאות", description: "חשב זכאות משרד השיכון", link: "/muhni7/calculators/eligibility_calculator", icon: Calculator5 },
-  { title: "מחשבון משכנתא", description: "חשב את ההחזר החודשי שלך.", link: "/muhni7/calculators/refinance-calculator", icon: Calculator6 },
+  { title: "מחשבון משכנתא", description: "חשב את ההחזר החודשי שלך.", link: "/muhni7/calculators/mortgage_calculator", icon: Calculator6 },
+
+
 ];
 
 

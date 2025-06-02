@@ -1,180 +1,132 @@
-"use client";
-import { useState } from "react";
+'use client';
+import { useEffect, useState } from 'react';
 
-const PurchaseTaxForm = () => {
-  const [propertyPrice, setPropertyPrice] = useState<number | "">("");
-  const [isSingleHome, setIsSingleHome] = useState<boolean>(true);
-  const [taxBreakdown, setTaxBreakdown] = useState<
-    { from: number; to: number; rate: number; amount: number }[]
-  >([]);
-  const [totalTax, setTotalTax] = useState<number | null>(null);
+export default function LoanInputsPreview() {
+  // 🟧 ערכים לשינוי חופשי:
+  const loanAmount = 1000000; // ₪
+  const annualInterest = 5; // %
+  const annualIndex = 2; // % מדד שנתי צפוי
+  const months = 60; // חודשים
+  const isLinkedToIndex = true; // ✔️ אם ההלוואה צמודת מדד
 
-  const formatNumber = (value: string) => {
-    const numericValue = value.replace(/\D/g, "");
-    return numericValue.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-  };
+  // 🟦 חישובים
+  const monthlyInterest = annualInterest / 12 / 100;
+ const monthlyIndex = isLinkedToIndex
+  ? Math.pow(1 + annualIndex / 100, 1 / 12) - 1
+  : 0;
 
-  const handlePropertyPriceChange = (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const rawValue = e.target.value.replace(/,/g, "");
-    const numericValue = Number(rawValue);
-    if (!isNaN(numericValue)) {
-      setPropertyPrice(numericValue);
-    } else {
-      setPropertyPrice("");
-    }
-  };
+  // 🟨 תשלום חודשי קבוע (לפני הצמדה)
+  const monthlyPayment =
+    (loanAmount * monthlyInterest) /
+    (1 - Math.pow(1 + monthlyInterest, -months));
+    // לוח סילוקין עם מספרי חודשים בלבד (כולל חודש 0)
+    const amortizationSchedule = Array.from({ length: months + 1 }, (_, i) => i);
 
-  const resetForm = () => {
-    setPropertyPrice("");
-    setIsSingleHome(true);
-    setTaxBreakdown([]);
-    setTotalTax(null);
-  };
+const rows = [];
+let remainingPrincipal = loanAmount;
 
-  const calculateTax = () => {
-    if (!propertyPrice || propertyPrice <= 0) {
-      setTotalTax(null);
-      return;
-    }
+for (let month = 0; month <= months; month++) {
+  if (month === 0) {
+    rows.push({
+      month,
+      openingBalance: null,
+      principal: null,
+      interest: null,
+      payment: null,
+      closingBalance: +loanAmount.toFixed(2),
+    });
+  } else {
+    const interestPayment = remainingPrincipal * monthlyInterest * (1 + monthlyIndex);
+    const payment = monthlyPayment * Math.pow(1 + monthlyIndex, month);
+    const principalPayment = payment - interestPayment;
 
-    let tax = 0;
-    const breakdown = [];
+    const openingBalance = remainingPrincipal;
+    const closingBalance = (openingBalance * (1 + monthlyIndex)) - principalPayment;
 
-    const brackets = isSingleHome
-      ? [
-          { limit: 1944000, rate: 0 },
-          { limit: 5175000, rate: 0.035 },
-          { limit: 17225000, rate: 0.05 },
-          { limit: 23607250, rate: 0.08 },
-          { limit: Infinity, rate: 0.1 },
-        ]
-      : [
-          { limit: 5373000, rate: 0.08 },
-          { limit: Infinity, rate: 0.1 },
-        ];
+    rows.push({
+      month,
+      openingBalance: +openingBalance.toFixed(2),
+      principal: +principalPayment.toFixed(2),
+      interest: +interestPayment.toFixed(2),
+      payment: +payment.toFixed(2),
+      closingBalance: +Math.max(closingBalance, 0).toFixed(2),
+    });
 
-    let remaining = propertyPrice;
-    let prev = 0;
+    remainingPrincipal = closingBalance;
+  }
+}
+// סיכומים
+const totalPrincipal = rows.reduce((sum, row) => sum + (row.principal || 0), 0);
+const totalInterest = rows.reduce((sum, row) => sum + (row.interest || 0), 0);
+const totalPayment = rows.reduce((sum, row) => sum + (row.payment || 0), 0);
 
-    for (let i = 0; i < brackets.length; i++) {
-      const { limit, rate } = brackets[i];
-      const range = Math.min(limit - prev, remaining);
-      const amount = range * rate;
-      tax += amount;
-      breakdown.push({ from: prev + 1, to: prev + range, rate, amount });
-      remaining -= range;
-      prev = limit;
-      if (remaining <= 0) break;
-    }
 
-    setTaxBreakdown(breakdown);
-    setTotalTax(tax);
-  };
 
-  return (
-    <div className=" min-h-screen my-6 bg-[#f9fafb] rounded-3xl shadow-2xl w-full max-w-3xl mx-auto p-6 sm:p-8 border border-gray-200">
-      <h1 className="text-4xl text-center font-extrabold text-main mb-6">
-        מחשבון מס רכישה 🏡
-      </h1>
 
-      {/* שדה מחיר */}
-      <div className="mb-4">
-        <label className="block text-gray-800 font-semibold mb-2">
-          מחיר הדירה (₪):
-        </label>
-        <input
-          type="text"
-          inputMode="numeric"
-          className="w-full p-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-400 focus:outline-none shadow-inner text-lg"
-          value={
-            propertyPrice !== "" ? formatNumber(propertyPrice.toString()) : ""
-          }
-          onChange={handlePropertyPriceChange}
-        />
-      </div>
+ 
+    return (
 
-      {/* בחירת דירה יחידה */}
-      <div className="mb-4">
-        <label className="block text-gray-800 font-semibold mb-2">
-          האם זו דירה יחידה?
-        </label>
-        <div className="flex gap-6 text-lg">
-          <label className="flex items-center gap-2">
-            <input
-              type="radio"
-              checked={isSingleHome}
-              onChange={() => setIsSingleHome(true)}
-            />
-            כן
-          </label>
-          <label className="flex items-center gap-2">
-            <input
-              type="radio"
-              checked={!isSingleHome}
-              onChange={() => setIsSingleHome(false)}
-            />
-            לא
-          </label>
-        </div>
-      </div>
 
-      {/* כפתורים */}
-      <div className="flex flex-col sm:flex-row gap-4 mt-4">
-        <button
-          onClick={calculateTax}
-          className="flex-1 py-3 rounded-xl bg-main text-white font-bold hover:bg-blue-800 transition-all shadow-lg text-xl"
-        >
-          חשב מס 💰
-        </button>
-        <button
-          onClick={resetForm}
-          className="flex-1 py-3 rounded-xl bg-gray-200 text-gray-700 font-bold hover:bg-gray-300 transition-all shadow text-xl"
-        >
-          נקה טופס ♻️
-        </button>
-      </div>
+      <div className="min-h-screen flex items-start justify-center bg-gradient-to-br from-orange-50 to-white py-10 px-4">
+  <div className="p-6 md:p-10 text-sm space-y-6 bg-white rounded-2xl shadow-xl w-full max-w-4xl border border-gray-200">
+    {/* נתוני הלוואה */}
+    <div className="space-y-3 text-gray-800">
+      <h2 className="text-xl font-bold text-center text-orange-600">📝 פרטי ההלוואה</h2>
+      <p>💰 <span className="font-medium">סכום הלוואה:</span> {loanAmount.toLocaleString()} ₪</p>
+      <p>📅 <span className="font-medium">תקופת הלוואה:</span> {months} חודשים</p>
+      <p>📈 <span className="font-medium">ריבית שנתית:</span> {annualInterest}%</p>
+      <p>📊 <span className="font-medium">מדד שנתי צפוי:</span> {annualIndex}%</p>
+      <p>✅ <span className="font-medium">צמוד מדד:</span> {isLinkedToIndex ? 'כן' : 'לא'}</p>
+      <p>📌 <span className="font-medium">ריבית חודשית:</span> {(monthlyInterest * 100).toFixed(4)}%</p>
+      <p>📌 <span className="font-medium">מדד חודשי:</span> {(monthlyIndex * 100).toFixed(4)}%</p>
+      <p>💸 <span className="font-medium">תשלום חודשי נומינלי (לפני מדד):</span> {monthlyPayment.toLocaleString(undefined, { maximumFractionDigits: 2 })} ₪</p>
+    </div>
 
-      {/* תוצאה */}
-      {totalTax !== null && (
-        <div className="mt-6 bg-white rounded-xl p-6 shadow-xl border border-blue-200 animate-fade-in">
-          <h2 className="text-2xl font-bold text-[#1d75a1] mb-4">
-            פירוט מס רכישה:
-          </h2>
-          <div className="space-y-4">
-            {taxBreakdown.map((step, idx) => (
-              <div
-                key={idx}
-                className="bg-blue-50 rounded-xl p-4 shadow-sm border border-blue-100 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2"
-              >
-                <div>
-                  <span className="font-semibold text-gray-700">מ:</span> ₪
-                  {step.from.toLocaleString()}
-                </div>
-                <div>
-                  <span className="font-semibold text-gray-700">עד:</span> ₪
-                  {step.to.toLocaleString()}
-                </div>
-                <div>
-                  <span className="font-semibold text-gray-700">שיעור מס:</span>{" "}
-                  {(step.rate * 100).toFixed(1)}%
-                </div>
-                <div className="text-blue-800 font-bold">
-                  <span className="font-semibold text-gray-700">תשלום:</span>{" "}
-                  ₪{step.amount.toLocaleString()}
-                </div>
-              </div>
+    {/* טבלת סילוקין */}
+    <div className="mt-8">
+      <h2 className="text-lg md:text-xl font-bold mb-4 text-center text-gray-800 border-b pb-2 border-orange-200">לוח סילוקין ה</h2>
+
+      <div className="overflow-x-auto rounded-xl border border-gray-300 shadow">
+        <table className="min-w-full text-sm text-center border-collapse">
+          <thead>
+            <tr className="bg-orange-100 text-gray-700">
+              <th className="py-3 px-4 border border-gray-300">תקופה</th>
+              <th className="py-3 px-4 border border-gray-300">יתרה פתיחה</th>
+              <th className="py-3 px-4 border border-gray-300">קרן</th>
+              <th className="py-3 px-4 border border-gray-300">ריבית</th>
+              <th className="py-3 px-4 border border-gray-300">תשלום חודשי</th>
+              <th className="py-3 px-4 border border-gray-300">יתרה סגירה</th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-100">
+            {rows.map((row, index) => (
+              <tr key={index} className="hover:bg-orange-50 transition-colors">
+                <td className="py-2 px-4 font-medium">{row.month}</td>
+                <td className="py-2 px-4">{row.openingBalance?.toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
+                <td className="py-2 px-4 text-green-700 font-semibold">{row.principal?.toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
+                <td className="py-2 px-4 text-red-600 font-semibold">{row.interest?.toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
+                <td className="py-2 px-4 text-gray-900 font-bold">{row.payment?.toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
+                <td className="py-2 px-4">{row.closingBalance?.toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
+              </tr>
             ))}
 
-            <div className="bg-[#e3f2fd] rounded-xl p-4 text-lg font-bold text-blue-900 text-center shadow-inner border-t-2 border-blue-300">
-              סך הכל מס רכישה: ₪{totalTax.toLocaleString()}
-            </div>
-          </div>
-        </div>
-      )}
+            {/* שורת סיכום */}
+            <tr className="bg-yellow-100 font-bold text-black border-t-2 border-yellow-400">
+              <td className="py-3 px-4">סה"כ</td>
+              <td className="py-3 px-4"></td>
+              <td className="py-3 px-4 text-green-800">{totalPrincipal.toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
+              <td className="py-3 px-4 text-red-800">{totalInterest.toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
+              <td className="py-3 px-4">{totalPayment.toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
+              <td className="py-3 px-4"></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
-  );
-};
+  </div>
+</div>
 
-export default PurchaseTaxForm;
+ 
+);
+  
+}

@@ -1,10 +1,8 @@
 "use client"
 
-import { useState, useEffect } from "react";
-import AmortizationSchedule from "./components/AmortizationSchedule";
-import { Modal } from "./components/Modal";
+import React, { useState, useEffect } from "react";
 
-
+import SpitzerScheduleModal from "@/components/graphs/SpitzerScheduleModal";
 
 interface LoanRow {
   id: number;
@@ -26,11 +24,21 @@ const LoanTable = () => {
   const [openModal, setOpenModal] = useState<LoanRow | null>(null); // שורה פתוחה
   const [expectedIndex,setExpectedIndex]=useState(2.8);
   const [showResult, setShowResult] = useState(false);
-
+  const [showModal, setShowModal] = useState(false);
   // סימולציה לנתוני החיסכון — תוכל להחליף כאן לחישוב אמיתי
   const minSaving = 150000;
   const maxSaving = 200000;
   
+// בתוך הקומפוננטה LoanTable, אחרי הגדרת הפונקציות:
+useEffect(() => {
+  addRow();
+}, []);
+
+
+
+
+
+
 
   const loanTypes = [
     { code: 1, name: "פריים", isIndexed: false },
@@ -63,13 +71,9 @@ const LoanTable = () => {
     return parseFloat(str.replace(/,/g, "")) || 0;
   };
 
- 
-const calculateMonthlyInterestRate = (annualRate: number): number => {
-    return annualRate / 12 / 100;
-    };
-
-
-
+  const calculateMonthlyInterestRate = (annualRate: number): number => {
+  return annualRate / 12 / 100;
+};
 
 
   const calculateMonths = (endDate: string) => {
@@ -101,9 +105,6 @@ const calculateMonthlyInterestRate = (annualRate: number): number => {
     ]);
   };  
 
-useEffect(() => {
-  addRow();
-}, []);
 
   const updateRow = (id: number, field: keyof LoanRow, value: any) => {
     const updatedRows = rows.map((row) => {
@@ -163,11 +164,11 @@ useEffect(() => {
   const todayDate = new Date().toISOString().split("T")[0];
 
   return (
-    <div className="min-h-screen bg-gray-100 p-3 ">
+    <div className="min-h-screen bg-galbg p-3 ">
       
       <div className="max-w-full mx-auto bg-white shadow-md rounded-lg p-2">
         <h1 className="text-2xl font-bold text-[#1d75a1] mb-4">
-          ד"ר מורגי כדאיות מיחזור
+          ד"ר מורגי מחשבון משכנתא
         </h1>
         <div className="mb-4 text-right flex items-center gap-4">
             <button
@@ -303,7 +304,9 @@ useEffect(() => {
       <td className="col-span-2 flex justify-between gap-2 md:hidden">
         <button
           className="flex-1 bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition"
-          onClick={() => setOpenModal(row)}
+        //  onClick={() => setOpenModal(row)}
+          onClick={() => setShowModal(true)}
+
         >
           סילוקין
         </button>
@@ -319,7 +322,7 @@ useEffect(() => {
       <td className="hidden md:table-cell p-2 border md:border-gray-300 border-transparent">
         <button
           className="w-full md:w-auto bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition"
-          onClick={() => setOpenModal(row)}
+          onClick={() => setShowModal(true)}
         >
           סילוקין
         </button>
@@ -332,8 +335,23 @@ useEffect(() => {
           מחק
         </button>
       </td>
+     <SpitzerScheduleModal
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        loanAmount={row.loanAmount}
+        annualInterest={row.annualInterestRate}
+        annualIndex={expectedIndex}
+        months={row.months}
+        isLinkedToIndex={row.isIndexed}
+      />
+
+
+
     </tr>
   ))}
+ 
+
+
 </tbody>
 
 
@@ -352,36 +370,12 @@ useEffect(() => {
         </div>
         </div>
        
-        <div className="flex justify-center">
-            <button
-                className="bg-green-500 mt-3 text-white px-8 py-3 text-lg rounded hover:bg-green-600 transition"
-                onClick={() => setShowResult(true)}
-            >
-                בדיקת כדאיות מחזור
-            </button>
-         </div>
+        
 
        
       </div>
 
-      {showResult && (
-            <div className="mt-6 bg-white border border-green-500 rounded-lg p-6 shadow-lg text-center animate-fade-in">
-                <h2 className="text-xl font-bold text-green-600 mb-2">✨ תוצאה</h2>
-                <p className="text-gray-700 text-lg">
-                לאחר בדיקת הנתונים שהעברת אלינו, <br />
-                קיימת <span className="font-bold text-green-700">כדאיות למחזר את המשכנתא</span>. <br />
-                אפשר לחסוך בין{" "}
-                <span className="font-bold text-blue-700">
-                    {formatNumber(minSaving)} ₪
-                </span>{" "}
-                ל{" "}
-                <span className="font-bold text-blue-700">
-                    {formatNumber(maxSaving)} ₪
-                </span>
-                .
-                </p>
-            </div>
-         )}
+    
 
 
 
@@ -389,20 +383,7 @@ useEffect(() => {
 
 
    
-      <Modal
-          isOpen={!!openModal}
-          onClose={() => setOpenModal(null)}
-        >
-          {openModal && (
-            <AmortizationSchedule
-              loanAmount={openModal.loanAmount}
-              monthlyInterestRate={openModal.monthlyInterestRate}
-              months={openModal.months}
-              monthlyPayment={openModal.monthlyPayment}
-              inflationRate={expectedIndex/100}
-            />
-          )}
-     </Modal>
+     
 
     </div>
   );

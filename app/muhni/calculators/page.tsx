@@ -26,7 +26,7 @@ const calculators = [
   
   { title: "מחשבון כדאיות מחזור", description: "בדוק האם משתלם לך למחזר את המשכנתא.", link: "/muhni/calculators/refinance-calculator", icon: Calculator1 },  
   { title: "מחשבון זכאות", description: "חשב זכאות משרד השיכון", link: "/muhni/calculators/eligibility_calculator", icon: Calculator5 },
-  { title: "מחשבון משכנתא", description: "חשב את ההחזר החודשי שלך.", link: "/muhni/calculators/refinance-calculator", icon: Calculator6},
+  { title: "מחשבון משכנתא", description: "חשב את ההחזר החודשי שלך.", link: "/muhni/calculators/mortgage_calculator", icon: Calculator6},
  
 ];
 

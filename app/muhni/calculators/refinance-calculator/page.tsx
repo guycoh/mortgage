@@ -73,9 +73,10 @@ useEffect(() => {
     return parseFloat(str.replace(/,/g, "")) || 0;
   };
 
-  const calculateMonthlyInterestRate = (annualRate: number): number => {
-    return Math.pow(1 + annualRate / 100, 1 / 12) - 1;
-  };
+   const calculateMonthlyInterestRate = (annualRate: number): number => {
+    return annualRate / 12 / 100;
+    };
+
 
   const calculateMonths = (endDate: string) => {
     const today = new Date();
