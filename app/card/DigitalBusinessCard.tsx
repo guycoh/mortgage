@@ -10,7 +10,7 @@ import Calculator4 from "public/assets/images/svg/Calculator4";
 import Phone from "@/public/assets/images/svg/phone";
 import WebIcon from "@/public/assets/images/svg/webIcon";
 import WhatsappIcon from "@/public/assets/images/svg/whatsapp";
-
+import CalendarIcon from "@/public/assets/images/svg/contact/CalendarIcon";
 import LocationIcon from "@/public/assets/images/svg/location";
 import WazeIcon from "@/public/assets/images/svg/waze_icon";
 
@@ -74,9 +74,7 @@ export default function DigitalBusinessCard() {
       <div className="relative bg-gradient-to-br from-purple-700 via-purple-600 to-purple-800 shadow-inner shadow-black/30 text-white flex flex-col items-center p-6">
   
         <Link href="/muhni/schedule" className="absolute text-xs top-4 right-4 w-24 h-24 bg-white text-purple-600 rounded-full flex flex-col items-center justify-center gap-1 shadow-md hover:shadow-lg transition">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 4h10M5 11h14M5 19h14M5 15h14" />
-          </svg>
+          <CalendarIcon/>
           קבע פגישה
         </Link>
   
@@ -129,7 +127,7 @@ export default function DigitalBusinessCard() {
               {[{ href: "/muhni/calculators/simple_calculator", icon: <Calculator1 color="#7e22ce" size={40} />, label: "מחשבון הלוואה" },
                 { href: "/muhni/calculators/mortgage_capability", icon: <Calculator2 color="#7e22ce" size={40} />, label: "כמה משכנתא אוכל לקחת?" },
                 { href: "/muhni/calculators/purchase_tax_calculator", icon: <Calculator3 color="#7e22ce" size={40} />, label: "מס רכישה" },
-                { href: "/muhni/calculators/refinance-calculator", icon: <Calculator4 color="#7e22ce" size={40} />, label: "החזר חודשי" },
+                { href: "/muhni/calculators/mortgage_calculator", icon: <Calculator4 color="#7e22ce" size={40} />, label: "מחשבון משכנתא" },
               ].map((btn, idx) => (
                 <Link
                   key={idx}

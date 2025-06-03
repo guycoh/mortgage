@@ -209,150 +209,148 @@ useEffect(() => {
             </tr>
         </thead>
         <tbody>
-  {rows.map((row) => (
-    <tr
-      key={row.id}
-      className="grid grid-cols-2 gap-x-4 gap-y-2 md:table-row md:gap-0 mb-6 md:mb-0 bg-white md:bg-transparent shadow-md md:shadow-none rounded-xl md:rounded-none p-4 md:p-0 border border-gray-200 md:border-0 transition-all duration-300"
-    >
-      {/* סכום ההלוואה */}
-      <td className="p-2 border md:border-gray-300 border-transparent">
-        <span className="text-sm text-gray-500 block md:hidden">💰 סכום ההלוואה (₪)</span>
-        <input
-          type="text"
-          className="w-full md:w-[150px] max-w-[15ch] border rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-orange-200 focus:bg-orange-50"
-          value={formatNumber(row.loanAmount)}
-          onChange={(e) =>
-            updateRow(row.id, "loanAmount", parseNumber(e.target.value))
-          }
-        />
-      </td>
+          {rows.map((row) => (
+            <tr
+              key={row.id}
+              className="grid grid-cols-2 gap-x-4 gap-y-2 md:table-row md:gap-0 mb-6 md:mb-0 bg-white md:bg-transparent shadow-md md:shadow-none rounded-xl md:rounded-none p-4 md:p-0 border border-gray-200 md:border-0 transition-all duration-300"
+            >
+              {/* סכום ההלוואה */}
+              <td className="p-2 border md:border-gray-300 border-transparent">
+                <span className="text-sm text-gray-500 block md:hidden">💰 סכום ההלוואה (₪)</span>
+                <input
+                  type="text"
+                  className="w-full md:w-[150px] max-w-[15ch] border rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-orange-200 focus:bg-orange-50"
+                  value={formatNumber(row.loanAmount)}
+                  onChange={(e) =>
+                    updateRow(row.id, "loanAmount", parseNumber(e.target.value))
+                  }
+                />
+              </td>
 
-      {/* מסלול הלוואה */}
-      <td className="p-2 border md:border-gray-300 border-transparent">
-        <span className="text-sm text-gray-500 block md:hidden">📊 מסלול הלוואה</span>
-        <select
-          className="w-full border rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-orange-200 focus:bg-orange-50"
-          value={row.loanType}
-          onChange={(e) => updateRow(row.id, "loanType", parseInt(e.target.value))}
-        >
-          {loanTypes.map((type) => (
-            <option key={type.code} value={type.code}>{type.name}</option>
+              {/* מסלול הלוואה */}
+              <td className="p-2 border md:border-gray-300 border-transparent">
+                <span className="text-sm text-gray-500 block md:hidden">📊 מסלול הלוואה</span>
+                <select
+                  className="w-full border rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-orange-200 focus:bg-orange-50"
+                  value={row.loanType}
+                  onChange={(e) => updateRow(row.id, "loanType", parseInt(e.target.value))}
+                >
+                  {loanTypes.map((type) => (
+                    <option key={type.code} value={type.code}>{type.name}</option>
+                  ))}
+                </select>
+              </td>
+
+              {/* ריבית שנתית */}
+              <td className="p-2 border md:border-gray-300 border-transparent">
+                <span className="text-sm text-gray-500 block md:hidden">📈 ריבית שנתית (%)</span>
+                <input
+                  type="number"
+                  step="0.01"
+                  className="w-full md:w-[100px] max-w-[10ch] border rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-orange-200 focus:bg-orange-50"
+                  value={row.annualInterestRate}
+                  onChange={(e) =>
+                    updateRow(row.id, "annualInterestRate", parseFloat(e.target.value))
+                  }
+                />
+              </td>
+
+              {/* צמוד */}
+              <td className="p-2 border md:border-gray-300 border-transparent flex items-center gap-2">
+                <span className="text-sm text-gray-500 block md:hidden">📌 צמוד</span>
+                <input
+                  type="checkbox"
+                  checked={row.isIndexed}
+                  onChange={(e) => updateRow(row.id, "isIndexed", e.target.checked)}
+                  disabled
+                />
+              </td>
+
+              {/* תאריך סיום */}
+              <td className="p-2 border md:border-gray-300 border-transparent">
+                <span className="text-sm text-gray-500 block md:hidden">📅 תאריך סיום</span>
+                <input
+                  type="date"
+                  className="w-full md:w-[160px] border rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-orange-200 focus:bg-orange-50"
+                  min={todayDate}
+                  value={row.endDate}
+                  onChange={(e) => updateRow(row.id, "endDate", e.target.value)}
+                />
+              </td>
+
+              {/* מספר חודשים */}
+              <td className="p-2 border md:border-gray-300 border-transparent">
+                <span className="text-sm text-gray-500 block md:hidden">🗓️ מספר חודשים</span>
+                <input
+                  type="number"
+                  className="w-full md:w-[60px] max-w-[6ch] border rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-orange-200 focus:bg-orange-50"
+                  value={row.months}
+                  onChange={(e) => updateRow(row.id, "months", parseInt(e.target.value))}
+                />
+              </td>
+
+              {/* תשלום חודשי */}
+              <td className="p-2 border md:border-gray-300 border-transparent">
+                <span className="text-sm text-gray-500 block md:hidden">💵 תשלום חודשי (₪)</span>
+                <input
+                  type="number"
+                  className="w-full md:w-[100px] max-w-[10ch] border rounded-md px-2 py-1 bg-gray-100"
+                  value={row.monthlyPayment}
+                  disabled
+                />
+              </td>
+
+              {/* כפתורי פעולה למסכים קטנים (סילוקין + מחק בשורה אחת) */}
+              <td className="col-span-2 flex justify-between gap-2 md:hidden">
+                <button
+                  className="flex-1 bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition"
+                //  onClick={() => setOpenModal(row)}
+                  onClick={() => setShowModal(true)}
+
+                >
+                  סילוקין
+                </button>
+                <button
+                  className="flex-1 bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 transition"
+                  onClick={() => deleteRow(row.id)}
+                >
+                  מחק
+                </button>
+              </td>
+
+              {/* כפתורי פעולה למסכים רגילים */}
+              <td className="hidden md:table-cell p-2 border md:border-gray-300 border-transparent">
+                <button
+                  className="w-full md:w-auto bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition"
+                  onClick={() => setShowModal(true)}
+                >
+                  סילוקין
+                </button>
+              </td>
+              <td className="hidden md:table-cell p-2 border md:border-gray-300 border-transparent">
+                <button
+                  className="w-full md:w-auto bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 transition"
+                  onClick={() => deleteRow(row.id)}
+                >
+                  מחק
+                </button>
+              </td>
+            <SpitzerScheduleModal
+                isOpen={showModal}
+                onClose={() => setShowModal(false)}
+                loanAmount={row.loanAmount}
+                annualInterest={row.annualInterestRate}
+                annualIndex={expectedIndex}
+                months={row.months}
+                isLinkedToIndex={row.isIndexed}
+              />
+
+
+
+            </tr>
           ))}
-        </select>
-      </td>
 
-      {/* ריבית שנתית */}
-      <td className="p-2 border md:border-gray-300 border-transparent">
-        <span className="text-sm text-gray-500 block md:hidden">📈 ריבית שנתית (%)</span>
-        <input
-          type="number"
-          step="0.01"
-          className="w-full md:w-[100px] max-w-[10ch] border rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-orange-200 focus:bg-orange-50"
-          value={row.annualInterestRate}
-          onChange={(e) =>
-            updateRow(row.id, "annualInterestRate", parseFloat(e.target.value))
-          }
-        />
-      </td>
-
-      {/* צמוד */}
-      <td className="p-2 border md:border-gray-300 border-transparent flex items-center gap-2">
-        <span className="text-sm text-gray-500 block md:hidden">📌 צמוד</span>
-        <input
-          type="checkbox"
-          checked={row.isIndexed}
-          onChange={(e) => updateRow(row.id, "isIndexed", e.target.checked)}
-          disabled
-        />
-      </td>
-
-      {/* תאריך סיום */}
-      <td className="p-2 border md:border-gray-300 border-transparent">
-        <span className="text-sm text-gray-500 block md:hidden">📅 תאריך סיום</span>
-        <input
-          type="date"
-          className="w-full md:w-[160px] border rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-orange-200 focus:bg-orange-50"
-          min={todayDate}
-          value={row.endDate}
-          onChange={(e) => updateRow(row.id, "endDate", e.target.value)}
-        />
-      </td>
-
-      {/* מספר חודשים */}
-      <td className="p-2 border md:border-gray-300 border-transparent">
-        <span className="text-sm text-gray-500 block md:hidden">🗓️ מספר חודשים</span>
-        <input
-          type="number"
-          className="w-full md:w-[60px] max-w-[6ch] border rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-orange-200 focus:bg-orange-50"
-          value={row.months}
-          onChange={(e) => updateRow(row.id, "months", parseInt(e.target.value))}
-        />
-      </td>
-
-      {/* תשלום חודשי */}
-      <td className="p-2 border md:border-gray-300 border-transparent">
-        <span className="text-sm text-gray-500 block md:hidden">💵 תשלום חודשי (₪)</span>
-        <input
-          type="number"
-          className="w-full md:w-[100px] max-w-[10ch] border rounded-md px-2 py-1 bg-gray-100"
-          value={row.monthlyPayment}
-          disabled
-        />
-      </td>
-
-      {/* כפתורי פעולה למסכים קטנים (סילוקין + מחק בשורה אחת) */}
-      <td className="col-span-2 flex justify-between gap-2 md:hidden">
-        <button
-          className="flex-1 bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition"
-        //  onClick={() => setOpenModal(row)}
-          onClick={() => setShowModal(true)}
-
-        >
-          סילוקין
-        </button>
-        <button
-          className="flex-1 bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 transition"
-          onClick={() => deleteRow(row.id)}
-        >
-          מחק
-        </button>
-      </td>
-
-      {/* כפתורי פעולה למסכים רגילים */}
-      <td className="hidden md:table-cell p-2 border md:border-gray-300 border-transparent">
-        <button
-          className="w-full md:w-auto bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition"
-          onClick={() => setShowModal(true)}
-        >
-          סילוקין
-        </button>
-      </td>
-      <td className="hidden md:table-cell p-2 border md:border-gray-300 border-transparent">
-        <button
-          className="w-full md:w-auto bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 transition"
-          onClick={() => deleteRow(row.id)}
-        >
-          מחק
-        </button>
-      </td>
-     <SpitzerScheduleModal
-        isOpen={showModal}
-        onClose={() => setShowModal(false)}
-        loanAmount={row.loanAmount}
-        annualInterest={row.annualInterestRate}
-        annualIndex={expectedIndex}
-        months={row.months}
-        isLinkedToIndex={row.isIndexed}
-      />
-
-
-
-    </tr>
-  ))}
- 
-
-
-</tbody>
+        </tbody>
 
 
 
@@ -376,6 +374,7 @@ useEffect(() => {
       </div>
 
     
+ 
 
 
 

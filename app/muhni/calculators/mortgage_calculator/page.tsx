@@ -25,6 +25,15 @@ const LoanTable = () => {
   const [expectedIndex,setExpectedIndex]=useState(2.8);
   const [showResult, setShowResult] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  
+
+const [selectedRow, setSelectedRow] = useState<typeof rows[0] | null>(null);
+
+  
+  
+  
+  
+  
   // סימולציה לנתוני החיסכון — תוכל להחליף כאן לחישוב אמיתי
   const minSaving = 150000;
   const maxSaving = 200000;
@@ -305,8 +314,11 @@ useEffect(() => {
         <button
           className="flex-1 bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition"
         //  onClick={() => setOpenModal(row)}
-          onClick={() => setShowModal(true)}
-
+      
+        onClick={() => {
+          setSelectedRow(row);
+          setShowModal(true);
+        }}
         >
           סילוקין
         </button>
@@ -322,7 +334,10 @@ useEffect(() => {
       <td className="hidden md:table-cell p-2 border md:border-gray-300 border-transparent">
         <button
           className="w-full md:w-auto bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition"
-          onClick={() => setShowModal(true)}
+          onClick={() => {
+            setSelectedRow(row);
+            setShowModal(true);
+          }}
         >
           סילוקין
         </button>
@@ -335,16 +350,7 @@ useEffect(() => {
           מחק
         </button>
       </td>
-     <SpitzerScheduleModal
-        isOpen={showModal}
-        onClose={() => setShowModal(false)}
-        loanAmount={row.loanAmount}
-        annualInterest={row.annualInterestRate}
-        annualIndex={expectedIndex}
-        months={row.months}
-        isLinkedToIndex={row.isIndexed}
-      />
-
+     
 
 
     </tr>
@@ -375,8 +381,21 @@ useEffect(() => {
        
       </div>
 
-    
+   
+   
 
+{/* מחוץ ל־<table> */}
+{showModal && selectedRow && (
+  <SpitzerScheduleModal
+    isOpen={showModal}
+    onClose={() => setShowModal(false)}
+    loanAmount={selectedRow.loanAmount}
+    annualInterest={selectedRow.annualInterestRate}
+    annualIndex={expectedIndex}
+    months={selectedRow.months}
+    isLinkedToIndex={selectedRow.isIndexed}
+  />
+)}
 
 
 
@@ -391,3 +410,12 @@ useEffect(() => {
 
 export default LoanTable;       
 
+//  <SpitzerScheduleModal
+//         isOpen={showModal}
+//         onClose={() => setShowModal(false)}
+//         loanAmount={row.loanAmount}
+//         annualInterest={row.annualInterestRate}
+//         annualIndex={expectedIndex}
+//         months={row.months}
+//         isLinkedToIndex={row.isIndexed}
+//       />
