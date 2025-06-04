@@ -13,7 +13,7 @@ import Link from 'next/link';
 
 const calculators = [
   { title: "מחשבון פשוט", description: "חשב את ההחזר החודשי", link: "/muhni7/calculators/simple_calculator", icon: Calculator2 },
-  { title: "מחשבון כמה משכנתא אוכל לקבל?", description: "", link: "/muhni7/calculators/mortgage_capability", icon: Calculator3 },
+  { title: "מחשבון יכולות", description: "", link: "/muhni7/calculators/mortgage_capability", icon: Calculator3 },
   { title: "מחשבון מס רכישה", description: "בדוק כמה מס רכישה תצטרך לשלם.", link: "/muhni7/calculators/purchase_tax_calculator", icon: Calculator4 },
   { title: "מחשבון מחיר למשתכן", description: "חשב את ההוצאות והתנאים לזכאות.", link: "/muhni7/calculators/mechir_la_mishtaken", icon: Calculator7 },
   { title: "מחשבון עלויות נלוות", description: "בדוק מה העלויות הנלוות", link: "/muhni7/calculators/costs_calculator", icon: Calculator8 },

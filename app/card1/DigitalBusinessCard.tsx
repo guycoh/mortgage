@@ -2,14 +2,19 @@
 import Image from "next/image";
 import Link from "next/link";
 
-import EmailIcon from "public/assets/images/svg/EmailIcon";
+import EmailIcon from "public/assets/images/svg/contact/EmailIcon";
+
+import WebIcon from "@/public/assets/images/svg/webIcon";
+
+import PhoneIcon from "@/public/assets/images/svg/contact/PhoneIcon";
+import WhatsappIcon from "@/public/assets/images/svg/contact/WhatsappIcon";
+
+
 import Calculator1 from "public/assets/images/svg/Calculator1";
 import Calculator2 from "public/assets/images/svg/Calculator2";
 import Calculator3 from "public/assets/images/svg/Calculator3";
 import Calculator4 from "public/assets/images/svg/Calculator4";
-import Phone from "@/public/assets/images/svg/phone";
-import WebIcon from "@/public/assets/images/svg/webIcon";
-import WhatsappIcon from "@/public/assets/images/svg/whatsapp";
+
 
 import LocationIcon from "@/public/assets/images/svg/location";
 import WazeIcon from "@/public/assets/images/svg/waze_icon";
@@ -29,22 +34,22 @@ export default function DigitalBusinessCard() {
     
 const buttons = [
   {
-    icon: '/assets/gal/phone.svg',
+    icon: PhoneIcon,
     label: 'טלפון',
     href: 'tel:0523684844',
   },
   {
-    icon: '/assets/gal/whatsap.svg',
+    icon: WhatsappIcon,
     label: 'צ\'אט',
     href: 'https://wa.me/972523684844',
   },
   {
-    icon: '/assets/gal/email.svg',
+    icon: EmailIcon,
     label: 'דוא"ל',
     href: 'mailto:guycoh@outlook.co.il',
   },
   {
-    icon: '/assets/gal/website.svg',
+    icon: WebIcon,
     label: 'אתר',
     href: 'https://morg-orcin.vercel.app/muhni',
   },
@@ -132,7 +137,7 @@ const calculators = [
         <p className="mt-2 text-3xl   ">יועץ משכנתאות </p>         
         
         {/* — יצירת קשר — */}
-        <div className="w-full flex justify-center mt-10">
+        {/* <div className="w-full flex justify-center mt-10">
           <div className="w-full max-w-5xl">
             <div className="grid grid-cols-4 sm:grid-cols-4 gap-6 text-center">
               {buttons.map((btn, idx) => (
@@ -157,7 +162,31 @@ const calculators = [
               ))}
             </div>
           </div>
+        </div> */}
+        
+        {/* — יצירת קשר — */}
+        <div className="w-full flex justify-center mt-10">
+          <div className="w-full max-w-5xl">
+            <div className="grid grid-cols-4 gap-6 place-items-center">
+              {buttons.map((btn, idx) => (
+                <div key={idx} className="flex flex-col items-center space-y-2">
+                  <a
+                    href={btn.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center rounded-full bg-white w-24 h-24 p-4 shadow transition hover:shadow-lg"
+                  >
+                    <div className="flex items-center justify-center rounded-full bg-gray-50 w-16 h-16 shadow-inner border border-gray-200">
+                      <btn.icon className="w-10 h-10 text-main" />
+                    </div>
+                  </a>
+                  <span className="text-base font-medium text-white">{btn.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
+
 
 
         {/* — מחשבוני משכנתא — */}      
@@ -231,7 +260,7 @@ const calculators = [
 
 
               </div>
-</div>
+        </div>
 
 </div>
 
