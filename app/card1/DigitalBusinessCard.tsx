@@ -66,7 +66,7 @@ export default function DigitalBusinessCard() {
         {/* — יצירת קשר — */}
         <div className="w-full flex justify-center mt-10">
           <div className="w-full max-w-5xl px-6">
-            <div className="grid grid-cols-4 gap-x-6 gap-y-4 sm:gap-x-8 place-items-center">
+            <div className="grid grid-cols-4 gap-x-6 gap-y-6 place-items-center">
               {buttons.map((btn, idx) => (
                 <div key={idx} className="relative flex flex-col items-center">
                   <a
@@ -74,14 +74,13 @@ export default function DigitalBusinessCard() {
                     target="_blank"
                     rel="noopener noreferrer"
                     className="rounded-full bg-white shadow hover:shadow-lg transition
-                              w-20 h-20 sm:w-24 sm:h-24 flex items-center justify-center"
+                             w-[72px] h-[72px] sm:w-20 sm:h-20 flex items-center justify-center"
                   >
                     <div className="bg-gray-50 border border-gray-200 rounded-full
-                                    w-14 h-14 sm:w-20 sm:h-20 flex items-center justify-center">
-                      <btn.icon color="#6929AC" className="w-7 h-7 sm:w-10 sm:h-10" />
+                                    w-12 h-12 sm:w-16 sm:h-16 flex items-center justify-center">
+                      <btn.icon color="#6929AC" className="w-6 h-6 sm:w-8 sm:h-8" />
                     </div>
                   </a>
-                  {/* תווית – במובייל מוחלטת, ב-sm+ רגילה */}
                   <span className="absolute top-full mt-2 text-xs sm:static sm:mt-3
                                   sm:text-sm font-medium text-white text-center whitespace-nowrap">
                     {btn.label}
@@ -92,38 +91,38 @@ export default function DigitalBusinessCard() {
           </div>
         </div>
 
-        {/* — מחשבוני משכנתא — */}
-        <div className="w-full flex justify-center mt-10">
-          <div className="w-full max-w-5xl px-6">
-            <div className="grid grid-cols-4 gap-x-6 gap-y-4 sm:gap-x-8 place-items-center">
-              {calculators.map((item, idx) => (
-                <div key={idx} className="relative flex flex-col items-center">
-                  <Link
-                    href={item.href}
-                    className="rounded-md bg-white shadow hover:shadow-lg transition
-                              w-20 h-20 sm:w-24 sm:h-24 flex items-center justify-center"
-                  >
-                    <div className="bg-gray-50 border border-gray-200 rounded-md
-                                    w-14 h-14 sm:w-20 sm:h-20 flex items-center justify-center">
-                      <item.icon color="#6929AC" className="w-7 h-7 sm:w-10 sm:h-10" />
-                    </div>
-                  </Link>
-                  {/* תווית – מוחלט במובייל */}
-                  <span className="absolute top-full mt-2 text-[10px] sm:static sm:mt-3
-                                  sm:text-sm font-medium text-white text-center whitespace-nowrap">
-                    {item.label}
-                  </span>
-                </div>
-              ))}
+          {/* — מחשבוני משכנתא — */}
+          <div className="w-full flex justify-center mt-10">
+            <div className="w-full max-w-5xl px-6">
+              <div className="grid grid-cols-4 gap-x-6 gap-y-6 place-items-center">
+                {calculators.map((item, idx) => (
+                  <div key={idx} className="relative flex flex-col items-center">
+                    <Link
+                      href={item.href}
+                      className="rounded-md bg-white shadow hover:shadow-lg transition
+                                w-[72px] h-[72px] sm:w-20 sm:h-20 flex items-center justify-center"
+                    >
+                      <div className="bg-gray-50 border border-gray-200 rounded-md
+                                      w-12 h-12 sm:w-16 sm:h-16 flex items-center justify-center">
+                        <item.icon color="#6929AC" className="w-6 h-6 sm:w-8 sm:h-8" />
+                      </div>
+                    </Link>
+                    <span className="absolute top-full mt-2 text-[10px] sm:static sm:mt-3
+                                    sm:text-sm font-medium text-white text-center whitespace-nowrap">
+                      {item.label}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
+
 
         </div>
 
         {/* Footer */}
         <div className="w-full relative mt-24">
-          {/* כפתור פגישה עגול שמרחף על הפוטר */}
+        
          {/* כפתור פגישה עגול שמרחף על הפוטר */}
           <div className="absolute -top-24 left-1/2 -translate-x-1/2 z-10">
             <Link href="/muhni/schedule">
