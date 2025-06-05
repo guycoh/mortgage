@@ -4,35 +4,27 @@
 import Image from "next/image";
 import Link from "next/link";
 
-
+import EmailIcon from "public/assets/images/svg/contact/EmailIcon";
+import WebIcon from "@/public/assets/images/svg/webIcon";
 import PhoneIcon from "@/public/assets/images/svg/contact/PhoneIcon";
 import WhatsappIcon from "@/public/assets/images/svg/contact/WhatsappIcon";
-import EnvelopeIcon from "@/public/assets/images/svg/contact/EnvelopeIcon";
-import GlobeIcon from "@/public/assets/images/svg/contact/GlobeIcon";
-
-
-
-import Calculator5 from "public/assets/images/svg/Calculator5";
+import Calculator1 from "public/assets/images/svg/Calculator1";
 import Calculator2 from "public/assets/images/svg/Calculator2";
 import Calculator3 from "public/assets/images/svg/Calculator3";
 import Calculator4 from "public/assets/images/svg/Calculator4";
-import SigmaIcon from "@/public/assets/images/svg/SigmaIcon";
-
-
-
 
 export default function DigitalBusinessCard() {
   const buttons = [
     { icon: PhoneIcon, label: "טלפון", href: "tel:0523684844" },
     { icon: WhatsappIcon, label: "צ׳אט", href: "https://wa.me/972523684844" },
-    { icon: EnvelopeIcon, label: "דוא\"ל", href: "mailto:guycoh@outlook.co.il" },
-    { icon: GlobeIcon, label: "אתר", href: "https://morg-orcin.vercel.app/muhni" },
+    { icon: EmailIcon, label: "דוא\"ל", href: "mailto:guycoh@outlook.co.il" },
+    { icon: WebIcon, label: "אתר", href: "https://morg-orcin.vercel.app/muhni" },
   ];
   const calculators = [
-    { icon: Calculator5, label: "מחשבון מהיר", href: "/muhni/calculators/simple_calculator" },
+    { icon: Calculator1, label: "מחשבון מהיר", href: "/muhni/calculators/simple_calculator" },
     { icon: Calculator2, label: "מחשבון יכולת", href: "/muhni/calculators/mortgage_capability" },
     { icon: Calculator3, label: "מס רכישה", href: "/muhni/calculators/purchase_tax_calculator" },
-    { icon: SigmaIcon, label: "מחשבון משכנתא", href: "/muhni/calculators/refinance-calculator" },
+    { icon: Calculator4, label: "מחשבון משכנתא", href: "/muhni/calculators/refinance-calculator" },
   ];
 
   return (
@@ -47,7 +39,7 @@ export default function DigitalBusinessCard() {
         {/* Header */}
         <div className="relative h-44 bg-white w-full "> {/* ⭐ mb-24 -> mb-0 */}
          <div className="absolute top-4 left-1/2 -translate-x-1/2 w-56">
-            <Image src="/assets/images/svg/muhni_logo.svg" alt="Logo" width={224} height={90} />
+            <Image src="/assets/images/svg/770.svg" alt="Logo" width={224} height={90} />
           </div>
           
         </div>
@@ -60,11 +52,11 @@ export default function DigitalBusinessCard() {
         >
           <div className="absolute -top-16 flex justify-center items-end">
             <div className="w-36 h-36 z-10 rounded-full overflow-hidden border-4 border-white shadow-xl translate-y-1/2 bg-white">
-                    <Image src="/assets/images/imgFiles/my_image.jpg" alt="גיא כהן" width={144} height={144}  className="object-contain" />
+                    <Image src="/assets/images/imgFiles/moshe.jpg" alt="גיא כהן" width={144} height={144}  className="object-contain" />
             </div>
           </div>
 
-          <h1 className="mt-6 text-5xl font-bold tracking-tight">גיא כהן</h1> {/* ⭐ mt-20 -> mt-0 */}
+          <h1 className="mt-6 text-5xl font-bold tracking-tight">משה מוסיוב</h1> {/* ⭐ mt-20 -> mt-0 */}
           <p className="mt-1 text-3xl">יועץ משכנתאות</p>
 
        {/* — יצירת קשר — */}
@@ -82,7 +74,7 @@ export default function DigitalBusinessCard() {
                   >
                     <div className="bg-gray-50 border border-gray-200 rounded-full
                                     w-12 h-12 sm:w-16 sm:h-16 flex items-center justify-center">
-                      <btn.icon color="#6929AC" className="w-7 h-7 sm:w-9 sm:h-9" />
+                      <btn.icon color="#6929AC" className="w-6 h-6 sm:w-8 sm:h-8" />
                     </div>
                   </a>
                   <span className="absolute top-full mt-2 text-xs sm:static sm:mt-3
@@ -108,7 +100,7 @@ export default function DigitalBusinessCard() {
                   >
                     <div className="bg-gray-50 border border-gray-200 rounded-md
                                     w-12 h-12 sm:w-16 sm:h-16 flex items-center justify-center">
-                      <item.icon color="#6929AC" className="w-7 h-7 sm:w-9 sm:h-9" />
+                      <item.icon color="#6929AC" className="w-6 h-6 sm:w-8 sm:h-8" />
                     </div>
                   </Link>
                   <span className="absolute top-full mt-2 text-xs sm:static sm:mt-3

@@ -75,7 +75,7 @@ export default function DigitalBusinessCard() {
         </span>
   
         <span className="mt-2 flex items-center gap-2 text-sm">
-          <LocationIcon size={14} color="white" /> הרב נחום לוין, 7 עפולה 
+          <LocationIcon size={14} color="white" /> הרב נחום לוין, 10 עפולה 
          
         </span>
   
@@ -150,7 +150,7 @@ export default function DigitalBusinessCard() {
                         <WazeIcon size={40} color="#7e22ce" className="hover:text-orange-500" />
                       </div>
                       <span className="text-xs font-medium text-main group-hover:text-orange-500 transition-colors duration-300 text-center leading-tight">
-                        הרב נחום לוין 7, עפולה
+                        הרב נחום לוין10, עפולה
                       </span>
                     </div>
                     <span className="absolute inset-0 bg-orange-100 opacity-0 group-hover:opacity-60 transition-opacity duration-500 z-0" />
