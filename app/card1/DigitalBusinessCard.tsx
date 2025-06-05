@@ -52,7 +52,7 @@ export default function DigitalBusinessCard() {
         >
           <div className="absolute -top-16 flex justify-center items-end">
             <div className="w-36 h-36 z-10 rounded-full overflow-hidden border-4 border-white shadow-xl translate-y-1/2 bg-white">
-              <Image src="/assets/images/imgFiles/my_image.jpg" alt="גיא כהן" width={144} height={144} className="object-cover" />
+                    <Image src="/assets/images/imgFiles/my_image.jpg" alt="גיא כהן" width={144} height={144}  className="object-contain" />
             </div>
           </div>
 
@@ -63,10 +63,10 @@ export default function DigitalBusinessCard() {
           <h1 className="mt-6 text-5xl font-bold tracking-tight">גיא כהן</h1> {/* ⭐ mt-20 -> mt-0 */}
           <p className="mt-1 text-3xl">יועץ משכנתאות</p>
 
-        {/* — יצירת קשר — */}
+       {/* — יצירת קשר — */}
         <div className="w-full flex justify-center mt-10">
-          <div className="w-full max-w-5xl px-6">
-            <div className="grid grid-cols-4 gap-x-6 gap-y-6 place-items-center">
+          <div className="w-full max-w-5xl px-2">
+            <div className="grid grid-cols-4 gap-x-8 gap-y-6 place-items-center">
               {buttons.map((btn, idx) => (
                 <div key={idx} className="relative flex flex-col items-center">
                   <a
@@ -74,7 +74,7 @@ export default function DigitalBusinessCard() {
                     target="_blank"
                     rel="noopener noreferrer"
                     className="rounded-full bg-white shadow hover:shadow-lg transition
-                             w-[72px] h-[72px] sm:w-20 sm:h-20 flex items-center justify-center"
+                            w-[72px] h-[72px] sm:w-20 sm:h-20 flex items-center justify-center"
                   >
                     <div className="bg-gray-50 border border-gray-200 rounded-full
                                     w-12 h-12 sm:w-16 sm:h-16 flex items-center justify-center">
@@ -91,31 +91,32 @@ export default function DigitalBusinessCard() {
           </div>
         </div>
 
-          {/* — מחשבוני משכנתא — */}
-          <div className="w-full flex justify-center mt-10">
-            <div className="w-full max-w-5xl px-6">
-              <div className="grid grid-cols-4 gap-x-6 gap-y-6 place-items-center">
-                {calculators.map((item, idx) => (
-                  <div key={idx} className="relative flex flex-col items-center">
-                    <Link
-                      href={item.href}
-                      className="rounded-md bg-white shadow hover:shadow-lg transition
-                                w-[72px] h-[72px] sm:w-20 sm:h-20 flex items-center justify-center"
-                    >
-                      <div className="bg-gray-50 border border-gray-200 rounded-md
-                                      w-12 h-12 sm:w-16 sm:h-16 flex items-center justify-center">
-                        <item.icon color="#6929AC" className="w-6 h-6 sm:w-8 sm:h-8" />
-                      </div>
-                    </Link>
-                    <span className="absolute top-full mt-2 text-[10px] sm:static sm:mt-3
-                                    sm:text-sm font-medium text-white text-center whitespace-nowrap">
-                      {item.label}
-                    </span>
-                  </div>
-                ))}
-              </div>
+        {/* — מחשבוני משכנתא — */}
+        <div className="w-full flex justify-center mt-10">
+          <div className="w-full max-w-5xl px-2">
+            <div className="grid grid-cols-4 gap-x-8 gap-y-6 place-items-center">
+              {calculators.map((item, idx) => (
+                <div key={idx} className="relative flex flex-col items-center">
+                  <Link
+                    href={item.href}
+                    className="rounded-md bg-white shadow hover:shadow-lg transition
+                              w-[72px] h-[72px] sm:w-20 sm:h-20 flex items-center justify-center"
+                  >
+                    <div className="bg-gray-50 border border-gray-200 rounded-md
+                                    w-12 h-12 sm:w-16 sm:h-16 flex items-center justify-center">
+                      <item.icon color="#6929AC" className="w-6 h-6 sm:w-8 sm:h-8" />
+                    </div>
+                  </Link>
+                  <span className="absolute top-full mt-2 text-xs sm:static sm:mt-3
+                                  sm:text-sm font-medium text-white text-center whitespace-nowrap">
+                    {item.label}
+                  </span>
+                </div>
+              ))}
             </div>
           </div>
+        </div>
+
 
 
         </div>
