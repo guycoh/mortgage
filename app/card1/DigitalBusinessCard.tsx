@@ -174,7 +174,7 @@ const calculators = [
                     href={btn.href}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center justify-center rounded-full bg-white w-24 h-24 p-4 shadow transition hover:shadow-lg"
+                    className="flex items-center justify-center rounded-full bg-white w-16 h-16 p-4 shadow transition hover:shadow-lg"
                   >
                     <div className="flex items-center justify-center rounded-full bg-gray-50 w-16 h-16 shadow-inner border border-gray-200">
                       <btn.icon className="w-10 h-10 text-main" />
@@ -186,6 +186,32 @@ const calculators = [
             </div>
           </div>
         </div>
+         
+         {/* — יצירת קשר — */}
+        <div className="w-full flex justify-center mt-10">
+          <div className="w-full max-w-5xl px-4">
+            <div className="grid grid-cols-4 gap-2 sm:gap-4 place-items-center">
+              {buttons.map((btn, idx) => (
+                <div key={idx} className="flex flex-col items-center space-y-1 sm:space-y-2">
+                  <a
+                    href={btn.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-full bg-white shadow transition hover:shadow-lg w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center"
+                  >
+                    <div className="bg-gray-50 border border-gray-200 rounded-full w-12 h-12 sm:w-16 sm:h-16 flex items-center justify-center">
+                      <btn.icon className="text-main w-6 h-6 sm:w-8 sm:h-8" />
+                    </div>
+                  </a>
+                  <span className="text-sm sm:text-base font-medium text-white text-center">
+                    {btn.label}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
 
 
 
