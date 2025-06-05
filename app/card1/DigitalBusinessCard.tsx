@@ -15,7 +15,6 @@ import GlobeIcon from "@/public/assets/images/svg/contact/GlobeIcon";
 import Calculator5 from "public/assets/images/svg/Calculator5";
 import Calculator2 from "public/assets/images/svg/Calculator2";
 import Calculator3 from "public/assets/images/svg/Calculator3";
-import Calculator4 from "public/assets/images/svg/Calculator4";
 import SigmaIcon from "@/public/assets/images/svg/SigmaIcon";
 
 
@@ -64,8 +63,8 @@ export default function DigitalBusinessCard() {
             </div>
           </div>
 
-          <h1 className="mt-6 text-5xl font-bold tracking-tight">גיא כהן</h1> {/* ⭐ mt-20 -> mt-0 */}
-          <p className="mt-1 text-3xl">יועץ משכנתאות</p>
+          <h1 className="mt-6 text-4xl font-bold tracking-tight">גיא כהן</h1> {/* ⭐ mt-20 -> mt-0 */}
+          <p className="mt-1 text-2xl">יועץ משכנתאות</p>
 
        {/* — יצירת קשר — */}
         <div className="w-full flex justify-center mt-10">
