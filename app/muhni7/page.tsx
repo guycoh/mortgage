@@ -10,6 +10,7 @@ import EligibleIcon from "@/public/assets/images/svg/motrgageType/EligibleIcon";
 import RefinancingIcon from  "@/public/assets/images/svg/motrgageType/RefinancingIcon";
 import InsuranceIcon from  "@/public/assets/images/svg/motrgageType/InsuranceIcon";
 import RefusedIcon from  "@/public/assets/images/svg/motrgageType/RefusedIcon";
+import BridgeIcon from "@/public/assets/images/svg/motrgageType/BridgeIcon";
 //import { HomeIcon, LoanIcon, ReverseIcon, InsuranceIcon, NonBankIcon, ConsolidationIcon, EligibleIcon, 
 // , RefusedIcon } from "@/components/icons";
 
@@ -21,6 +22,7 @@ const mortgageCategories = [
   { category: "משכנתא חוץ בנקאית", link: "mortgage_non_bank", icon: <IconGeneralMortgage size={100}/> },
   { category: "מחיר למשתכן", link: "home_for_eligible_buyers", icon: <EligibleIcon size={100}/> },
   { category: "מיחזור משכנתא", link: "mortgage_refinancing", icon: <RefinancingIcon size={100} /> },
+   { category: "הלוואת גישור", link: "bridge_loan", icon: <BridgeIcon size={100} /> },
   { category: "ביטוח משכנתא", link: "mortgage_insurance", icon: <InsuranceIcon size={100} color="#475569"/> },
   { category: "מסורבי בנקים", link: "mortgage_for_refused_clients", icon: <RefusedIcon size={100} /> },
  
