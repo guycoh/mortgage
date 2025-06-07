@@ -29,11 +29,6 @@ const LoanTable = () => {
 
 const [selectedRow, setSelectedRow] = useState<typeof rows[0] | null>(null);
 
-  
-  
-  
-  
-  
   // סימולציה לנתוני החיסכון — תוכל להחליף כאן לחישוב אמיתי
   const minSaving = 150000;
   const maxSaving = 200000;
@@ -42,12 +37,6 @@ const [selectedRow, setSelectedRow] = useState<typeof rows[0] | null>(null);
 useEffect(() => {
   addRow();
 }, []);
-
-
-
-
-
-
 
   const loanTypes = [
     { code: 1, name: "פריים", isIndexed: false },
@@ -380,10 +369,6 @@ useEffect(() => {
 
        
       </div>
-
-   
-   
-
 {/* מחוץ ל־<table> */}
 {showModal && selectedRow && (
   <SpitzerScheduleModal
@@ -397,25 +382,10 @@ useEffect(() => {
   />
 )}
 
-
-
-
-
-   
-     
-
     </div>
   );
 };
 
 export default LoanTable;       
 
-//  <SpitzerScheduleModal
-//         isOpen={showModal}
-//         onClose={() => setShowModal(false)}
-//         loanAmount={row.loanAmount}
-//         annualInterest={row.annualInterestRate}
-//         annualIndex={expectedIndex}
-//         months={row.months}
-//         isLinkedToIndex={row.isIndexed}
-//       />
+

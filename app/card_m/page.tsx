@@ -7,8 +7,8 @@ export const metadata = {
   description: "הכרטיס הדיגיטלי של משה - משרדים בעפולה",
   openGraph: {
     title: "הכרטיס שלי - משה מוסיוב",
-    description: "לחצו כאן לנווט אלינו! הרב נחום לוין 7 עפולה.",
-    url: "https://morg-orcin.vercel.app/", // שנה לכתובת האמיתית שלך
+    description: "לחצו כאן לנווט אלינו! הרב נחום לוין 10 עפולה.",
+    url: "https://morg-orcin.vercel.app/muhni7", // שנה לכתובת האמיתית שלך
     siteName: "muhni",
     images: [
       {
