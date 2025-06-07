@@ -1,171 +1,137 @@
+"use client"
+import { useState } from "react";
 
-"use client";
+export default function BalloonLoanCalculator() {
+  const [loanAmount, setLoanAmount] = useState(200000);
+  const [annualRate, setAnnualRate] = useState(5.0);
+  const [periodMonths, setPeriodMonths] = useState(24);
+  const [inflationRate, setInflationRate] = useState(0);
+  const [isLinked, setIsLinked] = useState(false);
 
-import Image from "next/image";
-import Link from "next/link";
+  const monthlyRate = (1 + annualRate / 100) ** (1 / 12) - 1;
+  const monthlyInflation = isLinked
+    ? (1 + inflationRate / 100) ** (1 / 12) - 1
+    : 0;
 
+  const rows = Array.from({ length: periodMonths }, (_, i) => {
+    const month = i + 1;
+    const inflationFactor = (1 + monthlyInflation) ** i;
+    const adjustedPrincipal = loanAmount * inflationFactor;
+    const interestPayment = adjustedPrincipal * monthlyRate;
+    const balloonPayment = month === periodMonths ? adjustedPrincipal : 0;
+    const totalPayment = interestPayment + balloonPayment;
 
-import PhoneIcon from "@/public/assets/images/svg/contact/PhoneIcon";
-import WhatsappIcon from "@/public/assets/images/svg/contact/WhatsappIcon";
-import EnvelopeIcon from "@/public/assets/images/svg/contact/EnvelopeIcon";
-import GlobeIcon from "@/public/assets/images/svg/contact/GlobeIcon";
-
-
-
-import Calculator5 from "public/assets/images/svg/Calculator5";
-import Calculator2 from "public/assets/images/svg/Calculator2";
-import Calculator3 from "public/assets/images/svg/Calculator3";
-import SigmaIcon from "@/public/assets/images/svg/SigmaIcon";
-
-import WazeIcon from "@/public/assets/images/svg/waze_icon";
-
-
-
-export default function DigitalBusinessCard() {
-  const buttons = [
-    { icon: PhoneIcon, label: "טלפון", href: 'tel:0502453345' },
-    { icon: WhatsappIcon, label: "צ׳אט", href: 'https://wa.me/972502453345' },
-    { icon: EnvelopeIcon, label: "דוא\"ל", href: 'mailto:mmusayov@gmail.com' },
-    { icon: GlobeIcon, label: "אתר", href: "https://morg-orcin.vercel.app/muhni7" },
-  ];
-  const calculators = [
-    { icon: Calculator5, label: "מחשבון מהיר", href: "/muhni7/calculators/simple_calculator" },
-    { icon: Calculator2, label: "מחשבון יכולת", href: "/muhni7/calculators/mortgage_capability" },
-    { icon: Calculator3, label: "מס רכישה", href: "/muhni7/calculators/purchase_tax_calculator" },
-    { icon: SigmaIcon, label: "מחשבון משכנתא", href: "/muhni7/calculators/mortgage_calculator" },
-  ];
+    return {
+      month,
+      interest: interestPayment,
+      balloon: balloonPayment,
+      total: totalPayment,
+      balance: balloonPayment ? 0 : adjustedPrincipal,
+    };
+  });
 
   return (
-    <div
-      className="w-full min-h-screen text-white
-                 flex justify-center
-                 md:grid md:grid-cols-2 md:place-items-center"
-    >
-      {/* — הכרטיס — */}
-      <div className="flex flex-col w-full order-2 md:order-1 animate-fade-in bg-gradient-to-br from-purple-700 via-purple-600 to-purple-800 ">
+    <div className="max-w-3xl mx-auto p-6 bg-white rounded-xl shadow-lg">
+      <h2 className="text-2xl font-bold mb-6 text-center text-orange-600">מחשבון הלוואת בלון מלא</h2>
 
-        {/* Header */}
-        <div className="relative h-44 bg-white w-full "> {/* ⭐ mb-24 -> mb-0 */}
-         <div className="absolute top-4 left-1/2 -translate-x-1/2 w-56">
-            <Image src="/assets/images/svg/770.svg" alt="Logo" width={224} height={90} />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <label className="flex flex-col">
+          <span className="mb-1 font-medium">
+            סכום הלוואה: <span className="text-orange-600">{loanAmount.toLocaleString()} ₪</span>
+          </span>
+          <input
+            type="range"
+            min={10000}
+            max={1000000}
+            step={1000}
+            value={loanAmount}
+            onChange={(e) => setLoanAmount(+e.target.value)}
+            className="w-full accent-orange-500 focus:bg-orange-50"
+          />
+        </label>
+
+        <label className="flex flex-col">
+          <span className="mb-1 font-medium">
+            ריבית שנתית: <span className="text-orange-600">{annualRate.toFixed(2)}%</span>
+          </span>
+          <input
+            type="range"
+            min={0}
+            max={15}
+            step={0.1}
+            value={annualRate}
+            onChange={(e) => setAnnualRate(+e.target.value)}
+            className="w-full accent-orange-500 focus:bg-orange-50"
+          />
+        </label>
+
+        <label className="flex flex-col">
+          <span className="mb-1 font-medium">
+            תקופה: <span className="text-orange-600">{periodMonths} חודשים</span>
+          </span>
+          <input
+            type="range"
+            min={6}
+            max={360}
+            step={6}
+            value={periodMonths}
+            onChange={(e) => setPeriodMonths(+e.target.value)}
+            className="w-full accent-orange-500 focus:bg-orange-50"
+          />
+        </label>
+
+        <label className="flex flex-col">
+          <span className="mb-2 font-medium">האם ההלוואה צמודה למדד?</span>
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={isLinked}
+              onChange={(e) => setIsLinked(e.target.checked)}
+              className="w-5 h-5 accent-orange-500"
+            />
+            <span>{isLinked ? "כן" : "לא"}</span>
           </div>
-          
-        </div>
+          {isLinked && (
+            <input
+              type="number"
+              placeholder="מדד שנתי צפוי (%)"
+              value={inflationRate}
+              onChange={(e) => setInflationRate(+e.target.value)}
+              className="mt-2 w-full border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-300"
+            />
+          )}
+        </label>
+      </div>
 
-        {/* גוף הכרטיס */}
-        <div
-          className="relative 
-                     flex flex-col items-center
-                     -mt-12 pt-36 px-6 mb-12"  /* ⭐ NEW: -mt-12 + pt-20 */
-        >
-          <div className="absolute -top-16 flex justify-center items-end">
-            <div className="w-36 h-36 z-10 rounded-full overflow-hidden border-4 border-white shadow-xl translate-y-1/2 bg-white">
-                    <Image src="/assets/images/imgFiles/moshe.jpg" alt="משה " width={144} height={144}  className="object-contain" />
-            </div>
-          </div>
-
-          <h1 className="mt-6 text-4xl font-bold tracking-tight">משה מוסיוב</h1> {/* ⭐ mt-20 -> mt-0 */}
-          <p className="mt-1 text-2xl">יועץ משכנתאות וכלכלת המשפחה</p>
-
-       {/* — יצירת קשר — */}
-        <div className="w-full flex justify-center mt-10">
-          <div className="w-full max-w-5xl px-2">
-            <div className="grid grid-cols-4 gap-x-8 gap-y-6 place-items-center">
-              {buttons.map((btn, idx) => (
-                <div key={idx} className="relative flex flex-col items-center">
-                  <a
-                    href={btn.href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="rounded-full bg-white shadow hover:shadow-lg transition
-                            w-[72px] h-[72px] sm:w-20 sm:h-20 flex items-center justify-center"
-                  >
-                    <div className="bg-gray-50 border border-gray-200 rounded-full
-                                    w-12 h-12 sm:w-16 sm:h-16 flex items-center justify-center">
-                      <btn.icon color="#6929AC" className="w-7 h-7 sm:w-9 sm:h-9" />
-                    </div>
-                  </a>
-                  <span className="absolute top-full mt-2 text-xs sm:static sm:mt-3
-                                  sm:text-sm font-medium text-white text-center whitespace-nowrap">
-                    {btn.label}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* — מחשבוני משכנתא — */}
-        <div className="w-full flex justify-center mt-10">
-          <div className="w-full max-w-5xl px-2">
-            <div className="grid grid-cols-4 gap-x-8 gap-y-6 place-items-center">
-              {calculators.map((item, idx) => (
-                <div key={idx} className="relative flex flex-col items-center">
-                  <Link
-                    href={item.href}
-                    className="rounded-md bg-white shadow hover:shadow-lg transition
-                              w-[72px] h-[72px] sm:w-20 sm:h-20 flex items-center justify-center"
-                  >
-                    <div className="bg-gray-50 border border-gray-200 rounded-md
-                                    w-12 h-12 sm:w-16 sm:h-16 flex items-center justify-center">
-                      <item.icon color="#6929AC" className="w-7 h-7 sm:w-9 sm:h-9" />
-                    </div>
-                  </Link>
-                  <span className="absolute top-full mt-2 text-xs sm:static sm:mt-3
-                                  sm:text-sm font-medium text-white text-center whitespace-nowrap">
-                    {item.label}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        </div>
-
-        {/* Footer */}
-        <div className="w-full relative mt-24">
-        
-         {/* כפתור פגישה עגול שמרחף על הפוטר */}
-          <div className="absolute -top-24 left-1/2 -translate-x-1/2 z-10">
-            <Link href="/muhni7/schedule">
-              <Image
-                src="/assets/gal/meeting.svg"
-                alt="קבע פגישה"
-                width={142}
-                height={142}
-                className="object-contain"
-              />
-            </Link>
-          </div>
-
-          {/* הפוטר עצמו */}
-          <div className="bg-white text-main text-sm py-12 rounded-b-xl shadow-sm text-right">
-              <div className="flex items-center justify-center gap-2">
-                <p className="font-medium text-xl">הרב נחום לוין 10, עפולה</p>
-
-                <a
-                  href="waze://?q=הרב+נחום+לוין+7+עפולה&navigate=yes"
-                  className="relative group w-[52px] h-[52px] flex items-center justify-center rounded-full border border-main"
-                >
-                  <WazeIcon size={34} color="#7e22ce" className="hover:text-orange-500 z-10" />
-                  
-                  <span className="absolute inset-0 bg-orange-100 opacity-0 group-hover:opacity-60 transition-opacity duration-500 rounded-full" />
-                </a>
-              </div>
-          </div>
-        </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm border">
+          <thead>
+            <tr className="bg-gray-100 text-right">
+              <th className="p-2 border">חודש</th>
+              <th className="p-2 border">תשלום ריבית</th>
+              <th className="p-2 border">תשלום קרן (בלון)</th>
+              <th className="p-2 border">סה"כ תשלום</th>
+              <th className="p-2 border">יתרת קרן</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.month} className="text-right">
+                <td className="p-2 border">{row.month}</td>
+                <td className="p-2 border">{row.interest.toFixed(2)} ₪</td>
+                <td className="p-2 border">
+                  {row.balloon ? row.balloon.toFixed(2) + " ₪" : "-"}
+                </td>
+                <td className="p-2 border">{row.total.toFixed(2)} ₪</td>
+                <td className="p-2 border">{row.balance.toFixed(2)} ₪</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );
 }
-
-
-
-
-
-
-
 
 
 

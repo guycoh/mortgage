@@ -8,6 +8,7 @@ import Calculator5 from "public/assets/images/svg/Calculator5";
 import Calculator6 from "@/public/assets/images/svg/Calculator6";
 import Calculator7 from "@/public/assets/images/svg/Calculator7";
 import Calculator8 from "@/public/assets/images/svg/Calculator8";
+import BaloonIcon from "@/public/assets/images/svg/calculators/baloon";
 
 import FloatingButtons from "../components/FloatingButtons";
 
@@ -23,7 +24,7 @@ const calculators = [
   { title: "מחשבון מחיר למשתכן", description: "חשב את ההוצאות והתנאים לזכאות.", link: "/muhni/calculators/mechir_la_mishtaken", icon: Calculator7 },
   { title: "מחשבון עלויות נלוות", description: "בדוק מה העלויות הנלוות", link: "/muhni/calculators/costs_calculator", icon: Calculator8 },
   { title: "מחשבון קרן שווה", description: "קרן שווה ", link: "/muhni/calculators/equal_principal", icon: Calculator8 },
-  
+  { title: "מחשבון הלוואת בלון", description: "בלון ", link: "/muhni/calculators/baloon", icon: BaloonIcon },
   { title: "מחשבון כדאיות מחזור", description: "בדוק האם משתלם לך למחזר את המשכנתא.", link: "/muhni/calculators/refinance-calculator", icon: Calculator1 },  
   { title: "מחשבון זכאות", description: "חשב זכאות משרד השיכון", link: "/muhni/calculators/eligibility_calculator", icon: Calculator5 },
   { title: "מחשבון משכנתא", description: "חשב את ההחזר החודשי שלך.", link: "/muhni/calculators/mortgage_calculator", icon: Calculator6},
