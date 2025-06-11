@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { useState } from 'react';
+import UserInfo from './logoutButton';
 
 const CrmNav = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -35,9 +36,11 @@ const CrmNav = () => {
           <Link href="/services" className="text-white hover:text-orange-400 transition-colors duration-300 font-medium text-lg">
             לקוחות
           </Link>
-          <Link href="/contact" className="text-white hover:text-orange-400 transition-colors duration-300 font-medium text-lg">
-            משכנתאות
-          </Link>
+          <UserInfo/>
+
+
+
+
         </div>
 
 

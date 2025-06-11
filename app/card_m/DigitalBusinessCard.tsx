@@ -30,7 +30,7 @@ export default function DigitalBusinessCard() {
   ];
   const calculators = [
     { icon: Calculator5, label: "מחשבון מהיר", href: "/muhni7/calculators/simple_calculator" },
-    { icon: Calculator2, label: "מחשבון יכולת", href: "/muhni7/calculators/mortgage_capability" },
+    { icon: Calculator2, label: "מחשבון יכולות", href: "/muhni7/calculators/mortgage_capability" },
     { icon: Calculator3, label: "מס רכישה", href: "/muhni7/calculators/purchase_tax_calculator" },
     { icon: SigmaIcon, label: "מחשבון משכנתא", href: "/muhni7/calculators/mortgage_calculator" },
   ];

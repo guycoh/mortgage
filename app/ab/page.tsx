@@ -1,33 +1,34 @@
 'use client';
 
-import React from 'react';
-
-export default function Home() {
+export default function BackgroundVideoPage() {
   return (
-    <main className="relative w-full h-screen overflow-hidden">
-      {/* רקע וידאו */}
+    <div className="relative w-full h-screen overflow-hidden">
+      {/* וידאו ברקע */}
       <video
-        className="absolute top-0 left-0 w-full h-full object-cover"
         autoPlay
         loop
         muted
         playsInline
+        className="absolute top-0 left-0 w-full h-full object-cover z-0"
       >
-        <source src="/video/hero-bg.mp4" type="video/mp4" />
+        <source src="assets/video/background.mp4" type="video/mp4" />
         הדפדפן שלך לא תומך בווידאו.
       </video>
 
-      {/* שכבת החושך/צבע חצי שקופה מעל הווידאו */}
-      <div className="absolute top-0 left-0 w-full h-full bg-black bg-opacity-50 z-10"></div>
-
-      {/* תוכן על הווידאו */}
-      <div className="relative z-20 flex flex-col items-center justify-center text-center h-full text-white px-4">
-        <h1 className="text-4xl md:text-6xl font-bold mb-4">ברוכים הבאים למורגי</h1>
-        <p className="text-lg md:text-2xl mb-6">העתיד של המשכנתאות מתחיל כאן</p>
-        <button className="bg-orange-500 hover:bg-orange-600 text-white font-semibold py-3 px-6 rounded-full transition duration-300">
-          התחילו עכשיו
-        </button>
+      {/* תוכן מעל הווידאו */}
+      <div className="relative z-10 flex items-center justify-center h-full bg-black/50 text-white text-center px-4">
+        <div>
+          <h1 className="text-4xl md:text-6xl font-bold mb-4">
+            ברוכים הבאים לאתר שלנו
+          </h1>
+          <p className="text-xl md:text-2xl mb-6">
+            רקע וידאו מרשים שמושך תשומת לב
+          </p>
+          <button className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 px-6 rounded-full shadow-lg transition">
+            קבלו הצעה
+          </button>
+        </div>
       </div>
-    </main>
+    </div>
   );
 }
