@@ -304,7 +304,7 @@ export default function MortgageSimulatorForm() {
             {/* שורה 5: הכנסות חודשיות */}
             <div className="grid grid-cols-2 md:grid-cols-2 gap-4">
               <div>
-                <label htmlFor="monthlyIncome" className="block text-main font-semibold mb-2">הכנסה חודשית נטו (₪)</label>
+                <label htmlFor="monthlyIncome" className="block text-main font-semibold mb-2">הכנסה חודשית נטו</label>
                 <input
                   type="text"
                   name="monthlyIncome"
