@@ -7,9 +7,10 @@ export default function MortgageInsurance() {
   return (
     <div className="bg-galbg min-h-screen py-12 px-6 sm:px-12 md:px-20">
       <div className="max-w-4xl mx-auto bg-white shadow-xl rounded-2xl p-8 sm:p-12">
-        <h1 className="text-3xl sm:text-4xl font-bold text-gray-800 text-center mb-6">
-          ביטוח חיים ומבנה למשכנתא - כל מה שצריך לדעת
-        </h1>
+        <div className="animate-tracking-in-expand-fwd text-3xl sm:text-4xl font-bold text-gray-800 text-center mb-6">
+         ביטוח חיים ומבנה למשכנתא - כל מה שצריך לדעת
+        </div>      
+       
         <p className="text-lg text-gray-600 leading-relaxed text-center mb-6">
           ביטוח חיים וביטוח מבנה למשכנתא הם דרישות חובה של הבנקים בישראל למי שלוקח משכנתא. מטרתם להגן על הבנק, על הלווים,
           ועל הנכס במקרה של אירועים בלתי צפויים.

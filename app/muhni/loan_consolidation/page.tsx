@@ -7,9 +7,10 @@ export default function LoanConsolidation() {
   return (
     <div className="bg-galbg min-h-screen py-12 px-6 sm:px-12 md:px-20">
       <div className="max-w-4xl mx-auto bg-white shadow-xl rounded-2xl p-8 sm:p-12">
-        <h1 className="text-3xl sm:text-4xl font-bold text-gray-800 text-center mb-6">
-          איחוד הלוואות - הפתרון ליציאה מחובות
-        </h1>
+        <div className="animate-tracking-in-expand-fwd text-3xl sm:text-4xl font-bold text-gray-800 text-center mb-6">
+        איחוד הלוואות - הפתרון ליציאה מחובות
+        </div>     
+        
         <p className="text-lg text-gray-600 leading-relaxed text-center mb-6">
           איחוד הלוואות מאפשר לכם לשלב מספר הלוואות להלוואה אחת עם תנאים טובים יותר, ריבית נמוכה יותר, והחזר חודשי נוח.
           זהו פתרון חכם למי שמעוניין להקל על העומס הכלכלי ולנהל את ההתחייבויות הפיננסיות בצורה נוחה ויעילה יותר.
