@@ -37,17 +37,6 @@ async function getConcepts() {
 }
 
 
-
-
-
-
-
-
-
-
-
-
-
 //CREATE NEW CONCEPT
 
 export async function POST(req: NextRequest) {

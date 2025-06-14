@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import UserInfo from './logoutButton';
+import LeadDropdown from './DropdownLeads';
 
 const CrmNav = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -19,6 +20,9 @@ const CrmNav = () => {
 
         {/* Desktop Navigation */}
         <div className="hidden md:flex items-center space-x-6 rtl:space-x-reverse">
+          <LeadDropdown/>
+          
+          
           <Link href="/private/crm/wa" className="text-white hover:text-orange-400 transition-colors duration-300 font-medium text-lg">
           הודעות ווצאפ
           </Link>
@@ -38,6 +42,7 @@ const CrmNav = () => {
           </Link>
           <UserInfo/>
 
+    
 
 
 

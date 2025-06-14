@@ -2,7 +2,17 @@
 
 import React, { useRef } from 'react'
 
+import { banks } from '@/app/data/banks'
+import { statusCall } from '@/app/data/status_call'
+import { useEmployees } from '@/app/data/hooks/useEmployees'
+import { useReasonNotInterested } from '@/app/data/hooks/useReasonNotInterested'
+
+
 export default function LeadForm() {
+ const { employees } = useEmployees();
+ const {reasons }=useReasonNotInterested();
+
+ 
   const refs = {
     name: useRef<HTMLInputElement>(null),
     email: useRef<HTMLInputElement>(null),
@@ -13,56 +23,85 @@ export default function LeadForm() {
     spouse_name: useRef<HTMLInputElement>(null),
     spouse_phone: useRef<HTMLInputElement>(null),
     lead_first_status: useRef<HTMLInputElement>(null),
-    comment: useRef<HTMLInputElement>(null),
+    comment: useRef<HTMLTextAreaElement>(null),
     zoom: useRef<HTMLInputElement>(null),
     hour_zoom: useRef<HTMLInputElement>(null),
     last_call: useRef<HTMLInputElement>(null),
-    status_call_id: useRef<HTMLInputElement>(null),
-    reason_not_intrested_id: useRef<HTMLInputElement>(null),
+    status_call_id: useRef<HTMLSelectElement>(null),
+   
+    reason_not_intrested_id: useRef<HTMLSelectElement>(null),
     follow_up_date: useRef<HTMLInputElement>(null),
     follow_up_hour: useRef<HTMLInputElement>(null),
     balance_statement: useRef<HTMLInputElement>(null),
-    bank_id: useRef<HTMLInputElement>(null),
-    profile_id: useRef<HTMLInputElement>(null),
+    bank_id: useRef<HTMLSelectElement>(null),
+    
+   
+   profile_id: useRef<HTMLSelectElement>(null),
     black_list: useRef<HTMLInputElement>(null),
     realtor: useRef<HTMLInputElement>(null),
     mailing_list: useRef<HTMLInputElement>(null),
     investors_list: useRef<HTMLInputElement>(null),
   }
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
+ const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  e.preventDefault();
 
-    const lead = {
-      name: refs.name.current?.value || '',
-      email: refs.email.current?.value || '',
-      cell: refs.cell.current?.value || '',
-      addess: refs.address.current?.value || null,
-      data_source: refs.data_source.current?.value || null,
-      intrested_in: refs.intrested_in.current?.value || null,
-      spouse_name: refs.spouse_name.current?.value || null,
-      spouse_phone: refs.spouse_phone.current?.value || null,
-      lead_first_status: refs.lead_first_status.current?.value || null,
-      comment: refs.comment.current?.value || null,
-      zoom: refs.zoom.current?.value || null,
-      hour_zoom: refs.hour_zoom.current?.value || null,
-      last_call: refs.last_call.current?.value || null,
-      status_call_id: refs.status_call_id.current?.value || null,
-      reason_not_intrested_id: refs.reason_not_intrested_id.current?.value || null,
-      follow_up_date: refs.follow_up_date.current?.value || null,
-      follow_up_hour: refs.follow_up_hour.current?.value || null,
-      black_list: refs.black_list.current?.checked || false,
-      realtor: refs.realtor.current?.checked || false,
-      mailing_list: refs.mailing_list.current?.checked || false,
-      investors_list: refs.investors_list.current?.checked || false,
-      balance_statement: refs.balance_statement.current?.value || null,
-      bank_id: refs.bank_id.current?.value || null,
-      profile_id: refs.profile_id.current?.value || null,
+  const lead = {
+    name: refs.name.current?.value || '',
+    email: refs.email.current?.value || '',
+    cell: refs.cell.current?.value || '',
+    addess: refs.address.current?.value || null,
+    data_source: refs.data_source.current?.value || null,
+    intrested_in: refs.intrested_in.current?.value || null,
+    spouse_name: refs.spouse_name.current?.value || null,
+    spouse_phone: refs.spouse_phone.current?.value || null,
+    lead_first_status: refs.lead_first_status.current?.value || null,
+    comment: refs.comment.current?.value || null,
+    zoom: refs.zoom.current?.value || null,
+    hour_zoom: refs.hour_zoom.current?.value || null,
+    last_call: refs.last_call.current?.value || null,
+    status_call_id: refs.status_call_id.current?.value || null,
+    reason_not_intrested_id: refs.reason_not_intrested_id.current?.value || null,
+    follow_up_date: refs.follow_up_date.current?.value || null,
+    follow_up_hour: refs.follow_up_hour.current?.value || null,  
+    black_list: refs.black_list.current?.checked ? 1 : 0,
+    realtor: refs.realtor.current?.checked ? 1 : 0, 
+    mailing_list: refs.mailing_list.current?.checked ? 1 : 0,
+    investors_list: refs.investors_list.current?.checked ? 1 : 0,  
+   
+    balance_statement: refs.balance_statement.current?.value || null,
+    bank_id: refs.bank_id.current?.value || null,
+    profile_id: refs.profile_id.current?.value || null,
+  };
+
+
+  try {
+    const response = await fetch('/api/leads', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(lead),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Error ${response.status}: ${errorText}`);
     }
 
-    console.log('📝 New Lead:', lead)
-    // TODO: send to server or Supabase here
+    const data = await response.json();
+    console.log('Lead created:', data);
+
+    // אופציונלי: נקה את הטופס או הצג הודעת הצלחה
+    // e.target.reset(); או setState כלשהו
+
+  } catch (error) {
+    console.error('Failed to create lead:', error);
+    // הצג הודעת שגיאה למשתמש
   }
+};
+
+ 
 
   return (
 
@@ -81,10 +120,7 @@ export default function LeadForm() {
       <legend className="text-sm font-semibold px-2">פרטי ליד</legend>
 
       <div className="space-y-2">
-        <label className="block text-sm font-medium">מקור ליד
-          <input ref={refs.data_source} id="data_source" name="data_source" className="w-full bg-transparent placeholder:text-slate-400 text-slate-700 text-sm border border-slate-500 rounded-md px-3 py-2 transition duration-300 ease focus:outline-none focus:border-slate-400 hover:border-slate-300 shadow-sm focus:shadow focus:bg-orange-50"  />
-        </label>
-
+        
         <label className="block text-sm font-medium">שם מלא
           <input ref={refs.name} id="name" name="name" className="w-full bg-transparent placeholder:text-slate-400 text-slate-700 text-sm border border-slate-500 rounded-md px-3 py-2 transition duration-300 ease focus:outline-none focus:border-slate-400 hover:border-slate-300 shadow-sm focus:shadow focus:bg-orange-50" />
         </label>
@@ -122,11 +158,6 @@ export default function LeadForm() {
       </div>
     </fieldset>
 
-
-
-
-    
-
     {/* מסגרת 3 – סיווגים ורשימות */}
     <fieldset className="space-y-4 p-4 border rounded-xl">
       <legend className="text-sm font-semibold px-2">סיווגים</legend>
@@ -150,14 +181,60 @@ export default function LeadForm() {
         <label className="block text-sm font-medium">דוח יתרות
           <input ref={refs.balance_statement} id="balance_statement" name="balance_statement" className="input-base" />
         </label>
+         
+         {/* בנק */}
+        <label className="block text-sm font-medium">
+          בחר בנק
+            <select
+                    ref={refs.bank_id}
+                    id="bank"
+                    name="bank"
+                    className="w-full bg-transparent text-slate-700 text-sm border border-slate-500 rounded-md px-3 py-2 transition duration-300 ease focus:outline-none focus:border-slate-400 hover:border-slate-300 shadow-sm focus:shadow focus:bg-orange-50"
+                    defaultValue=""
+                  >
+                    <option value="" disabled hidden>
+                      -- בחר בנק --
+                    </option>
 
-        <label className="block text-sm font-medium">בנק
-          <input ref={refs.bank_id} id="bank_id" name="bank_id" className="input-base" />
+                    {banks.map(({ id, name }) => (
+                      <option key={id} value={id} className="text-slate-700">
+                        {name}
+                      </option>
+                    ))}
+            </select>
+
         </label>
 
-        <label className="block text-sm font-medium">פרופיל
-          <input ref={refs.profile_id} id="profile_id" name="profile_id" className="input-base" />
+        <label className="block text-sm font-medium">
+          בטיפול עובד
+            <select
+                    ref={refs.profile_id}
+                    id="profile_id"
+                    name="profile_id"
+                    className="w-full bg-transparent text-slate-700 text-sm border border-slate-500 rounded-md px-3 py-2 transition duration-300 ease focus:outline-none focus:border-slate-400 hover:border-slate-300 shadow-sm focus:shadow focus:bg-orange-50"
+                    defaultValue=""
+                  >
+                    <option value="" disabled hidden>
+                      -- בחר עובד --
+                    </option>
+
+                    {employees.map(({ id, full_name }) => (
+                      <option key={id} value={id} className="text-slate-700">
+                        {full_name}
+                      </option>
+                    ))}
+            </select>
+
         </label>
+
+
+
+
+
+
+
+
+
       </div>
 
       <label className="flex items-center gap-2 text-sm">
@@ -169,41 +246,107 @@ export default function LeadForm() {
     {/* מסגרת 4 – הערות */}
     <fieldset className="space-y-4 p-4 border rounded-xl">
       <legend className="text-sm font-semibold px-2">הערות</legend>
-
-      <label className="block text-sm font-medium">הערות
-        <input ref={refs.comment} id="comment" name="comment" className="input-base" />
-      </label>
+       <label className="block text-sm font-medium">מקור ליד
+          <input ref={refs.data_source} id="data_source" name="data_source" className="w-full bg-transparent placeholder:text-slate-400 text-slate-700 text-sm border border-slate-500 rounded-md px-3 py-2 transition duration-300 ease focus:outline-none focus:border-slate-400 hover:border-slate-300 shadow-sm focus:shadow focus:bg-orange-50"  />
+        </label>
+      
+        <label className="block text-sm font-medium" htmlFor="comment">הערות
+          <textarea
+            ref={refs.comment}
+            id="comment"
+            name="comment"
+            className="w-full bg-transparent placeholder:text-slate-400 text-slate-700 text-sm border border-slate-500 rounded-md px-3 py-2 transition duration-300 ease focus:outline-none focus:border-slate-400 hover:border-slate-300 shadow-sm focus:shadow focus:bg-orange-50" 
+          />
+        </label>
     </fieldset>
 
+
+  </div>
     {/* מסגרת 5 – מעקב ושיחות */}
-    <fieldset className="space-y-4 p-4 border rounded-xl">
-      <legend className="text-sm font-semibold px-2">שיחות ומעקב</legend>
+    <fieldset className="w-full p-4 border rounded-2xl shadow-sm bg-white">
+      <legend className="text-sm font-semibold px-2 text-gray-700">שיחות ומעקב</legend>
 
-      <div className="space-y-2">
-        <label className="block text-sm font-medium">שיחה אחרונה
-          <input ref={refs.last_call} type="date" id="last_call" name="last_call" className="input-base" />
+      <div className="flex flex-col md:flex-row flex-wrap gap-4 mt-4">
+        {/* שיחה אחרונה */}
+        <label className="flex flex-col text-sm font-medium text-gray-800 w-full md:w-auto">
+          שיחה אחרונה
+          <input
+            ref={refs.last_call}
+            type="date"
+            id="last_call"
+            name="last_call"
+            className="w-full md:w-36 bg-transparent placeholder:text-slate-400 text-slate-700 text-sm border border-slate-500 rounded-md px-3 py-2 transition duration-300 ease focus:outline-none focus:border-slate-400 hover:border-slate-300 shadow-sm focus:shadow focus:bg-orange-50"
+          />
         </label>
 
-        <label className="block text-sm font-medium">סטטוס שיחה
-          <input ref={refs.status_call_id} id="status_call_id" name="status_call_id" className="input-base" />
+        {/* סטטוס שיחה */}
+        <label className="flex flex-col text-sm font-medium text-gray-800 w-full md:w-auto">
+          סטטוס שיחה
+          <select
+            ref={refs.status_call_id}
+            id="status_call_id"
+            name="status_call_id"
+            defaultValue=""
+            className="w-full md:w-44 bg-transparent text-slate-700 text-sm border border-slate-500 rounded-md px-3 py-2 transition duration-300 ease focus:outline-none focus:border-slate-400 hover:border-slate-300 shadow-sm focus:shadow focus:bg-orange-50"
+          >
+            <option value="" disabled hidden>-- סטטוס שיחה --</option>
+            {statusCall.map(({ id, name }) => (
+              <option key={id} value={id} className="text-slate-700">
+                {name}
+              </option>
+            ))}
+          </select>
         </label>
 
-        <label className="block text-sm font-medium">סיבת אי עניין
-          <input ref={refs.reason_not_intrested_id} id="reason_not_intrested_id" name="reason_not_intrested_id" className="input-base" />
+        {/* סיבת אי עניין */}
+        <label className="flex flex-col text-sm font-medium text-gray-800 w-full md:w-auto">
+          סיבת לא נסגר 
+          <select
+           ref={refs.reason_not_intrested_id}
+            id="reason_not_intrested_id"
+            name="reason_not_intrested_id"
+            defaultValue=""
+            className="w-full md:w-44 bg-transparent text-slate-700 text-sm border border-slate-500 rounded-md px-3 py-2 transition duration-300 ease focus:outline-none focus:border-slate-400 hover:border-slate-300 shadow-sm focus:shadow focus:bg-orange-50"
+          >
+            <option value="" disabled hidden>-- סיבת לא נסגר --</option>
+            {reasons.map(({ id,  }) => (
+              <option key={id} value={id} className="text-slate-700">
+                {status}
+              </option>
+            ))}
+          </select>
         </label>
 
-        <label className="block text-sm font-medium">תאריך מעקב
-          <input ref={refs.follow_up_date} type="date" id="follow_up_date" name="follow_up_date" className="input-base" />
+
+        {/* תאריך מעקב */}
+        <label className="flex flex-col text-sm font-medium text-gray-800 w-full md:w-auto">
+          תאריך מעקב
+          <input
+            ref={refs.follow_up_date}
+            type="date"
+            id="follow_up_date"
+            name="follow_up_date"
+            className="w-full md:w-36 bg-transparent placeholder:text-slate-400 text-slate-700 text-sm border border-slate-500 rounded-md px-3 py-2 transition duration-300 ease focus:outline-none focus:border-slate-400 hover:border-slate-300 shadow-sm focus:shadow focus:bg-orange-50"
+          />
         </label>
 
-        <label className="block text-sm font-medium">שעת מעקב
-          <input ref={refs.follow_up_hour} type="time" id="follow_up_hour" name="follow_up_hour" className="input-base" />
+        {/* שעת מעקב */}
+        <label className="flex flex-col text-sm font-medium text-gray-800 w-full md:w-auto">
+          שעת מעקב
+          <input
+            ref={refs.follow_up_hour}
+            type="time"
+            id="follow_up_hour"
+            name="follow_up_hour"
+            className="w-full md:w-28 bg-transparent placeholder:text-slate-400 text-slate-700 text-sm border border-slate-500 rounded-md px-3 py-2 transition duration-300 ease focus:outline-none focus:border-slate-400 hover:border-slate-300 shadow-sm focus:shadow focus:bg-orange-50"
+          />
         </label>
       </div>
     </fieldset>
 
+
     {/* מסגרת 6 – זום וסטטוסים */}
-    <fieldset className="space-y-4 p-4 border rounded-xl">
+    {/* <fieldset className="space-y-4 p-4 border rounded-xl">
       <legend className="text-sm font-semibold px-2">פגישות זום</legend>
 
       <div className="space-y-2">
@@ -220,8 +363,7 @@ export default function LeadForm() {
           <input ref={refs.hour_zoom} type="time" id="hour_zoom" name="hour_zoom" className="input-base" />
         </label>
       </div>
-    </fieldset>
-  </div>
+    </fieldset> */}
 
   <button
     type="submit"
