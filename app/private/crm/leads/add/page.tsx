@@ -181,7 +181,19 @@ export default function LeadForm() {
         <label className="block text-sm font-medium">דוח יתרות
           <input ref={refs.balance_statement} id="balance_statement" name="balance_statement" className="input-base" />
         </label>
-         
+
+
+{/* <label className="cursor-pointer">
+  <input type="checkbox" className="absolute opacity-0 h-0 w-0 peer" />
+    <span
+      className="relative inline-block rounded w-8 h-8 transition-all duration-700 bg-[#1e1e1e] peer-checked:bg-[#1e1e1e] peer-checked:shadow-[-10px_-10px_30px_0px_#696969cc,0_-10px_30px_0px_#808080cc,10px_-10px_30px_0px_#a9a9a9cc,10px_0_30px_0px_#808080cc,10px_10px_30px_0px_#808080cc,0_10px_30px_0px_#ffaa00cc,-10px_10px_30px_0px_#a9a9a9cc] after:absolute after:hidden after:top-1.5 after:w-2 after:h-4 after:rotate-45 after:content-[''] after:left-3 after:border-solid after:border-white after:border-t-0 after:border-r-[3px] after:border-b-4 after:border-l-0 peer-checked:after:block"
+  ></span>
+</label> */}
+
+
+
+
+
          {/* בנק */}
         <label className="block text-sm font-medium">
           בחר בנק
@@ -309,7 +321,7 @@ export default function LeadForm() {
             className="w-full md:w-44 bg-transparent text-slate-700 text-sm border border-slate-500 rounded-md px-3 py-2 transition duration-300 ease focus:outline-none focus:border-slate-400 hover:border-slate-300 shadow-sm focus:shadow focus:bg-orange-50"
           >
             <option value="" disabled hidden>-- סיבת לא נסגר --</option>
-            {reasons.map(({ id,  }) => (
+            {reasons.map(({ id, }) => (
               <option key={id} value={id} className="text-slate-700">
                 {status}
               </option>

@@ -7,9 +7,11 @@ export default function BridgeLoan() {
   return (
     <div className="bg-galbg min-h-screen py-12 px-6 sm:px-12 md:px-20">
       <div className="max-w-4xl mx-auto bg-white shadow-xl rounded-2xl p-8 sm:p-12">
-        <h1 className="text-3xl sm:text-4xl font-bold text-gray-800 text-center mb-6">
-          הלוואת גישור – פתרון מימון חכם בין דירות
-        </h1>
+       
+        <div className="animate-tracking-in-expand-fwd text-3xl sm:text-4xl font-bold text-gray-800 text-center mb-6">
+        הלוואת גישור – פתרון מימון חכם בין דירות
+        </div>  
+       
         <p className="text-lg text-gray-600 leading-relaxed text-center mb-6">
           הלוואת גישור היא הלוואה זמנית הניתנת לתקופה קצרה, עד למכירת נכס קיים או קבלת מקור מימון צפוי. היא מתאימה במיוחד
           למי שרוצה לקנות דירה חדשה לפני שמכר את הקיימת.
