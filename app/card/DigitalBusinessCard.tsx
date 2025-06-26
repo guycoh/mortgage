@@ -47,7 +47,7 @@ export default function DigitalBusinessCard() {
         {/* Header */}
         <div className="relative h-44 bg-white w-full "> {/* ⭐ mb-24 -> mb-0 */}
          <div className="absolute top-4 left-1/2 -translate-x-1/2 w-56">
-            <Image src="/assets/images/svg/muhni_logo.svg" alt="Logo" width={224} height={90} />
+            <Image src="/assets/myLogo.svg" alt="Logo" width={224} height={90} />
           </div>
           
         </div>

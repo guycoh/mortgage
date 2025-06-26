@@ -41,8 +41,8 @@ export default function LeadsTable() {
   }, []);
 
   const handleEdit = (id: number) => {
-    alert(`עריכת ליד ${id}`);
-    router.push(`/private/crm/leads/edit/${id}`);
+   // alert(`עריכת ליד ${id}`);
+    router.push(`/private/crm/leads/${id}`);
     // ניתוב לדף עריכה או פתיחת מודאל
   };
 

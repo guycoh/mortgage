@@ -70,7 +70,19 @@ export const Footer = () => {
         <div>
           <h4 className="underline text-lg font-semibold mb-1">כתובת</h4>
           <ul className="space-y-1">
-            <li>
+       <li>
+              <a
+                href="https://www.google.com/maps/search/?api=1&query=הרצל+92,+רמלה"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:underline hover:font-bold transition duration-200"
+              >
+                שמואל הנגיד 6 רמת השרון
+              </a>
+            </li>
+          
+       
+            {/* <li>
               <a
                 href="https://www.google.com/maps/search/?api=1&query=הרצל+92,+רמלה"
                 target="_blank"
@@ -99,7 +111,7 @@ export const Footer = () => {
               >
                 הלוחמים 1, תל אביב
               </a>
-            </li>
+            </li> */}
           </ul>
 
           

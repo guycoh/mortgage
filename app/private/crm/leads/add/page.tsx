@@ -321,7 +321,7 @@ export default function LeadForm() {
             className="w-full md:w-44 bg-transparent text-slate-700 text-sm border border-slate-500 rounded-md px-3 py-2 transition duration-300 ease focus:outline-none focus:border-slate-400 hover:border-slate-300 shadow-sm focus:shadow focus:bg-orange-50"
           >
             <option value="" disabled hidden>-- סיבת לא נסגר --</option>
-            {reasons.map(({ id, }) => (
+            {reasons.map(({ id,  }) => (
               <option key={id} value={id} className="text-slate-700">
                 {status}
               </option>

@@ -34,7 +34,7 @@ export default function AboutMe() {
               ובמקביל, פיתחתי סימולטורים פיננסיים עבור Lease4U.
             </span>
             <span className="block">
-              כיום יועץ משכנתאות בקבוצת <span className="font-bold text-purple-600">MUNNI SUCCESS</span>,
+              כיום יועץ משכנתאות  <span className="font-bold text-purple-600"></span>,
               ומרגיש זכות אדירה ללוות אנשים במסע להגשמת חלומות.
             </span>
             <span className="block">

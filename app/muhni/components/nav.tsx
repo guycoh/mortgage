@@ -38,7 +38,7 @@ export const Nav = ({ onOpenMenu, isMenuOpen }: { onOpenMenu: () => void, isMenu
       <div className="absolute top-1 left-1 w-36 h-auto">
         <Link href="/muhni" >
             <Image
-              src="/assets/images/svg/muhni_logo.svg"
+              src="/assets/images/svg/muhni_logo1.svg"
               alt="Logo"
               width={224}
               height={90}
