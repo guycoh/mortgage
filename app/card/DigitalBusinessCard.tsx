@@ -18,15 +18,15 @@ import Calculator3 from "public/assets/images/svg/Calculator3";
 import SigmaIcon from "@/public/assets/images/svg/SigmaIcon";
 
 import WazeIcon from "@/public/assets/images/svg/waze_icon";
-
+import CalendarIcon from "@/public/assets/images/svg/general/CalendarIcon";
 
 
 export default function DigitalBusinessCard() {
   const buttons = [
-    { icon: PhoneIcon, label: "טלפון", href: 'tel:0523684844' },
-    { icon: WhatsappIcon, label: "צ׳אט", href: 'https://wa.me/972523684844' },
-    { icon: EnvelopeIcon, label: "דוא\"ל", href: 'mailto:guycoh@outlook.co.il' },
-    { icon: GlobeIcon, label: "אתר", href: "https://morg-orcin.vercel.app/muhni" },
+    { icon: PhoneIcon, label: "טלפון", href: 'tel:0503466591' },
+    { icon: WhatsappIcon, label: "צ׳אט", href: 'https://wa.me/972503466591' },
+    { icon: EnvelopeIcon, label: "דוא\"ל", href: 'mailto:guy.c@primeinv.co.il' },
+    { icon: GlobeIcon, label: "אתר", href: "https://primeinv.co.il/" },
   ];
   const calculators = [
     { icon: Calculator5, label: "מחשבון מהיר", href: "/muhni/calculators/simple_calculator" },
@@ -42,12 +42,22 @@ export default function DigitalBusinessCard() {
                  md:grid md:grid-cols-2 md:place-items-center"
     >
       {/* — הכרטיס — */}
-      <div className="flex flex-col w-full order-2 md:order-1 animate-fade-in bg-gradient-to-br from-purple-700 via-purple-600 to-purple-800 ">
+      <div className="flex flex-col w-full order-2 md:order-1 animate-fade-in bg-main">
 
         {/* Header */}
         <div className="relative h-44 bg-white w-full "> {/* ⭐ mb-24 -> mb-0 */}
-         <div className="absolute top-4 left-1/2 -translate-x-1/2 w-56">
-            <Image src="/assets/myLogo.svg" alt="Logo" width={224} height={90} />
+         <div className="absolute top-0 left-0  w-44">
+           
+            {/* <Image src="/assets/myLogo.svg" alt="Logo" width={224} height={90} />
+          */}
+                   <Image
+                       src="/assets/images/imgFiles/prime.jpg"
+                       alt="Logo"
+                       width={224}
+                       height={90}
+                       className="object-contain"              
+                     />
+         
           </div>
           
         </div>
@@ -82,7 +92,7 @@ export default function DigitalBusinessCard() {
                   >
                     <div className="bg-gray-50 border border-gray-200 rounded-full
                                     w-12 h-12 sm:w-16 sm:h-16 flex items-center justify-center">
-                      <btn.icon color="#6929AC" className="w-7 h-7 sm:w-9 sm:h-9" />
+                      <btn.icon color="#1d75a1" className="w-7 h-7 sm:w-9 sm:h-9" />
                     </div>
                   </a>
                   <span className="absolute top-full mt-2 text-xs sm:static sm:mt-3
@@ -108,7 +118,7 @@ export default function DigitalBusinessCard() {
                   >
                     <div className="bg-gray-50 border border-gray-200 rounded-md
                                     w-12 h-12 sm:w-16 sm:h-16 flex items-center justify-center">
-                      <item.icon color="#6929AC" className="w-7 h-7 sm:w-9 sm:h-9" />
+                      <item.icon color="#1d75a1" className="w-7 h-7 sm:w-9 sm:h-9" />
                     </div>
                   </Link>
                   <span className="absolute top-full mt-2 text-xs sm:static sm:mt-3
@@ -127,8 +137,15 @@ export default function DigitalBusinessCard() {
         <div className="w-full relative mt-24">
         
          {/* כפתור פגישה עגול שמרחף על הפוטר */}
-          <div className="absolute -top-24 left-1/2 -translate-x-1/2 z-10">
+          <div className="absolute -top-24 left-1/2 -translate-x-1/2 z-10">            
             <Link href="/muhni/schedule">
+                <button className="w-[136px] h-[136px] rounded-full border-[6px] border-[#a39d8f] bg-white shadow-md hover:shadow-lg active:scale-95 transition-all duration-200 ease-out focus:outline-none flex flex-col justify-center items-center space-y-2">
+                  <CalendarIcon size={56} color="#1d75a1" />
+                  <span className="text-sm text-[#1d75a1] text-center">קבע פגישה</span>
+                </button>
+            </Link>
+            
+            {/* <Link href="/muhni/schedule">
               <Image
                 src="/assets/gal/meeting.svg"
                 alt="קבע פגישה"
@@ -136,40 +153,32 @@ export default function DigitalBusinessCard() {
                 height={142}
                 className="object-contain"
               />
-            </Link>
+            </Link> */}
           </div>
 
           {/* הפוטר עצמו */}
           <div className="bg-white text-main text-sm py-12 rounded-b-xl shadow-sm text-right">
               <div className="flex items-center justify-center gap-2">
-                    <p className="font-medium text-xl">הרצל 92 ,רמלה</p>
+                    <p className="font-medium text-xl">מצדה 7 בסר 4 ,בני ברק</p>
 
                     <a
                       href="waze://?ll=31.951944,34.897222&navigate=yes"
                       className="relative group w-[52px] h-[52px] flex items-center justify-center rounded-full border border-main"
                     >
-                      <WazeIcon size={34} color="#7e22ce" className="hover:text-orange-500 z-10" />
+                      <WazeIcon size={34} color="#1d75a1" className="hover:text-orange-500 z-10" />
                       
                       <span className="absolute inset-0 bg-orange-100 opacity-0 group-hover:opacity-60 transition-opacity duration-500 rounded-full" />
                     </a>
               </div>
-          <div className="flex items-center justify-center gap-2">
-               
-
-                <a
-                  href="waze://?ll=31.951944,34.897222&navigate=yes"
-                  className="relative group w-[52px] h-[52px] flex items-center justify-center rounded-full border border-main"
-                >
-                  <WazeIcon size={34} color="#7e22ce" className="hover:text-orange-500 z-10" />
-                  
-                  <span className="absolute inset-0 bg-orange-100 opacity-0 group-hover:opacity-60 transition-opacity duration-500 rounded-full" />
-                </a>
-
-                <p className="font-medium text-xl"> שד דוד המלך 2 ,לוד</p>
-           </div>
+        
+      
+ 
 
 
+          
+          
           </div>
+
         </div>
       </div>
     </div>

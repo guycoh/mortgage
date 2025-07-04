@@ -19,12 +19,20 @@ const config = {
     },
     extend: {
       colors: {
-        main: "#6929AC",
+       // main: "#6929AC", סגול מוני
+       // main:"#1d75a1",  מורגי
+        main:" #084F99",
+     
         second: "#F59E0B",
-        footer: "#6929AC",
+        
+       footer: "#a39d8f",
+        //footer: "#6929AC",
         fonts: "#475569",
         fontss1: "#546e7a",
-        galbg: "#EAE5FC",
+       
+       galbg: "#e5e4e3",
+       
+        // galbg: "#EAE5FC",
 
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
