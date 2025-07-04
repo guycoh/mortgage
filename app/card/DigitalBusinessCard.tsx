@@ -68,11 +68,17 @@ export default function DigitalBusinessCard() {
                      flex flex-col items-center
                      -mt-12 pt-36 px-6 mb-12"  /* ⭐ NEW: -mt-12 + pt-20 */
         >
-          <div className="absolute -top-16 flex justify-center items-end">
-            <div className="w-36 h-36 z-10 rounded-full overflow-hidden border-4 border-white shadow-xl translate-y-1/2 bg-white">
-                    <Image src="/assets/images/imgFiles/my_image.jpg" alt="משה " width={144} height={144}  className="object-contain" />
-            </div>
-          </div>
+ <div className="absolute -top-16 flex justify-center items-end">
+  <div className="w-36 h-36 z-10 relative rounded-full overflow-hidden border-4 border-white shadow-xl translate-y-1/2 bg-white">
+    <Image
+      src="/assets/images/imgFiles/my_image.jpg" // ודא שזה הנתיב הנכון
+      alt="גיא"
+      fill
+      className="object-contain object-center"
+    />
+  </div>
+</div>
+
 
           <h1 className="mt-6 text-4xl font-bold tracking-tight">גיא כהן</h1> {/* ⭐ mt-20 -> mt-0 */}
           <p className="mt-1 text-2xl">יועץ משכנתאות </p>
@@ -139,7 +145,7 @@ export default function DigitalBusinessCard() {
          {/* כפתור פגישה עגול שמרחף על הפוטר */}
           <div className="absolute -top-24 left-1/2 -translate-x-1/2 z-10">            
             <Link href="/muhni/schedule">
-                <button className="w-[136px] h-[136px] rounded-full border-[6px] border-[#a39d8f] bg-white shadow-md hover:shadow-lg active:scale-95 transition-all duration-200 ease-out focus:outline-none flex flex-col justify-center items-center space-y-2">
+                <button className="w-[136px] h-[136px] rounded-full border-[6px] border-[#e5e4e3] bg-white shadow-md hover:shadow-lg active:scale-95 transition-all duration-200 ease-out focus:outline-none flex flex-col justify-center items-center space-y-2">
                   <CalendarIcon size={56} color="#1d75a1" />
                   <span className="text-sm text-[#1d75a1] text-center">קבע פגישה</span>
                 </button>
@@ -162,7 +168,7 @@ export default function DigitalBusinessCard() {
                     <p className="font-medium text-xl">מצדה 7 בסר 4 ,בני ברק</p>
 
                     <a
-                      href="waze://?ll=31.951944,34.897222&navigate=yes"
+                       href="waze://?ll=31.820842,34.982254&navigate=yes"
                       className="relative group w-[52px] h-[52px] flex items-center justify-center rounded-full border border-main"
                     >
                       <WazeIcon size={34} color="#1d75a1" className="hover:text-orange-500 z-10" />
