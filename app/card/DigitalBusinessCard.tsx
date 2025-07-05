@@ -161,32 +161,27 @@ export default function DigitalBusinessCard() {
               />
             </Link> */}
           </div>
+            {/* הפוטר עצמו */}
+            <div className="bg-white text-[#1d75a1] text-sm py-12 rounded-b-xl shadow-sm text-right">
+              <div className="flex items-center justify-center gap-4">
+                {/* טקסט בשתי שורות */}
+                <div className="flex flex-col text-right">
+                  <p className="font-medium text-xl">רחוב מצדה 7, בני ברק</p>
+                  <p className="font-medium text-xl">בניין בסר 4, קומה 7</p>
+                </div>
 
-          {/* הפוטר עצמו */}
-          <div className="bg-white text-[#1d75a1] text-sm py-12 rounded-b-xl shadow-sm text-right">
-              <div className="flex items-center justify-center gap-2">
-                    <p className="font-medium text-xl">רחוב מצדה 7, בני ברק </p>
-                   
-                    <p className="font-medium text-xl">בניין בסר 4, קומה 7</p>
-
-                    <a
-                       href="waze://?ll=31.820842,34.982254&navigate=yes"
-                      className="relative group w-[52px] h-[52px] flex items-center justify-center rounded-full border border-main"
-                    >
-                      <WazeIcon size={42} color="#1d75a1" className="hover:text-orange-500 z-10" />
-                      
-                      <span className="absolute inset-0 bg-orange-100 opacity-0 group-hover:opacity-60 transition-opacity duration-500 rounded-full" />
-                    </a>
+                {/* אייקון וויז */}
+                <a
+                  href="waze://?ll=32.093649,34.824629&navigate=yes"                
+                  className="relative group w-[52px] h-[52px] flex items-center justify-center rounded-full border border-main"
+                >
+                  <WazeIcon size={42} color="#1d75a1" className="hover:text-orange-500 z-10" />
+                  <span className="absolute inset-0 bg-orange-100 opacity-0 group-hover:opacity-60 transition-opacity duration-500 rounded-full" />
+                </a>
               </div>
-        
-      
- 
+            </div>
 
-
-          
-          
-          </div>
-
+         
         </div>
       </div>
     </div>
