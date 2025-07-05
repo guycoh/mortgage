@@ -31,23 +31,6 @@ export const metadata = {
 };
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 export default function MortgageClearanceInstructions() {
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-8">

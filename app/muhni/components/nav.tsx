@@ -23,27 +23,34 @@ export const Nav = ({ onOpenMenu, isMenuOpen }: { onOpenMenu: () => void, isMenu
   
   return (
     <div>
+        
       <header className="shadow-md font-sans tracking-wide relative z-50">
+          {/* לוגו צמוד לשמאל בתוך ה-header */}
+  <div className="absolute top-0.2 left-0 z-50">
+    <Link href="/muhni">
+      <Image
+        src="/assets/images/imgFiles/prime.jpg"
+        alt="Logo"
+        width={105}
+        height={42}
+        className="object-contain"
+      />
+    </Link>
+  </div>
+
 
        {/* פס עליון */}
-        <section className="py-2 bg-main text-white px-10 flex justify-center items-center">
+        <section className="py-2 bg-white border-2 border-b-main text-main px-10 flex justify-center items-center">
           <p className="text-sm text-center">
-            <strong className="mx-3">גיא כהן - יועץ המשכנתא שלך 052-3684844</strong>
+            <strong className="mx-3">PRIME MORTGAGE </strong>
           </p>
         </section>
 
         {/* אזור תפריט */}
         <div className="flex flex-wrap items-center justify-between gap-4 px-10 py-4 bg-white min-h-[70px] relative">
 
-      <div className="absolute top-1 left-1 w-36 h-auto">
-        <Link href="/muhni" >
-            
-            
-            
-            
-            
-            
-            
+      {/* <div className="absolute top-1 left-1 w-36 h-auto">
+        <Link href="/muhni" >            
             <Image
               src="/assets/images/imgFiles/prime.jpg"
               alt="Logo"
@@ -52,7 +59,7 @@ export const Nav = ({ onOpenMenu, isMenuOpen }: { onOpenMenu: () => void, isMenu
               className="object-contain"              
             />
         </Link>
-      </div>
+      </div> */}
       <div className="max-lg:hidden lg:!block absolute top-4 left-52 w-auto h-auto   3">
          <UserInfo />
     
@@ -61,14 +68,7 @@ export const Nav = ({ onOpenMenu, isMenuOpen }: { onOpenMenu: () => void, isMenu
            <GuidesDropdown />    
       </div>
       
-      {/* <div className="max-lg:hidden lg:!block absolute top-5.2 left-[520px] w-auto h-auto   3">
-           <Link href="/muhni/schedule" className="text-white bg-main rounded-lg text-sm px-5 py-2.5">קבע פגישה</Link>
-      </div> */}
-
-
-
-
-     
+           
           {/* כפתור המבורגר */}
           <button
             onClick={onOpenMenu}
@@ -83,20 +83,6 @@ export const Nav = ({ onOpenMenu, isMenuOpen }: { onOpenMenu: () => void, isMenu
               <span className="block w-6 h-0.5 bg-main"></span>
             </div>
           </button>
-
-          {/* תפריט ניווט */}
-         
-          {/* <div className="max-lg:hidden lg:!block">
-            <ul className="flex gap-x-6">
-              <li><Link href="/muhni" className="text-main font-bold text-[15px]">בית</Link></li>            
-              <li><Link href="/muhni/calculators" className="text-main font-bold text-[15px]">מחשבונים</Link></li>
-              <li><Link href="/muhni/concepts" className="text-main font-bold text-[15px]">מושגים במשכנתא</Link></li>
-              <li><Link href="/muhni/contact" className="text-main font-bold text-[15px]">צור קשר</Link></li>
-              <li><Link href="/muhni/about" className="text-main font-bold text-[15px]">אודות</Link></li>            
-              
-            </ul>
-          </div>
- */}
 
          {/* תפריט ניווט */}
         <div className="max-lg:hidden lg:!block">

@@ -54,13 +54,13 @@ export const Footer = () => {
               </Link>
             </li>
             <li>
-              <a href="tel:0523684844" className="hover:underline hover:font-bold transition duration-200">
-                052-3684844
+              <a href="tel:0503466591" className="hover:underline hover:font-bold transition duration-200">
+                050-3466591
               </a>
             </li>
             <li>
-              <a href="mailto:guycoh@outlook.co.il" className="hover:underline hover:font-bold transition duration-200">
-                guycoh@outlook.co.il
+              <a href="mailto:guy.c@primeinv.co.il" className="hover:underline hover:font-bold transition duration-200">
+                guy.c@primeinv.co.il
               </a>
             </li>
           </ul>
@@ -77,7 +77,7 @@ export const Footer = () => {
                 rel="noopener noreferrer"
                 className="hover:underline hover:font-bold transition duration-200"
               >
-                שמואל הנגיד 6 רמת השרון
+                מצדה 7 בני ברק
               </a>
             </li>
           
