@@ -6,6 +6,7 @@ import { banks } from '@/app/data/banks'
 import { statusCall } from '@/app/data/status_call'
 import { useEmployees } from '@/app/data/hooks/useEmployees'
 import { useReasonNotInterested } from '@/app/data/hooks/useReasonNotInterested'
+import NotesPage from '../../components/notes';
 
 
 export type Lead = {
@@ -82,7 +83,7 @@ export default function EditLeadPage() {
       });
 
       if (!res.ok) throw new Error('שגיאה בעדכון הליד');
-      router.push('/private/crm/leads');
+      //router.push('/private/crm/leads');
     } catch (err: any) {
       alert(err.message);
     }
@@ -253,16 +254,9 @@ export default function EditLeadPage() {
     
     </fieldset>
 
-
- 
-
-
-
-
-
   </div>
 
-
+<NotesPage/>
 
 
 {/* כפתור שמירה */}
