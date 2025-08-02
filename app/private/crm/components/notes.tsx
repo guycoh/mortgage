@@ -57,7 +57,7 @@ export default function NotesPage() {
   return (
     <div
       
-      className="max-w-3xl mx-auto mt-10 p-4 font-sans bg-gray-50 border border-gray-300 rounded-xl shadow-sm"
+      className="max-w-3xl mx-auto mt-10 p-4 font-sans border border-gray-300 rounded-xl shadow-sm"
     >
       <div className="grid grid-cols-[auto_1fr] gap-2 mb-6">
         <button

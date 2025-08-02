@@ -134,8 +134,6 @@ export default function EditLeadPage() {
         
       </div>
     </fieldset>
-
-
     {/* מסגרת 2 – פרטי בן/בת זוג */}
     <fieldset className="space-y-4 p-4 border rounded-xl">
       <legend className="text-sm font-semibold px-2">פרטי בן/בת זוג</legend>
@@ -254,10 +252,102 @@ export default function EditLeadPage() {
     
     </fieldset>
 
+
+{/* מסגרת 4 – הערות */}
+    <fieldset className="space-y-4 p-4 border rounded-xl">
+      <legend className="text-sm font-semibold px-2">הערות</legend>
+       <label className="block text-sm font-medium">מקור ליד
+          <input value={lead.data_source ?? '' } onChange={handleChange} id="data_source" name="data_source" className="w-full bg-transparent placeholder:text-slate-400 text-slate-700 text-sm border border-slate-500 rounded-md px-3 py-2 transition duration-300 ease focus:outline-none focus:border-slate-400 hover:border-slate-300 shadow-sm focus:shadow focus:bg-orange-50"  />
+        </label>
+{/*       
+        <label className="block text-sm font-medium" htmlFor="comment">הערות
+          <textarea
+            value=""
+         
+            id="comment"
+            name="comment"
+            className="w-full bg-transparent placeholder:text-slate-400 text-slate-700 text-sm border border-slate-500 rounded-md px-3 py-2 transition duration-300 ease focus:outline-none focus:border-slate-400 hover:border-slate-300 shadow-sm focus:shadow focus:bg-orange-50" 
+          />
+        </label> */}
+    </fieldset>
+
+
+ </div>
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ <div className="flex flex-col md:flex-row gap-4">
+  {/* חלק ימין – שיחות ומעקב */}
+  <div className="w-full md:w-1/3">
+    {/* כאן שים את הקוד שהעברת לי קודם: מסגרת שיחות ומעקב */}
+    <fieldset className="w-full p-4 border rounded-2xl shadow-sm bg-white">
+      <legend className="text-sm font-semibold px-2 text-gray-700">שיחות ומעקב</legend>
+
+      <div className="flex flex-col gap-4 mt-4">
+        {/* כל הלייבלים והאינפוטים שלך */}
+        {/* לדוגמה: */}
+        <label className="flex flex-col text-sm font-medium text-gray-800">
+          שיחה אחרונה
+          <input
+           
+            type="date"
+            name="last_call"
+            className="bg-transparent text-sm border border-slate-500 rounded-md px-3 py-2 focus:bg-orange-50 shadow-sm"
+          />
+        </label>
+
+
+
+
+
+
+
+
+
+
+
+
+        {/* המשך שדות... */}
+     
+      {/* סטטוס שיחה */}
+             <label className="flex flex-col text-sm font-medium text-gray-800 w-full md:w-auto">
+               סטטוס שיחה
+               <select
+                 onChange={handleChange}
+                 id="status_call_id"
+                 name="status_call_id"
+                 value={lead.status_call_id ?? ''}
+                 className="w-full md:w-44 bg-transparent text-slate-700 text-sm border border-slate-500 rounded-md px-3 py-2 transition duration-300 ease focus:outline-none focus:border-slate-400 hover:border-slate-300 shadow-sm focus:shadow focus:bg-orange-50"
+               >
+                 <option value="" disabled hidden>-- סטטוס שיחה --</option>
+                 {statusCall.map(({ id, name }) => (
+                   <option key={id} value={id} className="text-slate-700">
+                     {name}
+                   </option>
+                 ))}
+               </select>
+             </label>
+     
+     
+   
+     
+      </div>
+    </fieldset>
   </div>
 
-<NotesPage/>
+  {/* חלק שמאל – שאר הקומפוננט שלך */}
+  <div className="w-full md:w-2/3">
+    {/* כאן תכניס את הקומפוננטה הקיימת שלך, לדוגמה: */}
+     <NotesPage/>
+  </div>
+</div>
 
+  
 
 {/* כפתור שמירה */}
 <button

@@ -9,7 +9,11 @@ import { useRouter } from 'next/navigation';
 type Profile = {
   full_name: string;
   role: string;
+  phone?: string | null;
+  email?: string | null;
 };
+
+
 
 type UserContextType = {
   user: any;
@@ -48,7 +52,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
 
     const { data: profileData, error: profileError } = await supabase
       .from("profiles")
-      .select("full_name, role")
+      .select("full_name, role, phone, email")
       .eq("id", user.id)
       .single();
 
@@ -101,7 +105,7 @@ useEffect(() => {
     <UserContext.Provider value={{
       user,
       profile,
-      role: profile?.role ?? null,
+      role: profile?.role ?? null,     
       isLoading,
       error,
       logout
