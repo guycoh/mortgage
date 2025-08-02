@@ -3,50 +3,92 @@ import type { PDFDocumentProxy } from 'pdfjs-dist'
 
 export type LoanPart = {
   id: string
-  type: string
-  amount: number
-  interest: number
+  type: 'פריים לא צמוד' | 'משתנה אג"ח צמודה' | 'קבועה צמודה' | 'לא ידוע'
+  amount: number | null
+  interest: number | null
   linked: boolean
-  monthlyPayment: number
-  startDate: string
-  endDate: string
+  monthlyPayment: number | null
+  startDate: string // ISO yyyy-MM-dd or empty
+  endDate: string // ISO yyyy-MM-dd or empty
 }
 
-// הגדר את ה-worker לטעינה נכונה בדפדפן
-GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`
+// Set worker; in production consider bundling or conditionally setting for browser
+GlobalWorkerOptions.workerSrc =
+  typeof window !== 'undefined'
+    ? 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'
+    : ''
 
+/**
+ * Parses the Mizrahi loan report PDF into structured loan parts.
+ */
 export async function parseMizrahiReport(file: File): Promise<LoanPart[]> {
   const text = await extractTextFromPDF(file)
-  const parts: LoanPart[] = []
+  if (!text) {
+    throw new Error('לא נמצא טקסט בקובץ ה-PDF או שההפקה נכשלה.')
+  }
 
-  const blocks = text.split(/שם החלק בהלוואה:\s*\d+\s+1/g).slice(1)
+  // Try to robustly split into loan part blocks by looking for the "שם החלק בהלוואה:" header.
+  const partHeaderRegex = /שם החלק בהלוואה:\s*\d+/g
+  const indices: number[] = []
+  let match: RegExpExecArray | null
+  while ((match = partHeaderRegex.exec(text)) !== null) {
+    indices.push(match.index)
+  }
+
+  const blocks: string[] = []
+  for (let i = 0; i < indices.length; i++) {
+    const start = indices[i]
+    const end = i + 1 < indices.length ? indices[i + 1] : text.length
+    blocks.push(text.slice(start, end))
+  }
+
+  const parts: LoanPart[] = []
 
   blocks.forEach((block, i) => {
     const id = (i + 1).toString()
 
-    const amountMatch = block.match(/יתרת הקרן:\s+([\d,]+\.\d{2})/)
-    const interestMatch = block.match(/שיעור ריבית ממוצעת.*?:\s+%?([\d.]+)/)
-    const linked = /צמוד מדד/.test(block)
-    const monthlyPaymentMatch = block.match(/סכום החיוב החודשי.*?:\s+ש"ח\s+([\d,]+\.\d{2})/)
-    const startDateMatch = block.match(/תאריך הביצוע:\s+(\d{2}\/\d{2}\/\d{4})/)
-    const endDateMatch = block.match(/תאריך סיום חלק.*?:\s+(\d{2}\/\d{2}\/\d{4})/)
+    const amountMatch = block.match(/יתרת הקרן:\s*([\d.,]+\.\d{2})/)
+    const interestMatch = block.match(/שיעור ריבית ממוצעת[^:]*:\s*%?([\d.,]+)/)
+    const linked = /צמוד\s*מדד/i.test(block)
+    const monthlyPaymentMatch = block.match(
+      /סכום\s*החיוב\s*החודשי[^:]*:\s*ש"ח\s*([\d.,]+\.\d{2})/
+    )
+    const startDateMatch = block.match(/תאריך\s*הביצוע:\s*(\d{2}\/\d{2}\/\d{4})/)
+    const endDateMatch = block.match(
+      /תאריך\s*סיום\s*חלק[^:]*:\s*(\d{2}\/\d{2}\/\d{4})/
+    )
 
-    const type = block.includes('פריים')
-      ? 'פריים לא צמוד'
-      : block.includes('משתנה') && linked
-      ? 'משתנה אג"ח צמודה'
-      : 'קבועה צמודה'
+    // Determine type with clear priority
+    let type: LoanPart['type'] = 'לא ידוע'
+    if (block.includes('פריים')) {
+      type = 'פריים לא צמוד'
+    } else if (block.includes('משתנה') && linked) {
+      type = 'משתנה אג"ח צמודה'
+    } else if (block.includes('קבועה') && linked) {
+      type = 'קבועה צמודה'
+    }
 
-    const parseNumber = (value: string | undefined) =>
-      value ? parseFloat(value.replace(/,/g, '')) : 0
+    const parseNumber = (value: string | undefined): number | null => {
+      if (!value) return null
+      // Remove commas and any other non-digit/dot characters
+      const cleaned = value.replace(/[,\s]/g, '')
+      const num = parseFloat(cleaned)
+      return isNaN(num) ? null : num
+    }
 
     parts.push({
       id,
       type,
-      amount: parseNumber(amountMatch?.[1]),
-      interest: parseFloat(interestMatch?.[1] || '0'),
+      amount: parseNumber(amountMatch?.[1]) ?? null,
+      interest: interestMatch
+        ? (() => {
+            const cleaned = interestMatch[1].replace(',', '.')
+            const num = parseFloat(cleaned)
+            return isNaN(num) ? null : num
+          })()
+        : null,
       linked,
-      monthlyPayment: parseNumber(monthlyPaymentMatch?.[1]),
+      monthlyPayment: parseNumber(monthlyPaymentMatch?.[1]) ?? null,
       startDate: convertDate(startDateMatch?.[1]),
       endDate: convertDate(endDateMatch?.[1]),
     })
@@ -55,28 +97,53 @@ export async function parseMizrahiReport(file: File): Promise<LoanPart[]> {
   return parts
 }
 
+/**
+ * Converts DD/MM/YYYY into ISO YYYY-MM-DD. Returns empty string if invalid.
+ */
 function convertDate(dateStr?: string): string {
   if (!dateStr) return ''
-  const [day, month, year] = dateStr.split('/')
+  const parts = dateStr.split('/')
+  if (parts.length !== 3) return ''
+  const [day, month, year] = parts
+  // Basic validation
+  if (
+    !/^\d{2}$/.test(day) ||
+    !/^\d{2}$/.test(month) ||
+    !/^\d{4}$/.test(year)
+  ) {
+    return ''
+  }
   return `${year}-${month}-${day}`
 }
 
 async function extractTextFromPDF(file: File): Promise<string> {
-  const typedArray = new Uint8Array(await file.arrayBuffer())
-  const pdf: PDFDocumentProxy = await getDocument({ data: typedArray }).promise
+  try {
+    const arrayBuffer = await file.arrayBuffer()
+    const typedArray = new Uint8Array(arrayBuffer)
+    const loadingTask = getDocument({ data: typedArray })
+    const pdf: PDFDocumentProxy = await loadingTask.promise
 
-  const pageTexts = await Promise.all(
-    Array.from({ length: pdf.numPages }, async (_, i) => {
-      const page = await pdf.getPage(i + 1)
-      const content = await page.getTextContent()
-      return content.items.map((item) => ('str' in item ? item.str : '')).join(' ')
-    })
-  )
+    const pageTexts: string[] = []
+    for (let i = 1; i <= pdf.numPages; i++) {
+      try {
+        const page = await pdf.getPage(i)
+        const content = await page.getTextContent()
+        const pageText = content.items
+          .map((item) => ('str' in item ? item.str : ''))
+          .join(' ')
+        pageTexts.push(pageText)
+      } catch (err) {
+        // If a single page fails, continue but note it.
+        console.warn(`Failed to extract text from page ${i}:`, err)
+      }
+    }
 
-  return pageTexts.join('\n')
+    return pageTexts.join('\n')
+  } catch (err) {
+    console.error('Error extracting PDF text:', err)
+    return ''
+  }
 }
-
-
 
 
 
