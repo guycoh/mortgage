@@ -80,7 +80,7 @@ export default function DigitalBusinessCard() {
 </div>
 
 
-          <h1 className="mt-6 text-4xl font-bold tracking-tight">גיא כהן</h1> {/* ⭐ mt-20 -> mt-0 */}
+          <h1 className="mt-6 text-4xl font-bold tracking-tight">גלעד ברלוביץ</h1> {/* ⭐ mt-20 -> mt-0 */}
           <p className="mt-1 text-2xl">יועץ משכנתאות </p>
 
        {/* — יצירת קשר — */}
