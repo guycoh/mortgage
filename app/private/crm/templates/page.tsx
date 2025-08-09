@@ -14,6 +14,7 @@ import NewTemplate from "./add/NewTemplate";
 import { useUser } from "@/app/context/UserContext";
 import SearchIcon from "@/public/assets/images/svg/general/SearchIcon";
 import { banks } from "@/app/data/banks";
+import EditTemplateModal from "./EditTemplateModal";
 
 // פונקציה להחלפת placeholders
 function interpolateTemplate(
@@ -40,6 +41,9 @@ function TemplateRow({
   const [copied, setCopied] = useState(false);
   const [showFull, setShowFull] = useState(false);
   const modalRootRef = useRef<HTMLElement | null>(null);
+
+
+
 
   const renderedContent = useMemo(() => {
     return interpolateTemplate(template.content, {
@@ -234,6 +238,10 @@ export default function TemplatesTable({}: TemplatesTableProps) {
   const [email, setEmail] = useState("");
   const [selectedBank, setSelectedBank] = useState<number | "">("");
 
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
+
+
   // debounce input
   useEffect(() => {
     const handle = setTimeout(() => setDebouncedSearch(search.trim()), 300);
@@ -247,8 +255,9 @@ export default function TemplatesTable({}: TemplatesTableProps) {
     );
   }, [debouncedSearch, templates]);
 
-  const handleEdit = useCallback((t: Template) => {
-    console.log("ערוך תבנית:", t);
+  const handleEdit = useCallback((template: Template) => {
+  setSelectedTemplate(template);
+  setIsEditOpen(true);
   }, []);
 
   const bankName = selectedBank
@@ -447,7 +456,12 @@ export default function TemplatesTable({}: TemplatesTableProps) {
           console.log("תבנית נוצרה:", template);
           setShowModal(false);
         }}
-      />
+
+     />
+
+
+
+      
     </div>
   );
 }
