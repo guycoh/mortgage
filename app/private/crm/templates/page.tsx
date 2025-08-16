@@ -1,281 +1,276 @@
-"use client";
+"use client"
 
-import {
-  useMemo,
-  useState,
-  useCallback,
-  useEffect,
-  Fragment,
-  useRef,
-} from "react";
-import { createPortal } from "react-dom";
-import { useTemplates, Template } from "@/app/data/hooks/useTemplates";
+import { useEffect, useState, useCallback, useMemo } from "react";
+
 import NewTemplate from "./add/NewTemplate";
-import { useUser } from "@/app/context/UserContext";
+import EditTemplate from "./add/EditTemplate";
+import ModalDelete from "./add/ModalDelete";
+
+
 import SearchIcon from "@/public/assets/images/svg/general/SearchIcon";
+import TrashIcon from "@/public/assets/images/svg/general/TrashIcon";
+import EditIcon from "@/public/assets/images/svg/general/EditIcon";
+import EmailIcon from "@/public/assets/images/svg/contact/EmailIcon";
+import WhatsappIcon from "@/public/assets/images/svg/contact/WhatsappIcon";
+import CopyIcon from "@/public/assets/images/svg/general/CopyIcon";
+
+
 import { banks } from "@/app/data/banks";
-import EditTemplateModal from "./EditTemplateModal";
+import { useUser } from "@/app/context/UserContext";
 
-// פונקציה להחלפת placeholders
-function interpolateTemplate(
-  template: string,
-  vars: Record<string, string | undefined>
-) {
-  return template.replace(/\{\{\s*(\w+)\s*\}\}/g, (_, key) => vars[key] ?? "");
-}
+export type Template = {
+  id: string;
+  name: string;
+  content: string;
+  inactive: boolean;
+  favorite: boolean;
+  rank: number | null;
+  created_at: string;
+  updated_at: string;
+};
 
-type TemplatesTableProps = {};
+export default function TemplatesPage() {
+  const [data, setData] = useState<Template[]>([]);
+  const [loading, setLoading] = useState(true);
 
-function TemplateRow({
-  template,
-  onEdit,
-  clientName,
-  bankName,
-}: {
-  template: Template;
-  onEdit: (t: Template) => void;
-  clientName: string;
-  bankName: string;
-}) {
-  const { profile } = useUser();
-  const [copied, setCopied] = useState(false);
-  const [showFull, setShowFull] = useState(false);
-  const modalRootRef = useRef<HTMLElement | null>(null);
-
-
-
-
-  const renderedContent = useMemo(() => {
-    return interpolateTemplate(template.content, {
-      advisorName: profile?.full_name,
-      advisorPhone: profile?.phone ?? undefined,
-      advisorEmail: profile?.email ?? undefined,
-      clientName: clientName || undefined,
-      bankName: bankName || undefined,
-    });
-  }, [template.content, profile, clientName, bankName]);
-
-  const handleCopy = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(renderedContent.trim());
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch (e) {
-      console.error("העתקה נכשלה", e);
-    }
-  }, [renderedContent]);
-
-  const whatsappLink = useMemo(() => {
-    return `https://wa.me/?text=${encodeURIComponent(renderedContent.trim())}`;
-  }, [renderedContent]);
-
-  const mailtoLink = useMemo(() => {
-    return `mailto:?subject=${encodeURIComponent(
-      template.name
-    )}&body=${encodeURIComponent(renderedContent.trim())}`;
-  }, [renderedContent, template.name]);
-
-  // יצירת container ל-portal של ה-modal
-  useEffect(() => {
-    if (typeof document === "undefined") return;
-    const div = document.createElement("div");
-    div.setAttribute("data-template-modal", template.id);
-    modalRootRef.current = div;
-    document.body.appendChild(div);
-    return () => {
-      if (modalRootRef.current) {
-        document.body.removeChild(modalRootRef.current);
-      }
-    };
-  }, [template.id]);
-
-  // סגירת modal ב-Escape
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && showFull) {
-        setShowFull(false);
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [showFull]);
-
-  const modalContent = showFull ? (
-    <div
-      className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
-      aria-modal="true"
-      role="dialog"
-      aria-label={`תוכן מלא של ${template.name}`}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) setShowFull(false);
-      }}
-    >
-      <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-auto p-6 relative">
-        <button
-          onClick={() => setShowFull(false)}
-          aria-label="סגור"
-          className="absolute top-3 right-3 text-sm px-3 py-1 bg-gray-200 rounded hover:bg-gray-300"
-        >
-          ✕
-        </button>
-        <h2 className="text-lg font-semibold mb-4">{template.name}</h2>
-        <div className="font-mono whitespace-pre-wrap text-sm">
-          {renderedContent}
-        </div>
-        <div className="mt-4 flex gap-2 flex-wrap">
-          <button
-            onClick={handleCopy}
-            className="text-xs h-9 px-4 flex items-center justify-center bg-indigo-600 text-white rounded hover:bg-indigo-700 transition"
-          >
-            {copied ? "הועתק!" : "העתק הכל"}
-          </button>
-          <a
-            href={whatsappLink}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs h-9 px-4 flex items-center justify-center bg-green-500 text-white rounded hover:bg-green-600 transition"
-          >
-            שלח וואצאפ
-          </a>
-          <a
-            href={mailtoLink}
-            className="text-xs h-9 px-4 flex items-center justify-center bg-orange-500 text-white rounded hover:bg-orange-600 transition"
-          >
-            שלח מייל
-          </a>
-        </div>
-      </div>
-    </div>
-  ) : null;
-
-  return (
-    <>
-      <tr
-        key={template.id}
-        className="odd:bg-white even:bg-gray-50 align-top"
-        data-testid={`template-row-${template.id}`}
-      >
-        <td className="px-4 py-3 border align-top font-medium">
-          {template.name}
-        </td>
-        <td className="px-4 py-3 border align-top">
-          <div className="relative group">
-            <div
-              className="font-mono text-sm bg-gray-50 p-2 rounded overflow-hidden cursor-pointer"
-              style={{
-                display: "-webkit-box",
-                WebkitLineClamp: 3,
-                WebkitBoxOrient: "vertical",
-                whiteSpace: "normal",
-              }}
-              onClick={() => setShowFull(true)}
-              aria-label="הצג תוכן מלא"
-              role="button"
-            >
-              {renderedContent}
-            </div>
-
-            {/* tooltip קטן ב-hover / focus */}
-            <div
-              className="invisible group-hover:visible group-focus-within:visible absolute z-10 top-full left-0 mt-1 w-[360px] max-h-64 overflow-auto bg-white border rounded shadow-lg p-3 text-xs font-mono whitespace-pre-wrap break-words"
-              role="tooltip"
-            >
-              {renderedContent}
-            </div>
-          </div>
-        </td>
-        <td className="px-4 py-3 border align-top">
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              onClick={() => onEdit(template)}
-              className="text-xs h-9 w-full flex items-center justify-center bg-blue-100 rounded hover:bg-blue-200 transition"
-              aria-label={`ערוך תבנית ${template.name}`}
-            >
-              ערוך
-            </button>
-            <button
-              onClick={handleCopy}
-              className="text-xs h-9 w-full flex items-center justify-center bg-indigo-600 text-white rounded hover:bg-indigo-700 transition"
-              aria-label="העתק תבנית"
-            >
-              {copied ? "הועתק!" : "העתק"}
-            </button>
-            <a
-              href={whatsappLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs h-9 w-full flex items-center justify-center bg-green-500 text-white rounded hover:bg-green-600 transition"
-              aria-label="שלח בווצאפ"
-            >
-              וואצאפ
-            </a>
-            <a
-              href={mailtoLink}
-              className="text-xs h-9 w-full flex items-center justify-center bg-orange-500 text-white rounded hover:bg-orange-600 transition"
-              aria-label="שלח במייל"
-            >
-              מייל
-            </a>
-          </div>
-        </td>
-      </tr>
-
-      {/* portal של ה-modal כדי שלא יהיה בתוך <tbody> */}
-      {modalRootRef.current &&
-        createPortal(modalContent, modalRootRef.current)}
-    </>
-  );
-}
-
-export default function TemplatesTable({}: TemplatesTableProps) {
-  const { templates = [], loading, error } = useTemplates();
-  const [search, setSearch] = useState("");
-  const [showModal, setShowModal] = useState(false);
-  const [debouncedSearch, setDebouncedSearch] = useState(search);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
 
   const [clientName, setClientName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [selectedBank, setSelectedBank] = useState<number | "">("");
 
-  const [isEditOpen, setIsEditOpen] = useState(false);
-  const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedTerm, setDebouncedTerm] = useState(searchTerm);
+
+ // מחיקה
+  
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+ 
+  //העתקת תוכן
+   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // פונקציה להעתקה + טוסט
+  
+const handleCopy = (t: Template) => {
+  // ממיר את התוכן לפי היועץ
+  const replaced = replacePlaceholders(t.content, advisorData);
+  navigator.clipboard.writeText(replaced);
+  setToastMessage("✅ התוכן הועתק בהצלחה!");
+};
 
 
-  // debounce input
+  // טוסט נעלם אוטומטית אחרי 3 שניות
   useEffect(() => {
-    const handle = setTimeout(() => setDebouncedSearch(search.trim()), 300);
-    return () => clearTimeout(handle);
-  }, [search]);
+    if (toastMessage) {
+      const timer = setTimeout(() => setToastMessage(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [toastMessage]);
 
-  const filtered = useMemo(() => {
-    if (!debouncedSearch) return templates;
-    return templates.filter((t) =>
-      t.name.toLowerCase().includes(debouncedSearch.toLowerCase())
-    );
-  }, [debouncedSearch, templates]);
 
-  const handleEdit = useCallback((template: Template) => {
-  setSelectedTemplate(template);
-  setIsEditOpen(true);
+
+
+  const { profile } = useUser();
+
+  const advisorData = {
+  advisorName: profile?.full_name || "",
+  advisorPhone: profile?.phone || "",
+  advisorEmail: profile?.email || "",
+
+};
+
+// מאחדים את כל הערכים שאפשר להשתמש בהם במלל
+const selectedBankName = useMemo(() => {
+  const bank = banks.find((b) => b.id === selectedBank);
+  return bank?.name ?? "";
+}, [selectedBank]);
+
+const placeholdersData = useMemo(() => ({
+  advisorName: profile?.full_name || "",
+  advisorPhone: profile?.phone || "",
+  advisorEmail: profile?.email || "",
+  clientName: clientName || "",
+  selectedBank: selectedBankName,
+}), [profile?.full_name, profile?.phone, profile?.email, clientName, selectedBankName]);
+
+// פונקציה שמחליפה את ה־{{placeholders}}
+function replacePlaceholders(text: string, data: Record<string, string>) {
+  return (text ?? "").replace(/{{(.*?)}}/g, (_, key) => {
+    const value = data[key.trim()];
+    return value !== undefined ? value : "";
+  });
+}
+
+const getTemplateContent = useCallback(
+  (t: Template) => replacePlaceholders(t.content ?? "", placeholdersData),
+  [placeholdersData]
+);
+
+
+
+
+
+
+
+
+  // debounce חיפוש
+  useEffect(() => {
+    const handler = setTimeout(() => setDebouncedTerm(searchTerm), 300);
+    return () => clearTimeout(handler);
+  }, [searchTerm]);
+
+  // חיפוש בפועל
+  const filteredData = useMemo(() => {
+    const lowerSearch = debouncedTerm.toLowerCase();
+    return data.filter((item) => item.name.toLowerCase().includes(lowerSearch));
+  }, [debouncedTerm, data]);
+
+  // קריאת נתונים
+  const fetchTemplates = useCallback(async () => {
+    try {
+      const res = await fetch("/api/templates", { cache: "no-store" });
+      if (!res.ok) throw new Error("Load error");
+      const templates = (await res.json()) as Template[] | null;
+      setData((templates ?? []).filter(Boolean));
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const bankName = selectedBank
-    ? banks.find((b) => b.id === selectedBank)?.name ?? ""
-    : "";
+  useEffect(() => {
+    fetchTemplates();
+  }, [fetchTemplates]);
+
+  // יצירה
+  const handleCreated = (created: Template) => {
+    if (!created?.id) {
+      fetchTemplates();
+      return;
+    }
+    setData((prev) => [created, ...prev]);
+    fetchTemplates();
+    setIsModalOpen(false);
+  };
+
+  // עדכון
+  const handleUpdated = (updated: Template) => {
+    setData((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+    fetchTemplates();
+  };
+
+  // מחיקה
+   // פתיחת המודל עם ה-ID הנבחר
+  const openDeleteModal = (id: string) => {
+    setDeleteId(id);
+    setIsDeleteModalOpen(true);
+  };
+
+  // מחיקה בפועל אחרי אישור
+  const handleConfirmDelete = async () => {
+    if (!deleteId) return;
+    const res = await fetch(`/api/templates/${deleteId}`, { method: "DELETE" });
+    if (res.ok) {
+      setData((prev) => prev.filter((t) => t?.id !== deleteId));
+    }
+    setIsDeleteModalOpen(false);
+    setDeleteId(null);
+  };
+  
+  //ממיר לווצאפ
+  function formatPhoneForWhatsapp(input: string) {
+  if (!input) return "";
+  // מסירים כל תו שאינו מספר או '+' בהתחלה
+  let cleaned = input.replace(/[^\d+]/g, "");
+
+  // אם המספר מתחיל ב-0 מחליפים בקידומת ישראלית 972
+  if (cleaned.startsWith("0")) {
+    cleaned = "972" + cleaned.slice(1);
+  }
+
+  // אם מתחיל ב-+ מסירים את ה+
+  if (cleaned.startsWith("+")) {
+    cleaned = cleaned.slice(1);
+  }
+
+  return cleaned;
+}
+
+
+  // עיצוב אחיד לשדות
+  const inputClass =
+    "w-full h-10 border rounded px-2 focus:outline-none focus:ring-2 focus:ring-green-500 focus:bg-orange-100";
+
+ 
+ // כפתורי פעולות
+const actionButtons = [
+  {
+    onClick: (t: Template) => {
+      const text = getTemplateContent(t);
+      navigator.clipboard.writeText(text);
+      setToastMessage("✅ התוכן הועתק בהצלחה!");
+    },
+    color: "bg-purple-500 hover:bg-purple-900",
+    icon: <CopyIcon className="w-10 h-10" />,
+  },
+  {
+    onClick: (t: Template) => {
+      setSelectedTemplate(t);
+      setIsEditOpen(true);
+    },
+    color: "bg-blue-500 hover:bg-blue-600",
+    icon: <EditIcon className="w-10 h-10" />,
+  },
+  {
+    onClick: (t: Template) => {
+      const subject = encodeURIComponent(t.name);
+      const body = encodeURIComponent(getTemplateContent(t));
+      if (!email) {
+        setToastMessage("⚠️ לא הוזנה כתובת אימייל");
+        return;
+      }
+      window.location.href = `mailto:${email}?subject=${subject}&body=${body}`;
+    },
+    color: "bg-orange-500 hover:bg-orange-900",
+    icon: <EmailIcon className="w-10 h-10" color="white" />,
+  },
+
+  {
+  onClick: (t: Template) => {
+      const text = encodeURIComponent(getTemplateContent(t));
+      const formattedPhone = formatPhoneForWhatsapp(phone);
+      if (!formattedPhone) {
+        setToastMessage("⚠️ לא הוזן מספר טלפון תקני");
+        return;
+      }
+      window.open(`https://wa.me/${formattedPhone}?text=${text}`, "_blank");
+    },
+    color: "bg-green-600 hover:bg-green-700",
+    icon: <WhatsappIcon className="w-10 h-10" color="white" />,
+  },
+
+
+  {
+    onClick: (t: Template) => openDeleteModal(t.id),
+    color: "bg-red-500 hover:bg-red-600",
+    icon: <TrashIcon className="w-10 h-10" />,
+  },
+];
 
   return (
-    <div className="max-w-5xl mx-auto p-6">
+    <div className="p-4">
+      {/* כותרת וטופס עליון */}
       <div className="flex flex-col items-center gap-4 mb-6">
         <h1 className="text-3xl font-bold text-center">תבניות לשליחה ללקוח</h1>
 
-        <div
-          dir="rtl"
-          className="w-full max-w-5xl border border-gray-300 rounded-xl p-5 flex flex-col gap-4"
-        >
-          {/* שורה ראשונה: חיפוש + כפתור */}
-          <div className="flex items-center gap-3 w-full">
-            {/* שדה חיפוש */}
+        <div className="w-full max-w-5xl border border-gray-300 rounded-xl p-5 flex flex-col gap-4">
+          {/* חיפוש + כפתור */}
+          <div className="flex items-center gap-3 w-full relative">
             <div className="relative flex-grow min-w-[160px] md:min-w-[220px]">
               <label htmlFor="template-search" className="sr-only">
                 חיפוש תבניות לפי שם
@@ -288,20 +283,18 @@ export default function TemplatesTable({}: TemplatesTableProps) {
               </div>
               <input
                 id="template-search"
-                aria-label="חיפוש תבניות לפי שם"
                 placeholder="חפש לפי שם..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
                 type="search"
-                className="w-full h-10 border rounded px-2 focus:outline-none focus:ring-2 focus:ring-green-500 focus:bg-orange-100"
+                className={inputClass}
                 style={{ paddingInlineStart: "2rem" }}
               />
             </div>
 
-            {/* כפתור בצד השמאלי ביותר */}
             <div className="flex-shrink-0 ml-auto">
               <button
-                onClick={() => setShowModal(true)}
+                onClick={() => setIsModalOpen(true)}
                 className="h-10 px-4 bg-green-600 text-white rounded hover:bg-green-700 transition whitespace-nowrap"
               >
                 + תבנית חדשה
@@ -309,159 +302,115 @@ export default function TemplatesTable({}: TemplatesTableProps) {
             </div>
           </div>
 
-          {/* שורה שנייה: שם, טלפון, מייל, בנק — רוחב שווה */}
-          <div className="flex flex-wrap gap-3 w-full">
-            {/* שם לקוח */}
-            <div className="flex-1 min-w-0">
-              <label htmlFor="client-name" className="sr-only">
-                שם לקוח
-              </label>
-              <input
-                id="client-name"
-                aria-label="שם לקוח"
-                placeholder="שם לקוח"
-                type="text"
-                value={clientName}
-                onChange={(e) => setClientName(e.target.value)}
-                className="w-full h-10 border rounded px-2 focus:outline-none focus:ring-2 focus:ring-green-500 focus:bg-orange-100"
-              />
-            </div>
-
-            {/* טלפון */}
-            <div className="flex-1 min-w-0">
-              <label htmlFor="client-phone" className="sr-only">
-                טלפון
-              </label>
-              <input
-                id="client-phone"
-                aria-label="טלפון"
-                placeholder="טלפון"
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className="w-full h-10 border rounded px-2 focus:outline-none focus:ring-2 focus:ring-green-500 focus:bg-orange-100"
-              />
-            </div>
-
-            {/* מייל */}
-            <div className="flex-1 min-w-0">
-              <label htmlFor="client-email" className="sr-only">
-                מייל
-              </label>
-              <input
-                id="client-email"
-                aria-label="מייל"
-                placeholder="מייל"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full h-10 border rounded px-2 focus:outline-none focus:ring-2 focus:ring-green-500 focus:bg-orange-100"
-              />
-            </div>
-
-            {/* בחירת בנק */}
-            <div className="flex-1 min-w-0">
-              <label htmlFor="bank-select" className="sr-only">
-                בנק
-              </label>
-              <select
-                id="bank-select"
-                aria-label="בנק"
-                value={selectedBank}
-                onChange={(e) =>
-                  setSelectedBank(e.target.value ? Number(e.target.value) : "")
-                }
-                className="w-full h-10 border rounded px-2 focus:outline-none focus:ring-2 focus:ring-green-500 focus:bg-orange-100"
-              >
-                <option value="">בחר בנק</option>
-                {banks.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+         {/* שם, טלפון, מייל, בנק */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 w-full">
+            <input
+              placeholder="שם לקוח"
+              type="text"
+              value={clientName}
+              onChange={(e) => setClientName(e.target.value)}
+              className={inputClass}
+            />
+            <input
+              placeholder="טלפון"
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              className={inputClass}
+            />
+            <input
+              placeholder="מייל"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className={inputClass}
+            />
+            <select
+              value={selectedBank}
+              onChange={(e) =>
+                setSelectedBank(e.target.value ? Number(e.target.value) : "")
+              }
+              className={inputClass}
+            >
+              <option value="">בחר בנק</option>
+              {banks.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
+            </select>
           </div>
+
         </div>
       </div>
 
-      {loading && (
-        <div
-          className="p-4 bg-yellow-50 rounded mb-4"
-          role="status"
-          aria-live="polite"
-        >
-          טוען תבניות...
-        </div>
-      )}
-      {error && (
-        <div
-          className="p-4 bg-red-50 rounded mb-4 text-red-700"
-          role="alert"
-          aria-live="assertive"
-        >
-          {error}
-        </div>
-      )}
+      {loading && <p className="text-gray-500">טוען...</p>}
 
-      <div className="overflow-x-auto">
-        <table
-          className="w-full table-auto border-collapse"
-          aria-label="טבלת תבניות"
-        >
-          <colgroup>
-            <col />
-            <col />
-            <col style={{ width: "240px" }} />
-          </colgroup>
-          <thead>
-            <tr className="bg-gray-100 text-left">
-              <th className="px-4 py-2 border">שם</th>
-              <th className="px-4 py-2 border">תוכן (עם החלפה)</th>
-              <th className="px-4 py-2 border">פעולות</th>
+      {/* טבלה */}
+      <div className="overflow-x-auto border rounded-lg shadow-sm">
+        <table className="w-full text-sm text-right border-collapse">
+          <thead className="bg-gray-800 text-white">
+            <tr>
+              <th className="p-3 border-b font-bold">שם</th>
+              <th className="p-3 border-b font-bold">תוכן</th>
+              <th className="p-3 border-b font-bold">פעולות</th>
             </tr>
           </thead>
           <tbody>
-            {!loading && filtered.length === 0 && (
-              <tr>
-                <td
-                  colSpan={3}
-                  className="px-4 py-6 text-center text-gray-500"
-                >
-                  {templates.length === 0
-                    ? "אין עדיין תבניות. צור אחת חדשה כדי להתחיל."
-                    : debouncedSearch
-                    ? `לא נמצאו תבניות עבור "${debouncedSearch}".`
-                    : "לא נמצאו תבניות."}
+            {filteredData.map((template, index) => (
+              <tr
+                key={template.id ?? `temp-${index}`}
+                className="hover:bg-gray-50 transition align-top h-[120px]"
+              >
+                <td className="p-3 border-b font-medium max-w-[150px] truncate">
+                  
+                  
+                  {template.name}
+                </td>
+                <td className="p-3 border-b max-w-[400px] text-gray-700 align-top">
+                  <div className="max-h-[100px] overflow-y-auto whitespace-pre-line">
+                    {getTemplateContent(template)}
+                  </div>
+                </td>
+
+                <td className="p-3 border-b flex flex-wrap gap-2">
+                  {actionButtons.map((btn, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => btn.onClick(template)}
+                      className={`w-20 h-20 flex items-center justify-center rounded-md text-white transition ${btn.color}`}
+                    >
+                      {btn.icon}
+                    </button>
+                  ))}
                 </td>
               </tr>
-            )}
-            {filtered.map((t) => (
-              <TemplateRow
-                key={t.id}
-                template={t}
-                onEdit={handleEdit}
-                clientName={clientName}
-                bankName={bankName}
-              />
             ))}
           </tbody>
         </table>
       </div>
 
+      {/* מודלים */}
       <NewTemplate
-        isOpen={showModal}
-        onClose={() => setShowModal(false)}
-        onCreated={(template) => {
-          console.log("תבנית נוצרה:", template);
-          setShowModal(false);
-        }}
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onCreated={handleCreated}
+      />
+      <EditTemplate
+        isOpen={isEditOpen}
+        onClose={() => setIsEditOpen(false)}
+        template={selectedTemplate}
+        onUpdated={handleUpdated}
+      />
 
-     />
+      {/* מודל המחיקה */}
+      <ModalDelete
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={handleConfirmDelete}
+      />
 
 
-
-      
     </div>
   );
 }
