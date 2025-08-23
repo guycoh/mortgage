@@ -16,6 +16,8 @@ async function getLeadSource() {
     return NextResponse.json(data, { status: 200 });
 }
 
+
+
 //CREATE NEW LEAD_SOURCE
 
 export async function POST(req: NextRequest) {
@@ -29,5 +31,4 @@ async function createLeadSource(body: any) {
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
     return NextResponse.json(data, { status: 201 });
 }
-
 
