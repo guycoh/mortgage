@@ -6,7 +6,7 @@ import { banks } from '@/app/data/banks'
 import { statusCall } from '@/app/data/status_call'
 import { useEmployees } from '@/app/data/hooks/useEmployees'
 import { useReasonNotInterested } from '@/app/data/hooks/useReasonNotInterested'
-import NotesPage from '../../components/notes';
+
 
 
 export type Lead = {
@@ -343,7 +343,7 @@ export default function EditLeadPage() {
   {/* חלק שמאל – שאר הקומפוננט שלך */}
   <div className="w-full md:w-2/3">
     {/* כאן תכניס את הקומפוננטה הקיימת שלך, לדוגמה: */}
-     <NotesPage/>
+   
   </div>
 </div>
 
