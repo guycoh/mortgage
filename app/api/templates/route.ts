@@ -2,21 +2,30 @@ import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 
 const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-// GET ALL TEMPLATES
+// GET ALL TEMPLATES ORDERED BY RANK
 export async function GET(req: NextRequest) {    
-    return getTemplates();
-}
-async function getTemplates() {
-    const { data, error } = await supabase.from('templates').select('*');
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-    return NextResponse.json(data, { status: 200 });
+  return getTemplates();
 }
 
-//CREATE NEW ROLE
+async function getTemplates() {
+  const { data, error } = await supabase
+    .from('templates')
+    .select('*')
+    .order('rank', { ascending: true }); // עולה לפי rank
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 400 });
+  }
+
+  return NextResponse.json(data, { status: 200 });
+}
+
+
+//CREATE NEW TEMPLATE
 
 export async function POST(req: NextRequest) {
     const body = await req.json();
@@ -36,30 +45,6 @@ async function createTemplate(body: any) {
 
 
 
-
-
-
-
-
-
-
-
-
-// import { createClient } from "@supabase/supabase-js";
-// import { NextResponse } from "next/server";
-// import { NextApiRequest, NextApiResponse } from "next";
-
-
-// export async function GET(request:Request) {
-   
- 
-//     const supabase=createClient(
-//     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-//     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-// );
-//  const {data} =await supabase.from('leads').select()  
-// return  NextResponse.json(data);
-// }
 
 
 

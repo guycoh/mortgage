@@ -1,9 +1,9 @@
-// hooks/useEmployees.ts
+// hooks/ReasonNotInterested.ts
 import { useEffect, useState } from 'react';
 
 export type Employee = {
   id: string;
-  full_name: string;
+  status: string;
 };
 
 export function useReasonNotInterested() {

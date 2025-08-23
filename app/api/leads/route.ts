@@ -16,7 +16,7 @@ async function getRoles() {
     return NextResponse.json(data, { status: 200 });
 }
 
-//CREATE NEW ROLE
+//CREATE NEW LEAD
 
 export async function POST(req: NextRequest) {
     const body = await req.json();
