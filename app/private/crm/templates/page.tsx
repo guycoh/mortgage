@@ -6,6 +6,8 @@ import NewTemplate from "./add/NewTemplate";
 import EditTemplate from "./add/EditTemplate";
 import ModalDelete from "./add/ModalDelete";
 
+import DocumentsDrawer from "../components/DocumentsDrawer";
+
 
 import SearchIcon from "@/public/assets/images/svg/general/SearchIcon";
 import TrashIcon from "@/public/assets/images/svg/general/TrashIcon";
@@ -36,6 +38,7 @@ export default function TemplatesPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
+  const [isOpen, setIsOpen] = useState(false);
 
   const [clientName, setClientName] = useState("");
   const [phone, setPhone] = useState("");
@@ -269,8 +272,10 @@ const actionButtons = [
         <h1 className="text-3xl font-bold text-center">תבניות לשליחה ללקוח</h1>
 
         <div className="w-full max-w-5xl border border-gray-300 rounded-xl p-5 flex flex-col gap-4">
-          {/* חיפוש + כפתור */}
+          
+          {/* חיפוש + כפתורים */}
           <div className="flex items-center gap-3 w-full relative">
+            {/* שדה חיפוש */}
             <div className="relative flex-grow min-w-[160px] md:min-w-[220px]">
               <label htmlFor="template-search" className="sr-only">
                 חיפוש תבניות לפי שם
@@ -292,7 +297,15 @@ const actionButtons = [
               />
             </div>
 
-            <div className="flex-shrink-0 ml-auto">
+            {/* כפתורים */}
+            <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
+              <button
+                className="h-10 px-4 bg-purple-600 text-white rounded hover:bg-purple-700 transition whitespace-nowrap"
+                onClick={() => setIsOpen(true)}
+              >
+                מסמכים לשליחה
+              </button>
+
               <button
                 onClick={() => setIsModalOpen(true)}
                 className="h-10 px-4 bg-green-600 text-white rounded hover:bg-green-700 transition whitespace-nowrap"
@@ -301,6 +314,7 @@ const actionButtons = [
               </button>
             </div>
           </div>
+
 
          {/* שם, טלפון, מייל, בנק */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 w-full">
@@ -409,7 +423,8 @@ const actionButtons = [
         onClose={() => setIsDeleteModalOpen(false)}
         onConfirm={handleConfirmDelete}
       />
-
+{/* הקומפוננטה של המודל */}
+      <DocumentsDrawer isOpen={isOpen} onClose={() => setIsOpen(false)} />
 
     </div>
   );
