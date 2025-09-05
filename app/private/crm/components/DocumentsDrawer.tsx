@@ -11,6 +11,7 @@ const documents: Doc[] = [
   { id: 1, name: "טופס בקשת משכנתא", file: "/docs/mortgage-request.pdf" },
   { id: 2, name: "אישור זכאות", file: "/docs/eligibility.pdf" },
   { id: 3, name: "טופס ויתור סודיות", file: "/docs/confidentiality.pdf" },
+  { id: 4, name: "עצמאים ", file: "/assets/pdf/עצמאי עוסק מורשה או פטור.pdf" },
 ];
 
 export default function DocumentsDrawer({

@@ -115,11 +115,6 @@ const getTemplateContent = useCallback(
 
 
 
-
-
-
-
-
   // debounce חיפוש
   useEffect(() => {
     const handler = setTimeout(() => setDebouncedTerm(searchTerm), 300);

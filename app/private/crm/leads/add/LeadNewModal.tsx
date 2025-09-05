@@ -117,11 +117,11 @@ export default function LeadNewModal({ isOpen, onClose, title }: LeadNewModalPro
         }`}
       >
         {/* Header */}
-        <div className="flex justify-between items-center p-4 bg-green-400">
-          <h2 className="text-lg font-bold">{title}</h2>
+        <div className="flex justify-between items-center p-4 bg-green-600">
+          <h2 className="text-lg text- font-bold">{title}</h2>
           <button
             onClick={onClose}
-            className="text-xl font-bold text-gray-700 hover:text-red-500"
+            className="text-xl font-bold text-white hover:text-red-500"
           >
             ✕
           </button>
@@ -255,7 +255,48 @@ export default function LeadNewModal({ isOpen, onClose, title }: LeadNewModalPro
             </div>
 
           </div>
+          {/* צ'קבוקסים */}
+          <div className="col-span-2 md:col-span-3 border border-gray-300 rounded-md p-4 flex flex-wrap gap-4">
+            {/* רשימה שחורה */}
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-black">
+              <input
+                ref={refs.black_list}
+                type="checkbox"
+                className="w-4 h-4 accent-orange-400"
+              />
+              <label className="text-white font-semibold">רשימה שחורה</label>
+            </div>
 
+            {/* מתווך */}
+            <div className="flex items-center gap-2">
+              <input
+                ref={refs.realtor}
+                type="checkbox"
+                className="w-4 h-4 accent-orange-400"
+              />
+              <label className="text-gray-700 font-medium">מתווך</label>
+            </div>
+
+            {/* רשימת דיוור */}
+            <div className="flex items-center gap-2">
+              <input
+                ref={refs.mailing_list}
+                type="checkbox"
+                className="w-4 h-4 accent-orange-400"
+              />
+              <label className="text-gray-700 font-medium">רשימת דיוור</label>
+            </div>
+
+            {/* משקיעים */}
+            <div className="flex items-center gap-2">
+              <input
+                ref={refs.investors_list}
+                type="checkbox"
+                className="w-4 h-4 accent-orange-400"
+              />
+              <label className="text-gray-700 font-medium">משקיעים</label>
+            </div>
+          </div>
         
 
             {/* כתובת */}
@@ -357,27 +398,7 @@ export default function LeadNewModal({ isOpen, onClose, title }: LeadNewModalPro
               </select>
             </div>
 
-            {/* צ'קבוקסים */}
-            <div className="flex items-center gap-2">
-              <input ref={refs.black_list} type="checkbox" className="w-4 h-4 accent-orange-400" />
-              <label className="text-gray-700 font-medium">רשימה שחורה</label>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <input ref={refs.realtor} type="checkbox" className="w-4 h-4 accent-orange-400" />
-              <label className="text-gray-700 font-medium">מתווך</label>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <input ref={refs.mailing_list} type="checkbox" className="w-4 h-4 accent-orange-400" />
-              <label className="text-gray-700 font-medium">רשימת דיוור</label>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <input ref={refs.investors_list} type="checkbox" className="w-4 h-4 accent-orange-400" />
-              <label className="text-gray-700 font-medium">משקיעים</label>
-            </div>
-
+           
           </form>
         </div>
         {/* Footer */}
