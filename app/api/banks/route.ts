@@ -16,3 +16,5 @@ async function getBanks() {
     return NextResponse.json(data, { status: 200 });
 }
 
+
+
