@@ -6,25 +6,74 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-export async function GET(req: Request, { params }: { params: { leadId: string } }) {
-  const leadId = Number(params.leadId);
+export async function GET(req: Request) {
+  try {
+    // הוצאת leadId מה-path
+    const url = new URL(req.url);
+    const leadId = Number(url.pathname.split("/").pop());
 
-  if (!leadId) {
-    return NextResponse.json({ error: "Missing leadId" }, { status: 400 });
+    if (!leadId) {
+      return NextResponse.json({ error: "Missing leadId" }, { status: 400 });
+    }
+
+    const { data, error } = await supabase
+      .from("loan_mixes")
+      .select("*")
+      .eq("lead_id", leadId)
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json(data);
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
-
-  const { data, error } = await supabase
-    .from("loan_mixes")
-    .select("*")
-    .eq("lead_id", leadId)
-    .order("created_at", { ascending: true });
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-
-  return NextResponse.json(data);
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// import { NextResponse } from "next/server";
+// import { createClient } from "@supabase/supabase-js";
+
+// const supabase = createClient(
+//   process.env.NEXT_PUBLIC_SUPABASE_URL!,
+//   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+// );
+
+// export async function GET(req: Request, { params }: { params: { leadId: string } }) {
+//   const leadId = Number(params.leadId);
+
+//   if (!leadId) {
+//     return NextResponse.json({ error: "Missing leadId" }, { status: 400 });
+//   }
+
+//   const { data, error } = await supabase
+//     .from("loan_mixes")
+//     .select("*")
+//     .eq("lead_id", leadId)
+//     .order("created_at", { ascending: true });
+
+//   if (error) {
+//     return NextResponse.json({ error: error.message }, { status: 500 });
+//   }
+
+//   return NextResponse.json(data);
+// }
 
 
 // import { NextRequest, NextResponse } from "next/server";
