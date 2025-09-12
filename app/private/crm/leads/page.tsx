@@ -19,17 +19,6 @@ export default function Page() {
 
 
   
-// שמירה של עריכה
-//   const handleSaveEdit = async (updatedLead: Lead) => {
-//     const res = await updateLead(updatedLead.id, updatedLead);
-//     setLeads((prev) =>
-//       prev.map((lead) =>
-//       lead.id === updatedLead.id ? updatedLead : lead
-//   )
-// );
-
-//     setEditLead(null);
-//   };
 
 const handleSaveEdit = async (updatedLead: Lead) => {
   const res = await updateLead(updatedLead.id, updatedLead); // מחזיר lead מה־DB עם id אמיתי
@@ -40,13 +29,6 @@ const handleSaveEdit = async (updatedLead: Lead) => {
       lead.id === res.id ? res : lead
     )
   );
-
-
-
-
-
-
-
 
 
   console.log("עודכן lead עם id:", res.id);

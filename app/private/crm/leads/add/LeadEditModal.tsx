@@ -2,7 +2,7 @@
 //import { useEffect, useState } from "react";
 import type { Lead } from "@/app/data/hooks/useLeads";
 import { useLeadSource } from "@/app/data/hooks/useLeadSource"; 
-
+import Link from "next/link";
 
 
 type Props = {
@@ -256,6 +256,20 @@ export default function LeadEditModal({
           >
             שמור
           </button>
+
+         <Link
+      href={`/private/crm/leads/simulators/${editLead.id}`}
+      className="inline-block px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 transition"
+    >
+      מעבר לסימולטור
+    </Link>
+
+
+
+
+
+
+
         
         
         </div>

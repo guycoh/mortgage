@@ -70,71 +70,73 @@ export default function LeadSourcesPage() {
               <th className="p-2 text-center">פעולות</th>
             </tr>
           </thead>
-          <tbody>
-            {sources.filter(Boolean).map((s: Source) => (
-              <tr key={s.id} className="border-t">
-                <td className="p-2">{s.id}</td>
-                <td className="p-2">
-                  {editingId === s.id ? (
-                    <input
-                      type="text"
-                      value={editingValue}
-                      onChange={(e) => setEditingValue(e.target.value)}
-                      className="border rounded px-2 py-1 w-full"
-                    />
-                  ) : (
-                    s.source
-                  )}
-                </td>
-                <td className="p-2 text-sm text-gray-500">
-                  {s.created_at
-                    ? new Date(s.created_at).toLocaleDateString("he-IL")
-                    : "-"}
-                </td>
-                <td className="p-2 flex justify-center gap-2">
-                  {editingId === s.id ? (
-                    <>
-                      <button
-                        onClick={() => handleSave(s.id!)}
-                        className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
-                      >
-                        שמור
-                      </button>
-                      <button
-                        onClick={() => {
-                          setEditingId(null);
-                          setEditingValue("");
-                        }}
-                        className="bg-gray-400 text-white px-3 py-1 rounded hover:bg-gray-500"
-                      >
-                        ביטול
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button
-                        onClick={() => {
-                          setEditingId(s.id!);
-                          setEditingValue(s.source);
-                        }}
-                        className="bg-yellow-500 text-white px-3 py-1 rounded hover:bg-yellow-600"
-                      >
-                        ערוך
-                      </button>
-                      <button
-                        onClick={() => deleteSource(s.id!)}
-                        className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700"
-                      >
-                        מחק
-                      </button>
-                    </>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
+        <tbody>
+        {sources.filter(Boolean).map((s: Source, i) => (
+          <tr key={s.id ?? `source-${i}`} className="border-t">
+            <td className="p-2">{s.id}</td>
+            <td className="p-2">
+              {editingId === s.id ? (
+                <input
+                  type="text"
+                  value={editingValue}
+                  onChange={(e) => setEditingValue(e.target.value)}
+                  className="border rounded px-2 py-1 w-full"
+                />
+              ) : (
+                s.source
+              )}
+            </td>
+            <td className="p-2 text-sm text-gray-500">
+              {s.created_at
+                ? new Date(s.created_at).toLocaleDateString("he-IL")
+                : "-"}
+            </td>
+            <td className="p-2 flex justify-center gap-2">
+                        {editingId === s.id ? (
+                          <>
+                            <button
+                              onClick={() => handleSave(s.id!)}
+                              className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
+                            >
+                              שמור
+                            </button>
+                            <button
+                              onClick={() => {
+                                setEditingId(null);
+                                setEditingValue("");
+                              }}
+                              className="bg-gray-400 text-white px-3 py-1 rounded hover:bg-gray-500"
+                            >
+                              ביטול
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              onClick={() => {
+                                setEditingId(s.id!);
+                                setEditingValue(s.source);
+                              }}
+                              className="bg-yellow-500 text-white px-3 py-1 rounded hover:bg-yellow-600"
+                            >
+                              ערוך
+                            </button>
+                            <button
+                              onClick={() => deleteSource(s.id!)}
+                              className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700"
+                            >
+                              מחק
+                            </button>
+                          </>
+                        )}
+                      </td>
+          </tr>
+        ))}
+      </tbody>
+
         </table>
       </div>
     </div>
   );
 }
+
