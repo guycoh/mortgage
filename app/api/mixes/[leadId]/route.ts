@@ -6,13 +6,17 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-export async function GET(
-  req: NextRequest,
-  context: { params: { leadId: string } } // <-- כאן השינוי
-) {
-  const leadId = Number(context.params.leadId); // <-- לא destructure ישיר
-
+export async function GET(req: NextRequest) {
   try {
+    // מוציאים את ה-leadId מה-path
+    const url = req.nextUrl;
+    const segments = url.pathname.split("/"); // ["", "api", "mixes", "3"]
+    const leadId = Number(segments[segments.length - 1]);
+
+    if (isNaN(leadId)) {
+      return NextResponse.json({ error: "Invalid leadId" }, { status: 400 });
+    }
+
     // 1. מביא את התמהילים של הליד
     const { data: mixes, error: mixError } = await supabase
       .from("loan_mixes")
