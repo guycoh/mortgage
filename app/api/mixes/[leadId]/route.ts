@@ -6,8 +6,11 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-export async function GET(req: NextRequest, { params }: { params: { leadId: string } }) {
-  const leadId = Number(params.leadId);
+export async function GET(
+  req: NextRequest,
+  context: { params: { leadId: string } } // <-- כאן השינוי
+) {
+  const leadId = Number(context.params.leadId); // <-- לא destructure ישיר
 
   try {
     // 1. מביא את התמהילים של הליד
