@@ -41,6 +41,7 @@ export default function Sidebar_admin() {
               <li className="hover:bg-gray-700 p-2 rounded"> <Link href="/private/admin/status_call" > 📞 טבלת סטטוס שיחה</Link></li>       
               <li className="hover:bg-gray-700 p-2 rounded"> <Link href="/private/admin/reason_not_intrested" > 😒 סיבת לא נסגר</Link></li>
               <li className="hover:bg-gray-700 p-2 rounded"> <Link href="/private/admin/lead-sources" >🧾מקורות לידים</Link></li>        
+              <li className="hover:bg-gray-700 p-2 rounded"> <Link href="/private/admin/loan_paths" >📊 מסלולי הלוואה </Link></li>
             </ul>
           )}
          

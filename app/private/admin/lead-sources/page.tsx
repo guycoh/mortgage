@@ -16,12 +16,12 @@ export default function LeadSourcesPage() {
   }, [sources]);
 
   const handleAdd = async () => {
-  if (!newSource.trim()) return;
-  const added = await addSource(newSource.trim());
-  if (added) {
-    setNewSource(""); // ✅ איפוס השדה אחרי הוספה
-  }
-};
+    if (!newSource.trim()) return;
+    const added = await addSource(newSource.trim());
+    if (added) {
+      setNewSource(""); // איפוס השדה אחרי הוספה
+    }
+  };
 
   const handleSave = async (id: number) => {
     if (!editingValue.trim()) return;
@@ -48,7 +48,7 @@ export default function LeadSourcesPage() {
           placeholder="שם מקור חדש..."
           value={newSource}
           onChange={(e) => setNewSource(e.target.value)}
-          className="flex-1 border rounded-lg px-3 py-2 focus:outline-none focus:ring focus:ring-orange-400"
+          className="flex-1 border rounded-lg px-3 py-2 focus:outline-none focus:ring focus:ring-orange-200 focus:bg-orange-50 transition-colors"
         />
         <button
           onClick={handleAdd}
@@ -62,7 +62,7 @@ export default function LeadSourcesPage() {
       {/* טבלה */}
       <div className="overflow-x-auto">
         <table className="w-full border border-gray-300 bg-white rounded-lg overflow-hidden shadow">
-          <thead className="bg-gray-100">
+          <thead className="text-white bg-gray-800">
             <tr>
               <th className="p-2 text-right min-w-[60px]">#</th>
               <th className="p-2 text-right">שם המקור</th>
@@ -70,73 +70,71 @@ export default function LeadSourcesPage() {
               <th className="p-2 text-center">פעולות</th>
             </tr>
           </thead>
-        <tbody>
-        {sources.filter(Boolean).map((s: Source, i) => (
-          <tr key={s.id ?? `source-${i}`} className="border-t">
-            <td className="p-2">{s.id}</td>
-            <td className="p-2">
-              {editingId === s.id ? (
-                <input
-                  type="text"
-                  value={editingValue}
-                  onChange={(e) => setEditingValue(e.target.value)}
-                  className="border rounded px-2 py-1 w-full"
-                />
-              ) : (
-                s.source
-              )}
-            </td>
-            <td className="p-2 text-sm text-gray-500">
-              {s.created_at
-                ? new Date(s.created_at).toLocaleDateString("he-IL")
-                : "-"}
-            </td>
-            <td className="p-2 flex justify-center gap-2">
-                        {editingId === s.id ? (
-                          <>
-                            <button
-                              onClick={() => handleSave(s.id!)}
-                              className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
-                            >
-                              שמור
-                            </button>
-                            <button
-                              onClick={() => {
-                                setEditingId(null);
-                                setEditingValue("");
-                              }}
-                              className="bg-gray-400 text-white px-3 py-1 rounded hover:bg-gray-500"
-                            >
-                              ביטול
-                            </button>
-                          </>
-                        ) : (
-                          <>
-                            <button
-                              onClick={() => {
-                                setEditingId(s.id!);
-                                setEditingValue(s.source);
-                              }}
-                              className="bg-yellow-500 text-white px-3 py-1 rounded hover:bg-yellow-600"
-                            >
-                              ערוך
-                            </button>
-                            <button
-                              onClick={() => deleteSource(s.id!)}
-                              className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700"
-                            >
-                              מחק
-                            </button>
-                          </>
-                        )}
-                      </td>
-          </tr>
-        ))}
-      </tbody>
-
+          <tbody>
+            {sources.filter(Boolean).map((s: Source, i) => (
+              <tr key={s.id ?? `source-${i}`} className="border-t">
+                <td className="p-2">{s.id}</td>
+                <td className="p-2">
+                  {editingId === s.id ? (
+                    <input
+                      type="text"
+                      value={editingValue}
+                      onChange={(e) => setEditingValue(e.target.value)}
+                      className="border rounded px-2 py-1 w-full"
+                    />
+                  ) : (
+                    s.source
+                  )}
+                </td>
+                <td className="p-2 text-sm text-gray-500">
+                  {s.created_at
+                    ? new Date(s.created_at).toLocaleDateString("he-IL")
+                    : "-"}
+                </td>
+                <td className="p-2 flex justify-center gap-2">
+                  {editingId === s.id ? (
+                    <>
+                      <button
+                        onClick={() => handleSave(s.id!)}
+                        className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 transition"
+                      >
+                        שמור
+                      </button>
+                      <button
+                        onClick={() => {
+                          setEditingId(null);
+                          setEditingValue("");
+                        }}
+                        className="bg-gray-400 text-white px-3 py-1 rounded hover:bg-gray-500 transition"
+                      >
+                        ביטול
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => {
+                          setEditingId(s.id!);
+                          setEditingValue(s.source);
+                        }}
+                        className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 transition"
+                      >
+                        ערוך
+                      </button>
+                      <button
+                        onClick={() => deleteSource(s.id!)}
+                        className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700 transition"
+                      >
+                        מחק
+                      </button>
+                    </>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
         </table>
       </div>
     </div>
   );
 }
-

@@ -1,71 +1,149 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-// יצירת client עם ה־anon key
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
+
+
+type Loan = {
+  id: string;
+  mix_id: string;
+  path_id: number;
+  amount: number;
+  rate: number;
+  months: number;
+  loan_end_date?: string | null;
+  anchor?: string | null;
+  anchor_margin?: number | null;
+  change_frequency?: string | null;
+  number?: number;
+  created_at?: string;
+  anchor_interval?: string | null;
+  end_date?: string | null;
+};
+
+
+
 type Mix = {
   id: string;
-  lead_id: number;
   mix_name: string;
-  loans?: any[]; // בהמשך נממש
+  loans?: Loan[];
 };
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { lead_id, mixes } = body as { lead_id: number; mixes: Mix[] };
+    const { client_id, mixes } = body as { client_id: number; mixes: Mix[] };
 
-    if (!lead_id || !Array.isArray(mixes)) {
-      return NextResponse.json(
-        { error: "Invalid payload" },
-        { status: 400 }
-      );
+    if (!client_id || !Array.isArray(mixes)) {
+      return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
     }
 
-    // 1. נביא את התמהילים הקיימים ל־lead_id
-    const { data: existingMixes, error: fetchError } = await supabase
+    // === שלב 1: שליפת תמהילים קיימים ===
+    const { data: existingMixes, error: fetchMixesError } = await supabase
       .from("loan_mixes")
       .select("id")
-      .eq("lead_id", lead_id);
+      .eq("lead_id", client_id);
 
-    if (fetchError) throw fetchError;
+    if (fetchMixesError) throw fetchMixesError;
 
-    const existingIds = (existingMixes || []).map((m) => m.id);
-    const incomingIds = mixes.map((m) => m.id);
+    const existingMixIds = (existingMixes || []).map(m => m.id);
+    const incomingMixIds = mixes.map(m => m.id);
 
-    // 2. עדכון / הוספה
+    // === שלב 2: עדכון / הוספת תמהילים ===
     for (const mix of mixes) {
-      if (existingIds.includes(mix.id)) {
-        // עדכון
+      if (existingMixIds.includes(mix.id)) {
+        // update
         const { error } = await supabase
           .from("loan_mixes")
           .update({ mix_name: mix.mix_name })
           .eq("id", mix.id);
-
         if (error) throw error;
       } else {
-        // הוספה
+        // insert
         const { error } = await supabase
           .from("loan_mixes")
-          .insert([{ id: mix.id, lead_id, mix_name: mix.mix_name }]);
-
+          .insert([{ id: mix.id, lead_id: client_id, mix_name: mix.mix_name }]);
         if (error) throw error;
       }
     }
 
-    // 3. מחיקה של תמהילים שנמחקו מה־UI
-    const mixesToDelete = existingIds.filter((id) => !incomingIds.includes(id));
+    // === שלב 3: מחיקת תמהילים שהוסרו ===
+    const mixesToDelete = existingMixIds.filter(id => !incomingMixIds.includes(id));
     if (mixesToDelete.length > 0) {
       const { error } = await supabase
         .from("loan_mixes")
         .delete()
         .in("id", mixesToDelete);
-
       if (error) throw error;
+    }
+
+    // === שלב 4: טיפול בהלוואות לכל תמהיל ===
+    for (const mix of mixes) {
+      if (!mix.loans) continue;
+
+      const { data: existingLoans, error: fetchLoansError } = await supabase
+        .from("loans")
+        .select("id")
+        .eq("mix_id", mix.id);
+
+      if (fetchLoansError) throw fetchLoansError;
+
+      const existingLoanIds = (existingLoans || []).map(l => l.id);
+      const incomingLoanIds = mix.loans.map(l => l.id);
+
+      // עדכון / הוספה
+      for (const loan of mix.loans) {
+        if (existingLoanIds.includes(loan.id)) {
+          const { error } = await supabase
+            .from("loans")
+            .update({
+              path_id: loan.path_id,
+              amount: loan.amount ?? null,
+              rate: loan.rate ?? null,               // חדש
+              months: loan.months ?? null,         // חדש
+              end_date: loan.end_date ?? null,
+              anchor: loan.anchor ?? null,
+              anchor_interval: loan.anchor_interval ?? null,
+              change_frequency: loan.change_frequency ?? null,
+            })
+            .eq("id", loan.id);
+          if (error) throw error;
+        } else {
+          const { error } = await supabase
+            .from("loans")
+            .insert([
+              {
+                id: loan.id,
+                mix_id: mix.id,
+                path_id: loan.path_id,
+                amount: loan.amount ?? null,
+                rate: loan.rate ?? null,             // חדש
+                months: loan.months ?? null,         // חדש
+
+
+                end_date: loan.end_date ?? null,
+                anchor: loan.anchor ?? null,
+                anchor_interval: loan.anchor_interval ?? null,
+                change_frequency: loan.change_frequency ?? null,
+              },
+            ]);
+          if (error) throw error;
+        }
+      }
+
+      // מחיקה של הלוואות שהוסרו
+      const loansToDelete = existingLoanIds.filter(id => !incomingLoanIds.includes(id));
+      if (loansToDelete.length > 0) {
+        const { error } = await supabase
+          .from("loans")
+          .delete()
+          .in("id", loansToDelete);
+        if (error) throw error;
+      }
     }
 
     return NextResponse.json({ success: true });
