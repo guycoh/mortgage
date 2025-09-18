@@ -25,6 +25,9 @@ export default function SimulatorPage() {
 
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // 🔹 state חדש לאינפלציה
+  const [annualInflation, setAnnualInflation] = useState<number>(2.8);
+
   useEffect(() => {
     async function fetchData() {
       const res = await fetch(`/api/mixes/${leadId}`);
@@ -73,7 +76,23 @@ export default function SimulatorPage() {
 
   return (
     <div className="p-6" ref={containerRef}>
-      <h1 className="text-2xl font-bold mb-4">סימולטור לליד {leadId}</h1>
+      {/* כותרת + שדה אינפלציה */}
+      <div className="flex items-center gap-4 mb-4">
+        <h1 className="text-2xl font-bold">סימולטור לליד {leadId}</h1>
+        <div className="flex items-center gap-2">
+          <label className="text-sm font-medium text-gray-700">אינפלציה שנתית צפויה:</label>
+          <input
+            type="number"
+            step="0.1"
+            value={annualInflation}
+            onChange={(e) => setAnnualInflation(parseFloat(e.target.value) || 0)}
+            className="w-20 px-2 py-1 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+          />
+          <span className="text-sm text-gray-600">
+            חודשי: {(annualInflation / 12).toFixed(3)}%
+          </span>
+        </div>
+      </div>
 
       {/* כפתורים עליונים */}
       <div className="flex gap-2 mb-4">
@@ -185,7 +204,7 @@ export default function SimulatorPage() {
               />
             )}
           </div>
-          <div className="p-2 border-t bg-gray-100 text-sm text-gray-600 text-right">
+          <div className="p-2 border-t bg-gray-100 text-sm text-gray-600 text-right hidden">
             ID של התמהיל: {activeMix.id}
           </div>
         </div>
@@ -193,12 +212,6 @@ export default function SimulatorPage() {
     </div>
   );
 }
-
-
-
-
-
-
 
 
 
