@@ -110,6 +110,8 @@ const [activeLoan, setActiveLoan] = React.useState<Loan | null>(null);
       "0"
     )}-${String(date.getDate()).padStart(2, "0")}`;
 
+
+
   return (
     <div className="overflow-x-auto">
       <button
@@ -145,6 +147,41 @@ const [activeLoan, setActiveLoan] = React.useState<Loan | null>(null);
             // 👇 כאן מותר לך לגשת ל-loan
               const path = paths.find((p) => p.id === loan.path_id);
               const isIndexed = path?.is_indexed ?? false;
+             
+            //  פונקציה לחישוב סכומים כוללים לפי לוח סילוקין
+     
+              const calculateTotalsForLoan = (
+                loan: Loan,
+                monthlyInflation: number,
+                isIndexed: boolean
+              ) => {
+                const monthlyPayment = calculateMonthly(loan); // סכום חודשי לפי ריבית והלוואה
+                let openingBalance = loan.amount; // י.פ
+                let totalPrincipal = 0;
+                let totalInterest = 0;
+                let totalPayment = 0;
+
+                for (let i = 1; i <= loan.months; i++) {
+                  const inflationFactor = isIndexed ? Math.pow(1 + monthlyInflation, i) : 1;
+                  const actualPayment = monthlyPayment * inflationFactor;
+                  const interestPayment = openingBalance * (loan.rate / 12 / 100) * (isIndexed ? 1 + monthlyInflation : 1);
+                  const principalPayment = actualPayment - interestPayment;
+
+                  totalPrincipal += principalPayment;
+                  totalInterest += interestPayment;
+                  totalPayment += actualPayment;
+
+                  // עדכון יתרת סגירה לחודש הבא
+                  openingBalance = (openingBalance * (isIndexed ? 1 + monthlyInflation : 1)) - principalPayment;
+                }
+
+                return {
+                  totalPrincipal,
+                  totalInterest,
+                  totalPayment,
+                };
+              };
+
 
 
             return (
@@ -312,7 +349,7 @@ const [activeLoan, setActiveLoan] = React.useState<Loan | null>(null);
                       מחיקה
                     </button>
                   </td>
-                </tr>                
+                </tr>  
                 <tr className="hidden"  >
                   <td colSpan={10} className="border p-2">
                     <div className="flex flex-col gap-1 text-xs">
@@ -342,6 +379,29 @@ const [activeLoan, setActiveLoan] = React.useState<Loan | null>(null);
 
 
                 </tr>
+
+                {/* סיכום הלוואה */}
+                <tr>
+                  <td colSpan={10} className="border p-2 bg-yellow-50 text-xs">
+                    {(() => {
+                      const totals = calculateTotalsForLoan(loan, monthlyInflation, isIndexed);
+                      return (
+                        <div className="flex gap-6">
+                          <span>סה"כ קרן: {totals.totalPrincipal.toLocaleString("he-IL")}</span>
+                          <span>סה"כ ריבית: {totals.totalInterest.toLocaleString("he-IL", {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}</span>
+                          <span>סה"כ החזר: {totals.totalPayment.toLocaleString("he-IL", {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}</span>
+                        </div>
+                      );
+                    })()}
+                  </td>
+                </tr>
+
 
               </React.Fragment>
             );
@@ -373,8 +433,11 @@ const [activeLoan, setActiveLoan] = React.useState<Loan | null>(null);
                 })}
             </td>
             <td className="border p-2"></td>
-          </tr>
+          </tr>       
         </tfoot>
+
+
+
       </table>
 
 
