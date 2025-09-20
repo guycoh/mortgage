@@ -1,4 +1,4 @@
-"use client";
+"use client"
 
 import { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
@@ -192,16 +192,19 @@ export default function SimulatorPage() {
           <div className="p-4 flex-1 bg-gray-50">
             {!loading && (
               <LoanTable
-                loans={activeMix.loans || []}
-                paths={loanPaths}
-                onChange={(newLoans) =>
-                  setMixes((prev) =>
-                    prev.map((m) =>
-                      m.id === activeMix.id ? { ...m, loans: newLoans } : m
-                    )
-                  )
-                }
-              />
+  loans={activeMix.loans || []}
+  paths={loanPaths}
+  annualInflation={annualInflation}
+  setAnnualInflation={setAnnualInflation}
+  onChange={(newLoans) =>
+    setMixes((prev) =>
+      prev.map((m) =>
+        m.id === activeMix.id ? { ...m, loans: newLoans } : m
+      )
+    )
+  }
+/>
+
             )}
           </div>
           <div className="p-2 border-t bg-gray-100 text-sm text-gray-600 text-right hidden">
