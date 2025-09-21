@@ -1,4 +1,4 @@
-"use client";
+"use client"
 
 import React from "react";
 import { LoanPath } from "@/app/data/hooks/useLoanPaths";
@@ -6,6 +6,8 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import LoanAmortization from "./LoanAmortization";
 import { useState } from "react";
+import LoanTotals from "./LoanTotals";
+
 
 export type Loan = {
   id: string;
@@ -109,7 +111,6 @@ const [activeLoan, setActiveLoan] = React.useState<Loan | null>(null);
       2,
       "0"
     )}-${String(date.getDate()).padStart(2, "0")}`;
-
 
 
   return (
@@ -381,7 +382,7 @@ const [activeLoan, setActiveLoan] = React.useState<Loan | null>(null);
                 </tr>
 
                 {/* סיכום הלוואה */}
-                <tr>
+                <tr className="hidden">
                   <td colSpan={10} className="border p-2 bg-yellow-50 text-xs">
                     {(() => {
                       const totals = calculateTotalsForLoan(loan, monthlyInflation, isIndexed);
@@ -434,6 +435,11 @@ const [activeLoan, setActiveLoan] = React.useState<Loan | null>(null);
             </td>
             <td className="border p-2"></td>
           </tr>       
+      {/* סיכום הלוואה */}
+
+
+      
+      
         </tfoot>
 
 
@@ -441,21 +447,43 @@ const [activeLoan, setActiveLoan] = React.useState<Loan | null>(null);
       </table>
 
 
-{/* 👇 מחוץ ל־map אבל בתוך LoanTable */}
-<LoanAmortization
-  isOpen={isAmortizationOpen}
-  onClose={() => setIsAmortizationOpen(false)}
-  loan={activeLoan}
-  path={paths.find((p) => p.id === activeLoan?.path_id)}
-  annualInflation={annualInflation}            
-  isIndexed={paths.find((p) => p.id === activeLoan?.path_id)?.is_indexed ?? false}
-  monthlyPayment={activeLoan ? calculateMonthly(activeLoan) : 0} // ✨ שולח את החישוב
-/>
+    <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {/* תיבה 1 */}
+        <div className="bg-blue-100  rounded shadow">
+        <LoanTotals
+              loans={loans}
+              paths={paths}
+              annualInflation={annualInflation}
+              calculateMonthly={calculateMonthly}
+        />
+        </div>
+
+        {/* תיבה 2 */}
+        <div className="bg-green-100 p-4 rounded shadow">
+          תוכן 2
+        </div>
+
+        {/* תיבה 3 */}
+        <div className="bg-yellow-100 p-4 rounded shadow">
+          תוכן 3
+        </div>
+    </div>
+
+
+    {/* 👇 מחוץ ל־map אבל בתוך LoanTable */}
+    <LoanAmortization
+      isOpen={isAmortizationOpen}
+      onClose={() => setIsAmortizationOpen(false)}
+      loan={activeLoan}
+      path={paths.find((p) => p.id === activeLoan?.path_id)}
+      annualInflation={annualInflation}            
+      isIndexed={paths.find((p) => p.id === activeLoan?.path_id)?.is_indexed ?? false}
+      monthlyPayment={activeLoan ? calculateMonthly(activeLoan) : 0} // ✨ שולח את החישוב
+    />
 
     </div>
   );
 }
-
 
 
 
