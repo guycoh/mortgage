@@ -67,12 +67,17 @@ export default function SimulatorPage() {
     alert(data.success ? "✅ נשמר בהצלחה!" : `❌ שגיאה: ${data.error}`);
   };
 
-  // מחשב את המיקום של התפריט ביחס לדף
-  const openMenu = (id: string, e: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    setMenuPosition({ top: rect.top - 8, left: rect.left });
-    setOpenMenuId(openMenuId === id ? null : id);
-  };
+ 
+// מחשב את המיקום של התפריט ביחס לטאב (תמיד משמאל)
+const openMenu = (id: string, e: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
+  const rect = e.currentTarget.getBoundingClientRect();
+  setMenuPosition({ 
+    top: rect.top,            // יישר לגובה של הכרטיסייה
+    left: rect.left - 140     // 140px שמאלה (אפשר לשנות לפי הרוחב של התפריט שלך)
+  });
+  setOpenMenuId(openMenuId === id ? null : id);
+};
+
 
   return (
     <div className="p-6" ref={containerRef}>
@@ -91,25 +96,17 @@ export default function SimulatorPage() {
           <span className="text-sm text-gray-600">
             חודשי: {(annualInflation / 12).toFixed(3)}%
           </span>
+          <button
+              onClick={handleSave}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg shadow hover:bg-green-700 transition"
+          >
+            שמור שינויים      
+          </button>
+          
         </div>
       </div>
 
-      {/* כפתורים עליונים */}
-      <div className="flex gap-2 mb-4">
-        <button
-          onClick={addMix}
-          className="px-4 py-2 bg-purple-600 text-white rounded-lg shadow hover:bg-purple-700 transition"
-        >
-          + הוסף תמהיל
-        </button>
-        <button
-          onClick={handleSave}
-          className="px-4 py-2 bg-green-600 text-white rounded-lg shadow hover:bg-green-700 transition"
-        >
-          שמור שינויים
-        </button>
-      </div>
-
+     
       {/* Tabs */}
       <div className="flex gap-2 mb-4 overflow-x-auto">
         {mixes.map((m) => (
@@ -155,17 +152,35 @@ export default function SimulatorPage() {
             </div>
           </div>
         ))}
+
+        {/* כפתור + בסוף ה־Tabs */}
+        <button
+          onClick={addMix}
+          className="px-3 py-0.5 rounded-t-lg shadow-sm bg-green-600 text-white hover:bg-green-700 transition"
+        >
+          +
+        </button>
       </div>
 
-      {/* Dropdown Menu שמוצג מעל הכרטיסיה */}
+      {/* Dropdown Menu שמוצג משמאל לכרטיסיה */}
       {openMenuId && (
         <div
-          className="fixed w-28 bg-white border rounded shadow-lg z-[9999]"
+          className="fixed w-32 bg-white border rounded shadow-lg z-[9999]"
           style={{
-            top: menuPosition.top - 48, // מעל הכרטיסיה
+            top: menuPosition.top,
             left: menuPosition.left,
           }}
         >
+          {/* שורת סגירה עם כפתור X בלבד */}
+          <div className="flex justify-end items-center px-2 py-1 border-b">
+            <button
+              onClick={() => setOpenMenuId(null)}
+              className="text-gray-500 hover:text-red-600"
+            >
+              ✖
+            </button>
+          </div>
+
           <button
             onClick={() => {
               setEditingId(openMenuId);

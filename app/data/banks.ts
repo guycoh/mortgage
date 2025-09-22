@@ -10,6 +10,5 @@ export const banks = [
   { id: 46, name: 'בנק מסד' },
   { id: 52, name: 'בנק פועלים' },
   { id: 54, name: 'בנק ירושלים' },
- 
   
 ];

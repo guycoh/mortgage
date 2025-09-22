@@ -7,6 +7,7 @@ import "react-datepicker/dist/react-datepicker.css";
 import LoanAmortization from "./LoanAmortization";
 import { useState } from "react";
 import LoanTotals from "./LoanTotals";
+import { schedules } from "@/app/data/amortization_schedules";
 
 
 export type Loan = {
@@ -24,6 +25,7 @@ export type Loan = {
   created_at?: string;
   anchor_interval?: string | null;
   end_date?: string | null;
+  amortization_schedule_id ?: number;
   repayment_type?: "שפיצר" | "קרן שווה"; // ✨ חדש
 };
 
@@ -205,25 +207,24 @@ const [activeLoan, setActiveLoan] = React.useState<Loan | null>(null);
                     />
                   </td>
 
-                  {/* סוג סילוקין */}
+                {/* לוח סילוקין */}
                   <td className="border p-1">
                     <select
-                      value={loan.repayment_type || "שפיצר"}
+                      value={loan.amortization_schedule_id}
                       onChange={(e) =>
-                        updateLoan(
-                          idx,
-                          "repayment_type",
-                          e.target.value as "שפיצר" | "קרן שווה"
-                        )
+                        updateLoan(idx, "amortization_schedule_id", Number(e.target.value))
                       }
                       className="w-full px-1 py-0.5 border rounded focus:ring-2 focus:ring-purple-400"
                     >
-                      <option value="שפיצר">שפיצר</option>
-                      <option value="קרן שווה">קרן שווה</option>
+                      {schedules.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.schedule_name}
+                        </option>
+                      ))}
                     </select>
                   </td>
 
-                  {/* מסלול */}
+                {/* מסלול */}
                   <td className="border p-1">
                     <select
                       value={loan.path_id}
@@ -240,6 +241,30 @@ const [activeLoan, setActiveLoan] = React.useState<Loan | null>(null);
                     </select>
                   </td>
 
+                
+                
+                
+                
+                  {/* סוג סילוקין */}
+                
+                  {/* <td className="border p-1">
+                    <select
+                      value={loan.repayment_type || "שפיצר"}
+                      onChange={(e) =>
+                        updateLoan(
+                          idx,
+                          "repayment_type",
+                          e.target.value as "שפיצר" | "קרן שווה"
+                        )
+                      }
+                      className="w-full px-1 py-0.5 border rounded focus:ring-2 focus:ring-purple-400"
+                    >
+                      <option value="שפיצר">שפיצר</option>
+                      <option value="קרן שווה">קרן שווה</option>
+                    </select>
+                  </td> */}
+
+                 
                   {/* תדירות שינוי */}
                   <td className="border p-1 w-[60px]">
                     <input

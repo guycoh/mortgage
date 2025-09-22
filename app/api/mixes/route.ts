@@ -39,10 +39,10 @@ async function getLoanMixes() {
 // POST NEW LOAN_MIXWS
 export async function POST(req: NextRequest) {
     const body = await req.json();
-    return createReasonNotIntrested(body);
+    return createLoanMixes(body);
 }
 
-async function createReasonNotIntrested(body: any) {
+async function createLoanMixes(body: any) {
     const { data, error } = await supabase.from('loan_mixes').insert([body]);
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
     return NextResponse.json(data, { status: 201 });
