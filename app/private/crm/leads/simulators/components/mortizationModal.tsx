@@ -63,6 +63,7 @@ export default function AmortizationModal({
           </button>
         </div>
 
+
         {/* טבלה */}
         <div className="flex-1 overflow-y-auto p-4">
           {schedule.length > 0 ? (
