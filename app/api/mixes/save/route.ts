@@ -23,9 +23,9 @@ type Loan = {
   created_at?: string;
   anchor_interval?: string | null;
   end_date?: string | null;
+  amortization_schedule_id ?: number;
+
 };
-
-
 
 type Mix = {
   id: string;
@@ -109,6 +109,7 @@ export async function POST(req: NextRequest) {
               anchor: loan.anchor ?? null,
               anchor_interval: loan.anchor_interval ?? null,
               change_frequency: loan.change_frequency ?? null,
+              amortization_schedule_id: loan.amortization_schedule_id ?? null, 
             })
             .eq("id", loan.id);
           if (error) throw error;
@@ -122,13 +123,12 @@ export async function POST(req: NextRequest) {
                 path_id: loan.path_id,
                 amount: loan.amount ?? null,
                 rate: loan.rate ?? null,             // חדש
-                months: loan.months ?? null,         // חדש
-
-
+                months: loan.months ?? null,        // חדש
                 end_date: loan.end_date ?? null,
                 anchor: loan.anchor ?? null,
                 anchor_interval: loan.anchor_interval ?? null,
                 change_frequency: loan.change_frequency ?? null,
+                amortization_schedule_id: loan.amortization_schedule_id ?? null,
               },
             ]);
           if (error) throw error;

@@ -26,7 +26,7 @@ export type Loan = {
   anchor_interval?: string | null;
   end_date?: string | null;
   amortization_schedule_id ?: number;
-  repayment_type?: "שפיצר" | "קרן שווה"; // ✨ חדש
+ 
 };
 
 type Props = {
@@ -64,7 +64,7 @@ const [activeLoan, setActiveLoan] = React.useState<Loan | null>(null);
         rate: 0,
         months: 0,
         loan_end_date: null,
-        repayment_type: "שפיצר", // ✨ ברירת מחדל
+        amortization_schedule_id: schedules[0]?.id || 1, // ✅ ברירת מחדל
       },
     ]);
   };
@@ -127,7 +127,7 @@ const [activeLoan, setActiveLoan] = React.useState<Loan | null>(null);
       <table className="w-full border-collapse border border-gray-300 text-sm">
         <thead className="bg-gray-200">
           <tr><th className="border p-2">סכום הלוואה</th>
-            <th className="border p-2">סוג סילוקין</th>
+            <th className="border p-2">לוח סילוקין</th>
             <th className="border p-2">מסלול</th>
             <th className="border p-2">תדירות שינוי</th>
             <th className="border p-2">עוגן</th>
@@ -241,30 +241,7 @@ const [activeLoan, setActiveLoan] = React.useState<Loan | null>(null);
                     </select>
                   </td>
 
-                
-                
-                
-                
-                  {/* סוג סילוקין */}
-                
-                  {/* <td className="border p-1">
-                    <select
-                      value={loan.repayment_type || "שפיצר"}
-                      onChange={(e) =>
-                        updateLoan(
-                          idx,
-                          "repayment_type",
-                          e.target.value as "שפיצר" | "קרן שווה"
-                        )
-                      }
-                      className="w-full px-1 py-0.5 border rounded focus:ring-2 focus:ring-purple-400"
-                    >
-                      <option value="שפיצר">שפיצר</option>
-                      <option value="קרן שווה">קרן שווה</option>
-                    </select>
-                  </td> */}
-
-                 
+                                
                   {/* תדירות שינוי */}
                   <td className="border p-1 w-[60px]">
                     <input

@@ -6,19 +6,8 @@ const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-// GET ALL LOAN_MIXES
-// export async function GET(req: NextRequest) {    
-//     return getLoanMixes();
-// }
-// async function getLoanMixes() {
-//     const { data, error } = await supabase.from('loan_mixes').select('*')
-//     .order("status", { ascending: true });
-//     ;
-//     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-//     return NextResponse.json(data, { status: 200 });
-// }
 
-// GET ALL LEADS
+// GET ALL LOAN_MIXES
 export async function GET(req: NextRequest) {    
     return getLoanMixes();
 }
@@ -29,14 +18,7 @@ async function getLoanMixes() {
 }
 
 
-
-
-
-
-
-
-
-// POST NEW LOAN_MIXWS
+// POST NEW LOAN_MIXES
 export async function POST(req: NextRequest) {
     const body = await req.json();
     return createLoanMixes(body);
