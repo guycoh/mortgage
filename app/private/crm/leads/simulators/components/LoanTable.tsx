@@ -124,6 +124,7 @@ const [activeLoan, setActiveLoan] = React.useState<Loan | null>(null);
         + הוסף הלוואה
       </button>
 
+
       <table className="w-full border-collapse border border-gray-300 text-sm">
         <thead className="bg-gray-200">
           <tr><th className="border p-2">סכום הלוואה</th>

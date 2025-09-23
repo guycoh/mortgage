@@ -28,6 +28,15 @@ export default function SimulatorPage() {
   // 🔹 state חדש לאינפלציה
   const [annualInflation, setAnnualInflation] = useState<number>(2.8);
 
+  // להביא לי רשימת תמהילים להשוואה
+  const [compareMixId, setCompareMixId] = useState<string | null>(null);
+  const compareMix = mixes.find((m) => m.id === compareMixId);
+
+
+const fieldClasses =
+  "h-9 px-2 py-1 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 focus:bg-orange-100";
+
+
   useEffect(() => {
     async function fetchData() {
       const res = await fetch(`/api/mixes/${leadId}`);
@@ -81,32 +90,55 @@ const openMenu = (id: string, e: React.MouseEvent<HTMLButtonElement, MouseEvent>
 
   return (
     <div className="p-6" ref={containerRef}>
-      {/* כותרת + שדה אינפלציה */}
-      <div className="flex items-center gap-4 mb-4">
+      {/* כותרת + שדה אינפלציה */}     
+     <div className="flex items-center gap-4 mb-4">
         <h1 className="text-2xl font-bold">סימולטור לליד {leadId}</h1>
         <div className="flex items-center gap-2">
-          <label className="text-sm font-medium text-gray-700">אינפלציה שנתית צפויה:</label>
+          <label className="text-sm font-medium text-gray-700">
+            אינפלציה שנתית צפויה:
+          </label>
           <input
             type="number"
             step="0.1"
             value={annualInflation}
             onChange={(e) => setAnnualInflation(parseFloat(e.target.value) || 0)}
-            className="w-20 px-2 py-1 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+            className={`${fieldClasses} w-20`}
           />
           <span className="text-sm text-gray-600">
             חודשי: {(annualInflation / 12).toFixed(3)}%
           </span>
-          <button
-              onClick={handleSave}
-              className="px-4 py-2 bg-green-600 text-white rounded-lg shadow hover:bg-green-700 transition"
-          >
-            שמור שינויים      
-          </button>
-          
-        </div>
-      </div>
 
-     
+          {activeMix && (
+            <div>
+              <label className="text-sm font-medium text-gray-700 mr-2">
+                תמהיל להשוואה :
+              </label>
+              <select
+                value={compareMixId ?? ""}
+                onChange={(e) => setCompareMixId(e.target.value || null)}
+                className={fieldClasses}
+              >
+                <option value="">בחר תמהיל להשוואה</option>
+                {mixes
+                  .filter((m) => m.id !== activeMixId)
+                  .map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.mix_name}
+                    </option>
+                  ))}
+              </select>
+            </div>
+          )}
+
+          <button
+            onClick={handleSave}
+            className="h-9 px-4 bg-green-600 text-white rounded-lg shadow hover:bg-green-700 transition"
+          >
+            שמור שינויים
+          </button>
+        </div>
+     </div>
+  
       {/* Tabs */}
       <div className="flex gap-2 mb-4 overflow-x-auto">
         {mixes.map((m) => (
