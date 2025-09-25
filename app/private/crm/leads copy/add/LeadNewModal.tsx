@@ -1,25 +1,40 @@
 "use client"
-import { useEffect, useRef, useState } from "react";
+
+import { useEffect, useRef,useState  } from "react";
 import { banks } from "@/app/data/banks";
 import { statusCall } from "@/app/data/status_call";
 import { useEmployees } from "@/app/data/hooks/useEmployees";
 import { useReasonNotInterested } from "@/app/data/hooks/useReasonNotInterested";
 import { useLeadSource } from "@/app/data/hooks/useLeadSource"; 
-import { Lead } from "@/app/data/hooks/useLeads";
+
 
 interface LeadNewModalProps {
   isOpen: boolean;
   onClose: () => void;
   title: string;
-  onSave?: (lead: Lead) => void; // חדש: callback עם הליד שנשמר
 }
 
-export default function LeadNewModal({ isOpen, onClose, title, onSave }: LeadNewModalProps) {
+export default function LeadNewModal({ isOpen, onClose, title }: LeadNewModalProps) {
   const { employees } = useEmployees();
   const { reasons } = useReasonNotInterested();
   const { sources } = useLeadSource();
 
   const [statusCallValue, setStatusCallValue] = useState("");
+ 
+  const resetForm = () => {
+    Object.values(refs).forEach((ref: any) => {
+      if (ref.current) {
+        if (ref.current.type === "checkbox") {
+          ref.current.checked = false;
+        } else {
+          ref.current.value = "";
+        }
+      }
+    });
+    setStatusCallValue(""); // לאפס גם את הסטייט
+  };
+
+
 
   const refs = {
     name: useRef<HTMLInputElement>(null),
@@ -48,75 +63,50 @@ export default function LeadNewModal({ isOpen, onClose, title, onSave }: LeadNew
     investors_list: useRef<HTMLInputElement>(null),
   };
 
-const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-  e.preventDefault();
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
 
-  const lead = {
-    // חובה (string)
-    name: refs.name.current?.value || "",
-    cell: refs.cell.current?.value || "",
-    email: refs.email.current?.value || "",
+    const lead = {
+      name: refs.name.current?.value || "",
+      email: refs.email.current?.value || "",
+      cell: refs.cell.current?.value || "",
+      address: refs.address.current?.value || null,
+      data_source: refs.data_source.current?.value || null,
+      intrested_in: refs.intrested_in.current?.value || null,
+      spouse_name: refs.spouse_name.current?.value || null,
+      spouse_phone: refs.spouse_phone.current?.value || null,
+      lead_first_status: refs.lead_first_status.current?.value || null,
+      comment: refs.comment.current?.value || null,
+      zoom: refs.zoom.current?.value || null,
+      hour_zoom: refs.hour_zoom.current?.value || null,
+      last_call: refs.last_call.current?.value || null,
+      status_call_id: refs.status_call_id.current?.value || null,
+      reason_not_intrested_id: refs.reason_not_intrested_id.current?.value || null,
+      follow_up_date: refs.follow_up_date.current?.value || null,
+      follow_up_hour: refs.follow_up_hour.current?.value || null,
+      black_list: refs.black_list.current?.checked ? 1 : 0,
+      realtor: refs.realtor.current?.checked ? 1 : 0,
+      mailing_list: refs.mailing_list.current?.checked ? 1 : 0,
+      investors_list: refs.investors_list.current?.checked ? 1 : 0,
+      balance_statement: refs.balance_statement.current?.value || null,
+      bank_id: refs.bank_id.current?.value || null,
+      profile_id: refs.profile_id.current?.value || null,
+    };
 
-    // string / nullable
-    address: refs.address.current?.value || null,
-    intrested_in: refs.intrested_in.current?.value || null,
-    spouse_name: refs.spouse_name.current?.value || null,
-    spouse_phone: refs.spouse_phone.current?.value || null,
-    lead_first_status: refs.lead_first_status.current?.value || null,
-    comment: refs.comment.current?.value || null,
-    zoom: refs.zoom.current?.value || null,
-    hour_zoom: refs.hour_zoom.current?.value || null,
-    last_call: refs.last_call.current?.value || null,
-    follow_up_date: refs.follow_up_date.current?.value || null,
-    follow_up_hour: refs.follow_up_hour.current?.value || null,
-    balance_statement: refs.balance_statement.current?.value || null,
-
-    // מספרים (או null)
-    data_source: refs.data_source.current?.value
-      ? Number(refs.data_source.current.value)
-      : null,
-    status_call_id: refs.status_call_id.current?.value
-      ? Number(refs.status_call_id.current.value)
-      : null,
-    reason_not_intrested_id: refs.reason_not_intrested_id.current?.value
-      ? Number(refs.reason_not_intrested_id.current.value)
-      : null,
-    bank_id: refs.bank_id.current?.value
-      ? Number(refs.bank_id.current.value)
-      : null,
-    profile_id: refs.profile_id.current?.value
-      ? Number(refs.profile_id.current.value)
-      : null,
-
-    // בוליאנים
-    black_list: refs.black_list.current?.checked || false,
-    realtor: refs.realtor.current?.checked || false,
-    mailing_list: refs.mailing_list.current?.checked || false,
-    investors_list: refs.investors_list.current?.checked || false,
-  };
-
-  try {
-    const response = await fetch("/api/leads", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(lead),
-    });
-
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({}));
-      throw new Error(`Error ${response.status}: ${err.error || "Bad request"}`);
+    try {
+      const response = await fetch("/api/leads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(lead),
+      });
+      if (!response.ok) throw new Error(`Error ${response.status}`);
+      const data = await response.json();
+      console.log("Lead created:", data);
+      onClose();
+    } catch (error) {
+      console.error("Failed to create lead:", error);
     }
-
-    const data: Lead = await response.json();
-
-    if (onSave) onSave(data);
-
-    onClose();
-  } catch (error) {
-    console.error("Failed to create lead:", error);
-  }
-};
-
+  };
 
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
@@ -125,6 +115,18 @@ const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     document.addEventListener("keydown", handleEsc);
     return () => document.removeEventListener("keydown", handleEsc);
   }, [onClose]);
+
+useEffect(() => {
+  if (!isOpen) {
+    resetForm();
+  }
+}, [isOpen]);
+
+
+
+
+
+
 
   return (
     <div
@@ -141,7 +143,7 @@ const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
       >
         {/* Header */}
         <div className="flex justify-between items-center p-4 bg-green-600">
-          <h2 className="text-lg font-bold text-white">{title}</h2>
+          <h2 className="text-lg text- font-bold">{title}</h2>
           <button
             onClick={onClose}
             className="text-xl font-bold text-white hover:text-red-500"
@@ -150,9 +152,10 @@ const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
           </button>
         </div>
 
-        {/* Form */}
+      
+       {/* Form with scroll */}
         <div className="flex-1 overflow-y-auto p-6 pb-32">
-             <form id="leadForm" onSubmit={handleSubmit} className="grid grid-cols-2 md:grid-cols-3 gap-6">
+          <form id="leadForm" onSubmit={handleSubmit} className="grid grid-cols-2 md:grid-cols-3 gap-6">
             
             {/* שם מלא */}
             <div className="flex flex-col">
@@ -423,7 +426,6 @@ const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
            
           </form>
         </div>
-
         {/* Footer */}
         <div className="sticky bottom-0 left-0 w-full bg-gray-100 p-4 flex justify-end gap-3 shadow-inner">
           <button
@@ -441,9 +443,12 @@ const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
             שמירה
           </button>
         </div>
+
+
+      
       </div>
+
+      
     </div>
   );
 }
-
-

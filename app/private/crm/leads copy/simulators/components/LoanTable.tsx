@@ -10,11 +10,6 @@ import LoanTotals from "./LoanTotals";
 import { schedules } from "@/app/data/amortization_schedules";
 
 
-
-
-import { LoanResult, calculateLoan } from "./calculate/loanCalculators";
-
-
 export type Loan = {
   id: string;
   mix_id: string;
@@ -30,7 +25,8 @@ export type Loan = {
   created_at?: string;
   anchor_interval?: string | null;
   end_date?: string | null;
-  amortization_schedule_id: number; // 👈 כאן זה חובה
+  amortization_schedule_id ?: number;
+ 
 };
 
 type Props = {
@@ -83,9 +79,7 @@ const [isAmortizationModalOpen, setIsAmortizationModalOpen] = useState(false);
     onChange(updated);
   };
 
-  
-  
-  //לבטל
+ 
   const calculateMonthly = (loan: Loan) => {
     if (!loan.months || loan.months === 0) return 0;
     const r = loan.rate / 12 / 100;
@@ -341,13 +335,11 @@ const [isAmortizationModalOpen, setIsAmortizationModalOpen] = useState(false);
 
                   {/* סכום חודשי */}
                   <td className="border p-1 text-right">
-                    {calculateLoan(loan, false, annualInflation).monthlyPayment.toLocaleString("he-IL", {
-                      minimumFractionDigits: 0,
-                      maximumFractionDigits: 0,
+                    {calculateMonthly(loan).toLocaleString("he-IL", {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
                     })}
                   </td>
-
-                 
 
                   {/* פעולות */}
                   <td className="border p-1 text-center space-x-1">
@@ -494,9 +486,22 @@ const [isAmortizationModalOpen, setIsAmortizationModalOpen] = useState(false);
       loan={activeLoan}
       path={paths.find((p) => p.id === activeLoan?.path_id)}
       annualInflation={annualInflation}            
-      //isIndexed={paths.find((p) => p.id === activeLoan?.path_id)?.is_indexed ?? false}
+      isIndexed={paths.find((p) => p.id === activeLoan?.path_id)?.is_indexed ?? false}
     //  monthlyPayment={activeLoan ? calculateMonthly(activeLoan) : 0} // ✨ שולח את החישוב
     />
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     </div>
   );

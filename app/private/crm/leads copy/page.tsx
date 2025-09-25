@@ -9,40 +9,31 @@ import LeadEditModal from "./add/LeadEditModal";
 
 import PlusIcon from "@/public/assets/images/svg/general/PlusIcon";
 
-export default function Page() {
-  const { leads, loading, addLead, updateLead, deleteLead } = useLeads();
 
-  // מצב מודאלים
+export default function Page() {
+  const { leads, loading,setLeads, addLead, updateLead, deleteLead } = useLeads();
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-
-  // ליד שנבחר לעריכה
+  
   const [editLead, setEditLead] = useState<Lead | null>(null);
 
-  // שמירה של ליד חדש
-  const handleAddLead = async (newLead: Partial<Lead>) => {
-    const added = await addLead(newLead);
-    if (added) {
-      console.log("Added lead ID:", added.id);
-      setIsNewModalOpen(false);
-    }
-  };
+
+  
+
+const handleSaveEdit = async (updatedLead: Lead) => {
+  const res = await updateLead(updatedLead.id, updatedLead); // מחזיר lead מה־DB עם id אמיתי
+  if (!res) return;
+
+  setLeads((prev) =>
+    prev.map((lead) =>
+      lead.id === res.id ? res : lead
+    )
+  );
 
 
-  // שמירה של עריכה
-  const handleSaveEdit = async (updatedLead: Lead) => {
-    const updated = await updateLead(updatedLead.id, updatedLead);
-    if (updated) {
-      console.log("Updated lead ID:", updated.id);
-      setEditLead(null);
-      setIsEditModalOpen(false);
-    }
-  };
-
-  // מחיקה
-  const handleDelete = async (id: number) => {
-    await deleteLead(id);
-  };
+  console.log("עודכן lead עם id:", res.id);
+  setEditLead(null);
+};
 
   return (
     <div className="h-screen flex flex-col bg-gray-100 p-6">
@@ -61,40 +52,43 @@ export default function Page() {
         </button>
       </div>
 
+
+
       {/* טבלה */}
       <LeadsTable
-        leads={leads}
-        loading={loading}
-        onEdit={(lead: Lead) => {
-          setEditLead(lead);
-          setIsEditModalOpen(true);
-        }}
-        onDelete={handleDelete}
-      />
+          leads={leads}
+          loading={loading}
+          onEdit={(lead: Lead) => setEditLead(lead)}
+          onDelete={deleteLead} 
+          setIsEditModalOpen={setIsEditModalOpen}
+                
+       />
 
-      {/* מודאל הוספה */}
+
+      {/* מודאל הוספה */}      
       <LeadNewModal
         isOpen={isNewModalOpen}
         onClose={() => setIsNewModalOpen(false)}
-        onSave={handleAddLead}
         title="הוספת ליד חדש"
       />
-
-
       {/* מודאל עריכה */}
-      {editLead && (
-        <LeadEditModal
-          isOpen={isEditModalOpen}
-          onClose={() => {
-            setIsEditModalOpen(false);
-            setEditLead(null);
-          }}
-          onSave={handleSaveEdit}
-          editLead={editLead}
-          setEditLead={setEditLead}              // 👈 חייב לשלוח
-          setIsEditModalOpen={setIsEditModalOpen} // 👈 חייב לשלוח
-        />
-      )}
+      <LeadEditModal
+            isOpen={isEditModalOpen}          
+            onClose={() => setIsEditModalOpen(false)}
+            setIsEditModalOpen={setIsEditModalOpen}
+            onSave={handleSaveEdit}                  
+            editLead={editLead}   // זה מה שהכנת עם useState
+            setEditLead={setEditLead}
+      />
+
     </div>
   );
 }
+
+
+
+    
+
+
+
+
