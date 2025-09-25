@@ -498,6 +498,16 @@ const [isAmortizationModalOpen, setIsAmortizationModalOpen] = useState(false);
     //  monthlyPayment={activeLoan ? calculateMonthly(activeLoan) : 0} // ✨ שולח את החישוב
     />
 
+
+
+
+
+
+
+
+
+
+
     </div>
   );
 }
