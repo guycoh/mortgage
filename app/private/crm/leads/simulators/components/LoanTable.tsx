@@ -6,7 +6,7 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import LoanAmortization from "./LoanAmortization";
 import { useState } from "react";
-import LoanTotals from "./LoanTotals";
+
 import { schedules } from "@/app/data/amortization_schedules";
 
 
@@ -135,22 +135,27 @@ const [isAmortizationModalOpen, setIsAmortizationModalOpen] = useState(false);
       </button>
 
 
-      <table className="w-full border-collapse border border-gray-300 text-sm">
-        <thead className="bg-gray-200">
-          <tr><th className="border p-2">סכום הלוואה</th>
-           
+      <table className="w-full border-collapse border border-gray-300 text-sm"><thead className="bg-gray-300">
+          <tr>
+            <th className="border p-2">סכום הלוואה</th>
             <th className="border p-2">לוח סילוקין</th>
             <th className="border p-2">מסלול</th>
             <th className="border p-2">תדירות שינוי</th>
             <th className="border p-2">עוגן</th>
             <th className="border p-2">מרווח מהעוגן</th>
+
+            {/* השדות החדשים */}
+            <th className="border p-2 bg-gray-400">גרייס</th>
+            <th className="border p-2 bg-gray-400">חודשי גרייס</th>
+
             <th className="border p-2">תאריך סיום</th>
             <th className="border p-2">חודשים</th>
             <th className="border p-2">ריבית %</th>
             <th className="border p-2">סכום חודשי</th>
-            <th className="border p-2">פעולות</th> 
+            <th className="border p-2">פעולות</th>
           </tr>
         </thead>
+
         <tbody>
           {loans.map((loan, idx) => {
             const parsedDate = parseISODate(
@@ -203,22 +208,18 @@ const [isAmortizationModalOpen, setIsAmortizationModalOpen] = useState(false);
               <React.Fragment key={loan.id}>
                 <tr className="hover:bg-gray-100">
                   {/* סכום הלוואה */}
-                  <td className="border p-1 ">
+                  
+                  <td className="border p-1 w-[120px]">
                     <input
                       type="text"
-                      value={
-                        Number.isFinite(loan.amount)
-                          ? loan.amount.toLocaleString("he-IL")
-                          : ""
-                      }
+                      value={Number.isFinite(loan.amount) ? loan.amount.toLocaleString("he-IL") : ""}
                       onChange={(e) => {
                         const raw = e.target.value.replace(/[^\d]/g, "");
                         updateLoan(idx, "amount", Number(raw) || 0);
                       }}
-                      className="w-full px-1 py-0.5 border rounded focus:ring-2 focus:ring-purple-400 text-right"
+                      className="w-full px-1 py-0.5 border rounded focus:ring-2 focus:ring-purple-400 text-right focus:bg-orange-100"
                     />
                   </td>
-
 
                 {/* לוח סילוקין */}
                   <td className="border p-1">
@@ -227,7 +228,7 @@ const [isAmortizationModalOpen, setIsAmortizationModalOpen] = useState(false);
                       onChange={(e) =>
                         updateLoan(idx, "amortization_schedule_id", Number(e.target.value))
                       }
-                      className="w-full px-1 py-0.5 border rounded focus:ring-2 focus:ring-purple-400"
+                      className="w-full px-1 py-0.5 border rounded focus:ring-2 focus:ring-purple-400 focus:bg-orange-100 "
                     >
                       {schedules.map((s) => (
                         <option key={s.id} value={s.id}>
@@ -244,7 +245,7 @@ const [isAmortizationModalOpen, setIsAmortizationModalOpen] = useState(false);
                       onChange={(e) =>
                         updateLoan(idx, "path_id", Number(e.target.value))
                       }
-                      className="w-full px-1 py-0.5 border rounded focus:ring-2 focus:ring-purple-400"
+                      className="w-full px-1 py-0.5 border rounded focus:ring-2 focus:ring-purple-400 focus:bg-orange-100"
                     >
                       {paths.map((p) => (
                         <option key={p.id} value={p.id}>
@@ -264,7 +265,7 @@ const [isAmortizationModalOpen, setIsAmortizationModalOpen] = useState(false);
                       onChange={(e) =>
                         updateLoan(idx, "change_frequency", e.target.value)
                       }
-                      className="w-full px-1 py-0.5 border rounded focus:ring-2 focus:ring-purple-400 text-center"
+                      className="w-full px-1 py-0.5 border rounded focus:ring-2 focus:ring-purple-400 text-center focus:bg-orange-100 "
                     />
                   </td>
 
@@ -275,7 +276,7 @@ const [isAmortizationModalOpen, setIsAmortizationModalOpen] = useState(false);
                       maxLength={3}
                       value={loan.anchor || ""}
                       onChange={(e) => updateLoan(idx, "anchor", e.target.value)}
-                      className="w-full px-1 py-0.5 border rounded focus:ring-2 focus:ring-purple-400 text-center"
+                      className="w-full px-1 py-0.5 border rounded focus:ring-2 focus:ring-purple-400 text-center focus:bg-orange-100 "
                     />
                   </td>
 
@@ -288,7 +289,35 @@ const [isAmortizationModalOpen, setIsAmortizationModalOpen] = useState(false);
                       onChange={(e) =>
                         updateLoan(idx, "anchor_margin", Number(e.target.value))
                       }
-                      className="w-full px-1 py-0.5 border rounded focus:ring-2 focus:ring-purple-400 text-center"
+                      className="w-full px-1 py-0.5 border rounded focus:ring-2 focus:ring-purple-400 text-center focus:bg-orange-100"
+                    />
+                  </td>
+
+                  {/* גרייס */}
+                  <td className="border p-1 w-[80px] bg-gray-400">
+                    <select
+                    
+                    
+                      className="w-full px-1 py-0.5 border rounded focus:ring-2 focus:ring-purple-400 text-center focus:bg-orange-100"
+                    >
+                      {[
+                        { id: 1, grace: 'ללא', labelEn: 'None' },
+                        { id: 2, grace: 'חלקי', labelEn: 'Partial' },
+                        { id: 3, grace: 'מלא', labelEn: 'Full' },
+                      ].map((g) => (
+                        <option key={g.id} value={g.id}>
+                          {g.grace}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+
+                  {/* חודשי גרייס */}
+                  <td className="border p-1 w-[60px] bg-gray-400">
+                    <input
+                      type="number"
+                      min={0}
+                          className="w-full px-1 py-0.5 border rounded focus:ring-2 focus:ring-purple-400 text-center focus:bg-orange-100 "
                     />
                   </td>
 
@@ -322,7 +351,7 @@ const [isAmortizationModalOpen, setIsAmortizationModalOpen] = useState(false);
                       onChange={(e) =>
                         updateLoan(idx, "months", Number(e.target.value))
                       }
-                      className="w-full px-1 py-0.5 border rounded text-center focus:ring-2 focus:ring-purple-400"
+                      className="w-full px-1 py-0.5 border rounded text-center focus:ring-2 focus:ring-purple-400 before:focus:bg-orange-100 focus:bg-orange-100 "
                     />
                   </td>
 
@@ -335,7 +364,7 @@ const [isAmortizationModalOpen, setIsAmortizationModalOpen] = useState(false);
                       onChange={(e) =>
                         updateLoan(idx, "rate", Number(e.target.value))
                       }
-                      className="w-full px-1 py-0.5 border rounded text-center focus:ring-2 focus:ring-purple-400"
+                      className="w-full px-1 py-0.5 border rounded text-center focus:ring-2 focus:ring-purple-400 focus:bg-orange-100"
                     />
                   </td>
 
@@ -350,24 +379,30 @@ const [isAmortizationModalOpen, setIsAmortizationModalOpen] = useState(false);
                  
 
                   {/* פעולות */}
-                  <td className="border p-1 text-center space-x-1">
-                    <button
-                     onClick={() => {
-                        setActiveLoan(loan);   // ✅ שמירת ההלוואה שנבחרה
-                        setIsAmortizationOpen(true); // ✅ פתיחת מודאל
-                      }}
-                      className="px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-xs"
-                    >
-                      לוח סילוקין
-                    </button>
-                    <button
-                      onClick={() => deleteLoan(idx)}
-                      className="px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-xs"
-                    >
-                      מחיקה
-                    </button>
-                  </td>
+                  <td className="border p-1 w-[140px]">
+  <div className="flex gap-2 justify-center">
+    <button
+      onClick={() => {
+        setActiveLoan(loan);
+        setIsAmortizationOpen(true);
+      }}
+      className="w-[65px] px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-xs"
+    >
+      לוח
+    </button>
+    <button
+      onClick={() => deleteLoan(idx)}
+      className="w-[65px] px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-xs"
+    >
+      מחיקה
+    </button>
+  </div>
+</td>
                 </tr>  
+           
+           
+           
+           
                 <tr className="hidden"  >
                   <td colSpan={10} className="border p-2">
                     <div className="flex flex-col gap-1 text-xs">
@@ -442,6 +477,9 @@ const [isAmortizationModalOpen, setIsAmortizationModalOpen] = useState(false);
             <td className="border p-2"></td>
             <td className="border p-2"></td>
             <td className="border p-2"></td>
+            <td className="border p-2"></td>
+            <td className="border p-2"></td>
+            
             <td className="border p-2 text-right">
               {loans
                 .reduce((sum, loan) => sum + calculateMonthly(loan), 0)
@@ -464,29 +502,7 @@ const [isAmortizationModalOpen, setIsAmortizationModalOpen] = useState(false);
       </table>
 
 
-    <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {/* תיבה 1 */}
-        <div className="bg-blue-100  rounded shadow">
-        <LoanTotals
-              loans={loans}
-              paths={paths}
-              annualInflation={annualInflation}
-              calculateMonthly={calculateMonthly}
-        />
-        </div>
-
-        {/* תיבה 2 */}
-        <div className="bg-green-100 p-4 rounded shadow">
-          תוכן 2
-        </div>
-
-        {/* תיבה 3 */}
-        <div className="bg-yellow-100 p-4 rounded shadow">
-          תוכן 3
-        </div>
-    </div>
-
-
+    
     {/* 👇 מחוץ ל־map אבל בתוך LoanTable */}
     <LoanAmortization
       isOpen={isAmortizationOpen}

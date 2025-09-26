@@ -5,6 +5,10 @@ import { useParams } from "next/navigation";
 import LoanTable, { Loan } from "../components/LoanTable";
 import { useLoanPaths } from "@/app/data/hooks/useLoanPaths";
 
+//חישובים להשוואת תמהילים
+import { calculateAllMixTotals } from "../components/calculate/mixCalculators";
+import MixTotals from "../components/MixTotals";
+
 type Mix = {
   id: string;
   mix_name: string;
@@ -31,6 +35,15 @@ export default function SimulatorPage() {
   // להביא לי רשימת תמהילים להשוואה
   const [compareMixId, setCompareMixId] = useState<string | null>(null);
   const compareMix = mixes.find((m) => m.id === compareMixId);
+;
+ // לשמירת התיק
+  const [isSaving, setIsSaving] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+
+
+
 
 
 const fieldClasses =
@@ -59,22 +72,67 @@ const fieldClasses =
     setActiveMixId(newMix.id);
   };
 
+// איפוס compareMixId כשעוברים תמהיל
+useEffect(() => {
+  setCompareMixId(null);
+}, [activeMixId]);
+
+
+
+
+
+
+
+
   const deleteMix = (id: string) => {
     setMixes((prev) => prev.filter((m) => m.id !== id));
     const remaining = mixes.filter((m) => m.id !== id);
     setActiveMixId(remaining.length ? remaining[0].id : null);
     if (openMenuId === id) setOpenMenuId(null);
   };
-
+  //שמירת התיק
   const handleSave = async () => {
-    const res = await fetch(`/api/mixes/save`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ client_id: leadId, mixes }),
-    });
-    const data = await res.json();
-    alert(data.success ? "✅ נשמר בהצלחה!" : `❌ שגיאה: ${data.error}`);
+    setIsSaving(true);
+    setSuccessMessage(null);
+    setErrorMessage(null);
+
+    try {
+      const res = await fetch(`/api/mixes/save`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ client_id: leadId, mixes }),
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        setSuccessMessage("✅ התיק נשמר בהצלחה!");
+        // נעלם אחרי 3 שניות
+        setTimeout(() => setSuccessMessage(null), 3000);
+      } else {
+        setErrorMessage(`❌ שגיאה: ${data.error}`);
+        setTimeout(() => setErrorMessage(null), 5000);
+      }
+    } catch (err) {
+      setErrorMessage("❌ קרתה שגיאה ברשת");
+      setTimeout(() => setErrorMessage(null), 5000);
+    } finally {
+      setIsSaving(false);
+    }
   };
+
+  
+  
+  
+  // const handleSave = async () => {
+  //   const res = await fetch(`/api/mixes/save`, {
+  //     method: "POST",
+  //     headers: { "Content-Type": "application/json" },
+  //     body: JSON.stringify({ client_id: leadId, mixes }),
+  //   });
+  //   const data = await res.json();
+  //   alert(data.success ? "✅ נשמר בהצלחה!" : `❌ שגיאה: ${data.error}`);
+  // };
 
  
 // מחשב את המיקום של התפריט ביחס לטאב (תמיד משמאל)
@@ -86,6 +144,12 @@ const openMenu = (id: string, e: React.MouseEvent<HTMLButtonElement, MouseEvent>
   });
   setOpenMenuId(openMenuId === id ? null : id);
 };
+
+const allTotals = calculateAllMixTotals(
+  mixes.flatMap((m) => m.loans || []),
+  true, // isIndexed
+  annualInflation
+);
 
 
   return (
@@ -129,14 +193,54 @@ const openMenu = (id: string, e: React.MouseEvent<HTMLButtonElement, MouseEvent>
               </select>
             </div>
           )}
+      
+      
+      {/* שמור שינויים */}
+     <div className="relative inline-block">
+      <button
+        onClick={handleSave}
+        disabled={isSaving}
+        className={`h-9 px-4 bg-green-600 text-white rounded-lg shadow hover:bg-green-700 transition flex items-center justify-center gap-2 ${
+          isSaving ? "opacity-70 cursor-not-allowed" : ""
+        }`}
+      >
+        {isSaving && (
+          <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+        )}
+        שמור שינויים
+      </button>
 
-          <button
-            onClick={handleSave}
-            className="h-9 px-4 bg-green-600 text-white rounded-lg shadow hover:bg-green-700 transition"
-          >
-            שמור שינויים
-          </button>
+      {/* הודעת הצלחה / שגיאה */}
+      {(successMessage || errorMessage) && (
+        <div
+          className={`absolute top-full mt-2 p-2 rounded text-white text-sm shadow-lg ${
+            successMessage ? "bg-green-600" : "bg-red-600"
+          }`}
+        >
+          {successMessage || errorMessage}
         </div>
+      )}
+    </div>
+     
+        </div>   
+        {/* הודעת הצלחה / שגיאה */}
+        {(successMessage || errorMessage) && (
+          <div
+            className={`absolute top-full mt-2 p-2 rounded text-white text-sm shadow-lg ${
+              successMessage ? "bg-green-600" : "bg-red-600"
+            }`}
+          >
+            {successMessage || errorMessage}
+          </div>
+        )}
+   
+   
+   
+   
+   
+   
+   
+   
      </div>
   
       {/* Tabs */}
@@ -259,10 +363,36 @@ const openMenu = (id: string, e: React.MouseEvent<HTMLButtonElement, MouseEvent>
           </div>
         </div>
       )}
+
+
+  <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
+          {/* תיבה 1 */}
+          <div className="bg-blue-100  rounded shadow">
+                  <MixTotals
+            totals={allTotals}
+            mixes={mixes}
+            activeMixId={activeMixId}
+            compareMixId={compareMixId}
+          />
+          </div>
+
+          {/* תיבה 2 */}
+          <div className="bg-green-100 p-4 rounded shadow">
+            תוכן 2
+          </div>
+
+          {/* תיבה 3 */}
+          <div className="bg-yellow-100 p-4 rounded shadow">
+            תוכן 3
+          </div>
+    </div>
+
+
+
+
     </div>
   );
 }
-
 
 
 

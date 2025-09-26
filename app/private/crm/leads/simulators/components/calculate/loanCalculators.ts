@@ -5,6 +5,7 @@ export type Loan = {
   rate: number; // ריבית שנתית באחוזים
   months: number;
   amortization_schedule_id: number; // 1=שפיצר, 2=קרן שווה, 3=בלון חלקי, 4=בלון מלא
+  mix_id: string;
 };
 
 export type LoanResult = {

@@ -1,56 +1,106 @@
+// MixedTotals.tsx
+
 "use client";
 
-import React from "react";
-//import { Loan } from "@/types/loan";
-import { Loan } from "./calculate/loanCalculators";
-import { calculateMixTotals } from "./calculate/mixCalculators";
+import { MixTotals as MixTotalsType } from "./calculate/mixCalculators";
 
-type MixTotalsProps = {
-  loans: Loan[];
-  isIndexed: boolean;
-  annualInflation: number;
-};
+interface Mix {
+  id: string;
+  mix_name: string;
+}
+
+interface MixTotalsProps {
+  totals: MixTotalsType[];
+  mixes: Mix[];
+  activeMixId: string | null;
+  compareMixId: string | null;
+}
 
 export default function MixTotals({
-  loans,
-  isIndexed,
-  annualInflation,
+  totals,
+  mixes,
+  activeMixId,
+  compareMixId,
 }: MixTotalsProps) {
-  if (!loans || loans.length === 0) {
-    return <div className="p-4 text-gray-500">אין הלוואות בתמהיל</div>;
-  }
+  if (!totals.length) return <p>לא נמצאו תמהילים להצגה</p>;
 
-  const totals = calculateMixTotals(loans, isIndexed, annualInflation);
+  const getMixName = (mix_id: string) => {
+    const mix = mixes.find((m) => m.id === mix_id);
+    return mix?.mix_name || mix_id;
+  };
+
+  // נבנה מערך של שני התמהילים להשוואה
+  const totalsToShow = [
+    totals.find((t) => t.mix_id === activeMixId),
+    totals.find((t) => t.mix_id === compareMixId),
+  ].filter(Boolean) as MixTotalsType[];
+
+  if (!totalsToShow.length) return <p>בחר תמהיל להשוואה</p>;
+
+  const rows = [
+    { key: "totalAmount", label: "סך ההלוואות" },
+    { key: "totalMonthlyPayment", label: "סך החזר חודשי" },
+    { key: "maxMonthlyPayment", label: "תשלום חודשי מקסימלי" },
+  ] as const;
 
   return (
-    <div className="mt-4 p-4 bg-gray-50 border rounded-lg shadow-sm">
-      <h2 className="text-lg font-bold mb-3">סיכום תמהיל</h2>
-      <div className="grid grid-cols-3 gap-4 text-right">
-        <div>
-          <p className="text-sm text-gray-600">סך כל ההלוואות</p>
-          <p className="font-semibold">
-            {totals.totalAmount.toLocaleString("he-IL")} ₪
-          </p>
-        </div>
-        <div>
-          <p className="text-sm text-gray-600">החזר חודשי משוער</p>
-          <p className="font-semibold">
-            {totals.totalMonthlyPayment.toLocaleString("he-IL", {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            })} ₪
-          </p>
-        </div>
-        <div>
-          <p className="text-sm text-gray-600">החזר חודשי מקסימלי</p>
-          <p className="font-semibold">
-            {totals.maxMonthlyPayment.toLocaleString("he-IL", {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            })} ₪
-          </p>
-        </div>
-      </div>
+    <div className="mt-6">
+      <table className="table-fixed w-full border-collapse border rounded-lg shadow-lg text-sm">
+        <thead className="bg-gray-100 text-gray-700">
+          <tr>
+            <th className="w-1/4 px-4 py-3 border text-right">פרמטר</th>
+            {totalsToShow.map((mix, idx) => (
+            <th
+                key={`${mix.mix_id}-${idx}`}
+                className="w-1/4 px-4 py-3 border text-center"
+            >
+                {getMixName(mix.mix_id)}
+            </th>
+            ))}
+
+            {totalsToShow.length === 2 && (
+              <th className="w-1/4 px-4 py-3 border text-center">הפרש</th>
+            )}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, i) => {
+            const values = totalsToShow.map(
+              (mix) => (mix as any)[row.key] as number
+            );
+            const diff =
+              totalsToShow.length === 2 ? values[1] - values[0] : null;
+
+            return (
+              <tr
+                key={row.key}
+                className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}
+              >
+                <td className="px-4 py-3 border font-medium text-right">
+                  {row.label}
+                </td>
+                {values.map((val, idx) => (
+                  <td
+                    key={idx}
+                    className="px-4 py-3 border text-center font-medium text-gray-800"
+                  >
+                    {Number.isFinite(val) ? val.toLocaleString("he-IL") : "-"}
+                  </td>
+                ))}
+                {diff !== null && (
+                  <td
+                    className={`px-4 py-3 border text-center font-semibold ${
+                      diff < 0 ? "text-green-600" : diff > 0 ? "text-red-600" : ""
+                    }`}
+                  >
+                    {diff.toLocaleString("he-IL")}
+                  </td>
+                )}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }
