@@ -3,6 +3,10 @@
 
 import { Loan, LoanResult, ScheduleRow, calculateLoan } from "./calculate/loanCalculators";
 
+import ExportScheduleButton from "./ExportScheduleButton";
+
+
+
 type Props = {
   isOpen: boolean;
   onClose: () => void;
@@ -63,6 +67,11 @@ export default function LoanAmortization({
       <div className="bg-white p-4 m-8 rounded shadow-lg w-full max-w-4xl">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-lg font-bold">לוח סילוקין - {path?.name || "הלוואה"}</h2>
+          <ExportScheduleButton
+            schedule={result.schedule || []}
+            fileName={`loan_${loan.mix_id || "unknown"}_schedule.csv`}
+            />
+
           <button
             onClick={onClose}
             className="px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700"
@@ -70,6 +79,37 @@ export default function LoanAmortization({
             סגור
           </button>
         </div>
+
+        {result && (
+          <div className="mb-4 p-4 border rounded-lg bg-gray-50">
+            <h3 className="text-lg font-semibold mb-2">סיכום ההלוואה</h3>
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              <div className="font-medium">תשלום חודשי התחלתי:</div>
+              <div>{result.monthlyPayment.toLocaleString("he-IL", { maximumFractionDigits: 2 })} ₪</div>
+
+              <div className="font-medium">תשלום חודשי מקסימלי:</div>
+              <div>{result.maxMonthlyPayment?.toLocaleString("he-IL", { maximumFractionDigits: 2 })} ₪</div>
+
+              <div className="font-medium">סה"כ ריבית + הצמדה:</div>
+              <div>{result.totalInterest?.toLocaleString("he-IL", { maximumFractionDigits: 2 })} ₪</div>
+
+              <div className="font-medium">סה"כ תשלום כולל לבנק:</div>
+              <div>{result.totalPaid?.toLocaleString("he-IL", { maximumFractionDigits: 2 })} ₪</div>
+            </div>
+          </div>
+        )}
+
+
+
+
+
+
+
+
+
+
+
+
 
         <table className="w-full border-collapse border border-gray-300 text-sm">
           <thead className="bg-gray-200">

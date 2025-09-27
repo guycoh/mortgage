@@ -10,8 +10,6 @@ import { useState } from "react";
 import { schedules } from "@/app/data/amortization_schedules";
 
 
-
-
 import { LoanResult, calculateLoan } from "./calculate/loanCalculators";
 
 
@@ -380,24 +378,24 @@ const [isAmortizationModalOpen, setIsAmortizationModalOpen] = useState(false);
 
                   {/* פעולות */}
                   <td className="border p-1 w-[140px]">
-  <div className="flex gap-2 justify-center">
-    <button
-      onClick={() => {
-        setActiveLoan(loan);
-        setIsAmortizationOpen(true);
-      }}
-      className="w-[65px] px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-xs"
-    >
-      לוח
-    </button>
-    <button
-      onClick={() => deleteLoan(idx)}
-      className="w-[65px] px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-xs"
-    >
-      מחיקה
-    </button>
-  </div>
-</td>
+                    <div className="flex gap-2 justify-center">
+                      <button
+                        onClick={() => {
+                          setActiveLoan(loan);
+                          setIsAmortizationOpen(true);
+                        }}
+                        className="w-[65px] px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-xs"
+                      >
+                        לוח
+                      </button>
+                      <button
+                        onClick={() => deleteLoan(idx)}
+                        className="w-[65px] px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-xs"
+                      >
+                        מחיקה
+                      </button>
+                    </div>
+                  </td>
                 </tr>  
            
            
@@ -479,15 +477,18 @@ const [isAmortizationModalOpen, setIsAmortizationModalOpen] = useState(false);
             <td className="border p-2"></td>
             <td className="border p-2"></td>
             <td className="border p-2"></td>
-            
             <td className="border p-2 text-right">
               {loans
-                .reduce((sum, loan) => sum + calculateMonthly(loan), 0)
+                .reduce((sum, loan) => {
+                  const result = calculateLoan(loan, false, annualInflation);
+                  return sum + result.monthlyPayment;
+                }, 0)
                 .toLocaleString("he-IL", {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
+                  minimumFractionDigits: 0,
+                  maximumFractionDigits: 0,
                 })}
             </td>
+
             <td className="border p-2"></td>
           </tr>       
       {/* סיכום הלוואה */}
@@ -513,15 +514,6 @@ const [isAmortizationModalOpen, setIsAmortizationModalOpen] = useState(false);
       //isIndexed={paths.find((p) => p.id === activeLoan?.path_id)?.is_indexed ?? false}
     //  monthlyPayment={activeLoan ? calculateMonthly(activeLoan) : 0} // ✨ שולח את החישוב
     />
-
-
-
-
-
-
-
-
-
 
 
     </div>
