@@ -2,10 +2,6 @@
 
 "use client";
 
-//import { Loan } from "./calculate/loanCalculators";
-
-
-
 import { calculateMixTotals } from "./calculate/mixCalculators";
 import { calculateLoan, Loan } from "./calculate/loanCalculators";
 

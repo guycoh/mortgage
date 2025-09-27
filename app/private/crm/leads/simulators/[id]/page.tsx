@@ -1,4 +1,4 @@
-"use client";
+"use client"
 
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useParams } from "next/navigation";
@@ -6,9 +6,9 @@ import LoanTable, { Loan } from "../components/LoanTable";
 import { useLoanPaths } from "@/app/data/hooks/useLoanPaths";
 
 import { calculateAllMixTotals,calculateMixTotals } from "../components/calculate/mixCalculators";
-import MixTotals from "../components/MixTotals";
-import TestMixTotals from "../components/TestMixTotals";
 
+import TestMixTotals from "../components/TestMixTotals";
+import MixSummary from "../components/MixSummary";
 
 import MergedScheduleChart from "../components/MergedScheduleChart";
 import { mergeSchedulesForMix } from "../components/calculate/mergeSchedulesForMix";
@@ -298,11 +298,18 @@ const allTotals = useMemo(() => {
       {/* Totals + Chart */}
       <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
         <div className="bg-blue-100 rounded shadow p-4">
-          <MixTotals totals={allTotals} mixes={mixes} activeMixId={activeMixId} compareMixId={compareMixId} />
+         <MixSummary
+            activeMixId={activeMixId}
+            compareMixId={compareMixId}
+            mixes={mixes}
+          />
+        
+          
         </div>
         <div className="bg-green-100 p-4 rounded shadow">
          <TestMixTotals mixes={mixes} activeMixId={activeMixId} />
-              
+        
+        
         
         
         
