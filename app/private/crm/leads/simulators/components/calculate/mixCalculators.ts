@@ -14,13 +14,6 @@ export type MixTotals = {
   mixPeakMonthlyPayment: number;    // התשלום החודשי הגבוה ביותר
 };
 
-
-
-
-
-
-
-
 export function calculateMixTotals(
   loans: Loan[],
   isIndexed: boolean,
