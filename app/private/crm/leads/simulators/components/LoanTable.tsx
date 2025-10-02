@@ -364,7 +364,7 @@ const [isAmortizationModalOpen, setIsAmortizationModalOpen] = useState(false);
 
                   {/* סכום חודשי */}
                   <td className="border p-1 text-right">
-                    {calculateLoan(loan, false, annualInflation).monthlyPayment.toLocaleString("he-IL", {
+                    {calculateLoan(loan, annualInflation).monthlyPayment.toLocaleString("he-IL", {
                       minimumFractionDigits: 0,
                       maximumFractionDigits: 0,
                     })}
@@ -419,10 +419,6 @@ const [isAmortizationModalOpen, setIsAmortizationModalOpen] = useState(false);
 
                   </td>
 
-
-
-
-
                 </tr>
 
                 {/* סיכום הלוואה */}
@@ -474,7 +470,7 @@ const [isAmortizationModalOpen, setIsAmortizationModalOpen] = useState(false);
             <td className="border p-2 text-right">
               {loans
                 .reduce((sum, loan) => {
-                  const result = calculateLoan(loan, false, annualInflation);
+                  const result = calculateLoan(loan, annualInflation);
                   return sum + result.monthlyPayment;
                 }, 0)
                 .toLocaleString("he-IL", {
@@ -496,20 +492,12 @@ const [isAmortizationModalOpen, setIsAmortizationModalOpen] = useState(false);
 
       </table>
 
-
-    
 <LoanAmortization
   isOpen={isAmortizationOpen}
   onClose={() => setIsAmortizationOpen(false)}
   loan={activeLoan}
   annualInflation={annualInflation}   // 👈 עכשיו באמת יעבור מהסטייט
 />
-
-
-
-
-
-
 
 
     </div>

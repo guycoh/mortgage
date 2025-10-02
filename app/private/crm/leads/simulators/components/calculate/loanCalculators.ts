@@ -31,6 +31,9 @@ export type LoanResult = {
   schedule: ScheduleRow[];
 };
 
+
+
+
 /**
  * מחשב את תוצאות ההלוואה לפי סוג לוח סילוקין
  */
