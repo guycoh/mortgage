@@ -4,18 +4,11 @@ import { useParams } from "next/navigation";
 import LoanTable, { Loan } from "../components/LoanTable";
 import { useLoanPaths } from "@/app/data/hooks/useLoanPaths";
 
-
-import ActiveMixDisplay from "../tests/TestMix";
-
-
-
-
 import UnifiedScheduleModal from "../components/UnifiedScheduleModal";
-
 import MixComparisonTable from "../components/MixComparisonTable";
 
 
-import MixScheduleSVGChart from "../tests/MixScheduleChart";
+
 
 
 
@@ -326,11 +319,11 @@ const openModal = () => {
 
 
 
-          <ActiveMixDisplay activeMixId={activeMixId} mixes={mixes} annualInflation={annualInflation}/>
+          
         </div>
         <div className="bg-green-100 p-4 rounded shadow">
        
-        <MixScheduleSVGChart mixes={mixes} activeMixId={activeMixId}   />
+  
         
         
         
