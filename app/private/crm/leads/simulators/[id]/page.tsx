@@ -1,17 +1,23 @@
 "use client"
-
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useParams } from "next/navigation";
 import LoanTable, { Loan } from "../components/LoanTable";
 import { useLoanPaths } from "@/app/data/hooks/useLoanPaths";
 
-import { calculateAllMixTotals,calculateMixTotals } from "../components/calculate/mixCalculators";
 
-import TestMixTotals from "../components/TestMixTotals";
-import MixSummary from "../components/MixSummary";
+import ActiveMixDisplay from "../tests/TestMix";
 
-import MergedScheduleChart from "../components/MergedScheduleChart";
-import { mergeSchedulesForMix } from "../components/calculate/mergeSchedulesForMix";
+
+
+
+import UnifiedScheduleModal from "../components/UnifiedScheduleModal";
+
+import MixComparisonTable from "../components/MixComparisonTable";
+
+
+import MixScheduleSVGChart from "../tests/MixScheduleChart";
+
+
 
 type Mix = {
   id: string;
@@ -30,6 +36,7 @@ export default function SimulatorPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+  const [isUnifiedSchedule, setIsUnifiedSchedulelOpen] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -56,7 +63,7 @@ export default function SimulatorPage() {
 
   // 🔹 Active and compare mix
   const activeMix = useMemo(() => mixes.find((m) => m.id === activeMixId), [mixes, activeMixId]);
-  const compareMix = useMemo(() => mixes.find((m) => m.id === compareMixId), [mixes, compareMixId]);
+  //const compareMix = useMemo(() => mixes.find((m) => m.id === compareMixId), [mixes, compareMixId]);
 
   // 🔹 Reset compareMix when active changes
   useEffect(() => setCompareMixId(null), [activeMixId]);
@@ -121,31 +128,27 @@ export default function SimulatorPage() {
 
   // 🔹 Totals
   // 🔹 Totals
-const allTotals = useMemo(() => {
-  return mixes.map((mix) => {
-    return calculateMixTotals(mix.loans || [], true, annualInflation, mix.id);
-  });
-}, [mixes, annualInflation]);
+// const allTotals = useMemo(() => {
+//   return mixes.map((mix) => {
+//     return calculateMixTotals(mix.loans || [], true, annualInflation, mix.id);
+//   });
+// }, [mixes, annualInflation]);
 
-
-  // 🔹 Merged schedule for chart
-  const mergedSchedule = useMemo(() => {
-    if (!activeMix?.loans) return [];
-    return mergeSchedulesForMix(activeMix.loans, true, annualInflation) || [];
-  }, [activeMix, annualInflation]);
-
-
-
-
-
+// פתיחת תמהיל משולב
+const openModal = () => {
+  
+    setIsUnifiedSchedulelOpen(true);
+  };
 
 
 
   return (
     <div className="p-6" ref={containerRef}>
-      {/* Header + Inflation */}
-      <div className="flex items-center gap-4 mb-4">
+      {/* Header + Inflation + Compare + Save + Modal */}
+      <div className="flex items-center gap-4 mb-4 flex-wrap">
         <h1 className="text-2xl font-bold">סימולטור לליד {leadId}</h1>
+
+        {/* אינפלציה */}
         <div className="flex items-center gap-2">
           <label className="text-sm font-medium text-gray-700">אינפלציה שנתית צפויה:</label>
           <input
@@ -156,48 +159,63 @@ const allTotals = useMemo(() => {
             className={`${fieldClasses} w-20`}
           />
           <span className="text-sm text-gray-600">חודשי: {(annualInflation / 12).toFixed(3)}%</span>
+        </div>
 
-          {activeMix && (
-            <div>
-              <label className="text-sm font-medium text-gray-700 mr-2">תמהיל להשוואה :</label>
-              <select
-                value={compareMixId ?? ""}
-                onChange={(e) => setCompareMixId(e.target.value || null)}
-                className={fieldClasses}
-              >
-                <option value="">בחר תמהיל להשוואה</option>
-                {mixes.filter((m) => m.id !== activeMixId).map((m) => (
+        {/* תמהיל להשוואה */}
+        {activeMix && (
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-medium text-gray-700">תמהיל להשוואה:</label>
+            <select
+              value={compareMixId ?? ""}
+              onChange={(e) => setCompareMixId(e.target.value || null)}
+              className={fieldClasses}
+            >
+              <option value="">בחר תמהיל להשוואה</option>
+              {mixes
+                .filter((m) => m.id !== activeMixId)
+                .map((m) => (
                   <option key={m.id} value={m.id}>
                     {m.mix_name}
                   </option>
                 ))}
-              </select>
-            </div>
-          )}
+            </select>
+          </div>
+        )}
 
-          <div className="relative inline-block">
-            <button
-              onClick={handleSave}
-              disabled={isSaving}
-              className={`h-9 px-4 bg-green-600 text-white rounded-lg shadow hover:bg-green-700 transition flex items-center justify-center gap-2 ${
-                isSaving ? "opacity-70 cursor-not-allowed" : ""
+        {/* כפתורי שמירה ולוח סילוקין */}
+        <div className="relative flex items-center gap-2">
+          <button
+            onClick={handleSave}
+            disabled={isSaving}
+            className={`h-9 px-4 bg-green-600 text-white rounded-lg shadow hover:bg-green-700 transition flex items-center justify-center gap-2 ${
+              isSaving ? "opacity-70 cursor-not-allowed" : ""
+            }`}
+          >
+            {isSaving && (
+              <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+            )}
+            שמור שינויים
+          </button>
+
+          <button
+            className="h-9 px-4 bg-green-600 text-white rounded-lg shadow hover:bg-green-700 transition flex items-center justify-center gap-2"
+            onClick={() => openModal()}
+          >
+            לוח סילוקין לתמהיל
+          </button>
+
+          {(successMessage || errorMessage) && (
+            <div
+              className={`absolute top-full mt-2 p-2 rounded text-white text-sm shadow-lg ${
+                successMessage ? "bg-green-600" : "bg-red-600"
               }`}
             >
-              {isSaving && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>}
-              שמור שינויים
-            </button>
-            {(successMessage || errorMessage) && (
-              <div
-                className={`absolute top-full mt-2 p-2 rounded text-white text-sm shadow-lg ${
-                  successMessage ? "bg-green-600" : "bg-red-600"
-                }`}
-              >
-                {successMessage || errorMessage}
-              </div>
-            )}
-          </div>
+              {successMessage || errorMessage}
+            </div>
+          )}
         </div>
       </div>
+
 
       {/* Tabs */}
       <div className="flex gap-2 mb-4 overflow-x-auto">
@@ -298,31 +316,53 @@ const allTotals = useMemo(() => {
       {/* Totals + Chart */}
       <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
         <div className="bg-blue-100 rounded shadow p-4">
-         <MixSummary
-            activeMixId={activeMixId}
-            compareMixId={compareMixId}
-            mixes={mixes}
-          />
-        
-          
+ 
+<MixComparisonTable
+  activeMixId={activeMixId}
+  mixes={mixes}
+  annualInflation={annualInflation}
+  compareMixId={compareMixId}
+/>
+
+
+
+          <ActiveMixDisplay activeMixId={activeMixId} mixes={mixes} annualInflation={annualInflation}/>
         </div>
         <div className="bg-green-100 p-4 rounded shadow">
-         <TestMixTotals mixes={mixes} activeMixId={activeMixId} />
-        
+       
+        <MixScheduleSVGChart mixes={mixes} activeMixId={activeMixId}   />
         
         
         
         
         
         </div>
-        <div className="bg-yellow-100 p-4 rounded shadow"> {mergedSchedule.length > 0 ? <MergedScheduleChart schedule={mergedSchedule} /> : "בחר תמהיל להצגה"} </div>
+       
       </div>
+
+      {isUnifiedSchedule && (
+          <UnifiedScheduleModal
+            activeMixId={activeMixId}
+            mixes={mixes}
+            annualInflation={annualInflation}
+            onClose={() => setIsUnifiedSchedulelOpen(false)}
+          />
+        )}
+
+
+
+
     </div>
   );
 }
 
 
-
+ {/* <MixSummary
+            activeMixId={activeMixId}
+            compareMixId={compareMixId}
+            mixes={mixes}
+          /> */}
+        
 
 
 

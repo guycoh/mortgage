@@ -1,177 +1,129 @@
+// LoanAmortization.tsx
+
 "use client"
 
+import React from "react";
+import { Loan, LoanResult, calculateLoan } from "./calculate/loanCalculators";
 
-import { Loan, LoanResult, ScheduleRow, calculateLoan } from "./calculate/loanCalculators";
-
-import ExportScheduleButton from "./ExportScheduleButton";
-
-
-
-type Props = {
+interface LoanAmortizationProps {
   isOpen: boolean;
   onClose: () => void;
-  loan?: Loan | null;
-  path?: { id: number; name: string; is_indexed?: boolean };
-  annualInflation?: number; // באחוזים
-};
+  loan: Loan | null;
+  annualInflation?: number;
+}
 
 export default function LoanAmortization({
   isOpen,
   onClose,
   loan,
-  path,
   annualInflation = 0,
-}: Props) {
+}: LoanAmortizationProps) {
   if (!isOpen || !loan) return null;
 
-  const isIndexed = path?.is_indexed ?? false;
-
-  // מחשב את ההלוואה כולל לוח סילוקין
- const result: LoanResult = calculateLoan(loan, isIndexed, annualInflation);
-
-  // יוצרים לוח סילוקין אם לא קיים
-  if (!result.schedule && loan.amortization_schedule_id === 2) {
-    const schedule: ScheduleRow[] = [];
-    const r = loan.rate / 12 / 100;
-    let openingBalance = loan.amount;
-    const monthlyInflation = isIndexed ? Math.pow(1 + annualInflation / 100, 1 / 12) - 1 : 0;
-
-    for (let i = 1; i <= loan.months; i++) {
-      const inflationFactor = Math.pow(1 + monthlyInflation, i);
-      const principalPayment = loan.amount / loan.months;
-      const interestPayment = openingBalance * r;
-      const monthlyPayment = principalPayment + interestPayment;
-
-      const closingBalance = openingBalance - principalPayment;
-
-      schedule.push({
-        month: i,
-        openingBalance,
-        principal: principalPayment,
-        interest: interestPayment,
-        payment: monthlyPayment * (isIndexed ? inflationFactor : 1),
-        closingBalance,
-      });
-
-      openingBalance = closingBalance;
-    }
-
-    result.schedule = schedule;
-    result.totalPaid = schedule.reduce((acc, s) => acc + s.payment, 0);
-    result.totalInterest = schedule.reduce((acc, s) => acc + s.interest, 0);
-    result.maxMonthlyPayment = Math.max(...schedule.map((s) => s.payment));
-  }
+  const loanResult: LoanResult = calculateLoan(loan, annualInflation);
 
   return (
-    <div className="fixed inset-0 bg-black/30 flex justify-center items-start overflow-auto z-50">
-      <div className="bg-white p-4 m-8 rounded shadow-lg w-full max-w-4xl">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-bold">לוח סילוקין - {path?.name || "הלוואה"}</h2>
-          <ExportScheduleButton
-            schedule={result.schedule || []}
-            fileName={`loan_${loan.mix_id || "unknown"}_schedule.csv`}
-            />
+    <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/50">
+      <div className="bg-white rounded-2xl shadow-2xl w-11/12 max-w-5xl max-h-[85vh] flex flex-col relative">
+        {/* כפתור X לסגירה */}
+        <button
+          onClick={onClose}
+          className="absolute top-3 left-3 text-3xl font-extrabold text-gray-700 hover:text-red-600 transition"
+        >
+          ×
+        </button>
 
-          <button
-            onClick={onClose}
-            className="px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700"
-          >
-            סגור
-          </button>
+        {/* כותרת */}
+        <div className="bg-blue-600 text-white text-center py-3 rounded-t-2xl">
+          <h2 className="text-xl font-bold">לוח סילוקין — {loan.id}</h2>
         </div>
 
-        {result && (
-          <div className="mb-4 p-4 border rounded-lg bg-gray-50">
-            <h3 className="text-lg font-semibold mb-2">סיכום ההלוואה</h3>
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              <div className="font-medium">תשלום חודשי התחלתי:</div>
-              <div>{result.monthlyPayment.toLocaleString("he-IL", { maximumFractionDigits: 2 })} ₪</div>
-
-              <div className="font-medium">תשלום חודשי מקסימלי:</div>
-              <div>{result.maxMonthlyPayment?.toLocaleString("he-IL", { maximumFractionDigits: 2 })} ₪</div>
-
-              <div className="font-medium">סה"כ ריבית + הצמדה:</div>
-              <div>{result.totalInterest?.toLocaleString("he-IL", { maximumFractionDigits: 2 })} ₪</div>
-
-              <div className="font-medium">סה"כ תשלום כולל לבנק:</div>
-              <div>{result.totalPaid?.toLocaleString("he-IL", { maximumFractionDigits: 2 })} ₪</div>
-            </div>
+        {/* סיכום */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 border-b border-gray-200 text-sm">
+          <div>
+            <span className="font-semibold">תשלום חודשי התחלתי:</span>{" "}
+            {loanResult.monthlyPayment.toLocaleString("he-IL", {
+              maximumFractionDigits: 0,
+            })}
           </div>
-        )}
+          <div>
+            <span className="font-semibold">תשלום חודשי מקסימלי:</span>{" "}
+            {loanResult.maxMonthlyPayment.toLocaleString("he-IL", {
+              maximumFractionDigits: 0,
+            })}
+          </div>
+          <div>
+            <span className="font-semibold">סך קרן:</span>{" "}
+            {loanResult.totalPrincipal.toLocaleString("he-IL", {
+              maximumFractionDigits: 0,
+            })}
+          </div>
+          <div>
+            <span className="font-semibold">סך ריבית:</span>{" "}
+            {loanResult.totalInterest.toLocaleString("he-IL", {
+              maximumFractionDigits: 0,
+            })}
+          </div>
+          <div className="col-span-2">
+            <span className="font-semibold">סך תשלום כולל:</span>{" "}
+            {loanResult.totalPaid.toLocaleString("he-IL", {
+              maximumFractionDigits: 0,
+            })}
+          </div>
+          <div>
+            <span className="font-semibold">צמוד מדד:</span>{" "}
+            {loanResult.isIndexed ? "כן" : "לא"}
+          </div>
+        </div>
 
-
-
-
-
-
-
-
-
-
-
-
-
-        <table className="w-full border-collapse border border-gray-300 text-sm">
-          <thead className="bg-gray-200">
-            <tr>
-              <th className="border p-1">חודש</th>
-              <th className="border p-1">י.פ</th>
-              <th className="border p-1">קרן</th>
-              <th className="border p-1">ריבית</th>
-              <th className="border p-1">תשלום חודשי</th>
-              <th className="border p-1">י.ס</th>
-            </tr>
-          </thead>
-          <tbody>
-            {result.schedule?.map((s) => (
-              <tr key={s.month} className="hover:bg-gray-100">
-                <td className="border p-1 text-center">{s.month}</td>
-                <td className="border p-1 text-right">{s.openingBalance.toLocaleString("he-IL", { minimumFractionDigits: 2 })}</td>
-                <td className="border p-1 text-right">{s.principal.toLocaleString("he-IL", { minimumFractionDigits: 2 })}</td>
-                <td className="border p-1 text-right">{s.interest.toLocaleString("he-IL", { minimumFractionDigits: 2 })}</td>
-                <td className="border p-1 text-right">{s.payment.toLocaleString("he-IL", { minimumFractionDigits: 2 })}</td>
-                <td className="border p-1 text-right">{s.closingBalance.toLocaleString("he-IL", { minimumFractionDigits: 2 })}</td>
+        {/* טבלה */}
+        <div className="flex-1 overflow-y-auto p-4">
+          <table className="w-full border-collapse border border-gray-300 text-sm">
+            <thead className="bg-gray-200 sticky top-0 z-10">
+              <tr>
+                <th className="border p-2">חודש</th>
+                <th className="border p-2">תשלום</th>
+                <th className="border p-2">קרן</th>
+                <th className="border p-2">ריבית</th>
+                <th className="border p-2">יתרת פתיחה</th>
+                <th className="border p-2">יתרת סגירה</th>
               </tr>
-            ))}
-          </tbody>
-          <tfoot className="bg-gray-100 font-bold">
-            <tr>
-              <td className="border p-1 text-center">סה"כ</td>
-              <td className="border p-1"></td>
-              <td className="border p-1">{result.schedule?.reduce((sum, s) => sum + s.principal, 0).toLocaleString("he-IL", { minimumFractionDigits: 2 })}</td>
-              <td className="border p-1">{result.schedule?.reduce((sum, s) => sum + s.interest, 0).toLocaleString("he-IL", { minimumFractionDigits: 2 })}</td>
-              <td className="border p-1">{result.totalPaid?.toLocaleString("he-IL", { minimumFractionDigits: 2 })}</td>
-              <td className="border p-1"></td>
-            </tr>
-          </tfoot>
-        </table>
+            </thead>
+            <tbody>
+              {loanResult.schedule.map((row) => (
+                <tr key={row.month} className="hover:bg-gray-100">
+                  <td className="border p-2">{row.month}</td>
+                  <td className="border p-2">
+                    {row.payment.toLocaleString("he-IL", {
+                      maximumFractionDigits: 0,
+                    })}
+                  </td>
+                  <td className="border p-2">
+                    {row.principal.toLocaleString("he-IL", {
+                      maximumFractionDigits: 0,
+                    })}
+                  </td>
+                  <td className="border p-2">
+                    {row.interest.toLocaleString("he-IL", {
+                      maximumFractionDigits: 0,
+                    })}
+                  </td>
+                  <td className="border p-2">
+                    {row.openingBalance.toLocaleString("he-IL", {
+                      maximumFractionDigits: 0,
+                    })}
+                  </td>
+                  <td className="border p-2">
+                    {row.closingBalance.toLocaleString("he-IL", {
+                      maximumFractionDigits: 0,
+                    })}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

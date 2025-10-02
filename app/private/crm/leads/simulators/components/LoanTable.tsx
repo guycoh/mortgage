@@ -8,8 +8,6 @@ import LoanAmortization from "./LoanAmortization";
 import { useState } from "react";
 
 import { schedules } from "@/app/data/amortization_schedules";
-
-
 import { LoanResult, calculateLoan } from "./calculate/loanCalculators";
 
 
@@ -81,8 +79,6 @@ const [isAmortizationModalOpen, setIsAmortizationModalOpen] = useState(false);
     onChange(updated);
   };
 
-  
-  
   //לבטל
   const calculateMonthly = (loan: Loan) => {
     if (!loan.months || loan.months === 0) return 0;
@@ -372,9 +368,7 @@ const [isAmortizationModalOpen, setIsAmortizationModalOpen] = useState(false);
                       minimumFractionDigits: 0,
                       maximumFractionDigits: 0,
                     })}
-                  </td>
-
-                 
+                  </td>                              
 
                   {/* פעולות */}
                   <td className="border p-1 w-[140px]">
@@ -504,16 +498,18 @@ const [isAmortizationModalOpen, setIsAmortizationModalOpen] = useState(false);
 
 
     
-    {/* 👇 מחוץ ל־map אבל בתוך LoanTable */}
-    <LoanAmortization
-      isOpen={isAmortizationOpen}
-      onClose={() => setIsAmortizationOpen(false)}
-      loan={activeLoan}
-      path={paths.find((p) => p.id === activeLoan?.path_id)}
-      annualInflation={annualInflation}            
-      //isIndexed={paths.find((p) => p.id === activeLoan?.path_id)?.is_indexed ?? false}
-    //  monthlyPayment={activeLoan ? calculateMonthly(activeLoan) : 0} // ✨ שולח את החישוב
-    />
+<LoanAmortization
+  isOpen={isAmortizationOpen}
+  onClose={() => setIsAmortizationOpen(false)}
+  loan={activeLoan}
+  annualInflation={annualInflation}   // 👈 עכשיו באמת יעבור מהסטייט
+/>
+
+
+
+
+
+
 
 
     </div>
