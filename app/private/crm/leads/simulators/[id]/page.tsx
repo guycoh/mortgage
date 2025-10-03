@@ -7,7 +7,7 @@ import { useLoanPaths } from "@/app/data/hooks/useLoanPaths";
 import UnifiedScheduleModal from "../components/UnifiedScheduleModal";
 import MixComparisonTable from "../components/MixComparisonTable";
 
-
+import MixScheduleChartSVG from "../components/MixScheduleChartSVG";
 
 
 
@@ -54,8 +54,19 @@ export default function SimulatorPage() {
     fetchData();
   }, [leadId]);
 
+
+const activeMix = mixes.find((m) => m.id === activeMixId);
+
+
+
+
+
+
+
+
+
   // 🔹 Active and compare mix
-  const activeMix = useMemo(() => mixes.find((m) => m.id === activeMixId), [mixes, activeMixId]);
+
   //const compareMix = useMemo(() => mixes.find((m) => m.id === compareMixId), [mixes, compareMixId]);
 
   // 🔹 Reset compareMix when active changes
@@ -308,25 +319,21 @@ const openModal = () => {
 
       {/* Totals + Chart */}
       <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
-        <div className="bg-blue-100 rounded shadow p-4">
- 
-<MixComparisonTable
-  activeMixId={activeMixId}
-  mixes={mixes}
-  annualInflation={annualInflation}
-  compareMixId={compareMixId}
-/>
-
-
-
-          
+        <div className="bg-blue-100 rounded shadow p-4"> 
+            <MixComparisonTable
+              activeMixId={activeMixId}
+              mixes={mixes}
+              annualInflation={annualInflation}
+              compareMixId={compareMixId}
+            />          
         </div>
         <div className="bg-green-100 p-4 rounded shadow">
-       
-  
-        
-        
-        
+       <MixScheduleChartSVG
+          activeMixId={activeMixId}
+          mixes={mixes}
+          annualInflation={annualInflation}
+        />
+      
         
         
         </div>

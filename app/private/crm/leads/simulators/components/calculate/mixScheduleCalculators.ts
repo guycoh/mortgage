@@ -1,5 +1,4 @@
 //mixScheduleCalculators.ts
-//mixScheduleCalculators.ts
 import { Loan, calculateLoan, ScheduleRow } from "./loanCalculators";
 
 export type CombinedRow = {
