@@ -30,22 +30,29 @@ export default function MixScheduleChartSVG({
 
 
 
-  const maxPayment = Math.max(...data.map((d) => d.totalPayment));
+
   const months = data.length;
 
-    // נגדיר את המקרא פעם אחת
-    const legendItems = [
-    { label: "קרן", color: "#4CAF50" },        // ירוק
-    { label: "ריבית", color: "#F44336" },      // אדום
-    { label: "תשלום חודשי", color: "#2196F3" } // כחול
-    ];
+  // נגדיר את המקרא פעם אחת
+  const legendItems = [
+  { label: "קרן", color: "#4CAF50" },        // ירוק
+  { label: "ריבית", color: "#F44336" },      // אדום
+  { label: "תשלום חודשי", color: "#2196F3" } // כחול
+  ];
 
+
+
+const payments = data.map((d) => d.totalPayment ?? 0);
+const maxPayment = Math.max(...payments, 0); // הגנה במקרה של undefined או רשימה ריקה
 
 const scaleX = (month: number) =>
   padding + (months > 0 ? (month / months) * (width - 2 * padding) : 0);
 
- const scaleY = (val: number) =>
-    height - padding - (val / maxPayment) * (height - 2 * padding);
+const scaleY = (val: number) => {
+  if (!maxPayment || maxPayment <= 0 || isNaN(maxPayment)) return height - padding;
+  return height - padding - (val / maxPayment) * (height - 2 * padding);
+};
+
 
   const makePath = (
     key: "totalPayment" | "totalPrincipal" | "totalInterest"
@@ -74,7 +81,7 @@ const scaleX = (month: number) =>
   }
 
   return (
-    <div className="p-6 bg-white rounded-xl shadow-lg border border-gray-200 w-full h-auto">
+    <div className="p-6  bg-white rounded-xl shadow-lg border border-gray-200 w-full h-auto">
       <svg
         viewBox={`0 0 ${width} ${height}`}
         preserveAspectRatio="xMidYMid meet"

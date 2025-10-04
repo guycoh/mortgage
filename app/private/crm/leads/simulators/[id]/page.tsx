@@ -121,21 +121,6 @@ const activeMix = mixes.find((m) => m.id === activeMixId);
   };
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   // 🔹 Save Mixes
   const handleSave = async () => {
     setIsSaving(true);
@@ -165,64 +150,27 @@ const activeMix = mixes.find((m) => m.id === activeMixId);
     }
   };
  // 🔹 שכפול תמהיל קיים (עם מזהים חדשים)
-// const duplicateMix = () => {
-//   if (!activeMixId) return;
 
-//   const mixToCopy = mixes.find((m) => m.id === activeMixId);
-//   if (!mixToCopy) return;
 
-//   // שכפול עמוק של ההלוואות עם מזהי id חדשים
-//   const duplicatedLoans = mixToCopy.loans
-//     ? mixToCopy.loans.map((loan) => ({
-//         ...loan,
-//         id: crypto.randomUUID(), // מזהה חדש לכל הלוואה
-//       }))
-//     : [];
+  // 🔹 שכפול תמהיל קיים (עם מזהים חדשים)
+  const duplicateMix = () => {
+    if (!activeMixId) return;
+    const mixToCopy = mixes.find(m => m.id === activeMixId);
+    if (!mixToCopy) return;
 
-//   // יצירת תמהיל חדש עם id חדש ונתונים זהים
-//   const duplicatedMix: Mix = {
-//     ...mixToCopy,
-//     id: crypto.randomUUID(), // מזהה חדש לתמהיל
-//     mix_name: `${mixToCopy.mix_name} (העתק)`,
-//     loans: duplicatedLoans,
-//   };
+    const duplicatedLoans = mixToCopy.loans?.map(l => ({ ...l, id: crypto.randomUUID() })) || [];
 
-//   setMixes((prev) => [...prev, duplicatedMix]);
-//   setActiveMixId(duplicatedMix.id);
-// };
+    const duplicatedMix: Mix = {
+      ...mixToCopy,
+      id: crypto.randomUUID(),
+      mix_name: `${mixToCopy.mix_name} (העתק)`,
+      loans: duplicatedLoans,
+      is_base: false, // ✅ ההעתק לא בסיסי
+    };
 
- // 🔹 שכפול תמהיל קיים (עם מזהים חדשים)
-const duplicateMix = () => {
-  if (!activeMixId) return;
-  const mixToCopy = mixes.find(m => m.id === activeMixId);
-  if (!mixToCopy) return;
-
-  const duplicatedLoans = mixToCopy.loans?.map(l => ({ ...l, id: crypto.randomUUID() })) || [];
-
-  const duplicatedMix: Mix = {
-    ...mixToCopy,
-    id: crypto.randomUUID(),
-    mix_name: `${mixToCopy.mix_name} (העתק)`,
-    loans: duplicatedLoans,
-    is_base: false, // ✅ ההעתק לא בסיסי
+    setMixes(prev => [...prev, duplicatedMix]);
+    setActiveMixId(duplicatedMix.id);
   };
-
-  setMixes(prev => [...prev, duplicatedMix]);
-  setActiveMixId(duplicatedMix.id);
-};
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
   // 🔹 Menu positioning
@@ -345,10 +293,6 @@ const defaultMix = createMix("משכנתא נוכחית");
             </button>
           )}
           
-          
-          
-          
-          
           <button
             className="h-9 px-4 bg-green-600 text-white rounded-lg shadow hover:bg-green-700 transition flex items-center justify-center gap-2"
             onClick={() => openModal()}
@@ -369,14 +313,15 @@ const defaultMix = createMix("משכנתא נוכחית");
         </div>
       </div>
 
-
       {/* Tabs */}
       <div className="flex gap-2 mb-4 overflow-x-auto">
         {mixes.map((m) => (
           <div
             key={m.id}
             className={`relative flex items-center px-3 py-0.5 rounded-t-lg shadow-sm cursor-pointer transition ${
-              m.id === activeMixId ? "bg-purple-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              m.id === activeMixId
+                ? "bg-purple-600 text-white"
+                : "bg-gray-300 text-gray-800 hover:bg-gray-400"
             }`}
             onClick={() => setActiveMixId(m.id)}
           >
@@ -387,7 +332,11 @@ const defaultMix = createMix("משכנתא נוכחית");
                 autoFocus
                 onClick={(e) => e.stopPropagation()}
                 onChange={(e) =>
-                  setMixes((prev) => prev.map((x) => (x.id === m.id ? { ...x, mix_name: e.target.value } : x)))
+                  setMixes((prev) =>
+                    prev.map((x) =>
+                      x.id === m.id ? { ...x, mix_name: e.target.value } : x
+                    )
+                  )
                 }
                 onBlur={() => setEditingId(null)}
                 className="px-2 py-0.5 rounded border focus:outline-none focus:ring-2 focus:ring-purple-400 text-black"
@@ -396,7 +345,10 @@ const defaultMix = createMix("משכנתא נוכחית");
               <span className="font-medium">{m.mix_name}</span>
             )}
             <div className="ml-1 relative" onClick={(e) => e.stopPropagation()}>
-              <button className="px-1.5 py-0.5 rounded hover:bg-white/20" onClick={(e) => openMenu(m.id, e)}>
+              <button
+                className="px-1.5 py-0.5 rounded hover:bg-white/20"
+                onClick={(e) => openMenu(m.id, e)}
+              >
                 ⋮
               </button>
             </div>
