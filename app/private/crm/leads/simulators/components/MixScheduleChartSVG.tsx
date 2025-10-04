@@ -1,4 +1,5 @@
-"use client";
+//MixScheduleChartSVG.tsx
+"use client"
 
 import { calculateMixFullTotals } from "./calculate/mixScheduleCalculators";
 import { Loan } from "./calculate/loanCalculators";
@@ -23,6 +24,9 @@ export default function MixScheduleChartSVG({
   const width = 800;
   const height = 400;
   const padding = 50;
+  if (!data || data.length === 0) {
+    return <div>אין נתונים להצגה עבור תמהיל זה</div>;
+  }
 
 
 
@@ -37,15 +41,10 @@ export default function MixScheduleChartSVG({
     ];
 
 
+const scaleX = (month: number) =>
+  padding + (months > 0 ? (month / months) * (width - 2 * padding) : 0);
 
-
-
-
-
-
-  const scaleX = (month: number) =>
-    padding + (month / months) * (width - 2 * padding);
-  const scaleY = (val: number) =>
+ const scaleY = (val: number) =>
     height - padding - (val / maxPayment) * (height - 2 * padding);
 
   const makePath = (
@@ -147,20 +146,20 @@ export default function MixScheduleChartSVG({
         <path d={pathInterest} stroke="red" fill="none" strokeWidth={2} />
 
         {/* מקרא */}
+      
         {/* Legend */}
- {/* Legend */}
-<g transform={`translate(${width - padding + 20}, ${padding})`}>
-  {legendItems.map((item, index) => (
-    <g key={item.label} transform={`translate(0, ${index * 30})`}>
-      {/* ריבוע צבע */}
-      <rect width={12} height={12} fill={item.color} rx={2} />
-      {/* טקסט בשורה מתחת */}
-      <text x={0} y={20} fontSize={12} fill="black">
-        {item.label}
-      </text>
-    </g>
-  ))}
-</g>
+        <g transform={`translate(${width - padding + 20}, ${padding})`}>
+        {legendItems.map((item, index) => (
+            <g key={item.label} transform={`translate(0, ${index * 30})`}>
+            {/* ריבוע צבע */}
+            <rect width={12} height={12} fill={item.color} rx={2} />
+            {/* טקסט בשורה מתחת */}
+            <text x={0} y={20} fontSize={12} fill="black">
+                {item.label}
+            </text>
+            </g>
+        ))}
+        </g>
 
 
 

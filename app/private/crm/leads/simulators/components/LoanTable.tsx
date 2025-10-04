@@ -2,6 +2,9 @@
 
 import React from "react";
 import { LoanPath } from "@/app/data/hooks/useLoanPaths";
+import { graceTypes } from "@/app/data/graceTypes";
+
+
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import LoanAmortization from "./LoanAmortization";
@@ -26,8 +29,11 @@ export type Loan = {
   created_at?: string;
   anchor_interval?: string | null;
   end_date?: string | null;
-  amortization_schedule_id: number; // 👈 כאן זה חובה
+  amortization_schedule_id: number;
+  grace_type_id?: number | null; // סוג גרייס (מתוך grace_types)
+  grace_months?: number; // ✅ חדש — מספר חודשי גרייס
 };
+
 
 type Props = {
   loans: Loan[];
@@ -52,8 +58,6 @@ export default function LoanTable({
 
 const [isAmortizationOpen, setIsAmortizationOpen] = React.useState(false)
 const [activeLoan, setActiveLoan] = React.useState<Loan | null>(null);
-//טסט
-const [isAmortizationModalOpen, setIsAmortizationModalOpen] = useState(false);
 
 
 
@@ -121,6 +125,7 @@ const [isAmortizationModalOpen, setIsAmortizationModalOpen] = useState(false);
 
   return (
     <div className="overflow-x-auto">
+      
       <button
         onClick={addLoan}
         className="mb-2 px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 transition"
@@ -290,31 +295,30 @@ const [isAmortizationModalOpen, setIsAmortizationModalOpen] = useState(false);
                   {/* גרייס */}
                   <td className="border p-1 w-[80px] bg-gray-400">
                     <select
-                    
-                    
+                      value={loan.grace_type_id ?? 1}
+                      onChange={(e) => updateLoan(idx, "grace_type_id", Number(e.target.value))}
                       className="w-full px-1 py-0.5 border rounded focus:ring-2 focus:ring-purple-400 text-center focus:bg-orange-100"
                     >
-                      {[
-                        { id: 1, grace: 'ללא', labelEn: 'None' },
-                        { id: 2, grace: 'חלקי', labelEn: 'Partial' },
-                        { id: 3, grace: 'מלא', labelEn: 'Full' },
-                      ].map((g) => (
+                      {graceTypes.map((g) => (
                         <option key={g.id} value={g.id}>
-                          {g.grace}
+                          {g.name}
                         </option>
                       ))}
                     </select>
                   </td>
 
-                  {/* חודשי גרייס */}
+                 {/* חודשי גרייס */}
                   <td className="border p-1 w-[60px] bg-gray-400">
                     <input
                       type="number"
                       min={0}
-                          className="w-full px-1 py-0.5 border rounded focus:ring-2 focus:ring-purple-400 text-center focus:bg-orange-100 "
+                      value={loan.grace_months ?? 0}
+                      onChange={(e) =>
+                        updateLoan(idx, "grace_months", Number(e.target.value))
+                      }
+                      className="w-full px-1 py-0.5 border rounded focus:ring-2 focus:ring-purple-400 text-center focus:bg-orange-100"
                     />
                   </td>
-
                   {/* תאריך סיום */}
                   <td className="border p-1">
                     <DatePicker
@@ -492,12 +496,12 @@ const [isAmortizationModalOpen, setIsAmortizationModalOpen] = useState(false);
 
       </table>
 
-<LoanAmortization
-  isOpen={isAmortizationOpen}
-  onClose={() => setIsAmortizationOpen(false)}
-  loan={activeLoan}
-  annualInflation={annualInflation}   // 👈 עכשיו באמת יעבור מהסטייט
-/>
+        <LoanAmortization
+          isOpen={isAmortizationOpen}
+          onClose={() => setIsAmortizationOpen(false)}
+          loan={activeLoan}
+          annualInflation={annualInflation}   // 👈 עכשיו באמת יעבור מהסטייט
+        />
 
 
     </div>

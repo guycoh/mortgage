@@ -24,8 +24,12 @@ type Loan = {
   anchor_interval?: string | null;
   end_date?: string | null;
   amortization_schedule_id ?: number;
+  grace_type_id?: number | null; 
+  grace_months?: number; 
 
 };
+
+
 
 type Mix = {
   id: string;
@@ -110,6 +114,9 @@ export async function POST(req: NextRequest) {
               anchor_interval: loan.anchor_interval ?? null,
               change_frequency: loan.change_frequency ?? null,
               amortization_schedule_id: loan.amortization_schedule_id ?? null, 
+              grace_type_id: loan.grace_type_id ?? null,
+              grace_months: loan. grace_months ?? null,
+
             })
             .eq("id", loan.id);
           if (error) throw error;
@@ -129,6 +136,9 @@ export async function POST(req: NextRequest) {
                 anchor_interval: loan.anchor_interval ?? null,
                 change_frequency: loan.change_frequency ?? null,
                 amortization_schedule_id: loan.amortization_schedule_id ?? null,
+                grace_type_id: loan.grace_type_id ?? null,
+                grace_months: loan. grace_months ?? null,
+
               },
             ]);
           if (error) throw error;
