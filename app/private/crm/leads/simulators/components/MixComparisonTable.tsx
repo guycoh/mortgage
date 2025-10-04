@@ -1,5 +1,5 @@
 // MixComparisonTable.tsx
-"use client";
+"use client"
 
 import React from "react";
 import { calculateMixFullTotals, MixFullTotals } from "./calculate/mixScheduleCalculators";
@@ -18,9 +18,6 @@ interface MixComparisonTableProps {
   annualInflation?: number;
 }
 
-// 🔹 נגדיר טיפוס חדש – רק לשדות מספריים
-type NumericMixField = Exclude<keyof MixFullTotals, "schedule">;
-
 const MixComparisonTable: React.FC<MixComparisonTableProps> = ({
   activeMixId,
   compareMixId,
@@ -35,34 +32,35 @@ const MixComparisonTable: React.FC<MixComparisonTableProps> = ({
   if (!activeMix || !activeMix.loans?.length)
     return <p>אין נתונים להצגה עבור התמהיל הנוכחי.</p>;
 
-  const activeTotals = calculateMixFullTotals(activeMix.loans, annualInflation);
-  const compareTotals = compareMix && compareMix.loans?.length
-    ? calculateMixFullTotals(compareMix.loans, annualInflation)
-    : null;
+  const activeTotals: MixFullTotals = calculateMixFullTotals(activeMix.loans, annualInflation);
+  const compareTotals: MixFullTotals | null =
+    compareMix && compareMix.loans?.length
+      ? calculateMixFullTotals(compareMix.loans, annualInflation)
+      : null;
 
+  // פונקציה לעיצוב ערכים
   const formatCurrency = (value: number) =>
-    value.toLocaleString("he-IL", {
-      style: "currency",
-      currency: "ILS",
-      maximumFractionDigits: 0,
-    });
+    value.toLocaleString("he-IL", { style: "currency", currency: "ILS", maximumFractionDigits: 0 });
 
-const rows: { label: string; field: keyof MixFullTotals | "costPerShekel" }[] = [
-  { label: "סכום המשכנתא", field: "originalLoanAmount" },
-  { label: "סך הקרן", field: "totalPrincipal" },
-  { label: "סך הריבית", field: "totalInterest" },
-  { label: "תשלום ראשון", field: "firstPayment" },
-  { label: "תשלום בשיא", field: "maxPayment" },
-  { label: "עלות כוללת", field: "totalPayment" },
-  { label: "עלות לשקל", field: "costPerShekel" }, // שורה חדשה
-];
-const formatCostPerShekel = (value: number) => value.toFixed(2);
+  const formatNumber2 = (value: number) =>
+    isFinite(value) ? value.toFixed(2) : "0.00";
 
+  // רשימת השדות בסדר החדש
+  const rows = [
+    { label: "סכום המשכנתא", field: "originalLoanAmount" },
+    { label: "סך הקרן", field: "totalPrincipal" },
+    { label: "סך הריבית", field: "totalInterest" },
+    { label: "תשלום ראשון", field: "firstPayment" },
+    { label: "תשלום השיא", field: "maxPayment" },
+    { label: "עלות כוללת", field: "totalPayment" },
+    { label: "עלות לשקל", field: "costPerShekel" }, // מחושב: totalPayment / originalLoanAmount
+  ];
 
   return (
     <div className="p-6 bg-white rounded-xl shadow-lg border border-gray-200 overflow-x-auto">
-      <h2 className="text-xl font-bold text-center mb-4">השוואת תמהילים</h2>
-
+      <h2 className="text-xl font-bold text-center mb-4">
+        השוואת תמהילים
+      </h2>
       <table className="w-full table-fixed border-collapse border border-gray-300 text-sm md:text-base">
         <thead className="bg-gray-200 sticky top-0 z-10">
           <tr>
@@ -73,69 +71,64 @@ const formatCostPerShekel = (value: number) => value.toFixed(2);
           </tr>
         </thead>
         <tbody>
-        {rows.map((row) => {
-          let activeValue: number;
-          let compareValue: number;
+          {rows.map((row) => {
+            // ערכים
+            let activeValue: number;
+            let compareValue: number;
 
-          if (row.field === "costPerShekel") {
-            activeValue = activeTotals.totalPayment / activeTotals.originalLoanAmount;
-            compareValue = compareTotals
-              ? compareTotals.totalPayment / compareTotals.originalLoanAmount
-              : 0;
-          } else {
-            activeValue = activeTotals[row.field as keyof MixFullTotals] as number;
-            compareValue = compareTotals
-              ? (compareTotals[row.field as keyof MixFullTotals] as number)
-              : 0;
-          }
+            if (row.field === "costPerShekel") {
+              activeValue = activeTotals.originalLoanAmount
+                ? activeTotals.totalPayment / activeTotals.originalLoanAmount
+                : 0;
+              compareValue = compareTotals?.originalLoanAmount
+                ? compareTotals.totalPayment / compareTotals.originalLoanAmount
+                : 0;
+            } else {
+              activeValue = activeTotals[row.field as keyof MixFullTotals] as number || 0;
+              compareValue = compareTotals
+                ? (compareTotals[row.field as keyof MixFullTotals] as number || 0)
+                : 0;
+            }
 
-          const diff = activeValue - compareValue;
+            const diff = activeValue - compareValue;
 
-          const diffClass =
-            diff > 0
-              ? "text-green-600 font-semibold"
-              : diff < 0
-              ? "text-red-600 font-semibold"
-              : "text-gray-700";
+            const diffClass =
+              diff > 0
+                ? "text-green-600 font-semibold"
+                : diff < 0
+                ? "text-red-600 font-semibold"
+                : "text-gray-700";
 
-          return (
-            <tr key={row.field} className="hover:bg-gray-100 transition">
-              <td className="border p-2 w-1/4 font-semibold">{row.label}</td>
-              <td className="border p-2 w-1/4">
-                {row.field === "costPerShekel"
-                  ? formatCostPerShekel(activeValue)
-                  : formatCurrency(activeValue)}
-              </td>
-              <td className="border p-2 w-1/4">
-                {compareTotals
-                  ? row.field === "costPerShekel"
-                    ? formatCostPerShekel(compareValue)
-                    : formatCurrency(compareValue)
-                  : "-"}
-              </td>
-              <td className={`border p-2 w-1/4 ${diffClass}`}>
-                {compareTotals
-                  ? row.field === "costPerShekel"
-                    ? formatCostPerShekel(diff)
-                    : formatCurrency(diff)
-                  : "-"}
-              </td>
-            </tr>
-          );
-        })}
-      </tbody>
+            // פורמט מספר
+            const displayValue =
+              row.field === "costPerShekel" ? formatNumber2(activeValue) : formatCurrency(activeValue);
+            const displayCompare =
+              row.field === "costPerShekel"
+                ? formatNumber2(compareValue)
+                : compareTotals
+                ? formatCurrency(compareValue)
+                : "-";
+            const displayDiff =
+              row.field === "costPerShekel" ? formatNumber2(diff) : formatCurrency(diff);
 
-
+            return (
+              <tr key={row.field} className="hover:bg-gray-100 transition">
+                <td className="border p-2 w-1/4 font-semibold">{row.label}</td>
+                <td className="border p-2 w-1/4">{displayValue}</td>
+                <td className="border p-2 w-1/4">{displayCompare}</td>
+                <td className={`border p-2 w-1/4 ${diffClass}`}>
+                  {compareTotals ? displayDiff : "-"}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
       </table>
     </div>
   );
 };
 
 export default MixComparisonTable;
-
-
-
-
 
 
 
