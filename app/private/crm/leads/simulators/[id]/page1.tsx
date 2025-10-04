@@ -13,8 +13,13 @@ type Mix = {
   id: string;
   mix_name: string;
   loans?: Loan[];
-  is_base?: boolean; // ✅ תמהיל בסיסי / משכנתא נוכחית
 };
+
+
+
+
+
+
 
 
 export default function SimulatorPage() {
@@ -43,50 +48,47 @@ export default function SimulatorPage() {
     "h-9 px-2 py-1 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 focus:bg-orange-100";
 
   // 🔹 Fetch data
+useEffect(() => {
+  async function loadMixes() {
+    const res = await fetch(`/api/mixes/${leadId}`);
+    const data = await res.json();
 
-
-  const defaultLoan = (mixId: string): Loan => ({
-    id: crypto.randomUUID(),
-    mix_id: mixId,
-    path_id: 1,
-    grace_type_id: 1,
-    amortization_schedule_id: 1,
-    amount: 0,
-    rate: 0,
-    months: 0,
-  });
-
-  // 🔹 Fetch data
-  useEffect(() => {
-    async function fetchData() {
-      const res = await fetch(`/api/mixes/${leadId}`);
-      const data = await res.json();
-
-      // יש תמהילים קיימים
-      if (data.mixes?.length > 0) {
-        setMixes(data.mixes);
-        setActiveMixId(data.mixes[0].id);
-        return;
-      }
-
+    if (data.mixes?.length > 0) {
+      setMixes(data.mixes);
+      setActiveMixId(data.mixes[0].id);
+    } else {
       // אין תמהילים -> יוצרים תמהיל ברירת מחדל
-      const defaultMixId = crypto.randomUUID();
-      const defaultLoans: Loan[] = Array.from({ length: 3 }, () => defaultLoan(defaultMixId));
-
-      const defaultMix: Mix = {
-        id: defaultMixId,
-        mix_name: "משכנתא נוכחית",
-        loans: defaultLoans,
-        is_base: true, // ✅ תמהיל בסיסי
-      };
-
+      const defaultMix = createDefaultMix();
       setMixes([defaultMix]);
-      setActiveMixId(defaultMixId);
+      setActiveMixId(defaultMix.id);
+
+      // (אופציונלי) שולחים גם לשרת כדי לשמור אותו
+      await fetch(`/api/mixes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lead_id: leadId, mix: defaultMix }),
+      });
     }
+  }
 
-    fetchData();
-  }, [leadId]);
+  loadMixes();
+}, [leadId]);
 
+
+
+
+
+
+
+  // useEffect(() => {
+  //   async function fetchData() {
+  //     const res = await fetch(`/api/mixes/${leadId}`);
+  //     const data = await res.json();
+  //     setMixes(data.mixes || []);
+  //     if (data.mixes?.length) setActiveMixId(data.mixes[0].id);
+  //   }
+  //   fetchData();
+  // }, [leadId]);
 
 
 const activeMix = mixes.find((m) => m.id === activeMixId);
@@ -110,31 +112,12 @@ const activeMix = mixes.find((m) => m.id === activeMixId);
   };
 
   // 🔹 Delete Mix
-
   const deleteMix = (id: string) => {
-    const mix = mixes.find(m => m.id === id);
-    if (!mix || mix.is_base) return; // ❌ אי אפשר למחוק תמהיל בסיסי
-
-    const remaining = mixes.filter(m => m.id !== id);
-    setMixes(remaining);
+    setMixes((prev) => prev.filter((m) => m.id !== id));
+    const remaining = mixes.filter((m) => m.id !== id);
     setActiveMixId(remaining.length ? remaining[0].id : null);
+    if (openMenuId === id) setOpenMenuId(null);
   };
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
   // 🔹 Save Mixes
   const handleSave = async () => {
@@ -165,64 +148,31 @@ const activeMix = mixes.find((m) => m.id === activeMixId);
     }
   };
  // 🔹 שכפול תמהיל קיים (עם מזהים חדשים)
-// const duplicateMix = () => {
-//   if (!activeMixId) return;
-
-//   const mixToCopy = mixes.find((m) => m.id === activeMixId);
-//   if (!mixToCopy) return;
-
-//   // שכפול עמוק של ההלוואות עם מזהי id חדשים
-//   const duplicatedLoans = mixToCopy.loans
-//     ? mixToCopy.loans.map((loan) => ({
-//         ...loan,
-//         id: crypto.randomUUID(), // מזהה חדש לכל הלוואה
-//       }))
-//     : [];
-
-//   // יצירת תמהיל חדש עם id חדש ונתונים זהים
-//   const duplicatedMix: Mix = {
-//     ...mixToCopy,
-//     id: crypto.randomUUID(), // מזהה חדש לתמהיל
-//     mix_name: `${mixToCopy.mix_name} (העתק)`,
-//     loans: duplicatedLoans,
-//   };
-
-//   setMixes((prev) => [...prev, duplicatedMix]);
-//   setActiveMixId(duplicatedMix.id);
-// };
-
- // 🔹 שכפול תמהיל קיים (עם מזהים חדשים)
 const duplicateMix = () => {
   if (!activeMixId) return;
-  const mixToCopy = mixes.find(m => m.id === activeMixId);
+
+  const mixToCopy = mixes.find((m) => m.id === activeMixId);
   if (!mixToCopy) return;
 
-  const duplicatedLoans = mixToCopy.loans?.map(l => ({ ...l, id: crypto.randomUUID() })) || [];
+  // שכפול עמוק של ההלוואות עם מזהי id חדשים
+  const duplicatedLoans = mixToCopy.loans
+    ? mixToCopy.loans.map((loan) => ({
+        ...loan,
+        id: crypto.randomUUID(), // מזהה חדש לכל הלוואה
+      }))
+    : [];
 
+  // יצירת תמהיל חדש עם id חדש ונתונים זהים
   const duplicatedMix: Mix = {
     ...mixToCopy,
-    id: crypto.randomUUID(),
+    id: crypto.randomUUID(), // מזהה חדש לתמהיל
     mix_name: `${mixToCopy.mix_name} (העתק)`,
     loans: duplicatedLoans,
-    is_base: false, // ✅ ההעתק לא בסיסי
   };
 
-  setMixes(prev => [...prev, duplicatedMix]);
+  setMixes((prev) => [...prev, duplicatedMix]);
   setActiveMixId(duplicatedMix.id);
 };
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
   // 🔹 Menu positioning
@@ -241,23 +191,28 @@ const duplicateMix = () => {
     
       setIsUnifiedSchedulelOpen(true);
     };
+// בנית ברירת מחדל לתמהיל
 
-  // יוצר תמהיל חדש עם 3 הלוואות ריקות
-    const createDefaultMix = (): Mix => {
-      const mixId = crypto.randomUUID();
+// יוצר תמהיל חדש עם 3 הלוואות ריקות
+const createDefaultMix = (): Mix => {
+  const mixId = crypto.randomUUID();
 
-      const loans: Loan[] = Array.from({ length: 3 }, () => defaultLoan(mixId));
+  const emptyLoans: Loan[] = Array.from({ length: 3 }, () => ({
+    id: crypto.randomUUID(),
+    mix_id: mixId,
+    path_id: 0,
+    amortization_schedule_id: 0,
+    amount: 0,
+    rate: 0,
+    months: 0,
+  }));
 
-      return {
-        id: mixId,
-        mix_name: "משכנתא נוכחית",
-        loans,
-        is_base: true,
-      };
-    };
-
-
-
+  return {
+    id: mixId,
+    mix_name: "משכנתא נוכחית",
+    loans: emptyLoans,
+  };
+};
 const createMix = (name = "תמהיל חדש"): Mix => {
   const mixId = crypto.randomUUID();
 
@@ -273,10 +228,6 @@ const createMix = (name = "תמהיל חדש"): Mix => {
   }));
 
   return { id: mixId, mix_name: name, loans };
-
-
-const defaultMix = createMix("משכנתא נוכחית");
-
 };
 
 

@@ -34,6 +34,7 @@ type Loan = {
 type Mix = {
   id: string;
   mix_name: string;
+  is_base: boolean;
   loans?: Loan[];
 };
 
@@ -63,17 +64,30 @@ export async function POST(req: NextRequest) {
         // update
         const { error } = await supabase
           .from("loan_mixes")
-          .update({ mix_name: mix.mix_name })
+          .update({ 
+            mix_name: mix.mix_name,
+            is_base: mix.is_base ?? false // 🟧 נוספה שורה לעדכון is_base
+          })
           .eq("id", mix.id);
+
         if (error) throw error;
       } else {
         // insert
         const { error } = await supabase
           .from("loan_mixes")
-          .insert([{ id: mix.id, lead_id: client_id, mix_name: mix.mix_name }]);
+          .insert([
+            { 
+              id: mix.id,
+              lead_id: client_id,
+              mix_name: mix.mix_name,
+              is_base: mix.is_base ?? false // 🟧 נוספה שורה לשמירת is_base
+            },
+          ]);
+
         if (error) throw error;
       }
     }
+
 
     // === שלב 3: מחיקת תמהילים שהוסרו ===
     const mixesToDelete = existingMixIds.filter(id => !incomingMixIds.includes(id));
