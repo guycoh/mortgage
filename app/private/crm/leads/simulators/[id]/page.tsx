@@ -108,6 +108,33 @@ const activeMix = mixes.find((m) => m.id === activeMixId);
       setIsSaving(false);
     }
   };
+ // 🔹 שכפול תמהיל קיים (עם מזהים חדשים)
+const duplicateMix = () => {
+  if (!activeMixId) return;
+
+  const mixToCopy = mixes.find((m) => m.id === activeMixId);
+  if (!mixToCopy) return;
+
+  // שכפול עמוק של ההלוואות עם מזהי id חדשים
+  const duplicatedLoans = mixToCopy.loans
+    ? mixToCopy.loans.map((loan) => ({
+        ...loan,
+        id: crypto.randomUUID(), // מזהה חדש לכל הלוואה
+      }))
+    : [];
+
+  // יצירת תמהיל חדש עם id חדש ונתונים זהים
+  const duplicatedMix: Mix = {
+    ...mixToCopy,
+    id: crypto.randomUUID(), // מזהה חדש לתמהיל
+    mix_name: `${mixToCopy.mix_name} (העתק)`,
+    loans: duplicatedLoans,
+  };
+
+  setMixes((prev) => [...prev, duplicatedMix]);
+  setActiveMixId(duplicatedMix.id);
+};
+
 
   // 🔹 Menu positioning
   const openMenu = (id: string, e: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
@@ -170,6 +197,7 @@ const activeMix = mixes.find((m) => m.id === activeMixId);
 
         {/* כפתורי שמירה ולוח סילוקין */}
         <div className="relative flex items-center gap-2">
+          {/* כפתור שמירה*/}
           <button
             onClick={handleSave}
             disabled={isSaving}
@@ -182,13 +210,27 @@ const activeMix = mixes.find((m) => m.id === activeMixId);
             )}
             שמור שינויים
           </button>
-
+          {/* כפתור שכפול תמהיל */}
+          {activeMixId && (
+            <button
+              onClick={duplicateMix}
+              className="h-9 px-4 bg-green-600 text-white rounded-lg shadow hover:bg-green-700 transition flex items-center justify-center gap-2"
+            >
+              ⧉ שכפל
+            </button>
+          )}
+          
+          
+          
+          
+          
           <button
             className="h-9 px-4 bg-green-600 text-white rounded-lg shadow hover:bg-green-700 transition flex items-center justify-center gap-2"
             onClick={() => openModal()}
           >
             לוח סילוקין לתמהיל
           </button>
+
 
           {(successMessage || errorMessage) && (
             <div
@@ -330,9 +372,6 @@ const activeMix = mixes.find((m) => m.id === activeMixId);
             onClose={() => setIsUnifiedSchedulelOpen(false)}
           />
         )}
-
-
-
 
     </div>
   );
