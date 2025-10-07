@@ -3,8 +3,9 @@
 import Link from "next/link";
 import CustomIcon from "@/public/assets/images/svg/general/CustomIcon";
 
-
-export default function Nav() {
+export const Nav = ({ onOpenMenu, isMenuOpen }: { onOpenMenu: () => void, isMenuOpen: boolean }) => {
+  
+//export default function Nav() {
   const links = [
     { href: "/home", label: "בית" },
     { href: "/home/calculators", label: "מחשבונים" },
@@ -22,7 +23,31 @@ export default function Nav() {
             className="absolute z-50 -top-6 left-0" // ממקם את האייקון ממש למעלה-ימין
           />
     
+      {/* כפתור המבורגר */}
+          <button
+            onClick={onOpenMenu}
+            className={`md:hidden absolute top-4 right-4 z-[60] bg-white rounded-full p-4 shadow-md transition-all duration-200
+              ${isMenuOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}
+            `}
+            aria-label="פתח תפריט"
+          >
+            <div className="space-y-1">
+              <span className="block w-6 h-0.5 bg-main"></span>
+              <span className="block w-6 h-0.5 bg-main"></span>
+              <span className="block w-6 h-0.5 bg-main"></span>
+            </div>
+          </button>
+
+
+
+
+
+
+
+
       {/* רקע ניווט עם תלת-ממד */}
+     
+     
       <div
       
         className="w-full h-28 relative overflow-hidden shadow-[0_12px_30px_rgba(0,0,0,0.35)]"
@@ -39,13 +64,7 @@ export default function Nav() {
         {/* תוכן התפריט */}
   
       <div className="relative z-10 flex justify-between items-start h-full px-12 font-semibold text-white pt-4">
-        {/* <CustomIcon
-            size={140}
-            color="white"
-            className="absolute top-0 left-0" // ממקם את האייקון ממש למעלה-ימין
-          /> */}
-        
-        
+       
         {/* תפריט בצד שמאל */}
         <nav className="flex gap-10 text-lg">
        
@@ -67,7 +86,7 @@ export default function Nav() {
   <div className="relative">
   
   </div>
-</div>
+      </div>
 
 
 

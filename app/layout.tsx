@@ -26,7 +26,7 @@ export const metadata = {
   description: "משכנתאות",
   url: "https://morg-orcin.vercel.app",
   icons: {
-    icon: '/assets/images/svg/m.svg',
+    icon: '/assets/images/svg/myLogo.svg',
   },
   //נוסף להציג תמונה בשליחה
   images: [
