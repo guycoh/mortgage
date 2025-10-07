@@ -429,15 +429,12 @@ const defaultMix = createMix("משכנתא נוכחית");
             />          
         </div>
         <div className="bg-green-100 p-4 rounded shadow">
-       <MixScheduleChartSVG
-          activeMixId={activeMixId}
-          mixes={mixes}
-          annualInflation={annualInflation}
-        />
-      
-        
-        
-        </div>
+            <MixScheduleChartSVG
+                activeMixId={activeMixId}
+                mixes={mixes}
+                annualInflation={annualInflation}
+              />
+      </div>
        
       </div>
 

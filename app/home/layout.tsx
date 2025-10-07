@@ -1,14 +1,11 @@
 "use client"
 
 import {Footer}from "./components/footer";
-import { Nav } from "./components/nav";
+import Nav from "./components/nav";
+
 import SideMenu from "./components/sidebar_mobile";
 
-<SideMenu
-      triggerButton={(onClick, isOpen) => (
-        <Nav onOpenMenu={onClick} isMenuOpen={isOpen} />
-      )}
-    />
+
 export default function HomeLayout({
   children,
 
@@ -22,11 +19,9 @@ export default function HomeLayout({
   <div className="min-h-screen flex flex-col">
   
    <main className="flex-grow">
-   <SideMenu
-      triggerButton={(onClick, isOpen) => (
-        <Nav onOpenMenu={onClick} isMenuOpen={isOpen} />
-      )}
-    />
+       
+        <Nav/>
+     
    {children}
    </main>
    <Footer/>

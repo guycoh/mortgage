@@ -1,82 +1,96 @@
-"use client";
+"use client"
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
-import Spinner from "./components/spinner";
 
-interface CategoryType {
-  id: number;
-  category_type: string;
-  link?: string;
-}
+import IconGeneralMortgage from "@/public/assets/images/svg/motrgageType/generalMortgage";
+import HomeIcon from "@/public/assets/images/svg/motrgageType/homeIcon";
+import LoanIcon from "@/public/assets/images/svg/motrgageType/loanIcon";
+import ReverseIcon from "@/public/assets/images/svg/motrgageType/ReverseIcon";
+import ConsolidationIcon from "@/public/assets/images/svg/motrgageType/ConsolidationIcon";
+import EligibleIcon from "@/public/assets/images/svg/motrgageType/EligibleIcon";
+import RefinancingIcon from "@/public/assets/images/svg/motrgageType/RefinancingIcon";
+import InsuranceIcon from "@/public/assets/images/svg/motrgageType/InsuranceIcon";
+import RefusedIcon from "@/public/assets/images/svg/motrgageType/RefusedIcon";
+import BridgeIcon from "@/public/assets/images/svg/motrgageType/BridgeIcon";
 
-export default function CategoryPage() {
-  const [categories, setCategories] = useState<CategoryType[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
+const mortgageCategories = [
+  { category: "משכנתא לדיור", link: "mortgage_for_housing", icon: <HomeIcon size={64} color="#1d75a1" /> },
+  { category: "הלוואה לכל מטרה", link: "mortgage_for_any_purpose", icon: <LoanIcon size={64} color="#1d75a1" /> },
+  { category: "משכנתא הפוכה", link: "reverse_mortgage", icon: <ReverseIcon size={64} color="#1d75a1" /> },
+  { category: "איחוד הלוואות", link: "loan_consolidation", icon: <ConsolidationIcon size={64} color="#1d75a1" /> },
+  { category: "משכנתא חוץ בנקאית", link: "mortgage_non_bank", icon: <IconGeneralMortgage size={64} color="#1d75a1" /> },
+  { category: "מחיר למשתכן", link: "home_for_eligible_buyers", icon: <EligibleIcon size={64} color="#1d75a1" /> },
+  { category: "מיחזור משכנתא", link: "mortgage_refinancing", icon: <RefinancingIcon size={64} color="#1d75a1" /> },
+  { category: "הלוואת גישור", link: "bridge_loan", icon: <BridgeIcon size={64} color="#1d75a1" /> },
+  { category: "ביטוח משכנתא", link: "mortgage_insurance", icon: <InsuranceIcon size={64} color="#1d75a1" /> },
+  { category: "מסורבי בנקים", link: "mortgage_for_refused_clients", icon: <RefusedIcon size={64} color="#1d75a1" /> },
+];
 
-  useEffect(() => {
-    fetch("/api/categorytype")
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error("Failed to fetch categories");
-        }
-        return response.json();
-      })
-      .then((data) => setCategories(data))
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
-  }, []);
-
-  if (loading)
-    return (
-      <div>
-        <Spinner />
-      </div>
-    );
-
-  if (error) return <p className="text-center text-red-500">Error: {error}</p>;
-
+export default function MortgageGrid() {
   return (
-    <div className="p-6 animate-fade-in">
-      <h1 className="text-2xl font-bold mb-4 text-center">
+    <section aria-label="תפריט נושאים" className="w-full max-w-6xl mx-auto px-4 py-12">
+      <h2 className="text-2xl md:text-3xl font-bold text-[#0f4f66] mb-6">תחומי משכנתא</h2>
+        <h1 className="text-2xl font-bold mb-4 text-center text-fontss1">
         איזה משכנתא מתאימה לי? &nbsp;
-        <Link href={`/home/guide`} className="text-blue-400 underline hover:text-blue-600 transition-colors">
+        <Link
+          href={`/muhni/guide`}
+          className="text-blue-400 underline hover:text-blue-600 transition-colors"
+        >
           למדריך המשכנתא
         </Link>
-      </h1>
-
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {categories.map((category) => (
-          <div
-            key={category.id}
-            className="p-4 shadow-md border rounded-lg transition-all duration-300 hover:shadow-lg hover:scale-[1.02] flex flex-col justify-between items-center min-h-[260px] bg-white"
+       </h1>
+      <div
+        className="
+          grid 
+          grid-cols-2 
+          md:grid-cols-3 
+          lg:grid-cols-4 
+          gap-6
+        "
+      >
+        {mortgageCategories.map((item) => (
+          <Link
+            key={item.link}
+            href={`/home/${item.link}`}
+            className="group"
+            aria-label={item.category}
           >
-            <h2 className="text-lg font-semibold text-center mb-2">
-              {category.category_type}
-            </h2>
-
-            <div className="flex items-center justify-center h-20 w-20 rounded-full bg-blue-100 mb-4">
-              <Image
-                src="/assets/images/svg/home.svg"
-                alt="home"
-                width={64}
-                height={64}
-              />
-            </div>
-
-            <Link href={`/home/${category.link ?? ""}`} className="w-full">
-              <div className="mt-auto bg-[#1d75a1] hover:bg-[#a39d8f] text-[#e5e4e3] font-bold py-2 px-4 rounded-full text-center transition-colors w-full">
-                למידע נוסף
+            <article
+              className="
+                w-full h-full
+                bg-white/90
+                rounded-2xl
+                border border-slate-100
+                shadow-[0_8px_30px_rgba(2,6,23,0.06)]
+                p-6
+                flex flex-col items-center justify-center
+                text-center
+                transition-[transform,box-shadow] duration-300
+                hover:-translate-y-1 hover:shadow-[0_18px_50px_rgba(13,30,49,0.12)]
+                focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#cbeefb]/50
+              "
+              role="button"
+            >
+              <div className="w-16 h-16 flex items-center justify-center mb-3">
+                {item.icon}
               </div>
-            </Link>
-          </div>
+
+              <h3 className="text-sm md:text-base font-semibold text-[#0f1724]">
+                {item.category}
+              </h3>
+
+              <p className="mt-2 text-xs text-slate-500 hidden md:block">
+                לחצו לפרטים והסברים שימושיים — חישובים, דוגמאות ומדריכים קצרים.
+              </p>
+            </article>
+          </Link>
         ))}
       </div>
-    </div>
+    </section>
   );
 }
+
+
 
 
 

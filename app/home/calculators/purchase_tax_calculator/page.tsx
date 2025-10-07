@@ -1,7 +1,7 @@
-"use client";
+"use client"
 import { useState } from "react";
 
-const PurchaseTaxCalculator = () => {
+const PurchaseTaxForm = () => {
   const [propertyPrice, setPropertyPrice] = useState<number | "">("");
   const [isSingleHome, setIsSingleHome] = useState<boolean>(true);
   const [taxBreakdown, setTaxBreakdown] = useState<
@@ -14,7 +14,9 @@ const PurchaseTaxCalculator = () => {
     return numericValue.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   };
 
-  const handlePropertyPriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePropertyPriceChange = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const rawValue = e.target.value.replace(/,/g, "");
     const numericValue = Number(rawValue);
     if (!isNaN(numericValue)) {
@@ -24,21 +26,28 @@ const PurchaseTaxCalculator = () => {
     }
   };
 
+  const resetForm = () => {
+    setPropertyPrice("");
+    setIsSingleHome(true);
+    setTaxBreakdown([]);
+    setTotalTax(null);
+  };
+
   const calculateTax = () => {
     if (!propertyPrice || propertyPrice <= 0) {
       setTotalTax(null);
       return;
     }
-
+ 
     let tax = 0;
     const breakdown = [];
-
+ 
     const brackets = isSingleHome
       ? [
-          { limit: 1944000, rate: 0 },
-          { limit: 5175000, rate: 0.035 },
-          { limit: 17225000, rate: 0.05 },
-          { limit: 23607250, rate: 0.08 },
+          { limit: 1978745, rate: 0 },
+          { limit: 2347040, rate: 0.035 },
+          { limit: 6055070, rate: 0.05 },
+          { limit: 20183565, rate: 0.08 },
           { limit: Infinity, rate: 0.1 },
         ]
       : [
@@ -65,81 +74,128 @@ const PurchaseTaxCalculator = () => {
   };
 
   return (
-    <div className="min-h-screen flex justify-center bg-gradient-to-b from-[#f9fafb] to-[#e3f2fd] py-16 px-6">
-      <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl p-8 w-full max-w-2xl border border-white/40">
-        <h1 className="text-4xl text-center font-extrabold text-[#1d75a1] mb-6">
-          מחשבון מס רכישה 🏡
-        </h1>
+ <div className="flex justify-center items-start min-h-screen bg-gradient-to-b from-[#f8fafc] to-[#e6eff3] pt-6 pb-6 px-2">
+  <div className="relative w-full max-w-[450px]">
+    {/* גוף התיבה - רקע טורקיז עם תלת מימד */}
+    <div
+      className="relative rounded-xl overflow-hidden p-5 sm:p-6"
+      style={{
+        background: "linear-gradient(180deg, #1d75a1 0%, #15516f 100%)",
+        boxShadow:
+          "0 20px 30px rgba(0,0,0,0.3), inset 0 2px 8px rgba(255,255,255,0.15)",
+      }}
+    >
+      {/* פס עליון מואר */}
+      <div className="absolute top-0 left-0 w-full h-[10px] bg-white/20"></div>
 
-        <div className="mb-4">
-          <label className="block text-gray-800 font-semibold mb-2">מחיר הדירה (₪):</label>
-          <input
-            type="text"
-            inputMode="numeric"
-            className="w-full p-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-400 focus:outline-none shadow-inner text-lg"
-            value={propertyPrice !== "" ? formatNumber(propertyPrice.toString()) : ""}
-            onChange={handlePropertyPriceChange}
-          />
+      {/* תוכן המחשבון */}
+      <div className="flex flex-col items-center justify-start h-full space-y-4 text-white">
+        <h2 className="text-2xl sm:text-3xl font-extrabold tracking-wide text-center drop-shadow-lg mb-2">
+          מחשבון מס רכישה
+        </h2>
+
+        {/* שדה מחיר */}
+        <input
+          type="text"
+          inputMode="numeric"
+          placeholder="מחיר הדירה (₪)"
+          className="w-full rounded-md p-3 text-gray-900 text-base bg-white shadow-inner focus:bg-orange-100 focus:ring-2 focus:ring-orange-300 focus:outline-none transition"
+          value={
+            propertyPrice !== "" ? formatNumber(propertyPrice.toString()) : ""
+          }
+          onChange={handlePropertyPriceChange}
+        />
+
+        {/* דירה יחידה */}
+        <div className="w-full flex justify-start gap-6 text-sm">
+          <label className="flex items-center gap-2">
+            <input
+              type="radio"
+              checked={isSingleHome}
+              onChange={() => setIsSingleHome(true)}
+              className="accent-blue-600"
+            />
+            כן
+          </label>
+          <label className="flex items-center gap-2">
+            <input
+              type="radio"
+              checked={!isSingleHome}
+              onChange={() => setIsSingleHome(false)}
+              className="accent-blue-600"
+            />
+            לא
+          </label>
         </div>
 
-        <div className="mb-4">
-          <label className="block text-gray-800 font-semibold mb-2">האם זו דירה יחידה?</label>
-          <div className="flex gap-6 text-lg">
-            <label className="flex items-center gap-2">
-              <input
-                type="radio"
-                checked={isSingleHome}
-                onChange={() => setIsSingleHome(true)}
-              />
-              כן
-            </label>
-            <label className="flex items-center gap-2">
-              <input
-                type="radio"
-                checked={!isSingleHome}
-                onChange={() => setIsSingleHome(false)}
-              />
-              לא
-            </label>
-          </div>
+        {/* כפתורים עם תלת מימד מתקדם */}
+        <div className="flex w-full justify-between gap-3">
+          <button
+            onClick={calculateTax}
+            className="flex-1 py-3 rounded-md bg-white text-blue-900 font-bold shadow-[inset_0_4px_6px_rgba(0,0,0,0.2),0_4px_6px_rgba(0,0,0,0.3)] hover:shadow-[inset_0_2px_3px_rgba(0,0,0,0.1),0_6px_10px_rgba(0,0,0,0.35)] transition-all"
+          >
+            חשב מס
+          </button>
+          <button
+            onClick={resetForm}
+            className="flex-1 py-3 rounded-md bg-white text-blue-900 font-bold shadow-[inset_0_4px_6px_rgba(0,0,0,0.2),0_4px_6px_rgba(0,0,0,0.3)] hover:shadow-[inset_0_2px_3px_rgba(0,0,0,0.1),0_6px_10px_rgba(0,0,0,0.35)] transition-all"
+          >
+            נקה טופס
+          </button>
         </div>
 
-        <button
-          onClick={calculateTax}
-          className="w-full py-3 mt-2 rounded-xl bg-[#1d75a1] text-white font-bold hover:bg-blue-800 transition-all shadow-lg text-xl"
-        >
-          חשב מס 💰
-        </button>
-
+        {/* תוצאה */}
         {totalTax !== null && (
-  <div className="mt-6 bg-white rounded-xl p-6 shadow-xl border border-blue-200 animate-fade-in">
-    <h2 className="text-2xl font-bold text-[#1d75a1] mb-4">פירוט מס רכישה:</h2>
-    <div className="space-y-4">
-      {taxBreakdown.map((step, idx) => (
-        <div
-          key={idx}
-          className="bg-blue-50 rounded-xl p-4 shadow-sm border border-blue-100 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2"
-        >
-          <div><span className="font-semibold text-gray-700">מ:</span> ₪{step.from.toLocaleString()}</div>
-          <div><span className="font-semibold text-gray-700">עד:</span> ₪{step.to.toLocaleString()}</div>
-          <div><span className="font-semibold text-gray-700">שיעור מס:</span> {(step.rate * 100).toFixed(1)}%</div>
-          <div className="text-blue-800 font-bold"><span className="font-semibold text-gray-700">תשלום:</span> ₪{step.amount.toLocaleString()}</div>
-        </div>
-      ))}
-
-      <div className="bg-[#e3f2fd] rounded-xl p-4 text-lg font-bold text-blue-900 text-center shadow-inner border-t-2 border-blue-300">
-        סך הכל מס רכישה: ₪{totalTax.toLocaleString()}
+          <div className="w-full bg-white rounded-xl p-4 mt-3 shadow-inner">
+            {taxBreakdown.map((step, idx) => (
+              <div
+                key={idx}
+                className="flex flex-col sm:flex-row justify-between items-center mb-3 p-3 bg-gray-100 rounded-md shadow-sm text-gray-800"
+              >
+                <span className="text-sm font-medium">
+                  מ: ₪{step.from.toLocaleString()}
+                </span>
+                <span className="text-sm font-medium">
+                  עד: ₪{step.to.toLocaleString()}
+                </span>
+                <span className="text-sm font-medium">
+                  שיעור מס: {(step.rate * 100).toFixed(1)}%
+                </span>
+                <span className="text-sm font-bold text-gray-900">
+                  תשלום: ₪{step.amount.toLocaleString()}
+                </span>
+              </div>
+            ))}
+            <div className="mt-3 font-bold text-center text-gray-900 text-base">
+              סך הכל מס רכישה: ₪{totalTax.toLocaleString()}
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* פס תחתון עם הצללה */}
+      <div className="absolute bottom-0 left-0 w-full h-[14px] bg-black/20 blur-[2px]"></div>
     </div>
+
+    {/* בסיס / שולחן */}
+    <div className="absolute bottom-[-18px] left-1/2 -translate-x-1/2 w-full max-w-[450px] h-[10px] bg-gradient-to-b from-[#a9b7bf] to-[#6c7b84] rounded-b-xl shadow-md"></div>
+
+    {/* צל רך מתחת */}
+    <div className="absolute bottom-[-30px] left-1/2 -translate-x-1/2 w-[380px] h-[20px] bg-black/20 blur-2xl rounded-full"></div>
   </div>
-)}
+</div>
 
-      </div>
-    </div>
+
+
+
   );
 };
 
-export default PurchaseTaxCalculator;
+export default PurchaseTaxForm;
+
+
+
+
 
 
 

@@ -1,4 +1,4 @@
-'use client';
+"use client"
 
 import { useState } from 'react';
 
@@ -11,21 +11,26 @@ interface MonthlyData {
 }
 
 export default function LoanCalculator() {
-  const [amount, setAmount] = useState(100000);
-  const [interest, setInterest] = useState(5.1);
-  const [months, setMonths] = useState(120);
+  const [amount, setAmount] = useState<number | ''>('');
+  const [interest, setInterest] = useState<number | ''>('');
+  const [months, setMonths] = useState<number | ''>('');
 
-  const monthlyRate = interest / 100 / 12;
+  const amountNum = Number(amount) || 0;
+  const interestNum = Number(interest) || 0;
+  const monthsNum = Number(months) || 0;
+
+  const monthlyRate = interestNum / 100 / 12;
   const monthlyPayment =
-    amount && monthlyRate
-      ? (amount * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -months))
+    amountNum && interestNum && monthsNum
+      ? (amountNum * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -monthsNum))
       : 0;
 
   const getMonthlyBreakdown = (): MonthlyData[] => {
-    let balance = amount;
+    if (!amountNum || !interestNum || !monthsNum) return [];
+    let balance = amountNum;
     const breakdown: MonthlyData[] = [];
 
-    for (let m = 1; m <= months; m++) {
+    for (let m = 1; m <= monthsNum; m++) {
       const interestPart = balance * monthlyRate;
       const principalPart = monthlyPayment - interestPart;
 
@@ -46,95 +51,327 @@ export default function LoanCalculator() {
 
   const breakdown = getMonthlyBreakdown();
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-100 to-sky-100 flex flex-col items-center justify-center px-4 py-10 space-y-10">
-      {/* מחשבון */}
-      <div className="w-full max-w-md p-6 bg-white/70 backdrop-blur-sm border border-slate-200 rounded-2xl shadow-lg animate-fade-in-up">
-        <h1 className="text-3xl font-bold text-gray-800 mb-6 text-center">מחשבון הלוואה 💸</h1>
+  const resetForm = () => {
+    setAmount('');
+    setInterest('');
+    setMonths('');
+  };
 
-        <div className="space-y-4">
+  return (
+ <div className="flex justify-center items-start min-h-screen bg-gradient-to-b from-[#f8fafc] to-[#e6eff3] pt-10 pb-20 px-2">
+  <div className="relative w-full max-w-[500px]">
+
+    {/* ===== קוביית המחשבון ===== */}
+    <div
+      className="relative rounded-2xl overflow-hidden p-6 sm:p-8 z-10"
+      style={{
+        background: "linear-gradient(180deg, #1d75a1 0%, #15516f 100%)",
+        boxShadow:
+          "0 18px 28px rgba(0,0,0,0.3), inset 0 2px 8px rgba(255,255,255,0.15)",
+      }}
+    >
+      {/* פס עליון מבריק */}
+      <div className="absolute top-0 left-0 w-full h-[10px] bg-white/20"></div>
+
+      {/* תוכן המחשבון */}
+      <div className="flex flex-col items-center space-y-5 text-white">
+        <h2 className="text-2xl sm:text-3xl font-extrabold text-center drop-shadow-lg">
+          מחשבון הלוואה
+        </h2>
+
+        {/* שדות הקלט */}
+        <div className="w-full space-y-4">
+          {/* סכום ההלוואה */}
           <div>
-            <label className="block text-sm text-gray-700 mb-1">סכום ההלוואה (₪)</label>
+            <label className="block text-sm mb-1 text-slate-100">
+              סכום ההלוואה (₪)
+            </label>
             <input
               type="text"
-              value={amount.toLocaleString()}
+              inputMode="numeric"
+              placeholder="לדוגמה: 350,000"
+              className="w-full rounded-md p-3 text-gray-900 bg-white shadow-[inset_0_3px_5px_rgba(0,0,0,0.2),0_3px_6px_rgba(0,0,0,0.25)] focus:bg-orange-50 focus:ring-2 focus:ring-orange-200 outline-none transition-all"
+              value={amount === "" ? "" : amount.toLocaleString()}
               onChange={(e) => {
-                const raw = e.target.value.replace(/,/g, '');
+                const raw = e.target.value.replace(/,/g, "");
                 const num = Number(raw);
                 if (!isNaN(num)) setAmount(num);
               }}
-              onBlur={(e) => {
-                const raw = e.target.value.replace(/,/g, '');
-                const num = Number(raw);
-                if (!isNaN(num)) e.target.value = num.toLocaleString();
-              }}
               onFocus={(e) => {
-                e.target.value = amount.toString();
+                if (amount !== "") e.target.value = amount.toString();
               }}
-              inputMode="numeric"
-              className="w-full px-4 py-2 rounded-lg bg-white text-gray-800 border border-gray-300 focus:ring-2 focus:ring-sky-300"
+              onBlur={(e) => {
+                if (amount !== "") e.target.value = amount.toLocaleString();
+              }}
             />
           </div>
 
+          {/* ריבית שנתית */}
           <div>
-            <label className="block text-sm text-gray-700 mb-1">ריבית שנתית (%)</label>
+            <label className="block text-sm mb-1 text-slate-100">
+              ריבית שנתית (%)
+            </label>
             <input
-              type="number"
-              step="0.1"
-              value={interest}
-              onChange={(e) => setInterest(Number(e.target.value))}
-              className="w-full px-4 py-2 rounded-lg bg-white text-gray-800 border border-gray-300 focus:ring-2 focus:ring-sky-300"
+              type="text"
+              inputMode="decimal"
+              placeholder="לדוגמה: 4.8"
+              className="w-full rounded-md p-3 text-gray-900 bg-white shadow-[inset_0_3px_5px_rgba(0,0,0,0.2),0_3px_6px_rgba(0,0,0,0.25)] focus:bg-orange-50 focus:ring-2 focus:ring-orange-200 outline-none transition-all"
+              value={interest === "" ? "" : interest.toString()}
+              onChange={(e) => {
+                const raw = e.target.value.replace(",", ".");
+                if (/^\d*\.?\d*$/.test(raw) || raw === "") {
+                  setInterest(raw === "" ? "" : Number(raw));
+                }
+              }}
             />
           </div>
 
+          {/* חודשי הלוואה */}
           <div>
-            <label className="block text-sm text-gray-700 mb-1">מספר חודשי הלוואה</label>
+            <label className="block text-sm mb-1 text-slate-100">
+              מספר חודשי הלוואה
+            </label>
             <input
               type="number"
+              placeholder="לדוגמה: 240"
+              className="w-full rounded-md p-3 text-gray-900 bg-white shadow-[inset_0_3px_5px_rgba(0,0,0,0.2),0_3px_6px_rgba(0,0,0,0.25)] focus:bg-orange-50 focus:ring-2 focus:ring-orange-200 outline-none transition-all"
               value={months}
-              onChange={(e) => setMonths(Number(e.target.value))}
-              className="w-full px-4 py-2 rounded-lg bg-white text-gray-800 border border-gray-300 focus:ring-2 focus:ring-sky-300"
+              onChange={(e) =>
+                setMonths(e.target.value === "" ? "" : Number(e.target.value))
+              }
             />
           </div>
-
-          <div className="mt-6 p-4 rounded-xl bg-sky-50 border border-sky-200 text-center">
-            <p className="text-gray-700 text-lg">תשלום חודשי מוערך:</p>
-            <p className="text-3xl font-semibold text-sky-600 mt-2">₪{monthlyPayment.toFixed(2)}</p>
-          </div>
         </div>
-      </div>
 
-
-      
-
-      {/* טבלה חודשית */}
-      <div className="w-full max-w-4xl bg-white/70 p-6 rounded-xl shadow-md border border-slate-200 space-y-4">
-        <h2 className="text-xl font-bold text-gray-700 mb-2">פירוט חודשי 🧾</h2>
-        <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
-          <table className="w-full text-sm text-right text-gray-700">
-            <thead className="text-xs text-gray-500 uppercase border-b">
-              <tr>
-                <th className="px-3 py-2">חודש</th>
-                <th className="px-3 py-2">תשלום חודשי</th>
-                <th className="px-3 py-2 text-rose-500">ריבית</th>
-                <th className="px-3 py-2 text-emerald-600">קרן</th>
-                <th className="px-3 py-2">יתרה</th>
-              </tr>
-            </thead>
-            <tbody>
-              {breakdown.map((row) => (
-                <tr key={row.month} className="border-b hover:bg-sky-50 transition">
-                  <td className="px-3 py-2">{row.month}</td>
-                  <td className="px-3 py-2">{row.totalPaid.toFixed(0)}</td>
-                  <td className="px-3 py-2 text-rose-500">{row.interestPaid.toFixed(0)}</td>
-                  <td className="px-3 py-2 text-emerald-600">{row.principalPaid.toFixed(0)}</td>
-                  <td className="px-3 py-2">{row.remainingBalance.toFixed(0)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        {/* כפתורים */}
+        <div className="flex w-full justify-between gap-3 mt-4">
+          <button
+            onClick={() => {}}
+            className="flex-1 py-3 rounded-md bg-white text-blue-900 font-bold shadow-[inset_0_4px_6px_rgba(0,0,0,0.15),0_4px_8px_rgba(0,0,0,0.25)] hover:shadow-[inset_0_2px_3px_rgba(0,0,0,0.1),0_6px_10px_rgba(0,0,0,0.35)] active:translate-y-[1px] transition-all"
+          >
+            חשב
+          </button>
+          <button
+            onClick={resetForm}
+            className="flex-1 py-3 rounded-md bg-white text-blue-900 font-bold shadow-[inset_0_4px_6px_rgba(0,0,0,0.15),0_4px_8px_rgba(0,0,0,0.25)] hover:shadow-[inset_0_2px_3px_rgba(0,0,0,0.1),0_6px_10px_rgba(0,0,0,0.35)] active:translate-y-[1px] transition-all"
+          >
+            נקה
+          </button>
         </div>
+
+        {/* תוצאה */}
+        <div className="w-full bg-white rounded-xl p-4 mt-3 shadow-inner text-gray-900 text-center">
+          <p className="text-lg font-medium">תשלום חודשי מוערך:</p>
+          <p className="text-3xl font-bold text-blue-900 mt-1">
+            ₪{monthlyPayment.toFixed(2)}
+          </p>
+        </div>
+
+
+
       </div>
+  
+ 
+
     </div>
+
+ {/* ===== בסיס/שולחן מתחת לקובייה ===== */}
+    <div className="relative w-full h-[50px] mt-[-10px] z-0">
+      {/* בסיס/שולחן */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-[500px] h-[10px] bg-gradient-to-b from-[#a9b7bf] to-[#6c7b84] rounded-b-2xl shadow-md"></div>
+      {/* צל רך מתחת */}
+      <div className="absolute top-10 left-1/2 -translate-x-1/2 w-[400px] h-[20px] bg-black/20 blur-2xl rounded-full"></div>
+    </div>
+
+    {/* ===== טבלת סילוקין (מתחת לכל האלמנטים) ===== */}
+    {breakdown.length > 0 && (
+      <div className="w-full mt-12 bg-white rounded-xl p-4 shadow-inner text-gray-900 max-h-[500px] overflow-y-auto">
+        <h2 className="text-xl font-bold text-gray-800 mb-3">פירוט חודשי</h2>
+        <table className="w-full text-sm text-right">
+          <thead className="text-xs text-gray-500 uppercase border-b">
+            <tr>
+              <th className="px-3 py-2">חודש</th>
+              <th className="px-3 py-2">תשלום חודשי</th>
+              <th className="px-3 py-2 text-rose-500">ריבית</th>
+              <th className="px-3 py-2 text-emerald-600">קרן</th>
+              <th className="px-3 py-2">יתרה</th>
+            </tr>
+          </thead>
+          <tbody>
+            {breakdown.map((row) => (
+              <tr key={row.month} className="border-b hover:bg-sky-50 transition">
+                <td className="px-3 py-2">{row.month}</td>
+                <td className="px-3 py-2">{row.totalPaid.toFixed(0)}</td>
+                <td className="px-3 py-2 text-rose-500">{row.interestPaid.toFixed(0)}</td>
+                <td className="px-3 py-2 text-emerald-600">{row.principalPaid.toFixed(0)}</td>
+                <td className="px-3 py-2">{row.remainingBalance.toFixed(0)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )}
+
+  </div>
+</div>
+
+
   );
 }
+
+
+//   <div className="flex justify-center items-start min-h-screen bg-gradient-to-b from-[#f8fafc] to-[#e6eff3] pt-10 pb-20 px-2">
+//   <div className="relative w-full max-w-[500px]">
+//     {/* קוביית המחשבון */}
+//     <div
+//       className="relative rounded-2xl overflow-hidden p-6 sm:p-8"
+//       style={{
+//         background: "linear-gradient(180deg, #1d75a1 0%, #15516f 100%)",
+//         boxShadow:
+//           "0 18px 28px rgba(0,0,0,0.3), inset 0 2px 8px rgba(255,255,255,0.15)",
+//       }}
+//     >
+//       {/* פס עליון מבריק */}
+//       <div className="absolute top-0 left-0 w-full h-[10px] bg-white/20"></div>
+
+//       <div className="flex flex-col items-center space-y-5 text-white">
+//         <h2 className="text-2xl sm:text-3xl font-extrabold text-center drop-shadow-lg">
+//           מחשבון הלוואה
+//         </h2>
+
+//         {/* שדות הקלט */}
+//         <div className="w-full space-y-4">
+//           {/* סכום ההלוואה */}
+//           <div>
+//             <label className="block text-sm mb-1 text-slate-100">
+//               סכום ההלוואה (₪)
+//             </label>
+//             <input
+//               type="text"
+//               inputMode="numeric"
+//               placeholder="לדוגמה: 350,000"
+//               className="w-full rounded-md p-3 text-gray-900 bg-white shadow-[inset_0_3px_5px_rgba(0,0,0,0.2),0_3px_6px_rgba(0,0,0,0.25)] focus:bg-orange-50 focus:ring-2 focus:ring-orange-200 outline-none transition-all"
+//               value={amount === "" ? "" : amount.toLocaleString()}
+//               onChange={(e) => {
+//                 const raw = e.target.value.replace(/,/g, "");
+//                 const num = Number(raw);
+//                 if (!isNaN(num)) setAmount(num);
+//               }}
+//               onFocus={(e) => {
+//                 if (amount !== "") e.target.value = amount.toString();
+//               }}
+//               onBlur={(e) => {
+//                 if (amount !== "") e.target.value = amount.toLocaleString();
+//               }}
+//             />
+//           </div>
+
+//           {/* ריבית שנתית */}
+//           <div>
+//             <label className="block text-sm mb-1 text-slate-100">
+//               ריבית שנתית (%)
+//             </label>
+//             <input
+//               type="text"
+//               inputMode="decimal"
+//               placeholder="לדוגמה: 4.8"
+//               className="w-full rounded-md p-3 text-gray-900 bg-white shadow-[inset_0_3px_5px_rgba(0,0,0,0.2),0_3px_6px_rgba(0,0,0,0.25)] focus:bg-orange-50 focus:ring-2 focus:ring-orange-200 outline-none transition-all"
+//               value={interest === "" ? "" : interest.toString()}
+//               onChange={(e) => {
+//                 const raw = e.target.value.replace(",", ".");
+//                 if (/^\d*\.?\d*$/.test(raw) || raw === "") {
+//                   setInterest(raw === "" ? "" : Number(raw));
+//                 }
+//               }}
+//             />
+//           </div>
+
+//           {/* חודשי הלוואה */}
+//           <div>
+//             <label className="block text-sm mb-1 text-slate-100">
+//               מספר חודשי הלוואה
+//             </label>
+//             <input
+//               type="number"
+//               placeholder="לדוגמה: 240"
+//               className="w-full rounded-md p-3 text-gray-900 bg-white shadow-[inset_0_3px_5px_rgba(0,0,0,0.2),0_3px_6px_rgba(0,0,0,0.25)] focus:bg-orange-50 focus:ring-2 focus:ring-orange-200 outline-none transition-all"
+//               value={months}
+//               onChange={(e) =>
+//                 setMonths(e.target.value === "" ? "" : Number(e.target.value))
+//               }
+//             />
+//           </div>
+//         </div>
+
+//         {/* כפתורים */}
+//         <div className="flex w-full justify-between gap-3 mt-4">
+//           <button
+//             onClick={() => {}}
+//             className="flex-1 py-3 rounded-md bg-white text-blue-900 font-bold shadow-[inset_0_4px_6px_rgba(0,0,0,0.15),0_4px_8px_rgba(0,0,0,0.25)] hover:shadow-[inset_0_2px_3px_rgba(0,0,0,0.1),0_6px_10px_rgba(0,0,0,0.35)] active:translate-y-[1px] transition-all"
+//           >
+//             חשב
+//           </button>
+//           <button
+//             onClick={resetForm}
+//             className="flex-1 py-3 rounded-md bg-white text-blue-900 font-bold shadow-[inset_0_4px_6px_rgba(0,0,0,0.15),0_4px_8px_rgba(0,0,0,0.25)] hover:shadow-[inset_0_2px_3px_rgba(0,0,0,0.1),0_6px_10px_rgba(0,0,0,0.35)] active:translate-y-[1px] transition-all"
+//           >
+//             נקה
+//           </button>
+//         </div>
+
+//         {/* תוצאה */}
+//         <div className="w-full bg-white rounded-xl p-4 mt-3 shadow-inner text-gray-900 text-center">
+//           <p className="text-lg font-medium">תשלום חודשי מוערך:</p>
+//           <p className="text-3xl font-bold text-blue-900 mt-1">
+//             ₪{monthlyPayment.toFixed(2)}
+//           </p>
+ 
+
+//         </div>
+    
+     
+     
+//       </div>
+
+   
+
+//       {/* טבלת סילוקין */}
+//       {breakdown.length > 0 && (
+//         <div className="w-full mt-12 bg-white rounded-xl p-4 shadow-inner text-gray-900 max-h-[500px] overflow-y-auto">
+//           <h2 className="text-xl font-bold text-gray-800 mb-3">פירוט חודשי</h2>
+//           <table className="w-full text-sm text-right">
+//             <thead className="text-xs text-gray-500 uppercase border-b">
+//               <tr>
+//                 <th className="px-3 py-2">חודש</th>
+//                 <th className="px-3 py-2">תשלום חודשי</th>
+//                 <th className="px-3 py-2 text-rose-500">ריבית</th>
+//                 <th className="px-3 py-2 text-emerald-600">קרן</th>
+//                 <th className="px-3 py-2">יתרה</th>
+//               </tr>
+//             </thead>
+//             <tbody>
+//               {breakdown.map((row) => (
+//                 <tr
+//                   key={row.month}
+//                   className="border-b hover:bg-sky-50 transition"
+//                 >
+//                   <td className="px-3 py-2">{row.month}</td>
+//                   <td className="px-3 py-2">{row.totalPaid.toFixed(0)}</td>
+//                   <td className="px-3 py-2 text-rose-500">
+//                     {row.interestPaid.toFixed(0)}
+//                   </td>
+//                   <td className="px-3 py-2 text-emerald-600">
+//                     {row.principalPaid.toFixed(0)}
+//                   </td>
+//                   <td className="px-3 py-2">
+//                     {row.remainingBalance.toFixed(0)}
+//                   </td>
+//                 </tr>
+//               ))}
+//             </tbody>
+//           </table>
+//         </div>
+//       )}
+//     </div>
+//   </div>
+// </div>
