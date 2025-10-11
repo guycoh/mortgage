@@ -22,51 +22,140 @@ const calculators = [
   { title: "מחשבון כדאיות מחזור", description: "בדוק האם משתלם לך למחזר את המשכנתא.", link: "/home/calculators/refinance-calculator", icon: Calculator1 },
 ];
 
-function CalculatorCube({ title, description, icon: Icon, link }: any) {
-  const size = 200; // רוחב הפאה הקדמית
-  const height = 220; // גובה הפאה הקדמית
-  const depth = 15; // עומק מצומצם לנייד
+// function CalculatorCube({ title, description, icon: Icon, link }: any) {
+//   const size = 200; // גודל רגיל (דסקטופ)
+//   const height = 220;
+//   const depth = 15;
+//   const cubeColor = "#1d75a1";
+
+//   return (
+//     <Link href={link}>
+//       <div
+//         className="relative cursor-pointer hover:scale-[1.05] transition-all duration-300 
+//                    w-[200px] h-[235px] sm:w-[220px] sm:h-[250px] 
+//                    md:w-[240px] md:h-[260px]"
+//         style={{ width: size + depth, height: height + depth }}
+//       >
+//         {/* פאה קדמית */}
+//         <div
+//           className="absolute flex flex-col items-center justify-start pt-6 text-white text-center shadow-lg rounded-none
+//                      w-[200px] h-[220px] sm:w-[220px] sm:h-[235px] md:w-[240px] md:h-[250px]"
+//           style={{
+//             top: depth,
+//             left: 0,
+//             zIndex: 3,
+//             background: cubeColor,
+//             boxShadow: "0 20px 30px rgba(0,0,0,0.3), inset 0 2px 8px rgba(255,255,255,0.15)",
+//           }}
+//         >
+//           <div className="mb-3 sm:mb-4">
+//             <Icon
+//               size={40} // קטן יותר לנייד
+//               color="white"
+//               className="drop-shadow-md sm:w-12 sm:h-12 w-10 h-10"
+//             />
+//           </div>
+//           <h3 className="text-base sm:text-lg md:text-xl font-bold mb-1">{title}</h3>
+//           {description && (
+//             <p className="text-xs sm:text-sm md:text-base opacity-90 break-words whitespace-normal px-2 text-center leading-snug">
+//               {description}
+//             </p>
+//           )}
+//         </div>
+
+//         {/* פאה ימנית */}
+//         <div
+//           className="absolute"
+//           style={{
+//             width: depth,
+//             height: height,
+//             top: depth,
+//             left: size,
+//             background: cubeColor,
+//             border: "1px solid #15516f",
+//             transform: "skewY(-45deg)",
+//             transformOrigin: "top left",
+//             zIndex: 2,
+//           }}
+//         />
+
+//         {/* פאה עליונה */}
+//         <div
+//           className="absolute"
+//           style={{
+//             width: size,
+//             height: depth,
+//             top: 0,
+//             left: 0,
+//             background: cubeColor,
+//             border: "1px solid #15516f",
+//             transform: "skewX(-45deg)",
+//             transformOrigin: "bottom left",
+//             zIndex: 1,
+//           }}
+//         />
+//       </div>
+//     </Link>
+//   );
+// }
+
+
+ function CalculatorCube({ title, description, icon: Icon, link }: any) {
+  // הגדרות בסיסיות
+  const baseSize = 200;
+  const baseHeight = 220;
+  const baseDepth = 15;
   const cubeColor = "#1d75a1";
 
   return (
     <Link href={link}>
       <div
-        className="relative cursor-pointer hover:scale-[1.05] transition-all duration-300"
-        style={{ width: size + depth, height: height + depth }}
+        className="relative cursor-pointer hover:scale-[1.05] transition-all duration-300
+                   mx-auto"
+        style={{
+          width: `clamp(140px, 35vw, ${baseSize + baseDepth}px)`,
+          height: `clamp(160px, 40vw, ${baseHeight + baseDepth}px)`,
+        }}
       >
         {/* פאה קדמית */}
         <div
-          className="absolute flex flex-col items-center justify-start pt-6 text-white text-center shadow-lg rounded-none"
+          className="absolute flex flex-col items-center justify-start text-white text-center shadow-lg rounded-none
+                     pt-[6%]"
           style={{
-            width: size,
-            height: height,
-            top: depth,
+            width: `clamp(130px, 33vw, ${baseSize}px)`,
+            height: `clamp(150px, 38vw, ${baseHeight}px)`,
+            top: `clamp(6px, 1.2vw, ${baseDepth}px)`,
             left: 0,
             zIndex: 3,
             background: cubeColor,
-            boxShadow: "0 20px 30px rgba(0,0,0,0.3), inset 0 2px 8px rgba(255,255,255,0.15)",
+            boxShadow: "0 18px 25px rgba(0,0,0,0.25), inset 0 2px 8px rgba(255,255,255,0.15)",
           }}
         >
-          <div className="mb-3">
-            <Icon size={50} color="white" className="drop-shadow-md" />
+          <div className="mb-2 sm:mb-3">
+            <Icon
+              size={40}
+              color="white"
+              className="drop-shadow-md w-[26px] h-[26px] sm:w-[36px] sm:h-[36px] md:w-[46px] md:h-[46px]"
+            />
           </div>
-          <h3 className="text-lg font-bold mb-1">{title}</h3>
+          <h3 className="text-[0.85rem] sm:text-base md:text-lg font-bold mb-1">
+            {title}
+          </h3>
           {description && (
-            <p className="text-sm opacity-90 break-words whitespace-normal px-2 text-center">
+            <p className="text-[0.7rem] sm:text-sm md:text-base opacity-90 break-words whitespace-normal px-2 text-center leading-snug">
               {description}
             </p>
           )}
-
         </div>
 
         {/* פאה ימנית */}
         <div
           className="absolute"
           style={{
-            width: depth,
-            height: height,
-            top: depth,
-            left: size,
+            width: `clamp(8px, 1.4vw, ${baseDepth}px)`,
+            height: `clamp(150px, 38vw, ${baseHeight}px)`,
+            top: `clamp(6px, 1.2vw, ${baseDepth}px)`,
+            left: `clamp(130px, 33vw, ${baseSize}px)`,
             background: cubeColor,
             border: "1px solid #15516f",
             transform: "skewY(-45deg)",
@@ -79,8 +168,8 @@ function CalculatorCube({ title, description, icon: Icon, link }: any) {
         <div
           className="absolute"
           style={{
-            width: size,
-            height: depth,
+            width: `clamp(130px, 33vw, ${baseSize}px)`,
+            height: `clamp(8px, 1.4vw, ${baseDepth}px)`,
             top: 0,
             left: 0,
             background: cubeColor,
