@@ -1,7 +1,10 @@
-"use client";
+"use client"
 
 import Image from "next/image";
 import Link from "next/link";
+import LoanCalculator from "../calculators/simple_calculator/page";
+
+
 
 export default function MortgageForHousing() {
   return (
@@ -44,7 +47,7 @@ export default function MortgageForHousing() {
               הבנק מספק מימון בהתאם להון העצמי שלך וליכולת ההחזר.
             </p>
           </div>
-
+  <LoanCalculator />
           <div className="bg-gradient-to-r from-green-50 to-green-100 p-6 rounded-xl shadow-md hover:shadow-lg transition">
             <h2 className="text-2xl font-semibold text-green-600 mb-2">
               מסלולי משכנתא נפוצים

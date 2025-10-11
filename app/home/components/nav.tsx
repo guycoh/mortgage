@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import CustomIcon from "@/public/assets/images/svg/general/CustomIcon";
+import IsraelInterest from "./IsraelBank";
+
 
 export const Nav = ({ onOpenMenu, isMenuOpen }: { onOpenMenu: () => void, isMenuOpen: boolean }) => {
   
@@ -92,7 +94,11 @@ export const Nav = ({ onOpenMenu, isMenuOpen }: { onOpenMenu: () => void, isMenu
 
 
         {/* אפקט "שולחן" תלת-ממדי מתחת לניווט */}
-        <div className="absolute bottom-0 left-0 w-full h-10 bg-gradient-to-b from-[#0b2f42] to-transparent shadow-inner"></div>
+       <div className="absolute bottom-0 left-0 w-full h-10 bg-gradient-to-b from-[#0b2f42] to-transparent shadow-inner">
+         <IsraelInterest/> 
+       </div>
+  
+      
       </div>
   
   

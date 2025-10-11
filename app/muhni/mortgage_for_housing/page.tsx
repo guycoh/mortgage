@@ -1,6 +1,5 @@
 "use client"
 
-
 import Image from "next/image";
 import Link from "next/link";
 
@@ -31,6 +30,8 @@ export default function MortgageForHousing() {
               משכנתא היא הלוואה בנקאית המאפשרת רכישת נכס למגורים תוך החזר חודשי לתקופה ארוכה. הבנק מספק מימון בהתאם להון העצמי שלך וליכולת ההחזר.
             </p>
           </div>
+
+
           <div className="bg-green-100 p-4 rounded-lg shadow-md">
             <h2 className="text-2xl font-semibold text-green-600">מסלולי משכנתא נפוצים</h2>
             <ul className="list-disc list-inside text-gray-700 mt-2">
