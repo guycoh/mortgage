@@ -25,8 +25,8 @@ const calculators = [
 function CalculatorCube({ title, description, icon: Icon, link }: any) {
   const size = 200; // רוחב הפאה הקדמית
   const height = 220; // גובה הפאה הקדמית
-  const depth = 20; // עומק הקובייה
-  const cubeColor = "#1d75a1"; // צבע אחיד לכל הפאות
+  const depth = 15; // עומק מצומצם לנייד
+  const cubeColor = "#1d75a1";
 
   return (
     <Link href={link}>
@@ -36,7 +36,7 @@ function CalculatorCube({ title, description, icon: Icon, link }: any) {
       >
         {/* פאה קדמית */}
         <div
-          className="absolute flex flex-col items-center justify-center text-white text-center shadow-lg rounded-none"
+          className="absolute flex flex-col items-center justify-start pt-6 text-white text-center shadow-lg rounded-none"
           style={{
             width: size,
             height: height,
@@ -51,7 +51,12 @@ function CalculatorCube({ title, description, icon: Icon, link }: any) {
             <Icon size={50} color="white" className="drop-shadow-md" />
           </div>
           <h3 className="text-lg font-bold mb-1">{title}</h3>
-          {description && <p className="text-sm opacity-90">{description}</p>}
+          {description && (
+            <p className="text-sm opacity-90 break-words whitespace-normal px-2 text-center">
+              {description}
+            </p>
+          )}
+
         </div>
 
         {/* פאה ימנית */}
@@ -90,10 +95,11 @@ function CalculatorCube({ title, description, icon: Icon, link }: any) {
   );
 }
 
+
 export default function Calculators3DGrid() {
   return (
     <div className="min-h-screen bg-gray-100 py-12 px-6">
-      <h1 className="text-center text-gray-900 text-3xl font-bold mb-10 tracking-wide drop-shadow-lg">
+      <h1 className="text-center text-gray-600 text-3xl font-bold mb-10 tracking-wide drop-shadow-lg">
         מחשבוני משכנתא 
       </h1>
 
