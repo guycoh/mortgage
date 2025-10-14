@@ -202,11 +202,6 @@ export default function MortgageSimulatorForm() {
     
     return Math.round(loanAmount); // עיגול לסכום שלם
  
-
-
-
-
-
 }
   
 
