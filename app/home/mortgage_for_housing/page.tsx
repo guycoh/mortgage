@@ -26,39 +26,59 @@ export default function MortgageForHousing() {
           עם אפשרויות מימון מגוונות המותאמות לצרכים שלך.
         </p>
 
-        <div className="flex justify-center mb-10">
-          <Image
-            src="/assets/images/imgFiles/mortgage_housing.jpg"
-            alt="משכנתא לדיור"
-            width={500}
-            height={300}
-            className="rounded-xl shadow-lg"
-          />
-        </div>
-
+        
         {/* מקטעים תלת מימדיים */}
         <div className="space-y-8">
           <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-6 rounded-xl shadow-md hover:shadow-lg transition">
             <h2 className="text-2xl font-semibold text-blue-600 mb-2">
               מהי משכנתא לדיור?
             </h2>
-            <p className="text-gray-700 leading-relaxed">
-              משכנתא היא הלוואה בנקאית המאפשרת רכישת נכס למגורים תוך החזר חודשי לתקופה ארוכה. 
-              הבנק מספק מימון בהתאם להון העצמי שלך וליכולת ההחזר.
-            </p>
+              <p className="text-gray-700 leading-relaxed">
+                משכנתא היא הלוואה בנקאית המאפשרת רכישת נכס למגורים או להשקעה,
+                תוך החזר חודשי קבוע או משתנה לאורך תקופה ארוכה.
+                מדובר בהלוואה בעלת הריבית הנמוכה ביותר מבין סוגי ההלוואות,
+                במיוחד כשמדובר בהלוואות ארוכות טווח.
+                גובה המימון שהבנק מאשר נקבע בהתאם להון העצמי שלך וליכולת ההחזר הכלכלית,
+                כאשר אחוז המימון המרבי עומד על <strong>75%</strong> לדירה יחידה,
+                <strong>70%</strong> לדירה חליפית ו־<strong>50%</strong> לדירה נוספת.
+                <br className="hidden md:block" />
+                מוזמן לבדוק באמצעות{" "}
+                <Link
+                  href="/home/calculators/mortgage_capability"
+                  className="text-main font-semibold hover:underline hover:text-main/80 transition-colors"
+                >
+                  המחשבון שלנו כמה משכנתא תוכל לקבל בהתאם לנתוניך האישיים
+                </Link>
+                .
+              </p>
+
           </div>
-  <LoanCalculator />
+         <LoanCalculator />
           <div className="bg-gradient-to-r from-green-50 to-green-100 p-6 rounded-xl shadow-md hover:shadow-lg transition">
-            <h2 className="text-2xl font-semibold text-green-600 mb-2">
+            <h2 className="text-2xl font-semibold text-green-600 mb-4">
               מסלולי משכנתא נפוצים
             </h2>
-            <ul className="list-disc list-inside text-gray-700 leading-relaxed">
-              <li>משכנתא בריבית קבועה – ביטחון מפני שינויים בריבית.</li>
-              <li>משכנתא בריבית משתנה – אפשרות לנצל ירידות בריבית.</li>
-              <li>משכנתא צמודה למדד – מותאמת לתנודות הכלכלה.</li>
-              <li>משכנתא עם החזר בלון – תשלומים מופחתים בתחילת התקופה.</li>
+            <ul className="list-disc list-outside pl-6 text-gray-700 leading-relaxed">
+              <li>
+                מסלול בריבית קבועה – מסלול יציב המעניק ביטחון מפני שינויים עתידיים בריבית. 
+                לפי הנחיות בנק ישראל, נדרש מינימום של שליש מההלוואה במסלול ריבית קבועה.
+              </li>
+              <li>
+                מסלול בריבית פריים – הריבית מושפעת מריבית בנק ישראל, ופריים מייצג את ריבית בנק ישראל + 1.5%.
+                מתאים למי שרוצה ריבית משתנה עם פוטנציאל להוזלה, אך סיכון לעלייה.
+              </li>
+              <li>
+                מסלול בריבית משתנה – מאפשר לנצל ירידות עתידיות בריבית, אך כולל סיכון לעלייה.
+              </li>
+              <li>
+                מסלול צמוד למדד – ההחזרים מתעדכנים בהתאם לשינויים במדד המחירים לצרכן.
+              </li>
+              <li>
+                מסלול עם החזר בלון – מאפשר תשלומים מופחתים בתחילת התקופה, עם פירעון עיקרי בסוף.
+              </li>
             </ul>
           </div>
+
 
           <div className="bg-gradient-to-r from-orange-50 to-orange-100 p-6 rounded-xl shadow-md hover:shadow-lg transition">
             <h2 className="text-2xl font-semibold text-orange-600 mb-2">
@@ -71,6 +91,22 @@ export default function MortgageForHousing() {
           </div>
         </div>
 
+        {/* <div className="flex justify-center mb-10">
+          <Image
+            src="/assets/images/imgFiles/mortgage_housing.jpg"
+            alt="משכנתא לדיור"
+            width={500}
+            height={300}
+            className="rounded-xl shadow-lg"
+          />
+        </div>
+       */}
+
+
+
+
+
+
         {/* קריאה לפעולה */}
         <div className="mt-12 flex justify-center">
           <Link
@@ -79,6 +115,11 @@ export default function MortgageForHousing() {
           >
             קבעו פגישה עם מומחה למשכנתאות
           </Link>
+
+
+
+
+
         </div>
       </div>
     </div>
