@@ -1,4 +1,4 @@
-"use client";
+"use client"
 import { useState } from "react";
 
 export default function BalloonLoanCalculator() {
@@ -6,7 +6,9 @@ export default function BalloonLoanCalculator() {
   const [annualRate, setAnnualRate] = useState(5);
   const [periodMonths, setPeriodMonths] = useState(60);
   const [inflationRate, setInflationRate] = useState(2);
-  const [balloonType, setBalloonType] = useState<"full" | "partial">("full");
+ 
+ const [balloonType, setBalloonType] = useState<"full" | "partial">("partial");
+
   const [isLinked, setIsLinked] = useState(false);
 
   const monthlyRate = annualRate / 12 / 100;
@@ -51,14 +53,14 @@ export default function BalloonLoanCalculator() {
               dir="ltr"
               type="range"
               min={10000}
-              max={1000000}
+              max={3000000}
               step={1000}
               value={loanAmount}
               onChange={(e) => setLoanAmount(+e.target.value)}
               className="w-full accent-white"
             />
             <div className="flex justify-between text-xs mt-1 text-white">
-              <span>1,000,000 ₪</span>
+              <span>3,000,000 ₪</span>
               <span>10,000 ₪</span>
             </div>
           </label>
@@ -101,8 +103,8 @@ export default function BalloonLoanCalculator() {
               className="w-full accent-white"
             />
             <div className="flex justify-between text-xs mt-1 text-white">
-              <span>1</span>
               <span>360</span>
+              <span>1</span>             
             </div>
           </label>
 
@@ -140,28 +142,34 @@ export default function BalloonLoanCalculator() {
           )}
 
           {/* סוג בלון */}
-          <label className="flex gap-4 text-white">
-            <span>
-              <input
-                type="radio"
-                name="balloonType"
-                value="full"
-                checked={balloonType === "full"}
-                onChange={() => setBalloonType("full")}
-              />
-              <span className="ml-2">בלון מלא</span>
-            </span>
-            <span>
-              <input
-                type="radio"
-                name="balloonType"
-                value="partial"
-                checked={balloonType === "partial"}
-                onChange={() => setBalloonType("partial")}
-              />
-              <span className="ml-2">בלון חלקי</span>
-            </span>
-          </label>
+         <label className="flex gap-6 text-white items-center">
+              {/* בלון חלקי */}
+              <span className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="balloonType"
+                  value="partial"
+                  checked={balloonType === "partial"}
+                  onChange={() => setBalloonType("partial")}
+                  className="w-5 h-5 accent-white"
+                />
+                <span className="text-lg">בלון חלקי</span>
+              </span>
+
+              {/* בלון מלא */}
+              <span className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="balloonType"
+                  value="full"
+                  checked={balloonType === "full"}
+                  onChange={() => setBalloonType("full")}
+                  className="w-5 h-5 accent-white"
+                />
+                <span className="text-lg">בלון מלא</span>
+              </span>
+         </label>
+
         </div>
 
         {/* תוצאה */}

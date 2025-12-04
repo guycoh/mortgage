@@ -1,4 +1,4 @@
-"use client";
+"use client"
 
 import Link from "next/link";
 import CustomIcon from "@/public/assets/images/svg/general/CustomIcon";
@@ -17,7 +17,7 @@ export const Nav = ({ onOpenMenu, isMenuOpen }: { onOpenMenu: () => void, isMenu
   ];
 
   return (
-    <header className="w-full ">
+    <header className="w-full sticky top-0 z-[100]">
     <div className="relative">
       <CustomIcon
             size={140}
@@ -39,12 +39,6 @@ export const Nav = ({ onOpenMenu, isMenuOpen }: { onOpenMenu: () => void, isMenu
               <span className="block w-6 h-0.5 bg-main"></span>
             </div>
           </button>
-
-
-
-
-
-
 
 
       {/* רקע ניווט עם תלת-ממד */}

@@ -59,7 +59,7 @@ export default function Sidebar_admin() {
          
           
           <li className="hover:bg-gray-700 p-2 rounded">📧 יצירת קשר</li>       
-          <li className="hover:bg-gray-700 p-2 rounded"> <Link href="/admin/setting" > ⚙️ הגדרות</Link></li>
+          <li className="hover:bg-gray-700 p-2 rounded"> <Link href="/private/admin/setting" > ⚙️ הגדרות</Link></li>
         </ul>
       </div>
 

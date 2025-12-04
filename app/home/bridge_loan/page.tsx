@@ -2,6 +2,10 @@
 
 import Image from "next/image";
 import Link from "next/link";
+//import LoanCalculator from "../calculators/simple_calculator/page";
+import BalloonLoanCalculator from "../calculators/baloon/BalloonLoanCalculator";
+
+
 
 export default function BridgeLoan() {
   return (
@@ -21,7 +25,8 @@ export default function BridgeLoan() {
           הלוואת גישור היא הלוואה זמנית הניתנת לתקופה קצרה, עד למכירת נכס קיים או קבלת מקור מימון צפוי. היא מתאימה במיוחד
           למי שרוצה לקנות דירה חדשה לפני שמכר את הקיימת.
         </p>
-
+       <BalloonLoanCalculator/>
+{/* 
         <div className="flex justify-center mb-10">
           <Image
             src="/assets/images/imgFiles/bridgeLoan.png"
@@ -30,7 +35,9 @@ export default function BridgeLoan() {
             height={300}
             className="rounded-xl shadow-lg"
           />
-        </div>
+     
+
+        </div> */}
 
         {/* מקטעים תלת מימדיים */}
         <div className="space-y-8">
