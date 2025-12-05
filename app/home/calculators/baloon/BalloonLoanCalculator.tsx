@@ -141,34 +141,61 @@ export default function BalloonLoanCalculator() {
             </label>
           )}
 
-          {/* סוג בלון */}
-         <label className="flex gap-6 text-white items-center">
-              {/* בלון חלקי */}
-              <span className="flex items-center gap-2">
-                <input
-                  type="radio"
-                  name="balloonType"
-                  value="partial"
-                  checked={balloonType === "partial"}
-                  onChange={() => setBalloonType("partial")}
-                  className="w-5 h-5 accent-white"
-                />
-                <span className="text-lg">בלון חלקי</span>
-              </span>
+        
+        {/* סוג בלון */}
+        <div className="flex gap-6 text-white items-center">
 
-              {/* בלון מלא */}
-              <span className="flex items-center gap-2">
-                <input
-                  type="radio"
-                  name="balloonType"
-                  value="full"
-                  checked={balloonType === "full"}
-                  onChange={() => setBalloonType("full")}
-                  className="w-5 h-5 accent-white"
-                />
-                <span className="text-lg">בלון מלא</span>
-              </span>
-         </label>
+          {/* בלון חלקי */}
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="radio"
+              name="balloonType"
+              value="partial"
+              checked={balloonType === "partial"}
+              onChange={() => setBalloonType("partial")}
+              className="hidden"
+            />
+            {/* עיגול מעוצב */}
+            <span
+              className={`w-6 h-6 rounded-md flex items-center justify-center border-2 
+                ${balloonType === "partial"
+                  ? "bg-white text-[#1d75a1] border-white"
+                  : "border-white"
+                }`}
+            >
+              {balloonType === "partial" && (
+                <span className="text-lg font-bold leading-none">✓</span>
+              )}
+            </span>
+            <span className="text-lg">בלון חלקי</span>
+          </label>
+
+          {/* בלון מלא */}
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="radio"
+              name="balloonType"
+              value="full"
+              checked={balloonType === "full"}
+              onChange={() => setBalloonType("full")}
+              className="hidden"
+            />
+            {/* עיגול מעוצב */}
+            <span
+              className={`w-6 h-6 rounded-md flex items-center justify-center border-2 
+                ${balloonType === "full"
+                  ? "bg-white text-[#1d75a1] border-white"
+                  : "border-white"
+                }`}
+            >
+              {balloonType === "full" && (
+                <span className="text-lg font-bold leading-none">✓</span>
+              )}
+            </span>
+            <span className="text-lg">בלון מלא</span>
+          </label>
+          
+        </div>
 
         </div>
 
