@@ -29,10 +29,10 @@ export default function DigitalBusinessCard() {
     { icon: GlobeIcon, label: "אתר", href: "https://primeinv.co.il/" },
   ];
   const calculators = [
-    { icon: Calculator5, label: "מחשבון מהיר", href: "/muhni/calculators/simple_calculator" },
-    { icon: Calculator2, label: "מחשבון יכולות", href: "/muhni/calculators/mortgage_capability" },
-    { icon: Calculator3, label: "מס רכישה", href: "/muhni/calculators/purchase_tax_calculator" },
-    { icon: SigmaIcon, label: "מחשבון משכנתא", href: "/muhni/calculators/mortgage_calculator" },
+    { icon: Calculator5, label: "מחשבון מהיר", href: "/home/calculators/simple_calculator" },
+    { icon: Calculator2, label: "מחשבון יכולות", href: "/home/calculators/mortgage_capability" },
+    { icon: Calculator3, label: "מס רכישה", href: "/home/calculators/purchase_tax_calculator" },
+    { icon: SigmaIcon, label: "מחשבון משכנתא", href: "/home/calculators/mortgage_calculator" },
   ];
 
   return (
@@ -151,7 +151,15 @@ export default function DigitalBusinessCard() {
                 </button>
             </Link>
             
-          
+            {/* <Link href="/muhni/schedule">
+              <Image
+                src="/assets/gal/meeting.svg"
+                alt="קבע פגישה"
+                width={142}
+                height={142}
+                className="object-contain"
+              />
+            </Link> */}
           </div>
             {/* הפוטר עצמו */}
             <div className="bg-white text-[#1d75a1] text-sm py-12 rounded-b-xl shadow-sm text-right">

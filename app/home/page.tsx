@@ -20,6 +20,7 @@ const mortgageCategories = [
   { category: "איחוד הלוואות", link: "loan_consolidation", icon: <ConsolidationIcon size={64} color="#1d75a1" /> },
   { category: "משכנתא חוץ בנקאית", link: "mortgage_non_bank", icon: <IconGeneralMortgage size={64} color="#1d75a1" /> },
   { category: "מחיר למשתכן", link: "home_for_eligible_buyers", icon: <EligibleIcon size={64} color="#1d75a1" /> },
+  { category: "בניה עצמית", link: "mortgage_for_self_build", icon: <EligibleIcon size={100}/> },
   { category: "מיחזור משכנתא", link: "mortgage_refinancing", icon: <RefinancingIcon size={64} color="#1d75a1" /> },
   { category: "הלוואת גישור", link: "bridge_loan", icon: <BridgeIcon size={64} color="#1d75a1" /> },
   { category: "ביטוח משכנתא", link: "mortgage_insurance", icon: <InsuranceIcon size={64} color="#1d75a1" /> },
