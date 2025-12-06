@@ -14,17 +14,17 @@ export const Footer = () => {
           <h4 className="underline text-lg font-semibold mb-1">האתר</h4>
           <ul className="space-y-1">
             <li>
-              <Link href="/muhni/about" className="hover:underline hover:font-bold transition duration-200">
+              <Link href="/home/about" className="hover:underline hover:font-bold transition duration-200">
                 אודותינו
               </Link>
             </li>
             <li>
-              <Link href="/muhni/calculators" className="hover:underline hover:font-bold transition duration-200">
+              <Link href="/home/calculators" className="hover:underline hover:font-bold transition duration-200">
                 מחשבונים
               </Link>
             </li>
             <li>
-              <Link href="/muhni/concepts" className="hover:underline hover:font-bold transition duration-200">
+              <Link href="/home/concepts" className="hover:underline hover:font-bold transition duration-200">
                 מושגים במשכנתא
               </Link>
             </li>
@@ -36,12 +36,12 @@ export const Footer = () => {
           <h4 className="underline text-lg font-semibold mb-1">מיחזור משכנתא</h4>
           <ul className="space-y-1">
             <li>
-              <Link href="/muhni/mortgage_refinancing" className="hover:underline hover:font-bold transition duration-200">
+              <Link href="/home/mortgage_refinancing" className="hover:underline hover:font-bold transition duration-200">
                 מיחזור משכנתא
               </Link>
             </li>
             <li>
-              <Link href="/muhni/bb" className="hover:underline hover:font-bold transition duration-200">
+              <Link href="/home/bb" className="hover:underline hover:font-bold transition duration-200">
                 מדריכים הוצאת דוח יתרות לסילוק
               </Link>
             </li>
@@ -53,7 +53,7 @@ export const Footer = () => {
           <h4 className="underline text-lg font-semibold mb-1">יצירת קשר</h4>
           <ul className="space-y-1">
             <li>
-              <Link href="/muhni/contact" className="hover:underline hover:font-bold transition duration-200">
+              <Link href="/home/contact" className="hover:underline hover:font-bold transition duration-200">
                 טופס יצירת קשר
               </Link>
             </li>
