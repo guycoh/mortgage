@@ -1,13 +1,12 @@
+"use client"
 import Link from "next/link";
 
 
 export const Footer = () => {
  
   return (
-    <>
-
-
-<footer className="hidden md:block bg-[#0f3b52] text-white  font-sans pt-12 pb-8 px-12 tracking-wide relative overflow-hidden">
+      <>
+      <footer className="hidden md:block bg-[#0f3b52] text-white  font-sans pt-12 pb-8 px-12 tracking-wide relative overflow-hidden">
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8 text-white">
         {/* עמודה 1 */}
         <div>
@@ -30,7 +29,7 @@ export const Footer = () => {
             </li>
           </ul>
         </div>
-
+      
         {/* עמודה 2 */}
         <div>
           <h4 className="underline text-lg font-semibold mb-1">מיחזור משכנתא</h4>
@@ -47,8 +46,7 @@ export const Footer = () => {
             </li>
           </ul>
         </div>
-
-        {/* עמודה 3 */}
+       {/* עמודה 3 */}
         <div>
           <h4 className="underline text-lg font-semibold mb-1">יצירת קשר</h4>
           <ul className="space-y-1">
@@ -76,15 +74,13 @@ export const Footer = () => {
           &copy; {new Date().getFullYear()} מורגי. כל הזכויות שמורות.
         </div>
       </div>
-    </footer>
+      
+      
+      
+          </footer>
 
-
-
-</>
-
-
-
-
+      
+      </>     
 
   )
 }
