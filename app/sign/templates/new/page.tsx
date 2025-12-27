@@ -1,49 +1,67 @@
 // app/sign/templates/new/page.tsx
-
-"use client";
-
-import { useEffect, useState } from "react";
+"use client"
+import { useEffect, useRef, useState } from "react";
 import PdfIframe from "@/app/sign/components/PdfIframe";
+import TemplateOverlay, {
+  FieldType,
+  TemplateFieldData,
+} from "../../components/TemplateOverlay";
 
 type Form = { id: string; title: string; file_path: string };
 
+
+
+
 export default function NewTemplatePage() {
+  const containerRef = useRef<HTMLDivElement>(null);
+
   const [forms, setForms] = useState<Form[]>([]);
   const [selectedFormId, setSelectedFormId] = useState("");
   const [pdfUrl, setPdfUrl] = useState("");
 
+  const [fields, setFields] = useState<TemplateFieldData[]>([]);
+  const [selectedFieldType, setSelectedFieldType] =
+    useState<FieldType>("name");
+
+  const [scale, setScale] = useState(1);
+  const [currentPage, setCurrentPage] = useState(1);
+
+
+
   useEffect(() => {
-    const fetchForms = async () => {
-      const res = await fetch("/sign/api/forms");
-      const data = await res.json();
-      setForms(Array.isArray(data) ? data : []);
-    };
-    fetchForms();
+    fetch("/sign/api/forms")
+      .then((res) => res.json())
+      .then((data) => setForms(Array.isArray(data) ? data : []));
   }, []);
 
-  
-useEffect(() => {
-  if (!selectedFormId) return;
+  useEffect(() => {
+    if (!selectedFormId) return;
+    const form = forms.find((f) => f.id === selectedFormId);
+    if (form) {
+      setPdfUrl(
+        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/forms/${form.file_path}`
+      );
+    }
+  }, [selectedFormId, forms]);
 
-  const form = forms.find((f) => f.id === selectedFormId);
-  if (form) {
-    // כאן מוסיפים את שם ה-bucket לפני ה-file_path
-    const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/forms/${form.file_path}`;
-    setPdfUrl(url);
-  }
-}, [selectedFormId, forms]);
-
-
-
-
-
-
-
+  const addField = () => {
+    setFields((prev) => [
+      ...prev,
+     {
+        id: crypto.randomUUID(),
+        type: selectedFieldType,
+        page: currentPage,
+        x: 20,
+        y: 20,
+      }
+    ]);
+  };
 
   return (
     <div className="p-6 space-y-6">
       <h1 className="text-2xl font-bold">יצירת תבנית חדשה</h1>
 
+      {/* בחירת טופס */}
       <select
         className="border rounded px-3 py-2 w-full max-w-md"
         value={selectedFormId}
@@ -57,23 +75,77 @@ useEffect(() => {
         ))}
       </select>
 
-      {pdfUrl && (
-        <>
-          <div className="border mt-4">
-            <PdfIframe url={pdfUrl} />
-          </div>
+      {/* כלי עבודה */}
+      <div className="flex gap-4 items-center">
+        <select
+          value={selectedFieldType}
+          onChange={(e) =>
+            setSelectedFieldType(e.target.value as FieldType)
+          }
+          className="border px-2 py-1 rounded"
+        >
+          <option value="name">שם</option>
+          <option value="id">ת"ז</option>
+          <option value="email">מייל</option>
+          <option value="signature">חתימה</option>
+        </select>
 
-          {/* שדה URL לקריאה בלבד */}
-          <div className="mt-2">
-            <label className="block mb-1 font-medium">URL של הקובץ:</label>
-            <input
-              type="text"
-              value={pdfUrl}
-              readOnly
-              className="w-full border px-2 py-1 text-sm"
+        <button
+          onClick={addField}
+          className="px-4 py-1 bg-blue-600 text-white rounded"
+        >
+          הוסף שדה
+        </button>
+
+        {/* Zoom */}
+        <div className="flex gap-2">
+          <button onClick={() => setScale((s) => s - 0.1)}>➖</button>
+          <span>{Math.round(scale * 100)}%</span>
+          <button onClick={() => setScale((s) => s + 0.1)}>➕</button>
+        </div>
+      </div>
+
+<div className="flex gap-2 items-center">
+  <button
+    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+    className="px-2 border rounded"
+  >
+    ◀
+  </button>
+
+  <span>עמוד {currentPage}</span>
+
+  <button
+    onClick={() => setCurrentPage((p) => p + 1)}
+    className="px-2 border rounded"
+  >
+    ▶
+  </button>
+</div>
+
+      {pdfUrl && (
+        <div
+          ref={containerRef}
+          className="relative border mx-auto"
+          style={{ width: "800px" }}
+        >
+          <div style={{ transform: `scale(${scale})`, transformOrigin: "top center" }}>
+            <PdfIframe url={pdfUrl} />
+
+            <TemplateOverlay
+              fields={fields}
+              setFields={setFields}
+              containerRef={containerRef}
+              scale={scale}
+              currentPage={currentPage}
             />
+
+
+
+
+
           </div>
-        </>
+        </div>
       )}
     </div>
   );
@@ -81,57 +153,131 @@ useEffect(() => {
 
 
 
-// "use client";
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 // import { useEffect, useState } from "react";
+// import PdfIframe from "@/app/sign/components/PdfIframe";
 
-// import PdfViewer from "../../components/pdfViewer";
+
+// import TemplateOverlay
+// , {
+//   TemplateField,
+//   FieldType,
+// } from "../../components/TemplateOverlay";
+
+// import DragOverlay from "../../components/DragOverlay";
+
+// type Form = { id: string; title: string; file_path: string };
 
 
-// type Form = {
+
+// type Field = {
 //   id: string;
-//   title: string;
+//   type: FieldType;
+//   x: number; // באחוזים
+//   y: number;
 // };
+
 
 // export default function NewTemplatePage() {
 //   const [forms, setForms] = useState<Form[]>([]);
 //   const [selectedFormId, setSelectedFormId] = useState("");
 //   const [pdfUrl, setPdfUrl] = useState("");
 
-//   // טפסים
+//   const [fields, setFields] = useState<Field[]>([]);
+//   const [selectedFieldType, setSelectedFieldType] =
+//     useState<FieldType>("name");
+
+
+
+
+
 //   useEffect(() => {
-//     fetch("/sign/api/forms")
-//       .then(res => res.json())
-//       .then(setForms);
+//     const fetchForms = async () => {
+//       const res = await fetch("/sign/api/forms");
+//       const data = await res.json();
+//       setForms(Array.isArray(data) ? data : []);
+//     };
+//     fetchForms();
 //   }, []);
 
-//   // PDF של הטופס
-//   useEffect(() => {
-//     if (!selectedFormId) return;
+  
+// useEffect(() => {
+//   if (!selectedFormId) return;
 
-//     fetch(`/sign/api/forms/${selectedFormId}/pdf`)
-//       .then(res => res.json())
-//       .then(data => setPdfUrl(data.pdfUrl));
-//   }, [selectedFormId]);
+//   const form = forms.find((f) => f.id === selectedFormId);
+//   if (form) {
+//     // כאן מוסיפים את שם ה-bucket לפני ה-file_path
+//     const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/forms/${form.file_path}`;
+//     setPdfUrl(url);
+//   }
+// }, [selectedFormId, forms]);
+
 
 //   return (
-//     <div className="p-6 space-y-4">
+//     <div className="p-6 space-y-6">
 //       <h1 className="text-2xl font-bold">יצירת תבנית חדשה</h1>
 
 //       <select
-//         className="border p-2 rounded w-full"
+//         className="border rounded px-3 py-2 w-full max-w-md"
 //         value={selectedFormId}
 //         onChange={(e) => setSelectedFormId(e.target.value)}
 //       >
 //         <option value="">בחר טופס</option>
-//         {forms.map(f => (
+//         {forms.map((f) => (
 //           <option key={f.id} value={f.id}>
 //             {f.title}
 //           </option>
 //         ))}
 //       </select>
 
-//       {pdfUrl && <PdfViewer pdfUrl={pdfUrl} />}
+//       <select
+//         value={selectedFieldType}
+//         onChange={(e) =>
+//           setSelectedFieldType(e.target.value as FieldType)
+//         }
+//         className="border px-2 py-1 rounded"
+//       >
+//         <option value="name">שם</option>
+//         <option value="id">ת"ז</option>
+//         <option value="email">מייל</option>
+//         <option value="signature">חתימה</option>
+//       </select>
+
+// {pdfUrl && (
+//   <div className="relative w-full max-w-4xl border">
+//     <PdfIframe url={pdfUrl} />
+
+
+// {/* Overlay */}
+//   <div className="absolute inset-0">
+//     <DragOverlay />
+//   </div>
+
+
+//   </div>
+// )}
+
 //     </div>
 //   );
 // }
+
+
