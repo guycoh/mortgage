@@ -1,13 +1,13 @@
 // app/sign/templates/new/page.tsx
 "use client"
 import { useEffect, useRef, useState } from "react";
-import PdfIframe from "@/app/sign/components/PdfIframe";
+//import PdfIframe from "@/app/sign/components/PdfIframe";
 import TemplateOverlay, {
   FieldType,
   TemplateFieldData,
 } from "../../components/TemplateOverlay";
 
-import PdfPage from "@/app/sign/components/PdfPage";
+//import PdfPage from "@/app/sign/components/PdfPage";
 
 
 type Form = { id: string; title: string; file_path: string };
@@ -154,12 +154,12 @@ export default function NewTemplatePage() {
     className="relative mx-auto border bg-gray-100"
     style={{ width: pageSize.w || 800 }}
   >
-    <PdfPage
+    {/* <PdfPage
       url={pdfUrl}
       page={currentPage}
       scale={scale}
       onPageSize={(w, h) => setPageSize({ w, h })}
-    />
+    /> */}
 
     <TemplateOverlay
       fields={fields.filter((f) => f.page === currentPage)}
