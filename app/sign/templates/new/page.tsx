@@ -7,6 +7,9 @@ import TemplateOverlay, {
   TemplateFieldData,
 } from "../../components/TemplateOverlay";
 
+import PdfPage from "@/app/sign/components/PdfPage";
+
+
 type Form = { id: string; title: string; file_path: string };
 
 
@@ -25,6 +28,7 @@ export default function NewTemplatePage() {
 
   const [scale, setScale] = useState(1);
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState({ w: 0, h: 0 });
 
 
 
@@ -123,7 +127,7 @@ export default function NewTemplatePage() {
   </button>
 </div>
 
-      {pdfUrl && (
+      {/* {pdfUrl && (
         <div
           ref={containerRef}
           className="relative border mx-auto"
@@ -140,13 +144,47 @@ export default function NewTemplatePage() {
               currentPage={currentPage}
             />
 
-
-
-
-
           </div>
         </div>
-      )}
+      )} */}
+
+{pdfUrl && (
+  <div
+    ref={containerRef}
+    className="relative mx-auto border bg-gray-100"
+    style={{ width: pageSize.w || 800 }}
+  >
+    <PdfPage
+      url={pdfUrl}
+      page={currentPage}
+      scale={scale}
+      onPageSize={(w, h) => setPageSize({ w, h })}
+    />
+
+    <TemplateOverlay
+      fields={fields.filter((f) => f.page === currentPage)}
+      setFields={setFields}
+      containerRef={containerRef}
+      
+      scale={scale}
+      currentPage={currentPage}
+    />
+  </div>
+)}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     </div>
   );
 }

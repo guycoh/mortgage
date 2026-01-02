@@ -33,6 +33,11 @@ export default function DigitalBusinessCard() {
     { icon: Calculator2, label: "מחשבון יכולות", href: "/home/calculators/mortgage_capability" },
     { icon: Calculator3, label: "מס רכישה", href: "/home/calculators/purchase_tax_calculator" },
     { icon: SigmaIcon, label: "מחשבון משכנתא", href: "/home/calculators/mortgage_calculator" },
+
+{ icon: SigmaIcon, label: "מחשבון משכנתא", href: "/home/calculators/mortgage_calculator" },
+{ icon: SigmaIcon, label: "מחשבון משכנתא", href: "/home/calculators/mortgage_calculator" },
+{ icon: SigmaIcon, label: "מחשבון משכנתא", href: "/home/calculators/mortgage_calculator" },
+{ icon: SigmaIcon, label: "מחשבון משכנתא", href: "/home/calculators/mortgage_calculator" },
   ];
 
   return (
@@ -136,6 +141,67 @@ export default function DigitalBusinessCard() {
             </div>
           </div>
         </div>
+
+
+{/* — מחשבוני משכנתא — */}
+<div className="w-full flex justify-center mt-10">
+  <div className="w-full max-w-5xl px-2">
+    <div
+      className="
+        flex
+        gap-x-8 gap-y-6
+        overflow-x-auto
+        scroll-smooth
+        place-items-center
+        [&::-webkit-scrollbar]:hidden
+        [-ms-overflow-style:'none']
+        [scrollbar-width:'none']
+      "
+    >
+      {calculators.map((item, idx) => (
+        <div key={idx} className="relative flex flex-col items-center">
+          <Link
+            href={item.href}
+            className="rounded-md bg-white shadow hover:shadow-lg transition
+                       w-[72px] h-[72px] sm:w-20 sm:h-20 flex items-center justify-center"
+          >
+            <div
+              className="bg-gray-50 border border-gray-200 rounded-md
+                         w-12 h-12 sm:w-16 sm:h-16 flex items-center justify-center"
+            >
+              <item.icon
+                color="#1d75a1"
+                className="w-7 h-7 sm:w-9 sm:h-9"
+              />
+            </div>
+          </Link>
+
+          <span
+            className="absolute top-full mt-2 text-xs sm:static sm:mt-3
+                       sm:text-sm font-medium text-white text-center whitespace-nowrap"
+          >
+            {item.label}
+          </span>
+        </div>
+      ))}
+    </div>
+  </div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
         </div>
 
