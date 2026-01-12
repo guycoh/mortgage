@@ -1,4 +1,4 @@
-"use client";
+"use client"
 
 import { useState } from "react";
 
@@ -39,24 +39,32 @@ export default function AbilityCalculator() {
 const [months, setMonths] = useState(360);       // ברירת מחדל 360 חודשים
 const [interest, setInterest] = useState(4.8);   // ברירת מחדל 4.8%
 
+ /* ===== מפריד אלפים ===== */
 
-  
-  
-  
-  
-  
-  
+const formatNumber = (value: string) =>
+  value.replace(/\D/g, "").replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+
+const parseNumber = (value: string) =>
+  Number(value.replace(/,/g, ""));
+
+
+
+
+
   
   /* ===== חישובים ===== */
 
-  const asset = Number(assetValue || 0);
-  const equityAmount = Number(equity || 0);
+const asset = parseNumber(assetValue || "0");
+const equityAmount = parseNumber(equity || "0");
 
-  const totalIncome =
-    Number(mainIncome || 0) + Number(secondaryIncome || 0);
+const totalIncome =
+  parseNumber(mainIncome || "0") +
+  parseNumber(secondaryIncome || "0");
 
-  const totalLoans =
-    Number(mainLoans || 0) + Number(secondaryLoans || 0);
+const totalLoans =
+  parseNumber(mainLoans || "0") +
+  parseNumber(secondaryLoans || "0");
+
 
   const maxMortgageAllowed =
     asset * (PURPOSES[purpose].maxLtv / 100);
@@ -141,8 +149,8 @@ const crmText = [
             type="text"
             value={assetValue}
             onChange={(e) =>
-              setAssetValue(e.target.value)
-            }
+                        setAssetValue(formatNumber(e.target.value))
+                    }
             placeholder="₪"
             className="w-full border rounded-lg p-2"
           />
@@ -157,7 +165,7 @@ const crmText = [
         <input
             type="text"
             value={equity}
-            onChange={(e) => setEquity(e.target.value)}
+            onChange={(e) => setEquity(formatNumber(e.target.value))}
             placeholder="₪"
             className="w-full border rounded-lg p-2"
         />
@@ -402,21 +410,7 @@ const crmText = [
 
 
 
-
-
-
-
-
-
-
-
     </div>
-
-
-
-
-
-
 
     </div>
   );
