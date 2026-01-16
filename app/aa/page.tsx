@@ -49,6 +49,28 @@ const parseNumber = (value: string) =>
 
 
 
+/* ===== איפוס טופס  ===== */
+
+const resetForm = () => {
+  setPurpose("single");
+
+  setMainAge("");
+  setSecondaryAge("");
+
+  setMainIncome("");
+  setSecondaryIncome("");
+
+  setMainLoans("");
+  setSecondaryLoans("");
+
+  setAssetValue("");
+  setEquity("");
+
+  setMonths(360);
+  setInterest(4.8);
+};
+
+
 
 
   
@@ -122,7 +144,7 @@ const crmText = [
             onChange={(e) =>
               setPurpose(e.target.value as Purpose)
             }
-            className="w-full border rounded-lg p-2"
+            className="w-full border rounded-lg p-2 focus:bg-orange-50 last:focus:border-orange-400 focus:ring-1 focus:ring-orange-300 focus:outline-none "
           >
             {Object.entries(PURPOSES).map(
               ([key, val]) => (
@@ -152,7 +174,7 @@ const crmText = [
                         setAssetValue(formatNumber(e.target.value))
                     }
             placeholder="₪"
-            className="w-full border rounded-lg p-2"
+            className="w-full border rounded-lg p-2 focus:bg-orange-50 last:focus:border-orange-400 focus:ring-1 focus:ring-orange-300 focus:outline-none "
           />
         </div>
 
@@ -167,7 +189,7 @@ const crmText = [
             value={equity}
             onChange={(e) => setEquity(formatNumber(e.target.value))}
             placeholder="₪"
-            className="w-full border rounded-lg p-2"
+            className="w-full border rounded-lg p-2 focus:bg-orange-50 last:focus:border-orange-400 focus:ring-1 focus:ring-orange-300 focus:outline-none "
         />
 
         {asset > 0 && equityAmount > 0 && (
@@ -195,7 +217,7 @@ const crmText = [
           value={mainAge}
           onChange={(e) => setMainAge(e.target.value)}
           placeholder="גיל"
-          className="border rounded p-2"
+          className="w-full border rounded-lg p-2 focus:bg-orange-50 last:focus:border-orange-400 focus:ring-1 focus:ring-orange-300 focus:outline-none "
         />
         <input
           value={secondaryAge}
@@ -203,7 +225,7 @@ const crmText = [
             setSecondaryAge(e.target.value)
           }
           placeholder="גיל"
-          className="border rounded p-2"
+          className="w-full border rounded-lg p-2 focus:bg-orange-50 last:focus:border-orange-400 focus:ring-1 focus:ring-orange-300 focus:outline-none "
         />
         <div className="border rounded p-2 bg-gray-50 text-center">
           —
@@ -212,19 +234,15 @@ const crmText = [
         {/* הכנסות */}
         <input
           value={mainIncome}
-          onChange={(e) =>
-            setMainIncome(e.target.value)
-          }
+          onChange={(e) => setMainIncome(formatNumber(e.target.value))}           
           placeholder="הכנסה חודשית"
-          className="border rounded p-2"
+          className="w-full border rounded-lg p-2 focus:bg-orange-50 last:focus:border-orange-400 focus:ring-1 focus:ring-orange-300 focus:outline-none "
         />
         <input
           value={secondaryIncome}
-          onChange={(e) =>
-            setSecondaryIncome(e.target.value)
-          }
+          onChange={(e) => setSecondaryIncome(formatNumber(e.target.value))}
           placeholder="הכנסה חודשית"
-          className="border rounded p-2"
+          className="w-full border rounded-lg p-2 focus:bg-orange-50 last:focus:border-orange-400 focus:ring-1 focus:ring-orange-300 focus:outline-none "
         />
         <div className="border rounded p-2 bg-gray-50 text-center font-semibold">
           {totalIncome.toLocaleString()} ₪
@@ -233,19 +251,15 @@ const crmText = [
         {/* הלוואות */}
         <input
           value={mainLoans}
-          onChange={(e) =>
-            setMainLoans(e.target.value)
-          }
+          onChange={(e) => setMainLoans(formatNumber(e.target.value))}
           placeholder="הלוואות"
-          className="border rounded p-2"
+          className="w-full border rounded-lg p-2 focus:bg-orange-50 last:focus:border-orange-400 focus:ring-1 focus:ring-orange-300 focus:outline-none "
         />
         <input
           value={secondaryLoans}
-          onChange={(e) =>
-            setSecondaryLoans(e.target.value)
-          }
+          onChange={(e) => setSecondaryLoans(formatNumber(e.target.value))}
           placeholder="הלוואות"
-          className="border rounded p-2"
+          className="w-full border rounded-lg p-2 focus:bg-orange-50 last:focus:border-orange-400 focus:ring-1 focus:ring-orange-300 focus:outline-none "
         />
         <div className="border rounded p-2 bg-gray-50 text-center font-semibold">
           {totalLoans.toLocaleString()} ₪
@@ -412,263 +426,21 @@ const crmText = [
 
     </div>
 
+            <div className="flex justify-end mt-6">
+            <button
+                type="button"
+                onClick={resetForm}
+                className="px-5 py-2 rounded-lg border border-red-300
+                        text-red-600 font-semibold
+                        hover:bg-red-50 transition"
+            >
+                ניקוי טופס
+            </button>
+            </div>
+
     </div>
   );
 }
 
 
 
-
-
-
-
-// "use client";
-
-// import { useMemo, useState } from "react";
-
-// /** ===== Types ===== */
-
-// type Purpose =
-//   | "single_apartment"
-//   | "replacement_apartment"
-//   | "investment_apartment"
-//   | "any_purpose"
-//   | "self_build";
-
-// type Person = {
-//   age: string;
-//   netIncome: string;
-//   extraIncome: string;
-//   loans: string;
-// };
-
-// const emptyPerson: Person = {
-//   age: "",
-//   netIncome: "",
-//   extraIncome: "",
-//   loans: "",
-// };
-
-// /** ===== Utils ===== */
-
-// const toNumber = (v: string) =>
-//   Number(v.replace(/[^\d]/g, "")) || 0;
-
-// const LTV_MAP: Record<Purpose, number> = {
-//   single_apartment: 75,
-//   replacement_apartment: 70,
-//   investment_apartment: 50,
-//   any_purpose: 50,
-//   self_build: 75,
-// };
-
-// const PURPOSE_LABELS: Record<Purpose, string> = {
-//   single_apartment: "דירה יחידה",
-//   replacement_apartment: "דירה חלופית",
-//   investment_apartment: "דירה נוספת (השקעה)",
-//   any_purpose: "כל מטרה",
-//   self_build: "בניה עצמית",
-// };
-
-// /** ===== Uncontrolled Numeric Input ===== */
-
-// function NumericInput({
-//   defaultValue,
-//   onCommit,
-//   placeholder,
-// }: {
-//   defaultValue?: string;
-//   onCommit: (v: string) => void;
-//   placeholder?: string;
-// }) {
-//   return (
-//     <input
-//       type="text"
-//       defaultValue={defaultValue}
-//       placeholder={placeholder}
-//       inputMode="numeric"
-//       dir="ltr"
-//       onBlur={(e) => onCommit(e.target.value)}
-//       className="w-full rounded-xl border px-3 py-2 text-center
-//                  focus:outline-none focus:ring-2 focus:ring-orange-400"
-//     />
-//   );
-// }
-
-// /** ===== Main Component ===== */
-
-// export default function AbilityCalculator() {
-//   const [purpose, setPurpose] =
-//     useState<Purpose>("single_apartment");
-//   const [primary, setPrimary] =
-//     useState<Person>(emptyPerson);
-//   const [secondary, setSecondary] =
-//     useState<Person>(emptyPerson);
-
-//   const calc = (p: Person) => {
-//     const net = toNumber(p.netIncome);
-//     const extra = toNumber(p.extraIncome);
-//     const loans = toNumber(p.loans);
-
-//     const totalIncome = net + extra;
-//     const freeIncome = totalIncome - loans;
-
-//     return {
-//       net,
-//       extra,
-//       loans,
-//       freeIncome,
-//       recommended: freeIncome * 0.36,
-//       max: freeIncome * 0.4,
-//     };
-//   };
-
-//   const p1 = useMemo(() => calc(primary), [primary]);
-//   const p2 = useMemo(() => calc(secondary), [secondary]);
-
-//   const summary = {
-//     net: p1.net + p2.net,
-//     extra: p1.extra + p2.extra,
-//     loans: p1.loans + p2.loans,
-//     freeIncome: p1.freeIncome + p2.freeIncome,
-//     recommended: p1.recommended + p2.recommended,
-//     max: p1.max + p2.max,
-//   };
-
-//   const Cell = ({ value }: { value: number | string }) => (
-//     <div className="font-medium">
-//       {typeof value === "number"
-//         ? value.toLocaleString() + " ₪"
-//         : value}
-//     </div>
-//   );
-
-//   return (
-//     <div className="max-w-6xl mx-auto p-6 bg-white rounded-3xl shadow-xl">
-//       <h2 className="text-2xl font-bold text-center mb-6">
-//         מחשבון יכולת החזר
-//       </h2>
-
-//       {/* ===== Purpose Select + LTV ===== */}
-//       <div className="max-w-md mx-auto mb-10">
-//         <label className="block text-sm font-medium text-gray-600 mb-1 text-right">
-//           מטרת המשכנתא
-//         </label>
-
-//         <select
-//           value={purpose}
-//           onChange={(e) =>
-//             setPurpose(e.target.value as Purpose)
-//           }
-//           className="w-full rounded-xl border px-3 py-2
-//                      focus:outline-none focus:ring-2 focus:ring-orange-400"
-//         >
-//           {(
-//             Object.keys(PURPOSE_LABELS) as Purpose[]
-//           ).map((key) => (
-//             <option key={key} value={key}>
-//               {PURPOSE_LABELS[key]}
-//             </option>
-//           ))}
-//         </select>
-
-//         <div className="mt-3 text-sm text-gray-700 bg-gray-50 rounded-xl p-3 text-right">
-//           <strong>אחוז מימון מקסימלי:</strong>{" "}
-//           {LTV_MAP[purpose]}%
-//         </div>
-//       </div>
-
-//       {/* ===== Calculator Grid ===== */}
-//       <div className="grid grid-cols-4 gap-6 items-center text-center">
-//         <div></div>
-//         <div className="font-semibold">בן זוג ראשי</div>
-//         <div className="font-semibold">בן זוג משני</div>
-//         <div className="font-semibold">סיכום</div>
-
-//         <div className="text-right">גיל</div>
-//         <NumericInput
-//           defaultValue={primary.age}
-//           onCommit={(v) =>
-//             setPrimary({ ...primary, age: v })
-//           }
-//         />
-//         <NumericInput
-//           defaultValue={secondary.age}
-//           onCommit={(v) =>
-//             setSecondary({ ...secondary, age: v })
-//           }
-//         />
-//         <Cell value="—" />
-
-//         <div className="text-right">שכר נטו</div>
-//         <NumericInput
-//           defaultValue={primary.netIncome}
-//           onCommit={(v) =>
-//             setPrimary({ ...primary, netIncome: v })
-//           }
-//         />
-//         <NumericInput
-//           defaultValue={secondary.netIncome}
-//           onCommit={(v) =>
-//             setSecondary({ ...secondary, netIncome: v })
-//           }
-//         />
-//         <Cell value={summary.net} />
-
-//         <div className="text-right">הכנסה נוספת</div>
-//         <NumericInput
-//           defaultValue={primary.extraIncome}
-//           onCommit={(v) =>
-//             setPrimary({ ...primary, extraIncome: v })
-//           }
-//         />
-//         <NumericInput
-//           defaultValue={secondary.extraIncome}
-//           onCommit={(v) =>
-//             setSecondary({
-//               ...secondary,
-//               extraIncome: v,
-//             })
-//           }
-//         />
-//         <Cell value={summary.extra} />
-
-//         <div className="text-right">הלוואות</div>
-//         <NumericInput
-//           defaultValue={primary.loans}
-//           onCommit={(v) =>
-//             setPrimary({ ...primary, loans: v })
-//           }
-//         />
-//         <NumericInput
-//           defaultValue={secondary.loans}
-//           onCommit={(v) =>
-//             setSecondary({ ...secondary, loans: v })
-//           }
-//         />
-//         <Cell value={summary.loans} />
-
-//         <div className="text-right font-semibold">
-//           הכנסה פנויה
-//         </div>
-//         <Cell value={p1.freeIncome} />
-//         <Cell value={p2.freeIncome} />
-//         <Cell value={summary.freeIncome} />
-
-//         <div className="text-right">
-//           החזר מומלץ (36%)
-//         </div>
-//         <Cell value={p1.recommended} />
-//         <Cell value={p2.recommended} />
-//         <Cell value={summary.recommended} />
-
-//         <div className="text-right">
-//           החזר מקסימלי (40%)
-//         </div>
-//         <Cell value={p1.max} />
-//         <Cell value={p2.max} />
-//         <Cell value={summary.max} />
-//       </div>
-//     </div>
-//   );
-// }
