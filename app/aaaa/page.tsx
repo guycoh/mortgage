@@ -57,6 +57,12 @@ const buttons = [
     { icon: Calculator2, label: "מחשבון יכולות", href: "/home/calculators/mortgage_capability" },
     { icon: Calculator3, label: "מס רכישה", href: "/home/calculators/purchase_tax_calculator" },
     { icon: SigmaIcon, label: "מחשבון משכנתא", href: "/home/calculators/mortgage_calculator" },
+
+    { icon: SigmaIcon, label: "מחשבון בלון", href: "/home/calculators/baloon" },
+    { icon: SigmaIcon, label: "קרן שווה", href: "/home/calculators/equal_principal" },
+    { icon: SigmaIcon, label: "קרן שווה", href: "/home/calculators/equal_principal" },
+    { icon: SigmaIcon, label: "קרן שווה", href: "/home/calculators/equal_principal" },
+
   ];
 
 
@@ -131,69 +137,94 @@ const buttons = [
           </div>
 
           {/* רצועה 1 – כפתורי פעולה */}
-<div className="grid grid-cols-4 gap-4">
-  {buttons.map((btn, i) => {
-    const Icon = btn.icon
+            <div className="grid grid-cols-4 gap-4">
+            {buttons.map((btn, i) => {
+                const Icon = btn.icon
 
-    return (
-      <a
-        key={i}
-        href={btn.href}
-        className="flex flex-col items-center gap-2"
-      >
-        {/* כפתור עגול */}
-        <div
-          className="
-            aspect-square
-            w-full
-            rounded-full
-            bg-white
+                return (
+                <a
+                    key={i}
+                    href={btn.href}
+                    className="flex flex-col items-center gap-2"
+                >
+                    {/* כפתור עגול */}
+                    <div
+                    className="
+                        aspect-square
+                        w-full
+                        rounded-full
+                        bg-white
 
-            shadow-[6px_6px_12px_rgba(0,0,0,0.25),-6px_-6px_12px_rgba(255,255,255,0.9)]
-            flex
-            items-center
-            justify-center
+                        shadow-[6px_6px_12px_rgba(0,0,0,0.25),-6px_-6px_12px_rgba(255,255,255,0.9)]
+                        flex
+                        items-center
+                        justify-center
 
-            transition
-            active:scale-95
-          "
+                        transition
+                        active:scale-95
+                    "
+                    >
+                    <Icon className="w-6 h-6 text-gray-800" />
+                    </div>
+
+                    {/* כיתוב */}
+                    <span className="text-xs font-medium text-white">
+                    {btn.label}
+                    </span>
+                </a>
+                )
+            })}
+            </div>
+
+
+        {/* רצועה 2 – מחשבונים, גלילה אופקית */}
+<div
+  className="
+    overflow-x-auto
+    [-ms-overflow-style:none]
+    [scrollbar-width:none]
+    [&::-webkit-scrollbar]:hidden
+  "
+>
+  <div className="grid grid-flow-col auto-cols-[calc((100%-3*1rem)/4)] gap-4">
+    {calculators.map((calc, i) => {
+      const Icon = calc.icon
+
+      return (
+        <a
+          key={i}
+          href={calc.href}
+          className="flex flex-col items-center gap-2"
         >
-          <Icon className="w-6 h-6 text-gray-800" />
-        </div>
-
-        {/* כיתוב */}
-        <span className="text-xs font-medium text-white">
-          {btn.label}
-        </span>
-      </a>
-    )
-  })}
-</div>
-
-
-          {/* רצועה 2 – גלילה באצבע בלבד, 4 נראים */}
+          {/* כפתור מרובע */}
           <div
             className="
-              overflow-x-auto
-              [-ms-overflow-style:none]
-              [scrollbar-width:none]
-              [&::-webkit-scrollbar]:hidden
+              aspect-square
+              w-full
+              rounded-xl
+              bg-white
+
+              shadow-[6px_6px_12px_rgba(0,0,0,0.25),-6px_-6px_12px_rgba(255,255,255,0.9)]
+              flex
+              items-center
+              justify-center
+
+              transition
+              active:scale-95
             "
           >
-            <div className="grid grid-flow-col auto-cols-[calc((100%-3*1rem)/4)] gap-4">
-              {Array.from({ length: 8 }).map((_, i) => (
-                <button
-                  key={i}
-                  className="
-                    aspect-square
-                    rounded-xl
-                    bg-gradient-to-br from-gray-200 to-gray-400
-                    shadow-[4px_4px_8px_rgba(0,0,0,0.3),-4px_-4px_8px_rgba(255,255,255,0.25)]
-                  "
-                />
-              ))}
-            </div>
+            <Icon className="w-6 h-6 text-gray-800" />
           </div>
+
+          {/* כיתוב */}
+          <span className="text-xs font-medium text-white text-center leading-tight">
+            {calc.label}
+          </span>
+        </a>
+      )
+    })}
+  </div>
+</div>
 
         </div>
 
