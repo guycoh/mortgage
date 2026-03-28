@@ -78,8 +78,17 @@
 
 
 /* רשימת פונטים  */
-/* ShmulikCLM.ttf */
 
+@theme {
+  --font-shmulik: "ShmulikCLM", serif;
+  --font-dorian: "DorianCLM", serif;
+  --font-miri: "Miri", sans-serif;
+  --font-adva: "AdvaOpen", sans-serif;
+
+}
+
+
+/* ShmulikCLM.ttf */
 @font-face {
   font-family: "ShmulikCLM";
   src: url("/fonts/ShmulikCLM.ttf") format("truetype");
@@ -102,14 +111,22 @@
   font-display: swap;
 }
 
+/* font-AdvaOpen   */
 
+@font-face {
+  font-family: "AdvaOpen";
+  src: url("/fonts/AdvaOpen-Light.ttf") format("truetype");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
 
-/* font-shmulik   */
-
-@theme {
-  --font-shmulik: "ShmulikCLM", serif;
-  --font-dorian: "DorianCLM", serif;
-  --font-miri: "Miri", sans-serif;
+@font-face {
+  font-family: "AdvaOpen";
+  src: url("/fonts/AdvaOpen-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
 }
 
 
@@ -148,4 +165,47 @@ input[type='number']::-webkit-outer-spin-button {
 
 input[type='number'] {
   -moz-appearance: textfield; /* Firefox */
+}
+
+/* כפתור עם אנימציה  */
+/* TEXT BASE */
+.text {
+  display: flex;
+  overflow: hidden;
+  font-weight: 500;
+}
+
+.text span {
+  display: inline-block;
+  transform: translateY(0);
+  transition: transform 0.4s cubic-bezier(.2,.8,.2,1);
+  transition-delay: calc(var(--i) * 0.04s);
+}
+
+/* HOVER ANIMATION כמו המקור */
+button.group:hover .text span {
+  transform: translateY(-12px);
+}
+
+/* ICON */
+.icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  filter: drop-shadow(0 1px 0.6px rgba(0,0,0,0.4));
+  transition: transform 0.4s ease;
+}
+
+button.group:hover .icon {
+  transform: translateY(-2px) scale(1.05);
+}
+
+/* STATE TRANSITION */
+button .text span {
+  will-change: transform;
+}
+
+/* יותר חלק */
+button {
+  transition: all 0.3s ease;
 }

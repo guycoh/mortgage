@@ -22,11 +22,11 @@ export default function BalloonLoanCalculator() {
   const partialMonthly = balloonType === "partial" ? loanAmount * monthlyRate : 0;
 
   return (
-  <div className="flex justify-center items-center min-h-screen bg-gradient-to-b from-[#f8fafc] to-[#e6eff3] py-16 px-4">
+  <div className="flex justify-center items-center min-h-screen bg-linear-to-b from-[#f8fafc] to-[#e6eff3] py-16 px-4">
   <div className="relative">
     {/* גוף הקופסה */}
     <div
-      className="relative w-[400px] rounded-xl shadow-2xl overflow-hidden p-6"
+      className="relative w-100 rounded-xl shadow-2xl overflow-hidden p-6"
       style={{
         background: "linear-gradient(180deg, #1d75a1 0%, #15516f 100%)",
         boxShadow:
@@ -34,7 +34,7 @@ export default function BalloonLoanCalculator() {
       }}
     >
       {/* קצה עליון מואר */}
-      <div className="absolute top-0 left-0 w-full h-[10px] bg-white/20"></div>
+      <div className="absolute top-0 left-0 w-full h-2.5 bg-white/20"></div>
 
       {/* תוכן המחשבון */}
       <div className="flex flex-col space-y-6 text-white">

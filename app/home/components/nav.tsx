@@ -17,7 +17,7 @@ export const Nav = ({ onOpenMenu, isMenuOpen }: { onOpenMenu: () => void, isMenu
   ];
 
   return (
-    <header className="w-full sticky top-0 z-[100]">
+    <header className="w-full sticky top-0 z-100]">
     <div className="relative">
       <CustomIcon
             size={140}
@@ -28,7 +28,7 @@ export const Nav = ({ onOpenMenu, isMenuOpen }: { onOpenMenu: () => void, isMenu
       {/* כפתור המבורגר */}
           <button
             onClick={onOpenMenu}
-            className={`md:hidden absolute top-4 right-4 z-[60] bg-white rounded-full p-4 shadow-md transition-all duration-200
+            className={`md:hidden absolute top-4 right-4 z-60 bg-white rounded-full p-4 shadow-md transition-all duration-200
               ${isMenuOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}
             `}
             aria-label="פתח תפריט"
@@ -53,7 +53,7 @@ export const Nav = ({ onOpenMenu, isMenuOpen }: { onOpenMenu: () => void, isMenu
         }}
       >
         {/* שכבות רקע תלת-ממדיות */}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#0b2f42] via-[#166083] to-[#38c5e0] opacity-95"></div>
+        <div className="absolute inset-0 bg-linear-to-t from-[#0b2f42] via-[#166083] to-[#38c5e0] opacity-95"></div>
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,_rgba(255,255,255,0.15),transparent)]"></div>
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(255,255,255,0.08),transparent)]"></div>
 

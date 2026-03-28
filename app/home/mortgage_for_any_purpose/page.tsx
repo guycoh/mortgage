@@ -3,6 +3,9 @@
 import Image from "next/image";
 import Link from "next/link";
 
+import UltraSendButton from "../components/UltraSendButton";
+
+
 export default function MortgageForAnyPurpose() {
   return (
     <div className=" font-dorian min-h-screen flex flex-col items-center justify-start py-20 relative overflow-hidden bg-[#f4f6f9]">
@@ -17,7 +20,7 @@ export default function MortgageForAnyPurpose() {
           משכנתא לכל מטרה – פתרון פיננסי חכם לצרכים שלכם
         </h1>
         
-        <p className=" font-miri  text-sm text-gray-700 leading-relaxed text-center mb-8">
+        <p className=" font-adva font-bold  text-2xl text-gray-900 leading-relaxed text-center mb-8">
           משכנתא לכל מטרה מאפשרת לכם לקבל מימון בתנאים נוחים כנגד נכס קיים.
           ניתן להשתמש בכסף למגוון רחב של מטרות — שיפוץ הבית, סגירת חובות,
           השקעות, או כל צורך פיננסי אחר.
@@ -34,12 +37,12 @@ export default function MortgageForAnyPurpose() {
         </div>
 
         {/* מקטעים תלת מימדיים */}
-        <div className="space-y-8">
-          <div className="bg-gradient-to-r from-orange-50 to-orange-100 p-6 rounded-xl shadow-md hover:shadow-lg transition">
-            <h2 className="text-2xl font-semibold text-orange-600 mb-2">
+        <div className=" font-adva font-bold space-y-8">
+          <div className="bg-linear-to-r from-orange-50 to-orange-100 p-6 rounded-xl shadow-md hover:shadow-lg transition">
+            <h2 className="text-3xl font-semibold text-orange-600 mb-2">
               למה לקחת משכנתא לכל מטרה?
             </h2>
-            <ul className="list-disc list-inside text-gray-700 leading-relaxed">
+            <ul className=" font-adva font-bold text-2xl list-disc list-inside  text-gray-700 leading-relaxed">
               <li>מימון הוצאות בלתי צפויות</li>
               <li>שיפוץ ושדרוג הבית</li>
               <li>סגירת הלוואות קיימות בריביות גבוהות</li>
@@ -48,11 +51,11 @@ export default function MortgageForAnyPurpose() {
             </ul>
           </div>
 
-          <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-6 rounded-xl shadow-md hover:shadow-lg transition">
-            <h2 className="text-2xl font-semibold text-blue-600 mb-2">
+          <div className="bg-linear to-r from-blue-50 to-blue-100 p-6 rounded-xl shadow-md hover:shadow-lg transition">
+            <h2 className="text-3xl font-semibold text-blue-600 mb-2">
               איך מקבלים משכנתא לכל מטרה?
             </h2>
-            <p className="text-gray-700 leading-relaxed">
+            <p className="text-gray-700 text-2xl  leading-relaxed">
               התהליך כולל בדיקת שווי הנכס, אישור מסגרת אשראי מול הבנק,
               חתימה על תנאי ההלוואה וקבלת הכסף תוך זמן קצר.
               אנו נלווה אתכם לאורך כל הדרך כדי לוודא שתקבלו את התנאים הטובים ביותר.
@@ -60,10 +63,10 @@ export default function MortgageForAnyPurpose() {
           </div>
 
           <div className="bg-gradient-to-r from-green-50 to-green-100 p-6 rounded-xl shadow-md hover:shadow-lg transition">
-            <h2 className="text-2xl font-semibold text-green-600 mb-2">
+            <h2 className="text-3xl font-semibold text-green-600 mb-2">
               למי זה מתאים?
             </h2>
-            <p className="text-gray-700 leading-relaxed">
+            <p className="text-gray-700 text-2xl leading-relaxed">
               אם יש בבעלותכם נכס קיים ואתם זקוקים למימון נוסף לצורך אישי או עסקי –
               משכנתא לכל מטרה יכולה להיות פתרון משתלם, גמיש ויעיל במיוחד עבורכם.
             </p>
@@ -71,14 +74,37 @@ export default function MortgageForAnyPurpose() {
         </div>
 
         {/* קריאה לפעולה */}
-        <div className="mt-12 flex justify-center">
+        <div className="mt-12 flex justify-center font-shmulik   ">
           <Link
             href="/muhni/schedule"
-            className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-bold py-3 px-8 rounded-xl text-lg shadow-md transition duration-300 hover:shadow-lg"
+            className="
+              bg-linear-to-r 
+              from-[#1d75a1] 
+              to-[#155a7c] 
+              hover:from-[#155a7c] 
+              hover:to-[#0f455e] 
+              text-white 
+              font-bold 
+              py-3 
+              px-8 
+              rounded-xl 
+              text-lg 
+              shadow-md 
+              transition 
+              duration-300 
+              hover:shadow-lg
+            "
           >
             קבעו פגישה עם מומחה למשכנתאות
           </Link>
         </div>
+      
+   
+      
+      
+      
+      
+      
       </div>
     </div>
   );
