@@ -1,6 +1,9 @@
-@tailwind base;
+@import "tailwindcss";
+
+
+/* @tailwind base;
 @tailwind components;
-@tailwind utilities;
+@tailwind utilities; */
 
 @layer base {
   :root {
@@ -61,12 +64,63 @@
 
 @layer base {
   * {
-    @apply border-border;
+    border-color: hsl(var(--border));
   }
+
   body {
-    @apply bg-background text-foreground;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+
+
   }
 }
+
+
+
+/* רשימת פונטים  */
+/* ShmulikCLM.ttf */
+
+@font-face {
+  font-family: "ShmulikCLM";
+  src: url("/fonts/ShmulikCLM.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "SDorianCLM";
+  src: url("/fonts/DorianCLM.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Miri";
+  src: url("/fonts/Miri_Medium.ttf") format("truetype");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+
+
+/* font-shmulik   */
+
+@theme {
+  --font-shmulik: "ShmulikCLM", serif;
+  --font-dorian: "DorianCLM", serif;
+  --font-miri: "Miri", sans-serif;
+}
+
+
+/* סיום  פונטים  */
+
+
+
+
+
+
+
 
 
 @layer utilities {

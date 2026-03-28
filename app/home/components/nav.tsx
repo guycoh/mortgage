@@ -69,7 +69,7 @@ export const Nav = ({ onOpenMenu, isMenuOpen }: { onOpenMenu: () => void, isMenu
             <Link
               key={href}
               href={href}
-              className=" max-lg:hidden lg:!block     relative hover:text-cyan-200 transition duration-300 before:absolute before:-bottom-2 before:left-0 before:w-0 before:h-[3px] before:bg-cyan-200 before:transition-all before:duration-300 hover:before:w-full"
+              className="font-miri text-base max-lg:hidden lg:block!   relative hover:text-cyan-200 transition duration-300 before:absolute before:-bottom-2 before:left-0 before:w-0 before:h-[3px] before:bg-cyan-200 before:transition-all before:duration-300 hover:before:w-full"
             >
               {label}
             </Link>

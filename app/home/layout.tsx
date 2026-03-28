@@ -4,6 +4,10 @@ import SideMenu from "./components/sidebar_mobile";
 import { Nav } from "./components/nav";
 import ContactBar from "./components/ContactBar";
 
+
+
+
+
 export default function HomeLayout({
   children,
 }: {

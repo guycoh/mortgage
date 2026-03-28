@@ -16,7 +16,7 @@ export default function MortgageForHousing() {
 
       {/* קופסה מרכזית */}
       <div className="relative z-10 w-[90%] max-w-4xl bg-white/70 backdrop-blur-xl rounded-2xl shadow-[0_8px_40px_rgba(0,0,0,0.08)] p-10 md:p-14 transition-transform hover:-translate-y-1">
-        <h1 className="text-3xl sm:text-4xl font-bold text-[#1d75a1] text-center mb-6 leading-tight">
+        <h1 className="font-shmulik  text-3xl sm:text-4xl font-bold text-[#1d75a1] text-center mb-6 leading-tight">
           משכנתא לדיור – הדרך לבית משלך
         </h1>
 

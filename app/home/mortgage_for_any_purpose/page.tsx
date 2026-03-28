@@ -5,7 +5,7 @@ import Link from "next/link";
 
 export default function MortgageForAnyPurpose() {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-start py-20 relative overflow-hidden bg-[#f4f6f9]">
+    <div className=" font-dorian min-h-screen flex flex-col items-center justify-start py-20 relative overflow-hidden bg-[#f4f6f9]">
       {/* שכבת רקע עם עומק עדין */}
       <div className="absolute inset-0 bg-gradient-to-br from-[#edf1f5] via-[#f7f9fb] to-[#e8edf1]" />
 
@@ -13,11 +13,11 @@ export default function MortgageForAnyPurpose() {
       <div className="absolute top-[-150px] left-1/2 -translate-x-1/2 w-[1200px] h-[600px] bg-white/40 blur-3xl rounded-full opacity-40" />
 
       <div className="relative z-10 w-[90%] max-w-4xl bg-white/70 backdrop-blur-xl rounded-2xl shadow-[0_8px_40px_rgba(0,0,0,0.08)] p-10 md:p-14 transition-transform hover:-translate-y-1">
-        <h1 className="text-3xl sm:text-4xl font-bold text-[#1d75a1] text-center mb-6 leading-tight">
+        <h1 className="text-3xl sm:text-4xl font-shmulik  text-[#1d75a1] text-center mb-6 leading-tight">
           משכנתא לכל מטרה – פתרון פיננסי חכם לצרכים שלכם
         </h1>
-
-        <p className="text-lg text-gray-700 leading-relaxed text-center mb-8">
+        
+        <p className=" font-miri  text-sm text-gray-700 leading-relaxed text-center mb-8">
           משכנתא לכל מטרה מאפשרת לכם לקבל מימון בתנאים נוחים כנגד נכס קיים.
           ניתן להשתמש בכסף למגוון רחב של מטרות — שיפוץ הבית, סגירת חובות,
           השקעות, או כל צורך פיננסי אחר.
