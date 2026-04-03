@@ -17,7 +17,7 @@ export const Nav = ({ onOpenMenu, isMenuOpen }: { onOpenMenu: () => void, isMenu
   ];
 
   return (
-    <header className="w-full sticky top-0 z-100]">
+    <header className="w-full fixed top-0 left-0 z-9999">
     <div className="relative">
       <CustomIcon
             size={140}
@@ -88,7 +88,7 @@ export const Nav = ({ onOpenMenu, isMenuOpen }: { onOpenMenu: () => void, isMenu
 
 
         {/* אפקט "שולחן" תלת-ממדי מתחת לניווט */}
-       <div className="absolute bottom-0 left-0 w-full h-10 bg-gradient-to-b from-[#0b2f42] to-transparent shadow-inner">
+       <div className="absolute bottom-0 left-0 w-full h-10 bg-linear-to-b from-[#0b2f42] to-transparent shadow-inner">
          <IsraelInterest/> 
        </div>
   

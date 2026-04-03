@@ -1,7 +1,9 @@
-"use client";
+"use client"
 
 import Image from "next/image";
 import Link from "next/link";
+import FancyButton from "../components/FancyButton";
+
 
 import UltraSendButton from "../components/UltraSendButton";
 
@@ -10,10 +12,10 @@ export default function MortgageForAnyPurpose() {
   return (
     <div className=" font-dorian min-h-screen flex flex-col items-center justify-start py-20 relative overflow-hidden bg-[#f4f6f9]">
       {/* שכבת רקע עם עומק עדין */}
-      <div className="absolute inset-0 bg-gradient-to-br from-[#edf1f5] via-[#f7f9fb] to-[#e8edf1]" />
+      <div className="absolute inset-0 bg-linear-to-br from-[#edf1f5] via-[#f7f9fb] to-[#e8edf1]" />
 
       {/* שכבת אור רכה למראה תלת מימד */}
-      <div className="absolute top-[-150px] left-1/2 -translate-x-1/2 w-[1200px] h-[600px] bg-white/40 blur-3xl rounded-full opacity-40" />
+      <div className="absolute -top-37.5 left-1/2 -translate-x-1/2 w-[1200px] h-[600px] bg-white/40 blur-3xl rounded-full opacity-40" />
 
       <div className="relative z-10 w-[90%] max-w-4xl bg-white/70 backdrop-blur-xl rounded-2xl shadow-[0_8px_40px_rgba(0,0,0,0.08)] p-10 md:p-14 transition-transform hover:-translate-y-1">
         <h1 className="text-3xl sm:text-4xl font-shmulik  text-[#1d75a1] text-center mb-6 leading-tight">
@@ -73,34 +75,21 @@ export default function MortgageForAnyPurpose() {
           </div>
         </div>
 
-        {/* קריאה לפעולה */}
-        <div className="mt-12 flex justify-center font-shmulik   ">
-          <Link
-            href="/muhni/schedule"
-            className="
-              bg-linear-to-r 
-              from-[#1d75a1] 
-              to-[#155a7c] 
-              hover:from-[#155a7c] 
-              hover:to-[#0f455e] 
-              text-white 
-              font-bold 
-              py-3 
-              px-8 
-              rounded-xl 
-              text-lg 
-              shadow-md 
-              transition 
-              duration-300 
-              hover:shadow-lg
-            "
-          >
-            קבעו פגישה עם מומחה למשכנתאות
-          </Link>
+        {/* קריאה לפעולה */}     
+      
+        <div className="font-adva mt-4 text-5xl  flex justify-center items-center gap-6 flex-wrap">
+            <FancyButton
+              href="/home/contact"
+              text="השאר פרטים"
+              hoverText="צור קשר"
+            />
+
+            <FancyButton
+              href="/home/schedule"
+              text="תיאום זום עם יועץ"
+              hoverText="קבע פגישה"
+            />
         </div>
-      
-   
-      
       
       
       

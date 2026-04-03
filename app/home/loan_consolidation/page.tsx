@@ -2,6 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import FancyButton from "../components/FancyButton";
+
 
 export default function LoanConsolidation() {
   return (
@@ -87,30 +89,21 @@ export default function LoanConsolidation() {
     </div>
 
     {/* קריאה לפעולה */}
-    <div className="mt-12 flex justify-center font-shmulik">
-      <Link
-        href="/muhni/schedule"
-        className="
-          bg-gradient-to-r 
-          from-[#1d75a1] 
-          to-[#155a7c] 
-          hover:from-[#155a7c] 
-          hover:to-[#0f455e] 
-          text-white 
-          font-bold 
-          py-3 
-          px-8 
-          rounded-xl 
-          text-lg 
-          shadow-md 
-          transition 
-          duration-300 
-          hover:shadow-lg
-        "
-      >
-        קבעו פגישה עם מומחה למשכנתאות
-      </Link>
-    </div>
+    {/* קריאה לפעולה */}     
+          
+            <div className="font-adva mt-4 text-5xl  flex justify-center items-center gap-6 flex-wrap">
+                <FancyButton
+                  href="/home/contact"
+                  text="השאר פרטים"
+                  hoverText="צור קשר"
+                />
+    
+                <FancyButton
+                  href="/home/schedule"
+                  text="תיאום זום עם יועץ"
+                  hoverText="קבע פגישה"
+                />
+            </div>
 
   </div>
 </div>

@@ -7,8 +7,8 @@ export default function AffordableHousing() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-start py-20 relative overflow-hidden bg-[#f4f6f9]">
       {/* רקע תלת־ממדי רך */}
-      <div className="absolute inset-0 bg-gradient-to-br from-[#edf1f5] via-[#f7f9fb] to-[#e8edf1]" />
-      <div className="absolute top-[-150px] left-1/2 -translate-x-1/2 w-[1200px] h-[600px] bg-white/40 blur-3xl rounded-full opacity-40" />
+      <div className="absolute inset-0 bg-linear-to-br from-[#edf1f5] via-[#f7f9fb] to-[#e8edf1]" />
+      <div className="absolute -top-37.5 left-1/2 -translate-x-1/2 w-300 h-150 bg-white/40 blur-3xl rounded-full opacity-40" />
 
       {/* קונטיינר ראשי */}
       <div className="relative z-10 w-[90%] max-w-4xl bg-white/70 backdrop-blur-xl rounded-2xl shadow-[0_8px_40px_rgba(0,0,0,0.08)] p-10 md:p-14 transition-transform hover:-translate-y-1">

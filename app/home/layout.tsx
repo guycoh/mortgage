@@ -15,6 +15,8 @@ export default function HomeLayout({
 }) {
   return (
     <>
+     
+     
         {/* תפריט צד נייד וניווט עליון */}
         <SideMenu
           triggerButton={(onClick, isOpen) => (
@@ -24,9 +26,12 @@ export default function HomeLayout({
 
         {/* סרגל יצירת קשר */}
         <ContactBar />
+<div className="mt-22">
 
-    {children}
-     
+ {children}
+
+</div>
+   
  
     </>
   );

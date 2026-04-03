@@ -1,6 +1,8 @@
 "use client";
 import React from "react";
 
+
+
 export default function StaticCube3D() {
   const size = 150; // גודל הפאה הקדמית
   const depth = 13; // עומק מצומצם (1/3 מהקודם)
