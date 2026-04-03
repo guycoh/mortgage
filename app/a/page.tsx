@@ -38,53 +38,58 @@ export default function BusinessCard() {
   
  
   return (
+<div className="min-h-screen flex justify-center bg-white">
+  <div className="w-full md:w-1/2">
+
+
   <div className="min-h-screen flex flex-col bg-blue-600">
 
    
     {/* HEADER - לבן עם לוגו */}
     
-{/* HEADER - פרימיום */}
-<div className="relative h-44 sm:h-52 flex items-center justify-center overflow-hidden">
+    {/* HEADER - פרימיום */}
+    <div className="relative h-44 sm:h-52 flex items-center justify-center ">
 
-  {/* רקע גרדיאנט עמוק */}
-  <div className="absolute inset-0
-   bg-white" />
+      {/* רקע גרדיאנט עמוק */}
+      <div className="absolute inset-0
+      bg-white" />
 
-  {/* שכבת אור עדינה */}
-  <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_30%_20%,white,transparent_60%)]" />
+      {/* שכבת אור עדינה */}
+      <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_30%_20%,white,transparent_60%)]" />
 
-  {/* לוגו */}
-  <div className="absolute left-6 top-1/2 -translate-y-1/2 z-10">
-    <Image
-      src="/assets/images/imgFiles/prime.jpg"
-      alt="logo"
-      width={260}
-      height={100}
-      className="object-contain max-h-24 w-auto drop-shadow-lg"
-      priority
-    />
-  </div>
 
-  {/* קו תחתון מותג */}
-  <div className="absolute bottom-0 left-0 w-full h-[3px] bg-gradient-to-r from-transparent via-white/60 to-transparent" />
+      {/* לוגו - צמוד לפינה */}
+        <div className="absolute top-0 left-0 z-10">
+            <Image
+              src="/assets/images/imgFiles/prime.jpg"
+              alt="logo"
+              width={280}
+              height={100}
+              className="object-contain max-h-28 w-auto"
+              priority
+            />
+        </div>
+      {/* קו תחתון מותג */}
+      <div className="absolute bottom-0 left-0 w-full h-0.75 bg-linear-to-r from-transparent via-white/60 to-transparent" />
 
-  {/* תמונת פרופיל */}
-  <div className="absolute left-1/2 -translate-x-1/2 top-full -translate-y-1/2 z-20">
-    <div className="relative">
-      <Image
-        src="/assets/images/imgFiles/guy_cohen2.jpg"
-        alt="avatar"
-        width={130}
-        height={130}
-        className="rounded-full border-[5px] border-white shadow-2xl"
-      />
+      {/* תמונת פרופיל */}
+    
+    <div className="absolute left-1/2 -translate-x-1/2 top-full -translate-y-[33%] z-50">
+      <div className="relative">
+        <Image
+          src="/assets/images/imgFiles/guy_cohen2.jpg"
+          alt="avatar"
+          width={150}
+          height={150}
+          className="rounded-full border-[5px] border-white shadow-2xl object-cover"
+        />
 
-      {/* הילה עדינה */}
-      <div className="absolute inset-0 rounded-full bg-white opacity-10 blur-xl scale-110" />
+        {/* הילה עדינה */}
+        <div className="absolute inset-0 rounded-full bg-white opacity-10 blur-xl scale-110" />
+      </div>
     </div>
-  </div>
 
-</div>
+    </div>
 
 
     {/* BODY */}
@@ -92,7 +97,7 @@ export default function BusinessCard() {
       flex-1 flex flex-col items-center justify-start pt-16 pb-8 px-6 text-center text-white 
       bg-linear-to-br from-[#0b2f42] via-[#145374] to-[#1d75a1]">
 
-     <div className="mt-5">
+     <div className="mt-22">
       <h1 className="text-5xl font-bold">
         גיא כהן
       </h1>
@@ -140,7 +145,7 @@ export default function BusinessCard() {
                   <Link
                     href={item.href}
                     className="rounded-md bg-white shadow hover:shadow-lg transition
-                              w-18 h-8 sm:w-20 sm:h-20 flex items-center justify-center"
+                                w-[72px] h-[72px] sm:w-20 sm:h-20 flex items-center justify-center"
                   >
                     <div className="bg-gray-50 border border-gray-200 rounded-md
                                     w-12 h-12 sm:w-16 sm:h-16 flex items-center justify-center">
@@ -161,7 +166,7 @@ export default function BusinessCard() {
     </div>
 
     {/* FOOTER */}
-    <div className="bg-white text-[#1d75a1] text-sm py-8 px-4 text-right">
+    <div className="bg-white text-[#1d75a1] text-sm font-shmulik py-8 px-4 text-right">
       <div className="flex items-center justify-center gap-4">
 
         {/* טקסט */}
@@ -183,5 +188,13 @@ export default function BusinessCard() {
     </div>
 
   </div>
+
+
+  </div>
+</div>
+
+
+
+
 );
 }
