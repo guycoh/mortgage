@@ -77,7 +77,7 @@ export default function BusinessCard() {
     <div className="absolute left-1/2 -translate-x-1/2 top-full -translate-y-[33%] z-50">
       <div className="relative">
         <Image
-          src="/assets/images/imgFiles/guy_cohen2.jpg"
+          src="/assets/images/imgFiles/my_image.jpg"
           alt="avatar"
           width={150}
           height={150}
@@ -97,8 +97,8 @@ export default function BusinessCard() {
       flex-1 flex flex-col items-center justify-start pt-16 pb-8 px-6 text-center text-white 
       bg-linear-to-br from-[#0b2f42] via-[#145374] to-[#1d75a1]">
 
-     <div className="mt-22">
-      <h1 className="text-5xl font-bold">
+     <div className="mt-10">
+      <h1 className="text-4xl font-bold">
         גיא כהן
       </h1>
 
@@ -171,8 +171,8 @@ export default function BusinessCard() {
 
         {/* טקסט */}
         <div className="flex flex-col text-right">
-          <p className="font-medium text-lg">רחוב מצדה 7, בני ברק</p>
-          <p className="font-medium text-lg">בניין בסר 4, קומה 7</p>
+          <p className="font-medium text-2xl">רחוב מצדה 7, בני ברק</p>
+          <p className="font-medium text-2xl">בניין בסר 4, קומה 7</p>
         </div>
 
         {/* אייקון וויז */}

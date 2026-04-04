@@ -3,7 +3,7 @@
 import Link from "next/link";
 import CustomIcon from "@/public/assets/images/svg/general/CustomIcon";
 import IsraelInterest from "./IsraelBank";
-
+import GuidesDropdown from "./GuidesDropdown";
 
 export const Nav = ({ onOpenMenu, isMenuOpen }: { onOpenMenu: () => void, isMenuOpen: boolean }) => {
   
@@ -24,6 +24,16 @@ export const Nav = ({ onOpenMenu, isMenuOpen }: { onOpenMenu: () => void, isMenu
             color="white"
             className="absolute z-50 -top-6 left-0" // ממקם את האייקון ממש למעלה-ימין
           />
+
+         <div    className="absolute z-50 top-3 left-44 max-lg:hidden lg:block!  "  >
+          <GuidesDropdown    
+        />    
+
+         </div>
+      
+            
+
+
     
       {/* כפתור המבורגר */}
           <button
@@ -75,7 +85,7 @@ export const Nav = ({ onOpenMenu, isMenuOpen }: { onOpenMenu: () => void, isMenu
             </Link>
          
           ))}
-      
+     
         </nav>
 
   {/* לוגו / אייקון בצד ימין - בחלק העליון */}
