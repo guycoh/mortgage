@@ -1,4 +1,4 @@
-"use client";
+"use client"
 
 import Image from "next/image";
 import Link from "next/link";
@@ -36,7 +36,7 @@ export default function BusinessCard() {
   ];
  
   
- 
+
   return (
 <div className="min-h-screen flex justify-center bg-white">
   <div className="w-full md:w-1/2">
@@ -48,7 +48,7 @@ export default function BusinessCard() {
     {/* HEADER - לבן עם לוגו */}
     
     {/* HEADER - פרימיום */}
-    <div className="relative h-44 sm:h-52 flex items-center justify-center ">
+    <div className="relative h-36 sm:h-52 flex items-center justify-center ">
 
       {/* רקע גרדיאנט עמוק */}
       <div className="absolute inset-0
@@ -93,9 +93,9 @@ export default function BusinessCard() {
 
 
     {/* BODY */}
-    <div className="font-shmulik 
-      flex-1 flex flex-col items-center justify-start pt-16 pb-8 px-6 text-center text-white 
-      bg-linear-to-br from-[#0b2f42] via-[#145374] to-[#1d75a1]">
+    <div className="relative font-shmulik 
+                    flex-1 flex flex-col items-center justify-start pt-16 pb-8 px-6 text-center text-white 
+                    bg-linear-to-br from-[#0b2f42] via-[#145374] to-[#1d75a1]">
 
      <div className="mt-10">
       <h1 className="text-4xl font-bold">
@@ -109,7 +109,7 @@ export default function BusinessCard() {
        {/* כפתורים */}
       
        {/* — יצירת קשר — */}
-        <div className="w-full flex justify-center mt-10">
+        <div className="w-full flex justify-center mt-5">
           <div className="w-full max-w-5xl px-2">
             <div className="grid grid-cols-4 gap-x-8 gap-y-6 place-items-center">
               {buttons.map((btn, idx) => (
@@ -137,7 +137,7 @@ export default function BusinessCard() {
         </div>
 
         {/* — מחשבוני משכנתא — */}
-        <div className="w-full flex justify-center mt-10">
+        <div className="w-full flex justify-center mt-10 mb-16">
           <div className="w-full max-w-5xl px-2">
             <div className="grid grid-cols-4 gap-x-8 gap-y-6 place-items-center">
               {calculators.map((item, idx) => (
@@ -162,15 +162,42 @@ export default function BusinessCard() {
           </div>
         </div>
 
+        {/* כפתור הוסף לאנשי קשר */}
+        <a
+          href="/contacts/guy-cohen.vcf"
+          download
+          className="absolute left-1/2 bottom-0 translate-x-[-50%] translate-y-1/2
+                    z-50 w-24 h-24 sm:w-28 sm:h-28
+                    rounded-full bg-white
+                    shadow-[0_10px_30px_rgba(0,0,0,0.25)]
+                    flex items-center justify-center
+                    hover:scale-105 active:scale-95 transition-all duration-300"
+        >
+          {/* טבעת */}
+          <div className="absolute inset-0 rounded-full border-4 border-[#1d75a1]" />
 
+          {/* תוכן */}
+          <div className="flex flex-col items-center justify-center text-[#1d75a1] z-10">
+          
+            <span className="text-lg font-bold leading-none">הוסף</span>
+            <span className="text-lg leading-none">לאנשי קשר</span>
+          </div>
+
+          {/* glow */}
+          <div className="absolute inset-0 rounded-full blur-xl opacity-20 bg-[#1d75a1]" />
+        </a>
+    
+    
     </div>
+
+
 
     {/* FOOTER */}
     <div className="bg-white text-[#1d75a1] text-sm font-shmulik py-8 px-4 text-right">
       <div className="flex items-center justify-center gap-4">
 
         {/* טקסט */}
-        <div className="flex flex-col text-right">
+        <div className="flex flex-col text-right mt-10">
           <p className="font-medium text-2xl">רחוב מצדה 7, בני ברק</p>
           <p className="font-medium text-2xl">בניין בסר 4, קומה 7</p>
         </div>
@@ -192,9 +219,6 @@ export default function BusinessCard() {
 
   </div>
 </div>
-
-
-
 
 );
 }
