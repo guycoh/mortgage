@@ -164,15 +164,19 @@ export default function BusinessCard() {
 
         {/* כפתור הוסף לאנשי קשר */}
         <a
-          href="/contacts/guy-cohen.vcf"
-          download
-          className="absolute left-1/2 bottom-0 -translate-x-1/2 translate-y-[33%]
-                    z-50 w-24 h-24 sm:w-28 sm:h-28
-                    rounded-full bg-white
-                    shadow-[0_10px_30px_rgba(0,0,0,0.25)]
-                    flex items-center justify-center
-                    hover:scale-105 active:scale-95 transition-all duration-300"
-        >
+            href="/contacts/guy-cohen.vcf"
+            className="absolute left-1/2 bottom-0 -translate-x-1/2 translate-y-[33%]
+                      z-50 w-24 h-24 sm:w-28 sm:h-28
+                      rounded-full bg-white
+                      shadow-[0_10px_30px_rgba(0,0,0,0.25)]
+                      flex items-center justify-center
+                      hover:scale-105 active:scale-95 transition-all duration-300"
+            onClick={(e) => {
+              if (/Android|iPhone/i.test(navigator.userAgent)) {
+                window.location.href = "/contacts/guy-cohen.vcf";
+              }
+            }}
+          >
           {/* טבעת */}
           <div className="absolute inset-0 rounded-full border-4 border-[#1d75a1]" />
 
