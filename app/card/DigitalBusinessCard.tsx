@@ -164,7 +164,7 @@ export default function BusinessCard() {
 
         {/* כפתור הוסף לאנשי קשר */}
         <a
-            href="/contacts/guy-cohen.vcf"
+            href="assets/contacts/guy-cohen.vcf"
             className="absolute left-1/2 bottom-0 -translate-x-1/2 translate-y-[33%]
                       z-50 w-24 h-24 sm:w-28 sm:h-28
                       rounded-full bg-white
