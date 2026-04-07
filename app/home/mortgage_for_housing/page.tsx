@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import LoanCalculator from "../calculators/simple_calculator/page";
-
+import FancyButton from "../components/FancyButton";
 
 
 export default function MortgageForHousing() {
@@ -15,13 +15,13 @@ export default function MortgageForHousing() {
   <div className="absolute -top-37.5 left-1/2 -translate-x-1/2 w-300 h-150 bg-white/40 blur-3xl rounded-full opacity-40" />
 
   {/* קופסה מרכזית */}
-  <div className="relative z-10 w-[90%] max-w-4xl bg-white/70 backdrop-blur-xl rounded-2xl shadow-[0_8px_40px_rgba(0,0,0,0.08)] p-10 md:p-14 transition-transform hover:-translate-y-1">
+  <div className="font-open-sans font-normal relative z-10 w-[90%] max-w-4xl bg-white/70 backdrop-blur-xl rounded-2xl shadow-[0_8px_40px_rgba(0,0,0,0.08)] p-10 md:p-14 transition-transform hover:-translate-y-1">
 
-    <h1 className="text-3xl sm:text-4xl font-shmulik text-[#1d75a1] text-center mb-6 leading-tight">
+    <h1 className="font-open-sans font-normal text-4xl sm:text-4xl text-[#1d75a1] text-center mb-6 leading-tight">
       משכנתא לדיור – הדרך לבית משלך
     </h1>
 
-    <p className="font-adva font-bold text-2xl text-gray-900 leading-relaxed text-center mb-8">
+    <p className="text-xl text-gray-900 leading-relaxed text-center mb-8">
       קניית דירה היא אחת ההחלטות הכלכליות החשובות ביותר בחיים. משכנתא לדיור מאפשרת לך להגשים את החלום ולהפוך לבעל נכס משלך,
       עם אפשרויות מימון מגוונות המותאמות לצרכים שלך.
     </p>
@@ -29,11 +29,11 @@ export default function MortgageForHousing() {
     {/* מקטעים תלת מימדיים */}
     <div className="font-adva font-bold space-y-8">
 
-      <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-6 rounded-xl shadow-md hover:shadow-lg transition">
+      <div className="font-open-sans font-normal bg-linear-to-r from-blue-50 to-blue-100 p-6 rounded-xl shadow-md hover:shadow-lg transition">
         <h2 className="text-3xl font-semibold text-blue-600 mb-2">
           מהי משכנתא לדיור?
         </h2>
-        <p className="text-2xl text-gray-700 leading-relaxed">
+        <p className="text-xl text-gray-700 leading-relaxed">
           משכנתא היא הלוואה בנקאית המאפשרת רכישת נכס למגורים או להשקעה,
           תוך החזר חודשי קבוע או משתנה לאורך תקופה ארוכה.
           מדובר בהלוואה בעלת הריבית הנמוכה ביותר מבין סוגי ההלוואות,
@@ -55,11 +55,11 @@ export default function MortgageForHousing() {
 
       <LoanCalculator />
 
-      <div className="bg-gradient-to-r from-green-50 to-green-100 p-6 rounded-xl shadow-md hover:shadow-lg transition">
+      <div className="font-open-sans font-normal   bg-linear-to-r from-green-50 to-green-100 p-6 rounded-xl shadow-md hover:shadow-lg transition">
         <h2 className="text-3xl font-semibold text-green-600 mb-4">
           מסלולי משכנתא נפוצים
         </h2>
-        <ul className="text-2xl list-disc list-outside pl-6 text-gray-700 leading-relaxed">
+        <ul className="text-xl list-disc list-outside pl-6 text-gray-700 leading-relaxed">
           <li>
             מסלול בריבית קבועה – מסלול יציב המעניק ביטחון מפני שינויים עתידיים בריבית. 
             לפי הנחיות בנק ישראל, נדרש מינימום של שליש מההלוואה במסלול ריבית קבועה.
@@ -80,11 +80,11 @@ export default function MortgageForHousing() {
         </ul>
       </div>
 
-      <div className="bg-gradient-to-r from-orange-50 to-orange-100 p-6 rounded-xl shadow-md hover:shadow-lg transition">
+      <div className="font-open-sans font-normal  bg-linear-to-r from-orange-50 to-orange-100 p-6 rounded-xl shadow-md hover:shadow-lg transition">
         <h2 className="text-3xl font-semibold text-orange-600 mb-2">
           איך לבחור את המשכנתא המתאימה?
         </h2>
-        <p className="text-2xl text-gray-700 leading-relaxed">
+        <p className="text-xl text-gray-700 leading-relaxed">
           בחירת משכנתא דורשת השוואת תנאים, חישוב עלויות ריבית ויכולת החזר חודשית. 
           המומחים שלנו יסייעו לך להתאים את ההלוואה לתקציב ולצרכים שלך.
         </p>
@@ -92,31 +92,21 @@ export default function MortgageForHousing() {
 
     </div>
 
-    {/* קריאה לפעולה */}
-    <div className="mt-12 flex justify-center font-shmulik">
-      <Link
-        href="/muhni/schedule"
-        className="
-          bg-linear-to-r 
-          from-[#1d75a1] 
-          to-[#155a7c] 
-          hover:from-[#155a7c] 
-          hover:to-[#0f455e] 
-          text-white 
-          font-bold 
-          py-3 
-          px-8 
-          rounded-xl 
-          text-lg 
-          shadow-md 
-          transition 
-          duration-300 
-          hover:shadow-lg
-        "
-      >
-        קבעו פגישה עם מומחה למשכנתאות
-      </Link>
-    </div>
+   
+    {/* קריאה לפעולה */}   
+            <div className="font-open-sans font-normal mt-4 text-5xl  flex justify-center items-center gap-6 flex-wrap">
+                <FancyButton
+                  href="/home/contact"
+                  text="השאר פרטים"
+                  hoverText="צור קשר"
+                />
+    
+                <FancyButton
+                  href="/home/schedule"
+                  text="תיאום זום עם יועץ"
+                  hoverText="קבע פגישה"
+                />
+            </div>
 
   </div>
 </div>

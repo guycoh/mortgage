@@ -12,6 +12,8 @@ import RefinancingIcon from "@/public/assets/images/svg/motrgageType/Refinancing
 import InsuranceIcon from "@/public/assets/images/svg/motrgageType/InsuranceIcon";
 import RefusedIcon from "@/public/assets/images/svg/motrgageType/RefusedIcon";
 import BridgeIcon from "@/public/assets/images/svg/motrgageType/BridgeIcon";
+import SelfBuildIcon from "@/public/assets/images/svg/motrgageType/SelfBuildIcon";
+
 
 const mortgageCategories = [
   { category: "משכנתא לדיור", link: "mortgage_for_housing", icon: <HomeIcon size={64} color="#1d75a1" /> },
@@ -20,7 +22,7 @@ const mortgageCategories = [
   { category: "איחוד הלוואות", link: "loan_consolidation", icon: <ConsolidationIcon size={64} color="#1d75a1" /> },
   { category: "משכנתא חוץ בנקאית", link: "mortgage_non_bank", icon: <IconGeneralMortgage size={64} color="#1d75a1" /> },
   { category: "מחיר למשתכן", link: "home_for_eligible_buyers", icon: <EligibleIcon size={64} color="#1d75a1" /> },
-  { category: "בניה עצמית", link: "mortgage_for_self_build", icon: <EligibleIcon size={100}/> },
+  { category: "בניה עצמית", link: "mortgage_for_self_build", icon: <SelfBuildIcon size={100} color="#1d75a1"      /> },
   { category: "מיחזור משכנתא", link: "mortgage_refinancing", icon: <RefinancingIcon size={64} color="#1d75a1" /> },
   { category: "הלוואת גישור", link: "bridge_loan", icon: <BridgeIcon size={64} color="#1d75a1" /> },
   { category: "ביטוח משכנתא", link: "mortgage_insurance", icon: <InsuranceIcon size={64} color="#1d75a1" /> },
@@ -29,7 +31,7 @@ const mortgageCategories = [
 
 export default function MortgageGrid() {
   return (
-    <section aria-label="תפריט נושאים" className="w-full max-w-6xl mx-auto px-4 py-12">
+    <section aria-label="תפריט נושאים" className="font-open-sans font-normal  w-full max-w-6xl mx-auto px-4 py-12">
       <h2 className="text-2xl md:text-3xl font-bold text-[#0f4f66] mb-6">תחומי משכנתא</h2>
         <h1 className="text-2xl font-bold mb-4 text-center text-fontss1">
         איזה משכנתא מתאימה לי? &nbsp;
@@ -76,7 +78,7 @@ export default function MortgageGrid() {
                 {item.icon}
               </div>
 
-              <h3 className="text-sm md:text-base font-semibold text-[#0f1724]">
+              <h3 className="text-2xl  text-[#0f1724]">
                 {item.category}
               </h3>
 
