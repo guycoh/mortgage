@@ -4,9 +4,20 @@ import WebIcon from "@/public/assets/images/svg/webIcon";
 import Image from "next/image";
 
 export default function MortgageClearanceInstructions() {
+ 
+  const steps = [
+  
+    "הלוואות ומשכנתאות",
+    "המשכנתא שלי",
+    "בקשות וטפסים",
+    "הפקת אישורים",
+    "הפקת אישור יתרות",
+  ];
+
+ 
   return (
-    <div className="max-w-4xl mx-auto p-6 space-y-8">
-      <h1 className="text-3xl font-bold text-center text-gray-800">
+    <div className=" font-open-sans font-normal max-w-4xl mx-auto my-32 p-6 space-y-8">
+      <h1 className="text-3xl font-bold text-center text-gray-900">
         איך מזמינים אישור יתרות לסילוק?
       </h1>
 
@@ -41,13 +52,30 @@ export default function MortgageClearanceInstructions() {
                 לחצו כאן
               </a>
             </p>
-            <ol className="list-decimal list-inside space-y-1">
-              <li>לוחצים על כפתור כניסה לחשבון הנמצא בפינה השמאלית למעלה</li>
-              <li>לוחצים על "הלוואות ומשכנתאות"</li>
-              <li>בוחרים "המשכנתא שלי"</li>
-              <li>נכנסים ל"טפסים ואישורים"</li>
-              <li>במסך שנפתח מזמינים את המסמך</li>
-            </ol>
+         
+         {/* כותרת */}
+         <div className="bg-gray-100 rounded-lg p-4 w-fit text-right shadow-sm" >
+      
+             {/* כותרת */}
+              <p className="font-bold text-gray-900 mb-3">
+                כניסה לחשבון הזינו פרטי כניסה
+              </p>
+
+              {/* רשימה מדורגת עם מדרגות */}
+              <ol className="list-decimal pr-6 space-y-1 text-gray-800">
+                {steps.map((step, index) => (
+                  <li
+                    key={index}
+                    style={{ marginRight: `${index * 12}px` }} // מדרגות
+                  >
+                    <span className="inline-flex items-center gap-1">
+                      <span>↩</span>
+                      <span>{step}</span>
+                    </span>
+                  </li>
+                ))}
+              </ol>
+          </div>
             <p className="pt-4">
               <span className="font-medium">אם ברשותכם רק משכנתא בבנק –</span>
               <br />
@@ -67,7 +95,7 @@ export default function MortgageClearanceInstructions() {
         </div>
 
         {/* קו הפרדה כתום אסתטי */}
-        <div className="h-[1px] bg-[#F97316]/40 mx-6" />
+        <div className="h-px bg-[#F97316]/40 mx-6" />
 
         {/* חלק 2 - דרך המוקד */}
         <div className="p-6">
@@ -85,7 +113,8 @@ export default function MortgageClearanceInstructions() {
             <li>המרכז פעיל בימים א'–ה' בין השעות 08:00–18:30</li>
             <li>ביום ו' בשעות 08:00–13:00</li>
           </ul>
-        </div>
+
+         </div>
       </div>
     </div>
   );

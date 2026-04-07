@@ -209,7 +209,7 @@ export default function BusinessCard() {
         {/* אייקון וויז */}
         <a
           href="waze://?ll=32.093649,34.824629&navigate=yes"
-          className="relative group w-[52px] h-[52px] flex items-center justify-center rounded-full border border-[#1d75a1]"
+          className="relative group w-13 h-13 flex items-center justify-center rounded-full border border-[#1d75a1]"
         >
           <WazeIcon size={42} color="#1d75a1" className="z-10" />
           <span className="absolute inset-0 bg-orange-100 opacity-0 group-hover:opacity-60 transition-opacity duration-500 rounded-full" />

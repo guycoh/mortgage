@@ -187,7 +187,7 @@ const calculators = [
 
 export default function Calculators3DGrid() {
   return (
-    <div className="min-h-screen bg-gray-100 py-12 px-6">
+    <div className="min-h-screen font-open-sans font-normal  bg-gray-100 py-12 px-6">
       <h1 className="text-center text-gray-600 text-3xl font-bold mb-10 tracking-wide drop-shadow-lg">
         מחשבוני משכנתא 
       </h1>
