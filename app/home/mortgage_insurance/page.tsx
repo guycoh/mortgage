@@ -8,7 +8,7 @@ export default function MortgageInsurance() {
     <div className=" bg-galbg min-h-screen py-12 px-6 sm:px-12 md:px-20">
       <div className="max-w-4xl mx-auto bg-white shadow-xl rounded-2xl p-8 sm:p-12">
        
-       <div className=" animate-tracking-in-expand-fwd text-3xl sm:text-4xl font-bold text-gray-800 text-center mb-6" style={{ fontFamily: "BalshanLight" }}  >
+       <div className="  animate-tracking-in-expand-fwd text-3xl sm:text-4xl font-bold text-gray-800 text-center mb-6" style={{ fontFamily: "BalshanLight" }}  >
          ביטוח חיים ומבנה למשכנתא 
        </div>
      <p className="font-balshan-bold text-2xl">

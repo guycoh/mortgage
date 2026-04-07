@@ -1,10 +1,5 @@
 @import "tailwindcss";
 
-
-/* @tailwind base;
-@tailwind components;
-@tailwind utilities; */
-
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -79,16 +74,6 @@
 
 /* רשימת פונטים  */
 
-@theme {
-  --font-shmulik: "ShmulikCLM", serif;
-  --font-dorian: "DorianCLM", serif;
-  --font-miri: "Miri", sans-serif;
-  --font-adva: "AdvaOpen", sans-serif;
-  --font-balshan: "Balshan", sans-serif;
-   --font-balshan-bold: "BalshanBold", sans-serif;
-
-}
-
 
 /* ShmulikCLM.ttf */
 @font-face {
@@ -147,6 +132,29 @@
   font-style: normal;
 }
 
+/* OpenSansHebrew */
+@font-face {
+  font-family: 'OpenSansHebrew';
+  src: url('/fonts/OpenSansHebrew-Light.ttf') format('truetype');
+  font-weight: 300;
+}
+
+@font-face {
+  font-family: 'OpenSansHebrew';
+  src: url('/fonts/OpenSansHebrew-Regular.ttf') format('truetype');
+  font-weight: 400;
+}
+
+@theme {
+  --font-shmulik: "ShmulikCLM", serif;
+  --font-dorian: "DorianCLM", serif;
+  --font-miri: "Miri", sans-serif;
+  --font-adva: "AdvaOpen", sans-serif;
+  --font-balshan: "Balshan", sans-serif;
+  --font-balshan-bold: "BalshanBold", sans-serif;
+  --font-open-sans: "OpenSansHebrew", sans-serif;
+
+}
 
 /* סיום  פונטים  */
 

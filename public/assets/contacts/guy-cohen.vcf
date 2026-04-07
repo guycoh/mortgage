@@ -2,8 +2,7 @@ BEGIN:VCARD
 VERSION:3.0
 FN:גיא כהן
 TITLE:יועץ משכנתאות 
-TEL;TYPE=CELL:052-3684844
-EMAIL:guycoh@outlook.co.il
-ADR;TYPE=WORK:;;שד' דוד המלך 2, לוד;;;;
-ADR;TYPE=WORK:;;הרצל 92, רמלה;;;;
+TEL;TYPE=CELL:050-3466591
+EMAIL:guy.c@primeinv.co.il
+ADR;TYPE=WORK:;; מצדה 7, בני ברק;;;;
 END:VCARD

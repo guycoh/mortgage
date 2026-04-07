@@ -91,7 +91,13 @@ export default function MortgageForAnyPurpose() {
             />
         </div>
       
-      
+ <p className="font-open-sans font-light">
+  טקסט דק
+</p>
+
+<p className="font-open-sans font-normal text  ">
+  טקסט רגיל
+</p>
       
       
       </div>
