@@ -35,7 +35,7 @@ export default function IsraelInterest() {
   return (
     <>
       {/* נתוני ריבית - תמיד מוצג */}
-      <div className="w-full md:w-[40%] flex items-center px-0 text-right">
+      <div className="font-open-sans font-normal   w-full md:w-[40%] flex items-center px-0 text-right">
         <div className="w-full text-sm text-white whitespace-nowrap overflow-hidden text-ellipsis p-2">
           {interestData ? (
             <div className="flex gap-4 w-full justify-start md:justify-start">

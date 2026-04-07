@@ -41,13 +41,16 @@ export default function BridgeLoan() {
         {/* מקטעים תלת מימדיים */}
         <div className="space-y-8">
           <div className="bg-linear-to-r from-orange-50 to-orange-100 p-6 rounded-xl shadow-md hover:shadow-lg transition">
-            <h2 className="text-2xl font-open-sans font-normal text-orange-600 mb-2">
-              מהי הלוואת גישור?
-            </h2>
-            <p className=" font-open-sans font-normal  text-gray-700 leading-relaxed">
-              הלוואת גישור היא הלוואה לתקופה קצרה (עד שנתיים לרוב), המיועדת לגשר בין רכישת נכס לבין מועד קבלת כספים
-              צפויים – לרוב ממכירת נכס אחר. כך תוכלו לרכוש דירה חדשה בלי להמתין למכירת הדירה הישנה.
-            </p>
+              <h2 className="text-2xl font-open-sans font-normal text-orange-600 mb-2">
+                מהי הלוואת גישור?
+              </h2>
+              <p className="font-open-sans font-normal text-gray-700 leading-relaxed">
+                הלוואת גישור היא הלוואה לתקופה קצרה (לרוב עד שנתיים), המיועדת לגשר בין רכישת נכס חדש לבין קבלת כספים צפויים —
+                בדרך כלל ממכירת נכס קיים. כך ניתן להתקדם לרכישת דירה חדשה מבלי להמתין למכירת הדירה הישנה.
+                <br /><br />
+                הלוואה זו ניתנת לרוב במבנה של <strong>הלוואת בלון</strong>, כלומר תשלום הקרן נדחה לסוף התקופה, ולעיתים משולמים רק ריביות במהלך חיי ההלוואה.
+                היקף המימון יכול להגיע עד כ־<strong>50% משווי הנכס</strong> (הקיים או הנרכש), בניכוי יתרת המשכנתא הקיימת על הנכס.
+              </p>
           </div>
 
           <div className="bg-linear-to-r from-blue-50 to-blue-100 p-6 rounded-xl shadow-md hover:shadow-lg transition">
