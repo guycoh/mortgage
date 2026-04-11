@@ -74,8 +74,8 @@ const PurchaseTaxForm = () => {
   };
 
   return (
- <div className="flex justify-center items-start min-h-screen bg-gradient-to-b from-[#f8fafc] to-[#e6eff3] pt-6 pb-6 px-2">
-  <div className="relative w-full max-w-[450px]">
+ <div className="flex justify-center items-start font-open-sans font-normal   min-h-screen bg-linear-to-b from-[#f8fafc] to-[#e6eff3] pt-6 pb-6 mt-40 px-2">
+  <div className="relative w-full max-w-112.5">
     {/* גוף התיבה - רקע טורקיז עם תלת מימד */}
     <div
       className="relative rounded-xl overflow-hidden p-5 sm:p-6"
@@ -108,6 +108,7 @@ const PurchaseTaxForm = () => {
 
         {/* דירה יחידה */}
         <div className="w-full flex justify-start gap-6 text-sm">
+          <p>האם זאת דירה יחידה ?</p>
           <label className="flex items-center gap-2">
             <input
               type="radio"
@@ -174,14 +175,14 @@ const PurchaseTaxForm = () => {
       </div>
 
       {/* פס תחתון עם הצללה */}
-      <div className="absolute bottom-0 left-0 w-full h-[14px] bg-black/20 blur-[2px]"></div>
+      <div className="absolute bottom-0 left-0 w-full h-3.5 bg-black/20 blur-[2px]"></div>
     </div>
 
     {/* בסיס / שולחן */}
-    <div className="absolute bottom-[-18px] left-1/2 -translate-x-1/2 w-full max-w-[450px] h-[10px] bg-gradient-to-b from-[#a9b7bf] to-[#6c7b84] rounded-b-xl shadow-md"></div>
+    <div className="absolute -bottom-4.5 left-1/2 -translate-x-1/2 w-full max-w-112.5 h-2.5 bg-linear-to-b from-[#a9b7bf] to-[#6c7b84] rounded-b-xl shadow-md"></div>
 
     {/* צל רך מתחת */}
-    <div className="absolute bottom-[-30px] left-1/2 -translate-x-1/2 w-[380px] h-[20px] bg-black/20 blur-2xl rounded-full"></div>
+    <div className="absolute -bottom-7.5 left-1/2 -translate-x-1/2 w-95 h-5 bg-black/20 blur-2xl rounded-full"></div>
   </div>
 </div>
 

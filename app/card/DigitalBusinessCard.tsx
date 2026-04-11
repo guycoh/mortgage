@@ -145,7 +145,7 @@ export default function BusinessCard() {
                   <Link
                     href={item.href}
                     className="rounded-md bg-white shadow hover:shadow-lg transition
-                                w-[72px] h-[72px] sm:w-20 sm:h-20 flex items-center justify-center"
+                                w-18 h-18 sm:w-20 sm:h-20 flex items-center justify-center"
                   >
                     <div className="bg-gray-50 border border-gray-200 rounded-md
                                     w-12 h-12 sm:w-16 sm:h-16 flex items-center justify-center">
