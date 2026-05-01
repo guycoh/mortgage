@@ -86,7 +86,7 @@ const PurchaseTaxForm = () => {
       }}
     >
       {/* פס עליון מואר */}
-      <div className="absolute top-0 left-0 w-full h-[10px] bg-white/20"></div>
+      <div className="absolute top-0 left-0 w-full h-2.5 bg-white/20"></div>
 
       {/* תוכן המחשבון */}
       <div className="flex flex-col items-center justify-start h-full space-y-4 text-white">

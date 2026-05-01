@@ -42,6 +42,8 @@ export default function Sidebar_admin() {
               <li className="hover:bg-gray-700 p-2 rounded"> <Link href="/private/admin/reason_not_intrested" > 😒 סיבת לא נסגר</Link></li>
               <li className="hover:bg-gray-700 p-2 rounded"> <Link href="/private/admin/lead-sources" >🧾מקורות לידים</Link></li>        
               <li className="hover:bg-gray-700 p-2 rounded"> <Link href="/private/admin/loan_paths" >📊 מסלולי הלוואה </Link></li>
+               <li className="hover:bg-gray-700 p-2 rounded"> <Link href="/private/admin/leads/import" > ⚙️ ייבוא לידים</Link></li>
+            
             </ul>
           )}
          
@@ -57,7 +59,7 @@ export default function Sidebar_admin() {
           <li className="hover:bg-gray-700 p-2 rounded"> <Link href="/private/admin/receipts" > 📄 קבלות לקוחות</Link></li> 
           <li className="p-2 rounded cursor-pointer bg-gray-800 hover:bg-gray-700" onClick={toggleTables}>📊 טבלאות מערכת {isTablesOpen ? '▲' : '▼'}</li>
          
-          
+         
           <li className="hover:bg-gray-700 p-2 rounded">📧 יצירת קשר</li>       
           <li className="hover:bg-gray-700 p-2 rounded"> <Link href="/private/admin/setting" > ⚙️ הגדרות</Link></li>
         </ul>

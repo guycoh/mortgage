@@ -1,5 +1,6 @@
-// hooks/useLeads.ts
-"use client";
+// data/hooks/useLeads.ts
+
+"use client"
 
 import { useState, useEffect } from "react";
 
@@ -29,6 +30,7 @@ export type Lead = {
   bank_id?: number | null;
   profile_id?: number | null;
   data_source?: number | null;
+  id_num?: string | null; // ✅ שינוי ל-string
 };
 
 export function useLeads() {
@@ -36,7 +38,7 @@ export function useLeads() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // טעינת לידים מהשרת
+  // ✅ טעינת לידים (תוקן - ללא לולאה)
   useEffect(() => {
     const fetchLeads = async () => {
       try {
@@ -51,70 +53,69 @@ export function useLeads() {
         setLoading(false);
       }
     };
+
     fetchLeads();
-  }, [leads]);
+  }, []);
 
-  // הוספת ליד חדש
-const addLead = async (lead: Partial<Lead> | null) => {
-  if (!lead) {
-    console.error("addLead received null or undefined");
-    return null;
-  }
-
-  try {
-    // נקיון השדות עם ערכי ברירת מחדל
-    const sanitizedLead: Partial<Lead> = {
-      name: lead.name || "",
-      email: lead.email || "",
-      cell: lead.cell || "",
-      address: lead.address ?? null,
-      data_source: lead.data_source ?? null,     
-      spouse_name: lead.spouse_name ?? null,
-      spouse_phone: lead.spouse_phone ?? null,
-      lead_first_status: lead.lead_first_status ?? null,
-      comment: lead.comment ?? null,
-      zoom: lead.zoom ?? null,
-      hour_zoom: lead.hour_zoom ?? null,
-      last_call: lead.last_call ?? null,
-      status_call_id: lead.status_call_id ?? null,
-      reason_not_intrested_id: lead.reason_not_intrested_id ?? null,
-      follow_up_date: lead.follow_up_date ?? null,
-      follow_up_hour: lead.follow_up_hour ?? null,
-      black_list: lead.black_list ?? false,
-      realtor: lead.realtor ?? false,
-      mailing_list: lead.mailing_list ?? false,
-      investors_list: lead.investors_list ?? false,
-      balance_statement: lead.balance_statement ?? null,
-      bank_id: lead.bank_id ?? null,
-      profile_id: lead.profile_id ?? null,
-    };
-
-    const res = await fetch("/api/leads", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(sanitizedLead),
-    });
-
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`Failed to add lead: ${res.status} ${text}`);
+  // ✅ הוספת ליד חדש
+  const addLead = async (lead: Partial<Lead> | null) => {
+    if (!lead) {
+      console.error("addLead received null or undefined");
+      return null;
     }
 
-    const newLead: Lead = await res.json();
-    if (!newLead?.id) return null;
+    try {
+      const sanitizedLead: Partial<Lead> = {
+        name: lead.name || "",
+        email: lead.email || "",
+        cell: lead.cell || "",
+        address: lead.address ?? null,
+        data_source: lead.data_source ?? null,
+        spouse_name: lead.spouse_name ?? null,
+        spouse_phone: lead.spouse_phone ?? null,
+        lead_first_status: lead.lead_first_status ?? null,
+        comment: lead.comment ?? null,
+        zoom: lead.zoom ?? null,
+        hour_zoom: lead.hour_zoom ?? null,
+        last_call: lead.last_call ?? null,
+        status_call_id: lead.status_call_id ?? null,
+        reason_not_intrested_id: lead.reason_not_intrested_id ?? null,
+        follow_up_date: lead.follow_up_date ?? null,
+        follow_up_hour: lead.follow_up_hour ?? null,
+        black_list: lead.black_list ?? false,
+        realtor: lead.realtor ?? false,
+        mailing_list: lead.mailing_list ?? false,
+        investors_list: lead.investors_list ?? false,
+        balance_statement: lead.balance_statement ?? null,
+        bank_id: lead.bank_id ?? null,
+        profile_id: lead.profile_id ?? null,
+        id_num: lead.id_num ?? null, // ✅ הוספה
+      };
 
-    setLeads((prev) => [...prev, newLead]);
-    console.log("Added lead with id:", newLead.id);
-    return newLead;
-  } catch (err) {
-    console.error("Add lead error:", err);
-    return null;
-  }
-};
+      const res = await fetch("/api/leads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(sanitizedLead),
+      });
 
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`Failed to add lead: ${res.status} ${text}`);
+      }
 
+      const newLead: Lead = await res.json();
+      if (!newLead?.id) return null;
 
-  // עדכון ליד קיים
+      setLeads((prev) => [...prev, newLead]);
+      console.log("Added lead with id:", newLead.id);
+      return newLead;
+    } catch (err) {
+      console.error("Add lead error:", err);
+      return null;
+    }
+  };
+
+  // ✅ עדכון ליד
   const updateLead = async (id: number, lead: Partial<Lead>) => {
     try {
       const res = await fetch(`/api/leads/${id}`, {
@@ -139,7 +140,7 @@ const addLead = async (lead: Partial<Lead> | null) => {
     }
   };
 
-  // מחיקת ליד
+  // ✅ מחיקה
   const deleteLead = async (id: number) => {
     try {
       const res = await fetch(`/api/leads/${id}`, { method: "DELETE" });
@@ -158,22 +159,6 @@ const addLead = async (lead: Partial<Lead> | null) => {
 
   return { leads, setLeads, loading, error, addLead, updateLead, deleteLead };
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -207,6 +192,7 @@ const addLead = async (lead: Partial<Lead> | null) => {
 //   bank_id?: number | null;
 //   profile_id?: number | null;
 //   data_source?: number | null;
+//   id_num?: number | null;
 // };
 
 // export function useLeads() {
@@ -224,34 +210,74 @@ const addLead = async (lead: Partial<Lead> | null) => {
 //         setLeads(data);
 //       } catch (err: any) {
 //         setError(err.message);
+//         console.error("Fetch leads error:", err);
 //       } finally {
 //         setLoading(false);
 //       }
 //     };
 //     fetchLeads();
-//   }, []);
+//   }, [leads]);
 
 //   // הוספת ליד חדש
-//   const addLead = async (lead: Partial<Lead>) => {
-//     try {
-//       const res = await fetch("/api/leads", {
-//         method: "POST",
-//         headers: { "Content-Type": "application/json" },
-//         body: JSON.stringify(lead),
-//       });
-//       if (!res.ok) throw new Error("Failed to add lead");
+// const addLead = async (lead: Partial<Lead> | null) => {
+//   if (!lead) {
+//     console.error("addLead received null or undefined");
+//     return null;
+//   }
 
-//       const newLead: Lead = await res.json();
+//   try {
+//     // נקיון השדות עם ערכי ברירת מחדל
+//     const sanitizedLead: Partial<Lead> = {
+//       name: lead.name || "",
+//       email: lead.email || "",
+//       cell: lead.cell || "",
+//       address: lead.address ?? null,
+//       data_source: lead.data_source ?? null,     
+//       spouse_name: lead.spouse_name ?? null,
+//       spouse_phone: lead.spouse_phone ?? null,
+//       lead_first_status: lead.lead_first_status ?? null,
+//       comment: lead.comment ?? null,
+//       zoom: lead.zoom ?? null,
+//       hour_zoom: lead.hour_zoom ?? null,
+//       last_call: lead.last_call ?? null,
+//       status_call_id: lead.status_call_id ?? null,
+//       reason_not_intrested_id: lead.reason_not_intrested_id ?? null,
+//       follow_up_date: lead.follow_up_date ?? null,
+//       follow_up_hour: lead.follow_up_hour ?? null,
+//       black_list: lead.black_list ?? false,
+//       realtor: lead.realtor ?? false,
+//       mailing_list: lead.mailing_list ?? false,
+//       investors_list: lead.investors_list ?? false,
+//       balance_statement: lead.balance_statement ?? null,
+//       bank_id: lead.bank_id ?? null,
+//       profile_id: lead.profile_id ?? null,
 
-//       if (!newLead?.id) return null;
+//     };
 
-//       setLeads((prev) => [...prev, newLead]);
-//       return newLead;
-//     } catch (err) {
-//       console.error(err);
-//       return null;
+//     const res = await fetch("/api/leads", {
+//       method: "POST",
+//       headers: { "Content-Type": "application/json" },
+//       body: JSON.stringify(sanitizedLead),
+//     });
+
+//     if (!res.ok) {
+//       const text = await res.text();
+//       throw new Error(`Failed to add lead: ${res.status} ${text}`);
 //     }
-//   };
+
+//     const newLead: Lead = await res.json();
+//     if (!newLead?.id) return null;
+
+//     setLeads((prev) => [...prev, newLead]);
+//     console.log("Added lead with id:", newLead.id);
+//     return newLead;
+//   } catch (err) {
+//     console.error("Add lead error:", err);
+//     return null;
+//   }
+// };
+
+
 
 //   // עדכון ליד קיים
 //   const updateLead = async (id: number, lead: Partial<Lead>) => {
@@ -261,14 +287,19 @@ const addLead = async (lead: Partial<Lead> | null) => {
 //         headers: { "Content-Type": "application/json" },
 //         body: JSON.stringify(lead),
 //       });
-//       if (!res.ok) throw new Error("Failed to update lead");
+
+//       if (!res.ok) {
+//         const text = await res.text();
+//         throw new Error(`Failed to update lead: ${res.status} ${text}`);
+//       }
 
 //       const updated: Lead = await res.json();
 
 //       setLeads((prev) => prev.map((l) => (l.id === id ? updated : l)));
+//       console.log("Updated lead with id:", updated.id);
 //       return updated;
 //     } catch (err) {
-//       console.error(err);
+//       console.error("Update lead error:", err);
 //       return null;
 //     }
 //   };
@@ -277,13 +308,35 @@ const addLead = async (lead: Partial<Lead> | null) => {
 //   const deleteLead = async (id: number) => {
 //     try {
 //       const res = await fetch(`/api/leads/${id}`, { method: "DELETE" });
-//       if (!res.ok) throw new Error("Failed to delete lead");
+
+//       if (!res.ok) {
+//         const text = await res.text();
+//         throw new Error(`Failed to delete lead: ${res.status} ${text}`);
+//       }
 
 //       setLeads((prev) => prev.filter((l) => l.id !== id));
+//       console.log("Deleted lead with id:", id);
 //     } catch (err) {
-//       console.error(err);
+//       console.error("Delete lead error:", err);
 //     }
 //   };
 
-//   return { leads,setLeads, loading, error, addLead, updateLead, deleteLead };
+//   return { leads, setLeads, loading, error, addLead, updateLead, deleteLead };
 // }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
