@@ -25,7 +25,12 @@ export default function HomeLayout({
         />
 
         {/* סרגל יצירת קשר */}
-        <ContactBar />
+        
+        
+{/*         
+        <ContactBar /> */}
+
+
 <div className="mt-22">
 
  {children}

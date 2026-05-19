@@ -25,7 +25,7 @@ export default function GuidesDropdown() {
       {isOpen && (
         <div className="absolute right-0 mt-2 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-10 animate-fade-slide-down">
           <Link
-            href="/muhni/guide"
+            href="/home/guide"
             className="block px-4 py-3 text-right text-gray-700 hover:bg-orange-100 transition"
             onClick={() => setIsOpen(false)}
           >

@@ -245,7 +245,7 @@ useEffect(() => {
         <input
           type="number"
           step="0.01"
-          className="w-full md:w-[100px] max-w-[10ch] border rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-orange-200 focus:bg-orange-50"
+          className="w-full md:w-25 max-w-[10ch] border rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-orange-200 focus:bg-orange-50"
           value={row.annualInterestRate}
           onChange={(e) =>
             updateRow(row.id, "annualInterestRate", parseFloat(e.target.value))
