@@ -7,7 +7,7 @@ import FancyButton from "../components/FancyButton";
 
 export default function MortgageForHousing() {
   return (
-    <div className="font-dorian min-h-screen flex flex-col items-center justify-start py-20 relative overflow-hidden bg-[#f4f6f9]">
+    <div className="font-open-sans font-normal min-h-screen flex flex-col items-center justify-start py-20 relative overflow-hidden bg-[#f4f6f9]">
   {/* שכבת רקע עם עומק עדין */}
   <div className="absolute inset-0 bg-linear-to-br from-[#edf1f5] via-[#f7f9fb] to-[#e8edf1]" />
 

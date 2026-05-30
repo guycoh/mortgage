@@ -19,11 +19,11 @@ export const Nav = ({ onOpenMenu, isMenuOpen }: { onOpenMenu: () => void, isMenu
   return (
     <header className="w-full fixed top-0 left-0 z-50">
     <div className="relative">
-      <CustomIcon
+        <CustomIcon
             size={140}
             color="white"
             className="absolute z-50 -top-6 left-0" // ממקם את האייקון ממש למעלה-ימין
-          />
+         />
 
          <div    className="absolute z-50 top-3 left-44 max-lg:hidden lg:block!  "  >
           <GuidesDropdown    
@@ -41,25 +41,25 @@ export const Nav = ({ onOpenMenu, isMenuOpen }: { onOpenMenu: () => void, isMenu
               `}
               aria-label="פתח תפריט"
             >
-              <div className="space-y-1">
-                <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="24"
-    height="24"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2.5"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className="text-main"
-  >
-    <line x1="3" y1="6" x2="21" y2="6" />
-    <line x1="3" y1="12" x2="21" y2="12" />
-    <line x1="3" y1="18" x2="21" y2="18" />
-  </svg>
+            <div className="space-y-1">
+                 <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="text-main"
+                >
+                  <line x1="3" y1="6" x2="21" y2="6" />
+                  <line x1="3" y1="12" x2="21" y2="12" />
+                  <line x1="3" y1="18" x2="21" y2="18" />
+                </svg>
               </div>
-            </button>
+          </button>
 
 
 
@@ -101,7 +101,7 @@ export const Nav = ({ onOpenMenu, isMenuOpen }: { onOpenMenu: () => void, isMenu
         {/* שכבות רקע תלת-ממדיות */}
         <div className="absolute inset-0 bg-linear-to-t from-[#0b2f42] via-[#166083] to-[#38c5e0] opacity-95"></div>
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,_rgba(255,255,255,0.15),transparent)]"></div>
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(255,255,255,0.08),transparent)]"></div>
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgbbg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.08),transparent)]a(255,255,255,0.08),transparent)]"></div>
 
         {/* תוכן התפריט */}
   
@@ -115,7 +115,7 @@ export const Nav = ({ onOpenMenu, isMenuOpen }: { onOpenMenu: () => void, isMenu
             <Link
               key={href}
               href={href}
-              className="font-miri text-base max-lg:hidden lg:block!   relative hover:text-cyan-200 transition duration-300 before:absolute before:-bottom-2 before:left-0 before:w-0 before:h-[3px] before:bg-cyan-200 before:transition-all before:duration-300 hover:before:w-full"
+              className="font-miri text-base max-lg:hidden lg:block!   relative hover:text-cyan-200 transition duration-300 before:absolute before:-bottom-2 before:left-0 before:w-0 before:h-0.75 before:bg-cyan-200 before:transition-all before:duration-300 hover:before:w-full"
             >
               {label}
             </Link>
