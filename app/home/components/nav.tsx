@@ -17,7 +17,7 @@ export const Nav = ({ onOpenMenu, isMenuOpen }: { onOpenMenu: () => void, isMenu
   ];
 
   return (
-    <header className="w-full fixed top-0 left-0 z-9999">
+    <header className="w-full fixed top-0 left-0 z-50">
     <div className="relative">
       <CustomIcon
             size={140}
@@ -31,24 +31,60 @@ export const Nav = ({ onOpenMenu, isMenuOpen }: { onOpenMenu: () => void, isMenu
 
          </div>
       
-            
+   
+
+        {/* כפתור המבורגר */}
+            <button
+              onClick={onOpenMenu}
+              className={`md:hidden absolute top-4 right-4 z-60 bg-white rounded-full p-4 shadow-md transition-all duration-200
+                ${isMenuOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}
+              `}
+              aria-label="פתח תפריט"
+            >
+              <div className="space-y-1">
+                <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className="text-main"
+  >
+    <line x1="3" y1="6" x2="21" y2="6" />
+    <line x1="3" y1="12" x2="21" y2="12" />
+    <line x1="3" y1="18" x2="21" y2="18" />
+  </svg>
+              </div>
+            </button>
+
+
+
+
+
+
+
+
 
 
     
       {/* כפתור המבורגר */}
-          <button
-            onClick={onOpenMenu}
-            className={`md:hidden absolute top-4 right-4 z-60 bg-white rounded-full p-4 shadow-md transition-all duration-200
-              ${isMenuOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}
-            `}
-            aria-label="פתח תפריט"
-          >
-            <div className="space-y-1">
-              <span className="block w-6 h-0.5 bg-main"></span>
-              <span className="block w-6 h-0.5 bg-main"></span>
-              <span className="block w-6 h-0.5 bg-main"></span>
-            </div>
-          </button>
+            {/* <button
+              onClick={onOpenMenu}
+              className={`md:hidden absolute top-4 right-4 z-60 bg-white rounded-full p-4 shadow-md transition-all duration-200
+                ${isMenuOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}
+              `}
+              aria-label="פתח תפריט"
+            >
+              <div className="space-y-1">
+                <span className="block w-6 h-0.5 bg-main"></span>
+                <span className="block w-6 h-0.5 bg-main"></span>
+                <span className="block w-6 h-0.5 bg-main"></span>
+              </div>
+            </button> */}
 
 
       {/* רקע ניווט עם תלת-ממד */}

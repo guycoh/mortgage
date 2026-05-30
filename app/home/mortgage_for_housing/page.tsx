@@ -45,13 +45,14 @@ export default function MortgageForHousing() {
           מוזמן לבדוק באמצעות{" "}
           <Link
             href="/home/calculators/mortgage_capability"
-            className="text-main font-semibold hover:underline hover:text-main/80 transition-colors"
+            className="text-main text-blue-400  hover:text-blue-600  underline  font-semibold hover:underline hover:text-main/80 transition-colors"
           >
             המחשבון שלנו כמה משכנתא תוכל לקבל בהתאם לנתוניך האישיים
           </Link>
           .
         </p>
       </div>
+
 
       <LoanCalculator />
 

@@ -22,7 +22,7 @@ export default function SideMenu({ triggerButton }: { triggerButton: (onClick: (
 
       {/* תפריט צד מימין */}
       <aside
-        className={`fixed top-4 right-0 z-50 h-full bg-white w-72 max-w-full shadow-md p-6 transform transition-transform duration-300 ease-in-out 
+        className={`fixed top-4 right-0 z-9999 h-full bg-white w-72 max-w-full shadow-md p-6 transform transition-transform duration-300 ease-in-out 
           ${isOpen ? 'translate-x-0' : 'translate-x-full'}
         `}
       >
