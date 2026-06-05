@@ -3,10 +3,12 @@ import Phone from "@/public/assets/images/svg/phone";
 import WebIcon from "@/public/assets/images/svg/webIcon";
 import Image from "next/image";
 import WhatsAppButton from "@/app/home/components/WhatsAppButton";
+
+
 export default function MortgageClearanceInstructions() {
   return (
-    <div className="max-w-4xl mx-auto p-6 space-y-8">
-      <h1 className="text-3xl font-bold text-center text-gray-800">
+    <div className="max-w-4xl mx-auto p-6 space-y-8 font-open-sans font-normal ">
+      <h1 className="text-3xl font-bold text-center mt-16 text-gray-800">
         איך מזמינים אישור יתרות לסילוק?
       </h1>
 
@@ -41,21 +43,48 @@ export default function MortgageClearanceInstructions() {
               <strong>לחצו כאן</strong>
             </a>
           </div>
-          <ol className="list-decimal list-inside space-y-2 text-gray-700 leading-relaxed">
-            <li>מזינים את פרטי הכניסה האישיים שלכם</li>
-            <li>נכנסים לתפריט המופיע בצד ימין של המסך</li>
-            <li>
-              לוחצים על <span className="font-medium">"הלוואות ומשכנתאות"</span>
-            </li>
-            <li>
-              בוחרים <span className="font-medium">"הזמנת מסמכי משכנתאות"</span>
-            </li>
-            <li>
-              במסך שנפתח מזמינים את המסמך{" "}
-              <span className="font-medium">"אישור יתרות לסילוק"</span>
-            </li>
-            <li>המסמך יתקבל ביום המחרת בתא הדואר באתר האישי</li>
-          </ol>
+        {/* מסלול הוצאת דוח */}
+          <div className="text-gray-700 leading-relaxed space-y-2 pr-2">
+
+            <div className="font-semibold">
+              הזינו את פרטי הכניסה
+            </div>
+
+            <div className="flex items-center gap-2 pr-2">
+              <span className="text-[#0078BE] text-2xl font-bold inline-block ">
+               &#8629;
+              </span>
+              <span>תפריט</span>
+            </div>
+
+            <div className="flex items-center gap-2 pr-6">
+              <span className="text-[#0078BE] text-2xl font-bold inline-block ">
+               &#8629;
+              </span>
+              <span>הלוואות ומשכנתאות</span>
+            </div>
+
+            <div className="flex items-center gap-2 pr-10">
+               <span className="text-[#0078BE] text-2xl font-bold inline-block ">
+                &#8629;
+               </span>
+              <span>הזמנת מסמכי משכנתאות</span>
+            </div>
+
+            <div className="flex items-center gap-2 pr-14">
+               <span className="text-[#0078BE] text-2xl font-bold inline-block ">
+               &#8629;
+               </span>
+              <span>אישור יתרות לסילוק</span>
+            </div>
+
+            <div className="pt-4 font-medium">
+              המסמך יתקבל ביום המחרת בתא הדואר באתר האישי.
+            </div>
+
+          </div>
+        
+        
         </div>
         </div>
         {/* קו הפרדה אסתטי */}
@@ -89,5 +118,3 @@ export default function MortgageClearanceInstructions() {
     </div>
   );
 }
-
-
