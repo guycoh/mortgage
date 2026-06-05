@@ -100,7 +100,7 @@ export const Nav = ({ onOpenMenu, isMenuOpen }: { onOpenMenu: () => void, isMenu
       >
         {/* שכבות רקע תלת-ממדיות */}
         <div className="absolute inset-0 bg-linear-to-t from-[#0b2f42] via-[#166083] to-[#38c5e0] opacity-95"></div>
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,_rgba(255,255,255,0.15),transparent)]"></div>
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,rgba(255,255,255,0.15),transparent)]"></div>
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgbbg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.08),transparent)]a(255,255,255,0.08),transparent)]"></div>
 
         {/* תוכן התפריט */}

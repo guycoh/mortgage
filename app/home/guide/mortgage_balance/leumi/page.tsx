@@ -88,7 +88,7 @@ export default function MortgageClearanceInstructions() {
         </div>
         </div>
         {/* קו הפרדה אסתטי */}
-        <div className="h-[1px] bg-[#0078BE]/40 mx-6" />
+        <div className="h-px bg-[#0078BE]/40 mx-6" />
 
         {/* חלק 2 - דרך המוקד */}
         <div className=" relative p-6">
