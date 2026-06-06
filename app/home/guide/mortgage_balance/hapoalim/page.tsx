@@ -3,6 +3,10 @@ import Phone from "@/public/assets/images/svg/phone";
 import WebIcon from "@/public/assets/images/svg/webIcon";
 import Image from "next/image";
 import WhatsAppButton from "@/app/home/components/WhatsAppButton";
+import PdfUploadForm from "@/app/home/components/PdfUploadForm";
+
+<PdfUploadForm/>
+
 
 export default function MortgageClearanceInstructions() {
   return (
@@ -101,7 +105,9 @@ export default function MortgageClearanceInstructions() {
     <div className="relative p-6">
 
       <div className="absolute left-1 bottom-1">
-        <WhatsAppButton />
+{/* 
+        <WhatsAppButton /> */}
+
       </div>
 
       <div className="flex items-center gap-3 mb-4">
@@ -122,6 +128,7 @@ export default function MortgageClearanceInstructions() {
         <li>שעות פעילות: 08:00–16:00</li>
       </ul>
     </div>
+<PdfUploadForm/>
 
   </div>
 </div>
