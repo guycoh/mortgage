@@ -1,11 +1,10 @@
-"use client";
+"use client"
 import Phone from "@/public/assets/images/svg/phone";
 import WebIcon from "@/public/assets/images/svg/webIcon";
 import Image from "next/image";
 import WhatsAppButton from "@/app/home/components/WhatsAppButton";
 import PdfUploadForm from "@/app/home/components/PdfUploadForm";
 
-<PdfUploadForm/>
 
 
 export default function MortgageClearanceInstructions() {
@@ -18,7 +17,7 @@ export default function MortgageClearanceInstructions() {
   </h1>
 
   {/* כרטיס מרכזי */}
-  <div className="bg-white rounded-2xl shadow-lg border-2 border-red-500/30 overflow-hidden">
+  <div className="bg-white rounded-2xl shadow-lg border-2 border-orange-300 overflow-hidden">
 
     {/* חלק 1 - אתר הבנק */}
     <div className="relative p-6">
@@ -26,8 +25,8 @@ export default function MortgageClearanceInstructions() {
       {/* לוגו */}
       <div className="absolute left-1 top-1">
         <Image
-          src="/assets/images/imgFiles/hapoalim.png"
-          alt="poalim"
+          src="/assets/images/imgFiles/benleumi.png"
+          alt="jerusalem"
           width={240}
           height={120}
           className="rounded-xl mx-auto"
@@ -37,7 +36,7 @@ export default function MortgageClearanceInstructions() {
       <div className="mt-20">
 
         <div className="flex items-center gap-3 mb-4">
-          <WebIcon className="h-6 w-6 text-red-600" />
+          <WebIcon className="h-6 w-6 text-orange-300" />
           <h2 className="text-xl font-semibold text-gray-700">
             1. דרך אתר הבנק
           </h2>
@@ -45,11 +44,10 @@ export default function MortgageClearanceInstructions() {
 
         <div className="mb-4 text-gray-700">
           <span className="font-medium">
-            ניתן לקבל את הדוח באתר הבנק רק במידה וקיים ברשותכם קוד משתמש וסיסמא,
-            וחשבון העו״ש שלכם מתנהל גם בפועלים.
+           
           </span>{" "}
           <a
-            href="https://www.bankhapoalim.co.il/"
+            href="https://www.fibi.co.il/private/"
             target="_blank"
             rel="noopener noreferrer"
             className="text-blue-600 font-medium hover:underline"
@@ -64,54 +62,55 @@ export default function MortgageClearanceInstructions() {
           <div className="font-semibold">הזינו שם משתמש וסיסמא </div>
 
           <div className="flex items-center gap-2 pr-2">
-            <span className="text-red-600 text-2xl font-bold inline-block">
+            <span className="text-orange-300 text-2xl font-bold inline-block">
               &#8629;
             </span>
-            <span>הלוואות ומשכנתא </span>
+            <span> אזור אישי </span>
           </div>
 
           <div className="flex items-center gap-2 pr-6">
-            <span className="text-red-600 text-2xl font-bold inline-block">
+            <span className="text-orange-300 text-2xl font-bold inline-block">
               &#8629;
             </span>
-            <span>פעולות במשכנתא</span>
+            <span>משכנתאות</span>
           </div>
 
           <div className="flex items-center gap-2 pr-10">
-            <span className="text-red-600 text-2xl font-bold inline-block">
+            <span className="text-orange-300 text-2xl font-bold inline-block">
               &#8629;
             </span>
-            <span>הפקת דוחות</span>
+            <span>בקשות שירות </span>
           </div>
 
           <div className="flex items-center gap-2 pr-14">
-            <span className="text-red-600 text-2xl font-bold inline-block">
+            <span className="text-orange-300 text-2xl font-bold inline-block">
               &#8629;
             </span>
-            <span>דו”ח פרטי משכנתאות </span>
+            <span>בקשה לקבלת מצב חשבון משכנתא </span>
           </div>
 
+
           <div className="pt-4 font-medium">
-          מיד תקבלו את הדוח בקובץ להדפסה או לשמירה במחשב
+          קבלת דו”ח במייל
           </div>
         </div>
+
+
       </div>
     </div>
 
     {/* קו הפרדה */}
-    <div className="h-px bg-red-300 mx-6" />
+    <div className="h-px bg-orange-300 mx-6" />
 
     {/* חלק 2 - מוקד טלפוני */}
     <div className="relative p-6">
 
       <div className="absolute left-1 bottom-1">
-{/* 
-        <WhatsAppButton /> */}
-
+        <WhatsAppButton />
       </div>
 
       <div className="flex items-center gap-3 mb-4">
-        <Phone className="h-6 w-6 text-red-600" />
+        <Phone className="h-6 w-6 text-orange-300" />
         <h2 className="text-xl font-semibold text-gray-700">
           2. דרך המוקד הטלפוני
         </h2>
@@ -121,14 +120,20 @@ export default function MortgageClearanceInstructions() {
         <li>
           טלפון:{" "}
           <a href="tel:*2401" className="font-medium text-blue-600 hover:underline">
-            *2401
+            *5726
           </a>
         </li>
-        <li>המוקד פעיל בימים א'–ה'</li>
-        <li>שעות פעילות: 08:00–16:00</li>
+       
       </ul>
     </div>
-<PdfUploadForm/>
+
+
+
+    <PdfUploadForm/>
+
+
+
+
 
   </div>
 </div>
@@ -139,8 +144,3 @@ export default function MortgageClearanceInstructions() {
 
   );
 }
-
-
-
-
-

@@ -1,4 +1,4 @@
-/* app/balloon/page.tsx */
+/* app/home/calculators/balloon/BalloonLoanCalculator.tsx */
 "use client"
 import BalloonLoanCalculator from "./BalloonLoanCalculator";
 export default function BalloonLoanPage() {
