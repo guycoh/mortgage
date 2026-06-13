@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-
+import ReverseMortgageAmortizationModal from "./ReverseMortgageAmortizationModal";
+import ReverseMortgageAmortizationTable from "./ReverseMortgageAmortizationTable";
 
 type Props = {
   maxLoan: number;
@@ -26,6 +27,8 @@ months = 360
 const [loanAmount,setLoanAmount] =
 useState(maxLoan);
 
+const [openTable, setOpenTable] =
+useState<"balloon" | "grace" | null>(null);
 
 const calc = useMemo(()=>{
 
@@ -241,7 +244,34 @@ p-5
 text-gray-900
 space-y-5
 ">
+<ReverseMortgageAmortizationModal
+  open={openTable === "balloon"}
+  onClose={() => setOpenTable(null)}
+  title="לוח סילוקין בלון מלא"
+>
+  <ReverseMortgageAmortizationTable
+    loan={loanAmount}
+    interestRate={Number(interestRate) || 0}
+    indexRate={Number(indexRate) || 0}
+    months={Number(months) || 360}
+    type="balloon"
+  />
+</ReverseMortgageAmortizationModal>
 
+
+<ReverseMortgageAmortizationModal
+  open={openTable === "grace"}
+  onClose={() => setOpenTable(null)}
+  title="לוח סילוקין גרייס"
+>
+  <ReverseMortgageAmortizationTable
+    loan={loanAmount}
+    interestRate={Number(interestRate) || 0}
+    indexRate={Number(indexRate) || 0}
+    months={Number(months) || 360}
+    type="grace"
+  />
+</ReverseMortgageAmortizationModal>
 
 
 <div>
@@ -301,26 +331,21 @@ mt-1
 </div>
 
 
-
-
-
 <ResultCard
-
 title="הלוואת בלון מלא"
-
 data={calc.balloon}
-
+onOpen={()=>setOpenTable("balloon")}
+tableTitle="לוח סילוקין בלון מלא"
 />
-
-
 
 <ResultCard
-
 title="הלוואת גרייס"
-
 data={calc.grace}
-
+onOpen={()=>setOpenTable("grace")}
+tableTitle="לוח סילוקין גרייס"
 />
+
+
 
 
 
@@ -331,11 +356,7 @@ data={calc.grace}
 
 }
 
-
-
-
-
-function ResultCard({title,data}:any){
+function ResultCard({ title, data, onOpen, tableTitle }: any) {
 
 
 return (
@@ -393,8 +414,38 @@ font-bold
 
 עלות כוללת ריבית + מדד:
 
-₪
-{data.cost.toLocaleString()}
+<div className="mt-1">
+₪{Math.round(data.cost).toLocaleString()}
+</div>
+
+</div>
+
+
+
+<div className="flex justify-center mt-3">
+
+<button
+
+onClick={onOpen}
+
+className="
+px-6
+py-2
+rounded-xl
+bg-blue-900
+text-white
+font-bold
+shadow-md
+hover:bg-blue-800
+transition
+"
+
+>
+
+{tableTitle}
+
+</button>
+
 
 </div>
 
@@ -406,6 +457,8 @@ font-bold
 )
 
 }
+
+
 
 
 
