@@ -15,7 +15,9 @@ import GlobeIcon from "@/public/assets/images/svg/contact/GlobeIcon";
 import Calculator5 from "public/assets/images/svg/Calculator5";
 import Calculator2 from "public/assets/images/svg/Calculator2";
 import Calculator3 from "public/assets/images/svg/Calculator3";
+import Calculator8 from "@/public/assets/images/svg/Calculator8";
 import SigmaIcon from "@/public/assets/images/svg/SigmaIcon";
+import ReverseIcon from "@/public/assets/images/svg/calculators/calculatorerverse";
 
 import WazeIcon from "@/public/assets/images/svg/waze_icon";
 
@@ -32,6 +34,9 @@ export default function BusinessCard() {
     { icon: Calculator5, label: "מחשבון מהיר", href: "/home/calculators/simple_calculator" },
     { icon: Calculator2, label: "מחשבון יכולות", href: "/home/calculators/mortgage_capability" },
     { icon: Calculator3, label: "מס רכישה", href: "/home/calculators/purchase_tax_calculator" },
+    { icon: ReverseIcon, label: "מחשבון הפוכה", href: "/home/calculators/reverse_calculator" },
+    { icon: Calculator8, label: "קרן שווה", href: "/home/calculators/equal_principal" },
+   
     { icon: SigmaIcon, label: "מחשבון משכנתא", href: "/home/calculators/mortgage_calculator" },
   ];
  
