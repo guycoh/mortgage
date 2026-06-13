@@ -158,16 +158,15 @@
 
 /* סיום  פונטים  */
 
-
-
-
 .no-scrollbar::-webkit-scrollbar {
-  display: none;
+  display:none;
 }
 
 .no-scrollbar {
-  scrollbar-width: none;
+  scrollbar-width:none;
 }
+
+
 
 
 

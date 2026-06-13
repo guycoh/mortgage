@@ -142,107 +142,118 @@ export default function BusinessCard() {
         </div>
 
         {/* — מחשבוני משכנתא — */}
-      
-{/* — מחשבוני משכנתא — */}
-<div className="w-full flex justify-center mt-10 mb-16">
+        <div className="w-full flex justify-center mt-10 mb-16">
 
-  <div
-    className="
-      w-full
-      overflow-x-auto
-      no-scrollbar
-    "
-  >
-
-    <div
-      className="
-        flex
-        gap-x-8
-        place-items-center
-        w-max
-        mx-auto
-        px-6
-      "
-    >
-
-      {calculators.map((item, idx) => (
-        <div
-          key={idx}
-          className="
-            relative
-            flex
-            flex-col
-            items-center
-            w-20
-            flex-none
-          "
-        >
-
-          <Link
-            href={item.href}
+          <div
             className="
-              rounded-md
-              bg-white
-              shadow
-              hover:shadow-lg
-              transition
-              w-20
-              h-20
-              flex
-              items-center
-              justify-center
+              w-full
+              max-w-5xl
+              px-2
+              overflow-x-auto
+              overflow-y-hidden
+              no-scrollbar
             "
           >
 
             <div
               className="
-                bg-gray-50
-                border
-                border-gray-200
-                rounded-md
-                w-16
-                h-16
                 flex
-                items-center
-                justify-center
+                gap-x-8
+                w-max
               "
             >
 
-              <item.icon
-                color="#1d75a1"
-                className="w-9 h-9"
-              />
+              {calculators.map((item, idx) => (
+
+                <div
+                  key={idx}
+                  className="
+                    relative
+                    flex
+                    flex-col
+                    items-center
+                    flex-none
+                  "
+                >
+
+                  <Link
+                    href={item.href}
+                    className="
+                      rounded-md
+                      bg-white
+                      shadow
+                      transition
+
+                      w-[72px]
+                      h-[72px]
+
+                      sm:w-20
+                      sm:h-20
+
+                      flex
+                      items-center
+                      justify-center
+                    "
+                  >
+
+                    <div
+                      className="
+                        bg-gray-50
+                        border
+                        border-gray-200
+                        rounded-md
+
+                        w-12
+                        h-12
+
+                        sm:w-16
+                        sm:h-16
+
+                        flex
+                        items-center
+                        justify-center
+                      "
+                    >
+
+                      <item.icon
+                        color="#1d75a1"
+                        className="
+                          w-7
+                          h-7
+                          sm:w-9
+                          sm:h-9
+                        "
+                      />
+
+                    </div>
+
+                  </Link>
+
+
+                  <span
+                    className="
+                      mt-3
+                      text-xs
+                      sm:text-sm
+                      font-medium
+                      text-white
+                      text-center
+                      whitespace-nowrap
+                    "
+                  >
+                    {item.label}
+                  </span>
+
+
+                </div>
+
+              ))}
 
             </div>
 
-          </Link>
-
-          <span
-            className="
-              absolute
-              top-full
-              mt-2
-              text-xs
-              sm:text-sm
-              font-medium
-              text-white
-              text-center
-              whitespace-nowrap
-            "
-          >
-            {item.label}
-          </span>
+          </div>
 
         </div>
-      ))}
-
-    </div>
-
-  </div>
-
-</div>
-
-
 
 
 
