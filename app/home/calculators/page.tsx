@@ -10,11 +10,15 @@ import Calculator6 from "@/public/assets/images/svg/Calculator6";
 import Calculator7 from "@/public/assets/images/svg/Calculator7";
 import Calculator8 from "@/public/assets/images/svg/Calculator8";
 import BaloonIcon from "@/public/assets/images/svg/calculators/baloon";
+import ReverseIcon from "@/public/assets/images/svg/calculators/calculatorerverse";
+//ReverseIcon
+
 
 const calculators = [
   { title: "מחשבון פשוט", description: "חשב את ההחזר החודשי", link: "/home/calculators/simple_calculator", icon: Calculator2 },
   { title: "מחשבון יכולות", description: "", link: "/home/calculators/mortgage_capability", icon: Calculator3 },
   { title: "מחשבון מס רכישה", description: "בדוק כמה מס רכישה תצטרך לשלם.", link: "/home/calculators/purchase_tax_calculator", icon: Calculator4 },
+  { title: "מחשבון משכנתא הפוכה", description: "בדוק כמה מימון תקבל בהפוכה.", link: "/home/calculators/reverse_calculator", icon: ReverseIcon },
   { title: "מחשבון מחיר למשתכן", description: "חשב את ההוצאות והתנאים לזכאות.", link: "/home/calculators/mechir_la_mishtaken", icon: Calculator7 },
   { title: "מחשבון עלויות נלוות", description: "בדוק מה העלויות הנלוות", link: "/home/calculators/costs_calculator", icon: Calculator8 },
   { title: "מחשבון קרן שווה", description: "קרן שווה", link: "/home/calculators/equal_principal", icon: Calculator8 },
@@ -22,82 +26,6 @@ const calculators = [
   { title: "מחשבון כדאיות מחזור", description: "בדוק האם משתלם לך למחזר את המשכנתא.", link: "/home/calculators/refinance-calculator", icon: Calculator1 },
 ];
 
-// function CalculatorCube({ title, description, icon: Icon, link }: any) {
-//   const size = 200; // גודל רגיל (דסקטופ)
-//   const height = 220;
-//   const depth = 15;
-//   const cubeColor = "#1d75a1";
-
-//   return (
-//     <Link href={link}>
-//       <div
-//         className="relative cursor-pointer hover:scale-[1.05] transition-all duration-300 
-//                    w-[200px] h-[235px] sm:w-[220px] sm:h-[250px] 
-//                    md:w-[240px] md:h-[260px]"
-//         style={{ width: size + depth, height: height + depth }}
-//       >
-//         {/* פאה קדמית */}
-//         <div
-//           className="absolute flex flex-col items-center justify-start pt-6 text-white text-center shadow-lg rounded-none
-//                      w-[200px] h-[220px] sm:w-[220px] sm:h-[235px] md:w-[240px] md:h-[250px]"
-//           style={{
-//             top: depth,
-//             left: 0,
-//             zIndex: 3,
-//             background: cubeColor,
-//             boxShadow: "0 20px 30px rgba(0,0,0,0.3), inset 0 2px 8px rgba(255,255,255,0.15)",
-//           }}
-//         >
-//           <div className="mb-3 sm:mb-4">
-//             <Icon
-//               size={40} // קטן יותר לנייד
-//               color="white"
-//               className="drop-shadow-md sm:w-12 sm:h-12 w-10 h-10"
-//             />
-//           </div>
-//           <h3 className="text-base sm:text-lg md:text-xl font-bold mb-1">{title}</h3>
-//           {description && (
-//             <p className="text-xs sm:text-sm md:text-base opacity-90 break-words whitespace-normal px-2 text-center leading-snug">
-//               {description}
-//             </p>
-//           )}
-//         </div>
-
-//         {/* פאה ימנית */}
-//         <div
-//           className="absolute"
-//           style={{
-//             width: depth,
-//             height: height,
-//             top: depth,
-//             left: size,
-//             background: cubeColor,
-//             border: "1px solid #15516f",
-//             transform: "skewY(-45deg)",
-//             transformOrigin: "top left",
-//             zIndex: 2,
-//           }}
-//         />
-
-//         {/* פאה עליונה */}
-//         <div
-//           className="absolute"
-//           style={{
-//             width: size,
-//             height: depth,
-//             top: 0,
-//             left: 0,
-//             background: cubeColor,
-//             border: "1px solid #15516f",
-//             transform: "skewX(-45deg)",
-//             transformOrigin: "bottom left",
-//             zIndex: 1,
-//           }}
-//         />
-//       </div>
-//     </Link>
-//   );
-// }
 
 
  function CalculatorCube({ title, description, icon: Icon, link }: any) {
@@ -193,7 +121,7 @@ export default function Calculators3DGrid() {
       </h1>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-12 justify-items-center">
-        {calculators.slice(0, 8).map((calc, i) => (
+        {calculators.slice(0, 9).map((calc, i) => (
           <CalculatorCube key={i} {...calc} />
         ))}
       </div>
