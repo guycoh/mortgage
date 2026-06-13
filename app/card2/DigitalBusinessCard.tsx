@@ -113,7 +113,7 @@ export default function BusinessCard() {
      </div>
        {/* כפתורים */}
       
-       {/* — יצירת קשר — */}
+        {/* — יצירת קשר — */}
         <div className="w-full flex justify-center mt-5">
           <div className="w-full max-w-5xl px-2">
             <div className="grid grid-cols-4 gap-x-8 gap-y-6 place-items-center">
@@ -157,8 +157,7 @@ export default function BusinessCard() {
 
             <div
               className="
-                flex
-                gap-x-8
+                flex              
                 w-max
               "
             >
