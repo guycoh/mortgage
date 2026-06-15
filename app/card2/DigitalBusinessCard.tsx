@@ -167,12 +167,14 @@ export default function BusinessCard() {
                 <div
                   key={idx}
                   className="
-                    relative
-                    flex
-                    flex-col
-                    items-center
-                    flex-none
-                  "
+                              relative
+                              flex
+                              flex-col
+                              items-center
+                              flex-none
+                              w-[104px]
+                              sm:w-[112px]
+"
                 >
 
                   <Link
@@ -189,6 +191,15 @@ export default function BusinessCard() {
                       sm:w-20
                       sm:h-20
 
+
+
+
+
+
+
+
+
+                      
                       flex
                       items-center
                       justify-center
