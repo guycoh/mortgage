@@ -4,6 +4,7 @@
 import { useState } from "react";
 import BalloonLoanModal from "./BalloonLoanModal"
 
+
 type Purpose =
   | "single"
   | "replacement"
@@ -34,12 +35,30 @@ export default function AbilityCalculator() {
   const [mainLoans, setMainLoans] = useState("");
   const [secondaryLoans, setSecondaryLoans] = useState("");
 
+  const [guarantorAge, setGuarantorAge] = useState("");
+  const [guarantorIncome, setGuarantorIncome] = useState("");
+  const [guarantorLoans, setGuarantorLoans] = useState("");
+
+
+
+
+
+
   const [assetValue, setAssetValue] = useState("");
   const [equity, setEquity] = useState("");
 
   // מדינות קלט
 const [months, setMonths] = useState(360);       // ברירת מחדל 360 חודשים
 const [interest, setInterest] = useState(4.8);   // ברירת מחדל 4.8%
+
+//  פתיחת מודלים
+const [isLoanConsolidationOpen, setIsLoanConsolidationOpen] = useState(false);
+
+
+
+
+
+
 
  /* ===== מפריד אלפים ===== */
 
@@ -70,8 +89,12 @@ const resetForm = () => {
 
   setMonths(360);
   setInterest(4.8);
-};
 
+  setGuarantorAge("");
+  setGuarantorIncome("");
+  setGuarantorLoans("");
+
+};
 
 
 
@@ -81,14 +104,18 @@ const resetForm = () => {
 const asset = parseNumber(assetValue || "0");
 const equityAmount = parseNumber(equity || "0");
 
+const guarantorIncomeAmount =
+  parseNumber(guarantorIncome || "0");
+
 const totalIncome =
   parseNumber(mainIncome || "0") +
-  parseNumber(secondaryIncome || "0");
+  parseNumber(secondaryIncome || "0") +
+  (guarantorIncomeAmount * 0.5);
 
 const totalLoans =
   parseNumber(mainLoans || "0") +
-  parseNumber(secondaryLoans || "0");
-
+  parseNumber(secondaryLoans || "0") +
+  parseNumber(guarantorLoans || "0");
 
   const maxMortgageAllowed =
     asset * (PURPOSES[purpose].maxLtv / 100);
@@ -123,7 +150,9 @@ const crmText = [
   freeIncome > 0 && `הכנסה פנויה:${freeIncome.toLocaleString()} ₪`,
   mainAge && `גיל1:${mainAge}`,
   secondaryAge && `גיל2:${secondaryAge}`,
-]
+  guarantorAge && `גיל ערב:${guarantorAge}`,
+  guarantorIncome && `הכנסת ערב:${guarantorIncome}`,
+  ]
   .filter(Boolean)
   .join("#");
 
@@ -178,6 +207,78 @@ const crmText = [
             placeholder="₪"
             className="w-full border rounded-lg p-2 focus:bg-orange-50 last:focus:border-orange-400 focus:ring-1 focus:ring-orange-300 focus:outline-none "
           />
+{/* כפתורי מסלולים נוספים */}
+{/* כפתורי מסלולים נוספים */}
+<div className="flex gap-1.5 mt-2">
+
+  <button
+    type="button"
+    className="
+      px-2.5 py-1
+      rounded-lg
+      bg-green-50
+      border border-green-300
+      text-green-700
+      font-semibold
+      text-xs
+      hover:bg-green-400
+      hover:text-white
+      transition-all
+      duration-200
+    "
+  >
+    איחוד הלוואות
+  </button>
+
+
+  <button
+    type="button"
+    className="
+      px-2.5 py-1
+      rounded-lg
+      bg-green-50
+      border border-green-300
+      text-green-700
+      font-semibold
+      text-xs
+      hover:bg-green-400
+      hover:text-white
+      transition-all
+      duration-200
+    "
+  >
+    משכנתא הפוכה
+  </button>
+
+
+  <button
+    type="button"
+    className="
+      px-2.5 py-1
+      rounded-lg
+      bg-green-50
+      border border-green-300
+      text-green-700
+      font-semibold
+      text-xs
+      hover:bg-green-400
+      hover:text-white
+      transition-all
+      duration-200
+    "
+  >
+    גיוס כל מטרה
+  </button>
+
+</div>
+
+
+
+
+
+
+
+
         </div>
 
       {/* הון עצמי */}
@@ -269,10 +370,11 @@ const crmText = [
 
 
       {/* טבלה */}
-      <div className="grid grid-cols-3 gap-4 text-sm">
+      <div className="grid grid-cols-4 gap-4 text-sm">
 
         <div className="font-bold">בן זוג ראשי</div>
         <div className="font-bold">בן זוג משני</div>
+        <div className="font-bold">ערבים (מחושבת לפי 50%)  </div>
         <div className="font-bold">סיכום</div>
 
         {/* גיל */}
@@ -290,9 +392,24 @@ const crmText = [
           placeholder="גיל"
           className="w-full border rounded-lg p-2 focus:bg-orange-50 last:focus:border-orange-400 focus:ring-1 focus:ring-orange-300 focus:outline-none "
         />
+       <input
+          value={guarantorAge}
+          onChange={(e)=>setGuarantorAge(e.target.value)}
+          placeholder="גיל"
+          className="w-full border rounded-lg p-2 focus:bg-orange-50"
+        />
+       
+       
         <div className="border rounded p-2 bg-gray-50 text-center">
           —
         </div>
+
+
+
+
+
+
+
 
         {/* הכנסות */}
         <input
@@ -307,6 +424,22 @@ const crmText = [
           placeholder="הכנסה חודשית"
           className="w-full border rounded-lg p-2 focus:bg-orange-50 last:focus:border-orange-400 focus:ring-1 focus:ring-orange-300 focus:outline-none "
         />
+        <input
+          value={guarantorIncome}
+          onChange={(e)=>
+            setGuarantorIncome(formatNumber(e.target.value))
+          }
+          placeholder="הכנסה חודשית"
+          className="w-full border rounded-lg p-2 focus:bg-orange-50"
+        />
+
+
+
+
+
+
+
+
         <div className="border rounded p-2 bg-gray-50 text-center font-semibold">
           {totalIncome.toLocaleString()} ₪
         </div>
@@ -324,6 +457,16 @@ const crmText = [
           placeholder="הלוואות"
           className="w-full border rounded-lg p-2 focus:bg-orange-50 last:focus:border-orange-400 focus:ring-1 focus:ring-orange-300 focus:outline-none "
         />
+        <input
+          value={guarantorLoans}
+          onChange={(e)=>
+            setGuarantorLoans(formatNumber(e.target.value))
+          }
+          placeholder="הלוואות"
+          className="w-full border rounded-lg p-2 focus:bg-orange-50"
+        />
+
+
         <div className="border rounded p-2 bg-gray-50 text-center font-semibold">
           {totalLoans.toLocaleString()} ₪
         </div>

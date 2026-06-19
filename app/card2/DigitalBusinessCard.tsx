@@ -142,7 +142,7 @@ export default function BusinessCard() {
         </div>
 
         {/* — מחשבוני משכנתא — */}
-        <div className="w-full flex justify-center mt-10 mb-16">
+        {/* <div className="w-full flex justify-center mt-10 mb-16">
 
           <div
             className="
@@ -199,7 +199,7 @@ export default function BusinessCard() {
 
 
 
-                      
+
                       flex
                       items-center
                       justify-center
@@ -263,7 +263,128 @@ export default function BusinessCard() {
 
           </div>
 
+        </div> */}
+
+{/* — מחשבוני משכנתא — */}
+<div className="w-full flex justify-center mt-10 mb-16">
+
+  <div
+    className="
+      w-full
+      max-w-5xl
+      px-2
+      overflow-x-auto
+      overflow-y-hidden
+      no-scrollbar
+    "
+  >
+
+    <div
+      className="
+        grid
+        grid-flow-col
+        auto-cols-[72px]
+        sm:auto-cols-[80px]
+        gap-x-8
+        w-max
+      "
+    >
+
+      {calculators.map((item, idx) => (
+
+        <div
+          key={idx}
+          className="
+            relative
+            flex
+            flex-col
+            items-center
+          "
+        >
+
+          <Link
+            href={item.href}
+            className="
+              rounded-md
+              bg-white
+              shadow
+              transition
+
+              w-[72px]
+              h-[72px]
+
+              sm:w-20
+              sm:h-20
+
+              flex
+              items-center
+              justify-center
+            "
+          >
+
+            <div
+              className="
+                bg-gray-50
+                border
+                border-gray-200
+                rounded-md
+
+                w-12
+                h-12
+
+                sm:w-16
+                sm:h-16
+
+                flex
+                items-center
+                justify-center
+              "
+            >
+
+              <item.icon
+                color="#1d75a1"
+                className="
+                  w-7
+                  h-7
+                  sm:w-9
+                  sm:h-9
+                "
+              />
+
+            </div>
+
+          </Link>
+
+
+          <span
+            className="
+              mt-3
+              text-xs
+              sm:text-sm
+              font-medium
+              text-white
+              text-center
+              whitespace-nowrap
+            "
+          >
+            {item.label}
+          </span>
+
+
         </div>
+
+      ))}
+
+    </div>
+
+  </div>
+
+</div>
+
+
+
+
+
 
 
 

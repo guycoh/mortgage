@@ -23,6 +23,8 @@ const calculators = [
   { title: "מחשבון עלויות נלוות", description: "בדוק מה העלויות הנלוות", link: "/home/calculators/costs_calculator", icon: Calculator8 },
   { title: "מחשבון קרן שווה", description: "קרן שווה", link: "/home/calculators/equal_principal", icon: Calculator8 },
   { title: "מחשבון הלוואת בלון", description: "בלון", link: "/home/calculators/baloon", icon: BaloonIcon },
+  { title: "מחשבון איחוד הלוואות", description: "איחוד הלוואות", link: "/home/calculators/loan_consolidation", icon: BaloonIcon },
+  
   { title: "מחשבון כדאיות מחזור", description: "בדוק האם משתלם לך למחזר את המשכנתא.", link: "/home/calculators/refinance-calculator", icon: Calculator1 },
 ];
 
