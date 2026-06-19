@@ -65,7 +65,7 @@ const calculators = [
             <Icon
               size={40}
               color="white"
-              className="drop-shadow-md w-[26px] h-[26px] sm:w-[36px] sm:h-[36px] md:w-[46px] md:h-[46px]"
+              className="drop-shadow-md w-6.5 h-6.5 sm:w-9 sm:h-[36px] md:w-[46px] md:h-[46px]"
             />
           </div>
           <h3 className="text-[0.85rem] sm:text-base md:text-lg font-bold mb-1">

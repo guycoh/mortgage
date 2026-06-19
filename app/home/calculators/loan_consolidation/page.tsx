@@ -10,11 +10,11 @@ type Loan = {
   months:string;
 };
 
-export default function LoanConsolidationModal(){
+export default function LoanConsolidation(){
 
 
-const [newMonths,setNewMonths]=useState(240);
-const [newInterest,setNewInterest]=useState(5.2);
+const [newMonths,setNewMonths]=useState(360);
+const [newInterest,setNewInterest]=useState(7);
 const [loans,setLoans] = useState<Loan[]>([
  {
   balance:"",
@@ -161,18 +161,51 @@ oldPayment-newPayment;
 
 return (
 
+
+
 <div className="
+font-open-sans
+font-normal
+
+mt-52
+
 bg-white
 rounded-2xl
-shadow-lg
+
+border-2
+border-[#1d75a1]
+
 p-4
 space-y-4
 text-sm
+
+w-full
+max-w-3xl
+mx-auto
 ">
 
 
-<h3 className="font-bold text-lg text-gray-800">
-בדיקת איחוד הלוואות
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h3 className="
+font-bold
+text-lg
+text-gray-800
+text-center
+">
+מחשבון איחוד הלוואות
 </h3>
 
 
@@ -182,26 +215,34 @@ text-sm
 <div className="w-full">
 
 
-<div className="flex items-center justify-between mb-2">
+<div className="
+flex
+items-center
+justify-start
+gap-3
+mb-2
+">
+
   <div className="font-bold text-gray-800">
-    הלוואות קיימות
+    הזן הלוואות קיימות
   </div>
 
   <button
     onClick={addLoan}
     className="
       text-xs
-      bg-blue-600
+      bg-green-600
       text-white
       px-3
       py-1
       rounded-lg
-      hover:bg-blue-700
+      hover:bg-green-800
       transition
     "
   >
-    + הוספת מסלול
+    + הוספת הלוואה
   </button>
+
 </div>
 
 
@@ -214,6 +255,8 @@ bg-gray-50
 
 
 <table className="
+
+table-fixed
 w-full
 text-xs
 border-collapse
@@ -486,6 +529,7 @@ bg-blue-50
 
 <table className="
 w-full
+table-fixed
 text-xs
 border-collapse
 ">
