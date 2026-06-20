@@ -28,7 +28,7 @@ export default function BusinessCard() {
     { icon: PhoneIcon, label: "טלפון", href: 'tel:0503466591' },
     { icon: WhatsappIcon, label: "צ׳אט", href: 'https://wa.me/972503466591' },
     { icon: EnvelopeIcon, label: "דוא\"ל", href: 'mailto:guy.c@primeinv.co.il' },
-    { icon: GlobeIcon, label: "אתר", href: "https://primeinv.co.il/" },
+    { icon: GlobeIcon, label: "אתר", href: "https://save-il.com//" },
   ];
   const calculators = [
     { icon: Calculator5, label: "מחשבון מהיר", href: "/home/calculators/simple_calculator" },
@@ -71,7 +71,7 @@ export default function BusinessCard() {
       {/* לוגו - צמוד לפינה */}
         <div className="absolute top-0 left-0 z-10">
             <Image
-              src="/assets/images/imgFiles/prime.jpg"
+              src="/assets/images/imgFiles/save_logo.webp"
               alt="logo"
               width={280}
               height={100}
@@ -82,22 +82,21 @@ export default function BusinessCard() {
       {/* קו תחתון מותג */}
       <div className="absolute bottom-0 left-0 w-full h-0.75 bg-linear-to-r from-transparent via-white/60 to-transparent" />
 
-      {/* תמונת פרופיל */}
-    
-    <div className="absolute left-1/2 -translate-x-1/2 top-full -translate-y-[33%] z-50">
-      <div className="relative">
-        <Image
-          src="/assets/images/imgFiles/my_image.jpg"
-          alt="avatar"
-          width={150}
-          height={150}
-          className="rounded-full border-[5px] border-white shadow-2xl object-cover"
-        />
+      {/* תמונת פרופיל */}    
+      <div className="absolute left-1/2 -translate-x-1/2 top-full -translate-y-[33%] z-50">
+        <div className="relative">
+          <Image
+            src="/assets/images/imgFiles/my_image.jpg"
+            alt="avatar"
+            width={150}
+            height={150}
+            className="rounded-full border-[5px] border-white shadow-2xl object-cover"
+          />
 
-        {/* הילה עדינה */}
-        <div className="absolute inset-0 rounded-full bg-white opacity-10 blur-xl scale-110" />
+          {/* הילה עדינה */}
+          <div className="absolute inset-0 rounded-full bg-white opacity-10 blur-xl scale-110" />
+        </div>
       </div>
-    </div>
 
     </div>
 
@@ -244,419 +243,189 @@ export default function BusinessCard() {
         </div>
       </div>
       
-       {/* — יצירת קשר — */}
-       {/* <div className="w-full flex justify-center mt-5">
+      
 
-  <div className="w-full max-w-5xl px-2">
+    {/* כפתורי תחתית */}
 
-    <div className="
-      grid
-      grid-cols-4
-      gap-x-8
-      gap-y-6
-      place-items-center
-    ">
-
-      {buttons.map((btn, idx) => (
-
-        <div
-          key={idx}
-          className="relative flex flex-col items-center w-[80px]"
-        >
-
-          <a
-            href={btn.href}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="
-              rounded-full
-              bg-white
-              shadow
-              hover:shadow-lg
-              transition
-              w-20
-              h-20
-              flex
-              items-center
-              justify-center
-            "
-          >
-
-            <div
-              className="
-                bg-gray-50
-                border
-                border-gray-200
-                rounded-full
-                w-16
-                h-16
-                flex
-                items-center
-                justify-center
-              "
-            >
-
-              <btn.icon
-                color="#1d75a1"
-                className="w-9 h-9"
-              />
-
-            </div>
-
-          </a>
+    <div className="absolute left-1/2 bottom-0 -translate-x-1/2 translate-y-[33%] z-50 flex items-center justify-center gap-10 ">
 
 
-          <span
-            className="
-              mt-3
-              text-sm
-              font-medium
-              text-white
-              text-center
-              whitespace-nowrap
-            "
-          >
-            {btn.label}
-          </span>
+      {/* אנשי קשר */}
+      <a
+      href="assets/contacts/guy-cohen.vcf"
 
-
-        </div>
-
-      ))}
-
-    </div>
-
-  </div>
-
-      </div> */}
-            
-   
-        {/* — מחשבוני משכנתא — */}
-      {/* <div className="w-full flex justify-center mt-10 mb-16">
-
-
-  <div
-    className="
-      w-full
-      max-w-5xl
-      px-2
-      overflow-x-auto
-      no-scrollbar
-    "
-  >
-
-
-    <div
       className="
-        grid
-        grid-flow-col
-        grid-rows-1
-        auto-cols-[80px]
-        gap-x-8
-        w-max
+      relative
+
+      w-26 h-26
+      sm:w-28 sm:h-28
+
+      rounded-full
+      bg-white
+
+      shadow-[0_10px_30px_rgba(0,0,0,0.25)]
+
+      flex
+      items-center
+      justify-center
+
+      hover:scale-105
+      active:scale-95
+      transition-all
+      duration-300
       "
-    >
+
+      onClick={(e) => {
+
+      if (/Android|iPhone/i.test(navigator.userAgent)) {
+      window.location.href="/contacts/guy-cohen.vcf";
+      }
+
+      }}
+
+      >
 
 
-      {calculators.map((item, idx)=>(
+      <div
+      className="
+      absolute
+      inset-0
+      rounded-full
+      border-4
+      border-[#1d75a1]
+      "
+      />
 
 
-        <div
-          key={idx}
-          className="
-            flex
-            flex-col
-            items-center
-            w-[80px]
-          "
-        >
+    <div className="flex flex-col items-center justify-center text-[#1d75a1] z-10 text-center leading-none">
+
+  <span className="text-lg font-bold leading-none">
+    הוסף
+  </span>
+
+  <span className="text-lg leading-none">
+    לאנשי
+  </span>
+
+  <span className="text-lg leading-none">
+    קשר
+  </span>
+
+</div>
 
 
-          <Link
-            href={item.href}
-            className="
-              rounded-md
-              bg-white
-              shadow
-              transition
-              w-20
-              h-20
-              flex
-              items-center
-              justify-center
-            "
-          >
+      <div
+      className="
+      absolute
+      inset-0
+      rounded-full
+      blur-xl
+      opacity-20
+      bg-[#1d75a1]
+      "
+      />
 
 
-            <div
-              className="
-                bg-gray-50
-                border
-                border-gray-200
-                rounded-md
-                w-16
-                h-16
-                flex
-                items-center
-                justify-center
-              "
-            >
+      </a>
+      {/* מדריך יתרות */}
+
+      <Link
+
+      href="/home/guide/mortgage_balance"
+
+      className="
+      relative
+
+      w-26 h-26
+      sm:w-28 sm:h-28
+
+      rounded-full
+      bg-white
+
+      shadow-[0_10px_30px_rgba(0,0,0,0.25)]
+
+      flex
+      items-center
+      justify-center
+
+      hover:scale-105
+      active:scale-95
+      transition-all
+      duration-300
+      "
+
+      >
 
 
-              <item.icon
-                color="#1d75a1"
-                className="w-9 h-9"
-              />
+      <div
+      className="
+      absolute
+      inset-0
+      rounded-full
+      border-4
+      border-[#1d75a1]
+      "
+      />
 
 
-            </div>
+
+      <div
+      className="
+      flex
+      flex-col
+      items-center
+      justify-center
+      text-[#1d75a1]
+      z-10
+      text-center
+      "
+      >
 
 
-          </Link>
+      <span className="
+      text-base
+      sm:text-lg
+      font-bold
+      leading-tight
+      ">
+
+      מדריך
+
+      </span>
 
 
-          <span
-            className="
-              mt-3
-              text-sm
-              font-medium
-              text-white
-              text-center
-              whitespace-nowrap
-            "
-          >
-            {item.label}
-          </span>
+      <span className="
+      text-base
+      sm:text-lg
+      leading-tight
+      ">
+
+      הנפקת דוח יתרות
+
+      </span>
 
 
-        </div>
+      </div>
 
 
-      ))}
+
+
+      <div
+      className="
+      absolute
+      inset-0
+      rounded-full
+      blur-xl
+      opacity-20
+      bg-[#1d75a1]
+      "
+      />
+
+
+      </Link>
 
 
     </div>
-
-
-  </div>
-
-
-      </div> */}
-
-
- 
-
-  {/* כפתורי תחתית */}
-
-  <div
-className="
-absolute
-left-1/2
-bottom-0
--translate-x-1/2
-translate-y-[33%]
-z-50
-
-flex
-items-center
-justify-center
-gap-10
-"
->
-
-
-  {/* אנשי קשר */}
-
-  <a
-  href="assets/contacts/guy-cohen.vcf"
-
-  className="
-  relative
-
-  w-26 h-26
-  sm:w-28 sm:h-28
-
-  rounded-full
-  bg-white
-
-  shadow-[0_10px_30px_rgba(0,0,0,0.25)]
-
-  flex
-  items-center
-  justify-center
-
-  hover:scale-105
-  active:scale-95
-  transition-all
-  duration-300
-  "
-
-  onClick={(e) => {
-
-  if (/Android|iPhone/i.test(navigator.userAgent)) {
-  window.location.href="/contacts/guy-cohen.vcf";
-  }
-
-  }}
-
-  >
-
-
-  <div
-  className="
-  absolute
-  inset-0
-  rounded-full
-  border-4
-  border-[#1d75a1]
-  "
-  />
-
-
-  <div
-  className="
-  flex
-  flex-col
-  items-center
-  justify-center
-  text-[#1d75a1]
-  z-10
-  text-center
-  "
-  >
-
-  <span className="
-  text-lg
-  font-bold
-  leading-none
-  ">
-  הוסף
-  </span>
-
-  <span className="
-  text-lg
-  leading-none
-  ">
-  לאנשי קשר
-  </span>
-
-  </div>
-
-
-  <div
-  className="
-  absolute
-  inset-0
-  rounded-full
-  blur-xl
-  opacity-20
-  bg-[#1d75a1]
-  "
-  />
-
-
-  </a>
-
-
-  {/* מדריך יתרות */}
-
-  <Link
-
-  href="/home/guide/mortgage_balance"
-
-  className="
-  relative
-
-  w-26 h-26
-  sm:w-28 sm:h-28
-
-  rounded-full
-  bg-white
-
-  shadow-[0_10px_30px_rgba(0,0,0,0.25)]
-
-  flex
-  items-center
-  justify-center
-
-  hover:scale-105
-  active:scale-95
-  transition-all
-  duration-300
-  "
-
-  >
-
-
-  <div
-  className="
-  absolute
-  inset-0
-  rounded-full
-  border-4
-  border-[#1d75a1]
-  "
-  />
-
-
-
-  <div
-  className="
-  flex
-  flex-col
-  items-center
-  justify-center
-  text-[#1d75a1]
-  z-10
-  text-center
-  "
-  >
-
-
-  <span className="
-  text-base
-  sm:text-lg
-  font-bold
-  leading-tight
-  ">
-
-  מדריך
-
-  </span>
-
-
-  <span className="
-  text-base
-  sm:text-lg
-  leading-tight
-  ">
-
-  הנפקת דוח יתרות
-
-  </span>
-
-
-  </div>
-
-
-
-
-  <div
-  className="
-  absolute
-  inset-0
-  rounded-full
-  blur-xl
-  opacity-20
-  bg-[#1d75a1]
-  "
-  />
-
-
-  </Link>
-
-
-  </div>
       
         
     
@@ -671,8 +440,8 @@ gap-10
 
         {/* טקסט */}
         <div className="flex flex-col text-right mt-2">
-          <p className="font-medium text-2xl">רחוב מצדה 7, בני ברק</p>
-          <p className="font-medium text-2xl">בניין בסר 4, קומה 7</p>
+          <p className="font-medium text-2xl">רחוב התעשיה 4, תל אביב</p>
+          <p className="font-medium text-2xl">     </p>
         </div>
 
         {/* אייקון וויז */}
