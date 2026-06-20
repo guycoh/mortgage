@@ -3,6 +3,8 @@ import Phone from "@/public/assets/images/svg/phone";
 import WebIcon from "@/public/assets/images/svg/webIcon";
 import Image from "next/image";
 import WhatsAppButton from "@/app/home/components/WhatsAppButton";
+import PdfUploadForm from "@/app/home/components/PdfUploadForm";
+
 
 
 export default function MortgageClearanceInstructions() {
@@ -113,7 +115,10 @@ export default function MortgageClearanceInstructions() {
             <li>המוקד פעיל בימים א'–ה'</li>
             <li>שעות פעילות: 08:00–16:00</li>
           </ul>
+
         </div>
+
+        <PdfUploadForm/>
       </div>
     </div>
   );

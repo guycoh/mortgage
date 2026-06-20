@@ -5,7 +5,7 @@ import Image from "next/image";
 import WhatsAppButton from "@/app/home/components/WhatsAppButton";
 import PdfUploadForm from "@/app/home/components/PdfUploadForm";
 
-<PdfUploadForm/>
+
 
 
 export default function MortgageClearanceInstructions() {

@@ -117,6 +117,19 @@ export default function BusinessCard() {
       </p>
      </div>
        {/* כפתורים */}
+
+
+
+
+
+
+
+
+
+
+
+
+
 {/* — יצירת קשר — */}
 <div className="w-full flex justify-center mt-5">
   <div className="w-full max-w-5xl px-2">
@@ -173,7 +186,7 @@ export default function BusinessCard() {
 
 
       
-       {/* — מחשבונים — */}
+  
         {/* — מחשבונים — */}
 <div className="w-full flex justify-center mt-10 mb-16">
 
