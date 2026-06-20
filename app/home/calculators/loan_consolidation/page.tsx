@@ -185,20 +185,6 @@ mx-auto
 ">
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 <h3 className="
 font-bold
 text-lg
