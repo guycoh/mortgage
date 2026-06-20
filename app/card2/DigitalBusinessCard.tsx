@@ -117,11 +117,148 @@ export default function BusinessCard() {
       </p>
      </div>
        {/* כפתורים */}
+{/* — יצירת קשר — */}
+<div className="w-full flex justify-center mt-5">
+  <div className="w-full max-w-5xl px-2">
+
+    <div className="grid grid-cols-4 gap-x-8 gap-y-6 place-items-center">
+
+      {buttons.map((btn, idx) => (
+        <div
+          key={idx}
+          className="flex flex-col items-center w-[72px] sm:w-20"
+        >
+
+          <a
+            href={btn.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="
+              w-[72px] h-[72px]
+              sm:w-20 sm:h-20
+              rounded-full
+              bg-white
+              shadow
+              flex items-center justify-center
+            "
+          >
+            <div className="
+              w-12 h-12
+              sm:w-16 sm:h-16
+              rounded-full
+              bg-gray-50
+              border border-gray-200
+              flex items-center justify-center
+            ">
+              <btn.icon
+                color="#1d75a1"
+                className="w-7 h-7 sm:w-9 sm:h-9"
+              />
+            </div>
+          </a>
+
+          <span className="mt-3 text-xs sm:text-sm text-white text-center whitespace-nowrap">
+            {btn.label}
+          </span>
+
+        </div>
+      ))}
+
+    </div>
+
+  </div>
+</div>
+
+
+
+
       
-       
+       {/* — מחשבונים — */}
+        {/* — מחשבונים — */}
+<div className="w-full flex justify-center mt-10 mb-16">
+
+  <div
+    className="
+      w-full
+      max-w-5xl
+      px-2
+
+      overflow-x-auto
+      overflow-y-hidden
+      no-scrollbar
+    "
+  >
+
+    <div
+      className="
+        flex
+        flex-nowrap
+        gap-x-8
+        w-max
+      "
+    >
+
+      {calculators.map((item, idx) => (
+
+        <div
+          key={idx}
+          className="flex flex-col items-center w-[72px] sm:w-20 shrink-0"
+        >
+
+          <Link
+            href={item.href}
+            className="
+              w-[72px] h-[72px]
+              sm:w-20 sm:h-20
+
+              rounded-md
+              bg-white
+              shadow
+
+              flex items-center justify-center
+            "
+          >
+
+            <div className="
+              w-12 h-12
+              sm:w-16 sm:h-16
+              rounded-md
+              bg-gray-50
+              border border-gray-200
+              flex items-center justify-center
+            ">
+              <item.icon
+                color="#1d75a1"
+                className="w-7 h-7 sm:w-9 sm:h-9"
+              />
+            </div>
+
+          </Link>
+
+          <span className="mt-3 text-xs sm:text-sm text-white whitespace-nowrap text-center">
+            {item.label}
+          </span>
+
+        </div>
+
+      ))}
+
+    </div>
+
+  </div>
+</div>
+
+
+
+
+
+
+
+
+
         
        {/* — יצירת קשר — */}
-       <div className="w-full flex justify-center mt-5">
+       {/* <div className="w-full flex justify-center mt-5">
 
   <div className="w-full max-w-5xl px-2">
 
@@ -204,11 +341,11 @@ export default function BusinessCard() {
 
   </div>
 
-</div>
+      </div> */}
             
    
         {/* — מחשבוני משכנתא — */}
-      <div className="w-full flex justify-center mt-10 mb-16">
+      {/* <div className="w-full flex justify-center mt-10 mb-16">
 
 
   <div
@@ -317,7 +454,7 @@ export default function BusinessCard() {
   </div>
 
 
-</div>
+      </div> */}
 
 
     
