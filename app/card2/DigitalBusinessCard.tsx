@@ -118,158 +118,132 @@ export default function BusinessCard() {
      </div>
        {/* כפתורים */}
 
+      {/* — יצירת קשר — */}
+      <div className="w-full flex justify-center mt-5">
+        <div className="w-full max-w-5xl px-2">
 
+          <div className="grid grid-cols-4 gap-x-8 gap-y-6 place-items-center">
 
+            {buttons.map((btn, idx) => (
+              <div
+                key={idx}
+                className="flex flex-col items-center w-[72px] sm:w-20"
+              >
 
+                <a
+                  href={btn.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="
+                    w-[72px] h-[72px]
+                    sm:w-20 sm:h-20
+                    rounded-full
+                    bg-white
+                    shadow
+                    flex items-center justify-center
+                  "
+                >
+                  <div className="
+                    w-12 h-12
+                    sm:w-16 sm:h-16
+                    rounded-full
+                    bg-gray-50
+                    border border-gray-200
+                    flex items-center justify-center
+                  ">
+                    <btn.icon
+                      color="#1d75a1"
+                      className="w-7 h-7 sm:w-9 sm:h-9"
+                    />
+                  </div>
+                </a>
 
+                <span className="mt-3 text-xs sm:text-sm text-white text-center whitespace-nowrap">
+                  {btn.label}
+                </span>
 
+              </div>
+            ))}
 
-
-
-
-
-
-
-{/* — יצירת קשר — */}
-<div className="w-full flex justify-center mt-5">
-  <div className="w-full max-w-5xl px-2">
-
-    <div className="grid grid-cols-4 gap-x-8 gap-y-6 place-items-center">
-
-      {buttons.map((btn, idx) => (
-        <div
-          key={idx}
-          className="flex flex-col items-center w-[72px] sm:w-20"
-        >
-
-          <a
-            href={btn.href}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="
-              w-[72px] h-[72px]
-              sm:w-20 sm:h-20
-              rounded-full
-              bg-white
-              shadow
-              flex items-center justify-center
-            "
-          >
-            <div className="
-              w-12 h-12
-              sm:w-16 sm:h-16
-              rounded-full
-              bg-gray-50
-              border border-gray-200
-              flex items-center justify-center
-            ">
-              <btn.icon
-                color="#1d75a1"
-                className="w-7 h-7 sm:w-9 sm:h-9"
-              />
-            </div>
-          </a>
-
-          <span className="mt-3 text-xs sm:text-sm text-white text-center whitespace-nowrap">
-            {btn.label}
-          </span>
+          </div>
 
         </div>
-      ))}
+      </div>
 
-    </div>
+      {/* — מחשבונים — */}
+      <div className="w-full flex justify-center mt-10 mb-16">
 
-  </div>
-</div>
+        <div
+          className="
+            w-full
+            max-w-5xl
+            px-2
 
+            overflow-x-auto
+            overflow-y-hidden
+            no-scrollbar
+          "
+        >
 
+          <div
+            className="
+              flex
+              flex-nowrap
+              gap-x-8
+              w-max
+            "
+          >
 
+            {calculators.map((item, idx) => (
 
+              <div
+                key={idx}
+                className="flex flex-col items-center w-[72px] sm:w-20 shrink-0"
+              >
+
+                <Link
+                  href={item.href}
+                  className="
+                    w-[72px] h-[72px]
+                    sm:w-20 sm:h-20
+
+                    rounded-md
+                    bg-white
+                    shadow
+
+                    flex items-center justify-center
+                  "
+                >
+
+                  <div className="
+                    w-12 h-12
+                    sm:w-16 sm:h-16
+                    rounded-md
+                    bg-gray-50
+                    border border-gray-200
+                    flex items-center justify-center
+                  ">
+                    <item.icon
+                      color="#1d75a1"
+                      className="w-7 h-7 sm:w-9 sm:h-9"
+                    />
+                  </div>
+
+                </Link>
+
+                <span className="mt-3 text-xs sm:text-sm text-white whitespace-nowrap text-center">
+                  {item.label}
+                </span>
+
+              </div>
+
+            ))}
+
+          </div>
+
+        </div>
+      </div>
       
-  
-        {/* — מחשבונים — */}
-<div className="w-full flex justify-center mt-10 mb-16">
-
-  <div
-    className="
-      w-full
-      max-w-5xl
-      px-2
-
-      overflow-x-auto
-      overflow-y-hidden
-      no-scrollbar
-    "
-  >
-
-    <div
-      className="
-        flex
-        flex-nowrap
-        gap-x-8
-        w-max
-      "
-    >
-
-      {calculators.map((item, idx) => (
-
-        <div
-          key={idx}
-          className="flex flex-col items-center w-[72px] sm:w-20 shrink-0"
-        >
-
-          <Link
-            href={item.href}
-            className="
-              w-[72px] h-[72px]
-              sm:w-20 sm:h-20
-
-              rounded-md
-              bg-white
-              shadow
-
-              flex items-center justify-center
-            "
-          >
-
-            <div className="
-              w-12 h-12
-              sm:w-16 sm:h-16
-              rounded-md
-              bg-gray-50
-              border border-gray-200
-              flex items-center justify-center
-            ">
-              <item.icon
-                color="#1d75a1"
-                className="w-7 h-7 sm:w-9 sm:h-9"
-              />
-            </div>
-
-          </Link>
-
-          <span className="mt-3 text-xs sm:text-sm text-white whitespace-nowrap text-center">
-            {item.label}
-          </span>
-
-        </div>
-
-      ))}
-
-    </div>
-
-  </div>
-</div>
-
-
-
-
-
-
-
-
-
-        
        {/* — יצירת קשר — */}
        {/* <div className="w-full flex justify-center mt-5">
 
@@ -470,35 +444,221 @@ export default function BusinessCard() {
       </div> */}
 
 
-    
-        {/* כפתור הוסף לאנשי קשר */}
-        <a
-            href="assets/contacts/guy-cohen.vcf"
-            className="absolute left-1/2 bottom-0 -translate-x-1/2 translate-y-[33%]
-                      z-50 w-24 h-24 sm:w-28 sm:h-28
-                      rounded-full bg-white
-                      shadow-[0_10px_30px_rgba(0,0,0,0.25)]
-                      flex items-center justify-center
-                      hover:scale-105 active:scale-95 transition-all duration-300"
-            onClick={(e) => {
-              if (/Android|iPhone/i.test(navigator.userAgent)) {
-                window.location.href = "/contacts/guy-cohen.vcf";
-              }
-            }}
-          >
-          {/* טבעת */}
-          <div className="absolute inset-0 rounded-full border-4 border-[#1d75a1]" />
+ 
 
-          {/* תוכן */}
-          <div className="flex flex-col items-center justify-center text-[#1d75a1] z-10">
-          
-            <span className="text-lg font-bold leading-none">הוסף</span>
-            <span className="text-lg leading-none">לאנשי קשר</span>
-          </div>
+  {/* כפתורי תחתית */}
 
-          {/* glow */}
-          <div className="absolute inset-0 rounded-full blur-xl opacity-20 bg-[#1d75a1]" />
-        </a>
+  <div
+className="
+absolute
+left-1/2
+bottom-0
+-translate-x-1/2
+translate-y-[33%]
+z-50
+
+flex
+items-center
+justify-center
+gap-10
+"
+>
+
+
+  {/* אנשי קשר */}
+
+  <a
+  href="assets/contacts/guy-cohen.vcf"
+
+  className="
+  relative
+
+  w-26 h-26
+  sm:w-28 sm:h-28
+
+  rounded-full
+  bg-white
+
+  shadow-[0_10px_30px_rgba(0,0,0,0.25)]
+
+  flex
+  items-center
+  justify-center
+
+  hover:scale-105
+  active:scale-95
+  transition-all
+  duration-300
+  "
+
+  onClick={(e) => {
+
+  if (/Android|iPhone/i.test(navigator.userAgent)) {
+  window.location.href="/contacts/guy-cohen.vcf";
+  }
+
+  }}
+
+  >
+
+
+  <div
+  className="
+  absolute
+  inset-0
+  rounded-full
+  border-4
+  border-[#1d75a1]
+  "
+  />
+
+
+  <div
+  className="
+  flex
+  flex-col
+  items-center
+  justify-center
+  text-[#1d75a1]
+  z-10
+  text-center
+  "
+  >
+
+  <span className="
+  text-lg
+  font-bold
+  leading-none
+  ">
+  הוסף
+  </span>
+
+  <span className="
+  text-lg
+  leading-none
+  ">
+  לאנשי קשר
+  </span>
+
+  </div>
+
+
+  <div
+  className="
+  absolute
+  inset-0
+  rounded-full
+  blur-xl
+  opacity-20
+  bg-[#1d75a1]
+  "
+  />
+
+
+  </a>
+
+
+  {/* מדריך יתרות */}
+
+  <Link
+
+  href="/home/guide/mortgage_balance"
+
+  className="
+  relative
+
+  w-26 h-26
+  sm:w-28 sm:h-28
+
+  rounded-full
+  bg-white
+
+  shadow-[0_10px_30px_rgba(0,0,0,0.25)]
+
+  flex
+  items-center
+  justify-center
+
+  hover:scale-105
+  active:scale-95
+  transition-all
+  duration-300
+  "
+
+  >
+
+
+  <div
+  className="
+  absolute
+  inset-0
+  rounded-full
+  border-4
+  border-[#1d75a1]
+  "
+  />
+
+
+
+  <div
+  className="
+  flex
+  flex-col
+  items-center
+  justify-center
+  text-[#1d75a1]
+  z-10
+  text-center
+  "
+  >
+
+
+  <span className="
+  text-base
+  sm:text-lg
+  font-bold
+  leading-tight
+  ">
+
+  מדריך
+
+  </span>
+
+
+  <span className="
+  text-base
+  sm:text-lg
+  leading-tight
+  ">
+
+  הנפקת דוח יתרות
+
+  </span>
+
+
+  </div>
+
+
+
+
+  <div
+  className="
+  absolute
+  inset-0
+  rounded-full
+  blur-xl
+  opacity-20
+  bg-[#1d75a1]
+  "
+  />
+
+
+  </Link>
+
+
+  </div>
+      
+        
     
     
     </div>
