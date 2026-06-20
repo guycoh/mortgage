@@ -49,21 +49,61 @@ export default function PdfUploadForm() {
     }
   };
 
-
-  const submit = () => {
-
-    if (!isFormValid) return;
+const [sending, setSending] = useState(false);
 
 
-    console.log({
-      file,
-      name,
-      phone
+const submit = async () => {
+
+  if (!isFormValid || !file) return;
+
+
+  try {
+
+    setSending(true);
+
+
+    const formData = new FormData();
+
+    formData.append("name", name);
+    formData.append("phone", phone);
+    formData.append("file", file);
+
+
+    const res = await fetch("/api/send-pdf", {
+      method: "POST",
+      body: formData
     });
 
 
+    const data = await res.json();
+
+
+    if (!res.ok) {
+      throw new Error(data.error);
+    }
+
+
     alert("הקובץ נשלח בהצלחה");
-  };
+
+
+    setFile(null);
+    setName("");
+    setPhone("");
+
+
+  } catch (err) {
+
+    console.error(err);
+
+    alert("אירעה שגיאה בשליחת הקובץ");
+
+  } finally {
+
+    setSending(false);
+
+  }
+
+};
 
 
   return (
@@ -283,9 +323,8 @@ export default function PdfUploadForm() {
             </div>
 
 
-
             <button
-              disabled={!isFormValid}
+             disabled={!isFormValid || sending}
               onClick={submit}
 
               className={`
@@ -305,7 +344,7 @@ export default function PdfUploadForm() {
               `}
             >
 
-              שליחה
+             {sending ? "שולח..." : "שליחה"}
 
             </button>
 
