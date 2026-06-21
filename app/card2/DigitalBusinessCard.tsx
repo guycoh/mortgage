@@ -104,7 +104,19 @@ export default function BusinessCard() {
     {/* BODY */}
     <div className="relative font-shmulik 
                     flex-1 flex flex-col items-center justify-start pt-16 pb-8 px-6 text-center text-white 
-                    bg-linear-to-br from-[#0b2f42] via-[#145374] to-[#1d75a1]">
+                    bg-linear-to-br from-[#073b5c] via-[#0f6fa5] to-[#39a8df]">
+
+
+{/* 
+נסיון
+bg-gradient-to-br from-[#073b5c] via-[#0f6fa5] to-[#39a8df] */}
+
+{/* 
+קיים
+bg-linear-to-br from-[#0b2f42] via-[#145374] to-[#1d75a1] */}
+
+
+
 
      <div className="mt-10">
       <h1 className="text-4xl font-bold">
@@ -170,7 +182,7 @@ export default function BusinessCard() {
       </div>
 
       {/* — מחשבונים — */}
-      <div className="w-full flex justify-center mt-6 mb-12">
+      <div className="w-full flex justify-center mt-6 mb-12 ">
 
         <div
           className="
