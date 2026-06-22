@@ -15,7 +15,7 @@ export const metadata = {
         url: "https://morg-orcin.vercel.app/assets/images/imgFiles/my_image.jpg", // לינק מלא לתמונה
         width: 1200,
         height: 630,
-        alt: "MUHNI - משרדים בלוד וברמלה",
+        alt: "SAVE - משרדים בתל אביב ",
       },
     ],
     locale: "he_IL",

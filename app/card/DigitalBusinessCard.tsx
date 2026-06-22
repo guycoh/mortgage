@@ -38,7 +38,7 @@ export default function BusinessCard() {
   
 
   return (
-<div className="min-h-screen flex justify-center bg-white">
+<div className="min-h-screen font-shmulik flex justify-center bg-white">
   <div className="w-full md:w-1/2">
 
 
@@ -201,8 +201,8 @@ export default function BusinessCard() {
       <div className="flex items-center justify-center gap-4">
 
         {/* טקסט */}
-        <div className="flex flex-col text-right mt-2">
-          <p className="font-medium text-2xl">רחוב מצדה 7, בני ברק</p>
+        <div className="flex flex-col text-right mt-2 font-shmulik ">
+          <p className="font-medium text-2xl ">רחוב מצדה 7, בני ברק</p>
           <p className="font-medium text-2xl">בניין בסר 4, קומה 7</p>
         </div>
 
