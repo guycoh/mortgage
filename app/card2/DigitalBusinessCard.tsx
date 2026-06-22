@@ -458,9 +458,7 @@ bg-linear-to-br from-[#0b2f42] via-[#145374] to-[#1d75a1] */}
 
         {/* אייקון וויז */}
         <a
-
-          href="waze://?ll=32.0645,34.7858&navigate=yes" 
-        //  href="waze://?ll=32.093649,34.824629&navigate=yes"
+          href="waze://?q=התעשיה%204%20תל%20אביב&navigate=yes"      
           className="relative group w-13 h-13 flex items-center justify-center rounded-full border border-[#1d75a1]"
         >
           <WazeIcon size={42} color="#1d75a1" className="z-10" />
