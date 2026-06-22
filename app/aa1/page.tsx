@@ -1,9 +1,8 @@
-
 "use client"
 
 import { useState } from "react";
 import BalloonLoanModal from "./BalloonLoanModal"
-
+import LoanConsolidation from "./LoanConsolidationModal";
 
 type Purpose =
   | "single"
@@ -212,7 +211,9 @@ const crmText = [
 <div className="flex gap-1.5 mt-2">
 
   <button
-    type="button"
+   
+   onClick={() => setIsLoanConsolidationOpen(true)}
+   type="button"
     className="
       px-2.5 py-1
       rounded-lg
@@ -676,9 +677,6 @@ const crmText = [
         isOpen={isOpen}
         onClose={() => setIsOpen(false)}
       />
-
-
-
 
 
 
