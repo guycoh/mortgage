@@ -41,43 +41,44 @@ export default function BusinessCard() {
       {/* מעטפת הכרטיס */}
       <div className="w-full md:w-1/2 h-full md:min-h-screen flex flex-col bg-blue-600 relative overflow-hidden md:overflow-visible">
         
-        {/* HEADER - צומצם משמעותית במובייל (h-20) כדי להגביה את הבודי */}
-        <div className="relative h-20 md:h-44 bg-white shrink-0 z-10 flex items-center justify-center">
-          {/* לוגו */}
-          <div className="absolute top-2 left-2 z-10">
+        {/* HEADER - הגובה הוכפל במובייל ל-h-40 (כ-160 פיקסלים) */}
+        <div className="relative h-40 md:h-48 bg-white shrink-0 z-10 flex items-center justify-center">
+          {/* לוגו גדול ובולט */}
+          <div className="absolute top-4 left-4 z-10">
             <Image
               src="/assets/images/imgFiles/save_logo.webp"
               alt="logo"
-              width={180}
-              height={60}
-              className="object-contain max-h-12 md:max-h-16 w-auto"
+              width={220}
+              height={80}
+              className="object-contain max-h-16 md:max-h-20 w-auto"
               priority
             />
           </div>
 
-          {/* תמונת פרופיל - שומרת על פרופורציה וממוקמת 1/3 למעלה ו-2/3 בתוך הבודי */}
-          <div className="absolute left-1/2 -translate-x-1/2 top-[calc(100%-34px)] md:top-[calc(100%-44px)] z-30">
+          {/* תמונת פרופיל - הוגדלה פי 2 במובייל (w-40 h-40 שהם 160 פיקסלים) */}
+          {/* top-[calc(100%-53px)] דואג שחלק של שליש בדיוק (כ-53 פיקסלים) יישאר למעלה בלבן ו-2/3 בכחול */}
+          <div className="absolute left-1/2 -translate-x-1/2 top-[calc(100%-53px)] md:top-[calc(100%-53px)] z-30">
             <div className="relative">
               <Image
                 src="/assets/images/imgFiles/my_image.jpg"
                 alt="avatar"
-                width={110}
-                height={110}
-                className="rounded-full border-[4px] border-white shadow-xl object-cover w-26 h-26 md:w-32 md:h-32"
+                width={160}
+                height={160}
+                className="rounded-full border-[5px] border-white shadow-2xl object-cover w-40 h-40"
               />
               <div className="absolute inset-0 rounded-full bg-white opacity-10 blur-xl scale-110" />
             </div>
           </div>
         </div>
 
-        {/* BODY - קיבל מקסימום גובה כלפי מעלה במובייל */}
-        <div className="relative font-shmulik flex-1 flex flex-col items-center justify-start pt-16 px-6 text-center text-white 
-                        bg-linear-to-br from-[#073b5c] via-[#0f6fa5] to-[#39a8df] overflow-hidden md:overflow-visible md:pb-24">
+        {/* BODY - פדינג עליון מותאם (pt-28) כדי שהטקסט יתחיל בדיוק מתחת לתמונת הענק */}
+        <div className="relative font-shmulik flex-1 flex flex-col items-center justify-start pt-28 px-6 text-center text-white 
+                        bg-linear-to-br from-[#073b5c] via-[#0f6fa5] to-[#39a8df] overflow-hidden md:overflow-visible md:pb-28">
 
-          {/* שם ותפקיד */}
-          <div className="mt-1 mb-2 md:mb-4 shrink-0">
-            <h1 className="text-2xl md:text-3xl font-bold tracking-wide">גיא כהן</h1>
-            <p className="text-lg md:text-xl opacity-90 mt-0.5">יועץ משכנתאות</p>
+          {/* שם ותפקיד - תמיד מתחת לתמונה */}
+          <div className="mb-3 md:mb-5 shrink-0">
+            <h1 className="text-3xl md:text-4xl font-bold tracking-wide">גיא כהן</h1>
+            <p className="text-xl md:text-2xl opacity-90 mt-0.5">יועץ משכנתאות</p>
           </div>
 
           {/* — כפתורי יצירת קשר — */}
@@ -85,15 +86,15 @@ export default function BusinessCard() {
             <div className="w-full max-w-5xl px-2">
               <div className="grid grid-cols-4 gap-x-3 place-items-center">
                 {buttons.map((btn, idx) => (
-                  <div key={idx} className="flex flex-col items-center w-[60px] md:w-20">
+                  <div key={idx} className="flex flex-col items-center w-[64px] md:w-22">
                     <a
                       href={btn.href}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="w-13 h-13 md:w-16 md:h-16 rounded-full bg-white shadow flex items-center justify-center transition-transform active:scale-95"
+                      className="w-14 h-14 md:w-18 md:h-18 rounded-full bg-white shadow flex items-center justify-center transition-transform active:scale-95"
                     >
-                      <div className="w-10 h-10 md:w-14 md:h-14 rounded-full bg-gray-50 border border-gray-200 flex items-center justify-center">
-                        <btn.icon color="#1d75a1" className="w-5 h-5 md:w-8 md:h-8" />
+                      <div className="w-11 h-11 md:w-15 md:h-15 rounded-full bg-gray-50 border border-gray-200 flex items-center justify-center">
+                        <btn.icon color="#1d75a1" className="w-6 h-6 md:w-9 sm:h-9" />
                       </div>
                     </a>
                     <span className="mt-1 text-xs md:text-sm text-white text-center whitespace-nowrap opacity-95">
@@ -106,17 +107,17 @@ export default function BusinessCard() {
           </div>
 
           {/* — רצועת מחשבונים — */}
-          <div className="w-full flex flex-col items-center mb-1 md:mb-4 shrink-0">
+          <div className="w-full flex flex-col items-center mb-1 md:mb-6 shrink-0">
             <div className="w-full max-w-5xl px-2 overflow-x-auto overflow-y-hidden no-scrollbar">
               <div className="flex flex-nowrap gap-x-5 w-max pb-1 px-4">
                 {calculators.map((item, idx) => (
-                  <div key={idx} className="flex flex-col items-center w-[60px] md:w-20 shrink-0">
+                  <div key={idx} className="flex flex-col items-center w-[62px] md:w-22 shrink-0">
                     <Link
                       href={item.href}
-                      className="w-13 h-13 md:w-16 md:h-16 rounded-md bg-white shadow flex items-center justify-center transition-transform active:scale-95"
+                      className="w-14 h-14 md:w-18 md:h-18 rounded-md bg-white shadow flex items-center justify-center transition-transform active:scale-95"
                     >
-                      <div className="w-10 h-10 md:w-14 md:h-14 rounded-md bg-gray-50 border border-gray-200 flex items-center justify-center">
-                        <item.icon color="#1d75a1" className="w-5 h-5 md:w-8 md:h-8" />
+                      <div className="w-11 h-11 md:w-15 md:h-15 rounded-md bg-gray-50 border border-gray-200 flex items-center justify-center">
+                        <item.icon color="#1d75a1" className="w-6 h-6 md:w-9 sm:h-9" />
                       </div>
                     </Link>
                     <span className="mt-1 text-[11px] md:text-xs text-white whitespace-nowrap text-center opacity-95">
@@ -127,20 +128,20 @@ export default function BusinessCard() {
               </div>
             </div>
 
-            {/* קו חצים מעוצב ברוחב 75% - מופיע רק במובייל */}
-            <div className="flex items-center justify-between w-[75%] mt-2 text-white text-[12px] md:hidden select-none px-1">
+            {/* קו חצים מעוצב ברוחב 75% לגלילת מחשבונים */}
+            <div className="flex items-center justify-between w-[75%] mt-2 text-white/40 text-[12px] md:hidden select-none px-1">
               <span>❮</span>
-              <div className="flex-1 mx-2 border-b border-dashed border-white h-0" />
+              <div className="flex-1 mx-2 border-b border-dashed border-white/20 h-0" />
               <span>❯</span>
             </div>
           </div>
 
-          {/* כפתורי התחתית הצפים - תמיד רוכבים ביחס של 2/3 בבודי ו-1/3 בפוטר, גלויים לחלוטין */}
+          {/* כפתורי התחתית הצפים - שומרים על יחס 2/3 בבודי ו-1/3 בפוטר, ונשארים גלויים לחלוטין מעל הפוטר */}
           <div className="absolute left-1/2 bottom-0 -translate-x-1/2 translate-y-[33%] z-30 flex items-center justify-center gap-6 w-full px-4">
             {/* אנשי קשר */}
             <a
               href="assets/contacts/guy-cohen.vcf"
-              className="relative w-22 h-22 md:w-26 md:h-26 rounded-full bg-white shadow-[0_8px_20px_rgba(0,0,0,0.25)] flex items-center justify-center hover:scale-105 active:scale-95 transition-all duration-300 shrink-0"
+              className="relative w-24 h-24 md:w-28 md:h-28 rounded-full bg-white shadow-[0_8px_20px_rgba(0,0,0,0.25)] flex items-center justify-center hover:scale-105 active:scale-95 transition-all duration-300 shrink-0"
               onClick={(e) => {
                 if (/Android|iPhone/i.test(navigator.userAgent)) {
                   window.location.href = "/contacts/guy-cohen.vcf";
@@ -149,39 +150,39 @@ export default function BusinessCard() {
             >
               <div className="absolute inset-0 rounded-full border-4 border-[#1d75a1]" />
               <div className="flex flex-col items-center justify-center text-[#1d75a1] z-10 text-center leading-tight">
-                <span className="text-xs md:text-sm font-bold">הוסף</span>
-                <span className="text-xs md:text-sm">לאנשי</span>
-                <span className="text-xs md:text-sm">קשר</span>
+                <span className="text-sm font-bold">הוסף</span>
+                <span className="text-sm">לאנשי</span>
+                <span className="text-sm">קשר</span>
               </div>
             </a>
 
             {/* מדריך יתרות */}
             <Link
               href="/home/guide/mortgage_balance"
-              className="relative w-22 h-22 md:w-26 md:h-26 rounded-full bg-white shadow-[0_8px_20px_rgba(0,0,0,0.25)] flex items-center justify-center hover:scale-105 active:scale-95 transition-all duration-300 shrink-0"
+              className="relative w-24 h-24 md:w-28 md:h-28 rounded-full bg-white shadow-[0_8px_20px_rgba(0,0,0,0.25)] flex items-center justify-center hover:scale-105 active:scale-95 transition-all duration-300 shrink-0"
             >
               <div className="absolute inset-0 rounded-full border-4 border-[#1d75a1]" />
               <div className="flex flex-col items-center justify-center text-[#1d75a1] z-10 text-center px-1 leading-tight">
-                <span className="text-xs md:text-sm font-bold">מדריך</span>
-                <span className="text-[10px] md:text-xs">הנפקת</span>
-                <span className="text-[10px] md:text-xs">דוח יתרות</span>
+                <span className="text-sm font-bold">מדריך</span>
+                <span className="text-xs">הנפקת</span>
+                <span className="text-xs">דוח יתרות</span>
               </div>
             </Link>
           </div>
 
         </div>
 
-        {/* FOOTER - עם מרווח עליון מותאם כדי לתת מקום לשליש התחתון של הכפתורים */}
-        <div className="bg-white text-[#1d75a1] pt-10 pb-4 md:py-8 px-4 text-right shrink-0 z-5 shadow-[0_-4px_10px_rgba(0,0,0,0.05)]">
+        {/* FOOTER - פדינג עליון מותאם לתמיכה בשליש התחתון של כפתורי הענק */}
+        <div className="bg-white text-[#1d75a1] pt-12 pb-5 md:py-10 px-4 text-right shrink-0  shadow-[0_-4px_10px_rgba(0,0,0,0.05)]">
           <div className="flex items-center justify-center gap-4">
             <div className="flex flex-col text-right">
-              <p className="font-medium text-lg md:text-xl">רחוב התעשיה 4, תל אביב</p>
+              <p className="font-medium text-xl md:text-2xl">רחוב התעשיה 4, תל אביב</p>
             </div>
             <a
               href="waze://?q=התעשיה%204%20תל%20אביב&navigate=yes"      
-              className="relative group w-10 h-10 flex items-center justify-center rounded-full border border-[#1d75a1] shrink-0"
+              className="relative group w-11 h-11 flex items-center justify-center rounded-full border border-[#1d75a1] shrink-0"
             >
-              <WazeIcon size={32} color="#1d75a1" className="z-10" />
+              <WazeIcon size={34} color="#1d75a1" className="z-10" />
             </a>
           </div>
         </div>
@@ -190,6 +191,9 @@ export default function BusinessCard() {
     </div>
   );
 }
+
+
+
 
 // "use client"
 
