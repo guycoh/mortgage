@@ -143,49 +143,46 @@ export default function BusinessCard() {
         </div>
 
         {/* FOOTER + כפתורים צפים */}
-        <div className="relative bg-white text-[#1d75a1] pt-14 pb-5 md:py-10 px-4 text-right shrink-0 z-30 shadow-[0_-4px_10px_rgba(0,0,0,0.05)]">
+        {/* שונה ה-padding העליון בנייד מ-pt-14 ל-pt-11 כדי לצמצם את המרחק לכתובת */}
+        <div className="relative bg-white text-[#1d75a1] pt-10 pb-5 md:py-10 px-4 text-right shrink-0 z-30 shadow-[0_-4px_10px_rgba(0,0,0,0.05)]">
           
-          {/* כפתורים צפים - 2/3 בגוף ו-1/3 בפוטר, תמיד גלויים ב-z-50 */}
-          
-            {/* כפתורים צפים - מורחקים לעבר השוליים באמצעות justify-between ורוחב מוגדר */}
-            {/* כפתורים צפים - מורחקים במעט זה מזה באמצעות הגדלת ה-gap */}
-            <div className="absolute left-1/2 top-0 -translate-x-1/2 -translate-y-[66%] z-50 flex items-center justify-center gap-12 md:gap-16 w-full px-4">
-              
-              {/* אנשי קשר */}
-              <a
-                href="/contacts/guy-cohen.vcf"
-                download="guy-cohen.vcf"
-                className="relative w-24 h-24 md:w-28 md:h-28 rounded-full bg-white shadow-[0_8px_20px_rgba(0,0,0,0.25)] flex items-center justify-center hover:scale-105 active:scale-95 transition-all duration-300 shrink-0"
-              >
-                <div className="absolute inset-0 rounded-full border-4 border-[#1d75a1]" />
-                <div className="flex flex-col items-center justify-center text-[#1d75a1] z-10 text-center leading-tight">
-                  <span className="text-sm font-bold">הוסף</span>
-                  <span className="text-sm">לאנשי</span>
-                  <span className="text-sm">קשר</span>
-                </div>
-              </a>
+          {/* כפתורים צפים - 2/3 בגוף ו-1/3 בפוטר, תמיד גלויים ב-z-50 */}         
+          <div className="absolute left-1/2 top-0 -translate-x-1/2 -translate-y-[66%] z-50 flex items-center justify-center gap-12 md:gap-16 w-full px-4">
+            
+            {/* אנשי קשר */}
+            <a
+              href="/contacts/guy-co-hen.vcf"
+              download="guy-cohen.vcf"
+              className="relative w-24 h-24 md:w-28 md:h-28 rounded-full bg-white shadow-[0_8px_20px_rgba(0,0,0,0.25)] flex items-center justify-center hover:scale-105 active:scale-95 transition-all duration-300 shrink-0"
+            >
+              <div className="absolute inset-0 rounded-full border-4 border-[#1d75a1]" />
+              <div className="flex flex-col items-center justify-center text-[#1d75a1] z-10 text-center leading-tight">
+                <span className="text-sm font-bold">הוסף</span>
+                <span className="text-sm font-bold">לאנשי</span>
+                <span className="text-sm font-bold">קשר</span>
+              </div>
+            </a>
 
-              {/* מדריך יתרות */}
-              <Link
-                href="/home/guide/mortgage_balance"
-                className="relative w-24 h-24 md:w-28 md:h-28 rounded-full bg-white shadow-[0_8px_20px_rgba(0,0,0,0.25)] flex items-center justify-center hover:scale-105 active:scale-95 transition-all duration-300 shrink-0"
-              >
-                <div className="absolute inset-0 rounded-full border-4 border-[#1d75a1]" />
-                <div className="flex flex-col items-center justify-center text-[#1d75a1] z-10 text-center px-1 leading-tight">
-                  <span className="text-sm font-bold">מדריך</span>
-                  <span className="text-xs">הנפקת</span>
-                  <span className="text-xs">דוח יתרות</span>
-                </div>
-              </Link>
+            {/* מדריך יתרות */}
+            <Link
+              href="/home/guide/mortgage_balance"
+              className="relative w-24 h-24 md:w-28 md:h-28 rounded-full bg-white shadow-[0_8px_20px_rgba(0,0,0,0.25)] flex items-center justify-center hover:scale-105 active:scale-95 transition-all duration-300 shrink-0"
+            >
+              <div className="absolute inset-0 rounded-full border-4 border-[#1d75a1]" />
+              <div className="flex flex-col items-center justify-center text-[#1d75a1] z-10 text-center px-1 leading-tight">
+                <span className="text-sm font-bold">מדריך</span>
+                <span className="text-sm font-bold">הנפקת</span>
+                <span className="text-sm font-bold">דוח יתרות</span>
+              </div>
+            </Link>
 
-            </div>
-
-
+          </div>
 
           {/* תוכן הפוטר */}
           <div className="flex items-center justify-center gap-4">
             <div className="flex flex-col text-right">
-              <p className="font-medium text-xl md:text-2xl">רחוב התעשיה 4, תל אביב</p>
+              <p className="font-medium text-xl md:text-2xl">רחוב התעשיה  4,</p>
+              <p className="font-medium text-xl md:text-2xl">תל אביב</p>
             </div>
             <a
               href="waze://?q=התעשיה%204%20תל%20אביב&navigate=yes"      
@@ -200,8 +197,6 @@ export default function BusinessCard() {
     </div>
   );
 }
-
-
 
 
 
