@@ -41,9 +41,9 @@ export default function BusinessCard() {
       {/* מעטפת הכרטיס */}
       <div className="w-full md:w-1/2 h-full md:min-h-screen flex flex-col bg-blue-600 relative overflow-hidden md:overflow-visible">
         
-        {/* HEADER - הגובה נשאר יציב לחלוטין (h-40 במובייל, h-48 בדסקטופ) */}
-        <div className="relative h-40 md:h-48 bg-white shrink-0 z-10 flex items-center justify-center">
-          {/* לוגו - הוגדל ב-20% ברוחב ובגובה המקסימלי בלי לשנות את גובה ההדר */}
+        {/* HEADER - יציב בראש הדף */}
+        <div className="relative h-36 md:h-48 bg-white shrink-0 z-40 flex items-center justify-center">
+          {/* לוגו */}
           <div className="absolute top-4 left-4 z-10">
             <Image
               src="/assets/images/imgFiles/save_logo.webp"
@@ -56,7 +56,7 @@ export default function BusinessCard() {
           </div>
 
           {/* תמונת פרופיל - 1/3 למעלה בלבן ו-2/3 בכחול */}
-          <div className="absolute left-1/2 -translate-x-1/2 top-[calc(100%-53px)] z-30">
+          <div className="absolute left-1/2 -translate-x-1/2 top-[calc(100%-53px)] z-50">
             <div className="relative">
               <Image
                 src="/assets/images/imgFiles/my_image.jpg"
@@ -70,9 +70,9 @@ export default function BusinessCard() {
           </div>
         </div>
 
-        {/* BODY - פדינג עליון מותאם */}
+        {/* BODY - קיבל z-20 כדי להיות מעל הפוטר */}
         <div className="relative font-shmulik flex-1 flex flex-col items-center justify-start pt-28 px-6 text-center text-white 
-                        bg-linear-to-br from-[#073b5c] via-[#0f6fa5] to-[#39a8df] overflow-hidden md:overflow-visible md:pb-28">
+                        bg-linear-to-br from-[#073b5c] via-[#0f6fa5] to-[#39a8df] overflow-hidden md:overflow-visible md:pb-28 z-20">
 
           {/* שם ותפקיד */}
           <div className="mb-3 md:mb-5 shrink-0">
@@ -128,15 +128,15 @@ export default function BusinessCard() {
             </div>
 
             {/* קו חצים מעוצב ברוחב 75% */}
-            <div className="flex items-center justify-between w-[75%] mt-2 text-white/40 text-[12px] md:hidden select-none px-1">
+            <div className="flex items-center justify-between w-[75%] mt-2 text-white text-[12px] md:hidden select-none px-1">
               <span>❮</span>
-              <div className="flex-1 mx-2 border-b border-dashed border-white/20 h-0" />
+              <div className="flex-1 mx-2 border-b border-dashed border-white h-0" />
               <span>❯</span>
             </div>
           </div>
 
-          {/* כפתורי התחתית הצפים - z-45 כדי לוודא שהם תמיד מעל הפוטר הלבן */}
-          <div className="absolute left-1/2 bottom-0 -translate-x-1/2 translate-y-[33%] z-45 flex items-center justify-center gap-6 w-full px-4">
+          {/* כפתורי התחתית הצפים - קיבלו z-30 קשיח כדי לרכוב מעל הפוטר הלבן בכל מסך */}
+          <div className="absolute left-1/2 bottom-0 -translate-x-1/2 translate-y-[33%] z-30 flex items-center justify-center gap-6 w-full px-4">
             {/* אנשי קשר */}
             <a
               href="assets/contacts/guy-cohen.vcf"
@@ -160,7 +160,7 @@ export default function BusinessCard() {
               href="/home/guide/mortgage_balance"
               className="relative w-24 h-24 md:w-28 md:h-28 rounded-full bg-white shadow-[0_8px_20px_rgba(0,0,0,0.25)] flex items-center justify-center hover:scale-105 active:scale-95 transition-all duration-300 shrink-0"
             >
-              <div className="absolute inset-0 rounded-full border-4 border-[#1d75a1] font-shmulik" />
+              <div className="absolute inset-0 rounded-full border-4 border-[#1d75a1]" />
               <div className="flex flex-col items-center justify-center text-[#1d75a1] z-10 text-center px-1 leading-tight">
                 <span className="text-sm font-bold">מדריך</span>
                 <span className="text-xs">הנפקת</span>
@@ -171,8 +171,8 @@ export default function BusinessCard() {
 
         </div>
 
-        {/* FOOTER - קיבל z-10 כדי לא להסתיר את הכפתורים הצפים שקיבלו z-45 */}
-        <div className="bg-white text-[#1d75a1] pt-12 pb-5 md:py-10 px-4 text-right shrink-0 z-10 shadow-[0_-4px_10px_rgba(0,0,0,0.05)]">
+        {/* FOOTER - קיבל font-shmulik ו-z-10 כדי שהכפתורים שמעליו (z-30) לא ייחסמו על ידי הלבן */}
+        <div className="bg-white font-shmulik text-[#1d75a1] pt-12 pb-5 md:py-10 px-4 text-right shrink-0 z-10 shadow-[0_-4px_10px_rgba(0,0,0,0.05)]">
           <div className="flex items-center justify-center gap-4">
             <div className="flex flex-col text-right">
               <p className="font-medium text-xl md:text-2xl">רחוב התעשיה 4, תל אביב</p>
@@ -190,6 +190,8 @@ export default function BusinessCard() {
     </div>
   );
 }
+
+
 
 // "use client"
 
