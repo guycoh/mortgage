@@ -1,6 +1,6 @@
 "use client";
 
-import React from 'react';
+import React from 'react'
 
 // הגדרת המאפיינים (Props) שהכפתור יקבל
 interface CustomButtonProps {

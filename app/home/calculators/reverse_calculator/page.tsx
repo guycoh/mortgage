@@ -1,6 +1,8 @@
+
 "use client";
 
 import { useState } from "react";
+import CustomButton from "../../components/CustomButton";
 
 import ReverseMortgageLoanComparison from "./ReverseMortgageLoanComparison";
 
@@ -420,9 +422,6 @@ onChange={e=>setInterestRate(e.target.value)}
 
 </div>
 
-
-
-
 {/* מדד */}
 <div className="
 flex
@@ -465,48 +464,20 @@ md:col-span-1
 
 </div>
 
+{/* כפתורי מחשבון */}
+<div className="flex flex-wrap justify-center items-center gap-3">
+  <CustomButton
+    text="חשב"
+    size="md"
+    onClick={calculate}
+  />
 
-
-
-
-<div className="flex w-full gap-3 mt-12">
-
-
-<button
-onClick={calculate}
-className="
-flex-1 py-3
-rounded-md
-bg-white
-text-blue-900
-font-bold
-shadow-[inset_0_4px_6px_rgba(0,0,0,0.2),0_4px_6px_rgba(0,0,0,0.3)]
-hover:shadow-[inset_0_2px_3px_rgba(0,0,0,0.1),0_6px_10px_rgba(0,0,0,0.35)]
-transition
-"
->
-חשב
-</button>
-
-
-
-<button
-onClick={()=>setResult(null)}
-className="
-flex-1 py-3
-rounded-md
-bg-white
-text-blue-900
-font-bold
-shadow-[inset_0_4px_6px_rgba(0,0,0,0.2),0_4px_6px_rgba(0,0,0,0.3)]
-"
->
-נקה
-</button>
-
-
+  <CustomButton
+    text="נקה טופס"
+    size="md"
+    onClick={() => setResult(null)}
+  />
 </div>
-
 
 
 
