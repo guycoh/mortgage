@@ -9,7 +9,7 @@ export const metadata = {
     title: "הכרטיס של גיא כהן ",
     description: "     ",
     url: "https://morg-orcin.vercel.app/", // שנה לכתובת האמיתית שלך
-    siteName: "prime",
+    siteName: "save",
     images: [
       {
         url: "https://morg-orcin.vercel.app/assets/images/imgFiles/my_image.jpg", // לינק מלא לתמונה

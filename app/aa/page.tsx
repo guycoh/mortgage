@@ -74,6 +74,14 @@ export default function MaintenancePage() {
           האתר בתחזוקה
         </h1>
 
+    <div className="relative top-0 left-0 m-0 flex h-[50px] w-[160px] items-center justify-center group">
+      <div className="flex h-full w-full items-center justify-center rounded-[30px] border-b border-t border-white/10 bg-transparent text-[#FFFFF0] filter drop-shadow-[0_0_2px_rgba(0,0,0,0.5)] tracking-[1px] text-[16px] font-medium z-[1] transition-all duration-600 ease-in-out
+        shadow-[4px_4px_6px_0_rgba(255,255,255,0.5),-4px,-4px_6px_0_rgba(116,125,136,0.5),inset_-4px_-4px_6px_0_rgba(255,255,255,0.2),inset_4px_4px_6px_0_rgba(0,0,0,0.4)]
+        group-hover:tracking-[4px] group-hover:text-[#4a4a40] group-hover:bg-[#FFFFF0]">
+        חשב
+      </div>
+    </div>
+ 
 
         <p className="text-gray-600 text-lg leading-relaxed mb-8">
           אנחנו מבצעים כרגע שדרוגים ושיפורים

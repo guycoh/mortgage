@@ -50,9 +50,9 @@ export default function EqualPrincipalCalculator() {
   const spitzerMonthlyLast = spitzerPayments.at(-1)?.total || 0
 
   return (
- <div className="flex flex-col items-center bg-gradient-to-b from-[#f8fafc] to-[#e6eff3] min-h-screen py-10 px-4">
+ <div className="flex flex-col items-center bg-linear-to-b from-[#f8fafc] to-[#e6eff3] min-h-screen py-10 px-4">
   {/* מחשבון */}
-  <div className="relative w-full max-w-[900px] flex flex-col items-center">
+  <div className="relative w-full max-w-225 flex flex-col items-center">
     {/* גוף התיבה */}
     <div
       className="relative w-full rounded-xl overflow-hidden"
@@ -104,7 +104,34 @@ export default function EqualPrincipalCalculator() {
               onChange={(e) => setAnnualRate(+e.target.value)}
               className="w-full rounded-md p-2 text-gray-900 text-sm bg-white/95 shadow-inner focus:outline-none focus:ring-2 focus:ring-main focus:bg-orange-50"
             />
-          </div>
+
+
+
+
+
+
+
+   
+    <div className="relative top-0 left-0 m-0 flex h-12.5 w-40 items-center justify-center bg-white rounded-[30px] group cursor-pointer">
+      {/* הדיב הפנימי עם הצבעים החדשים שביקשת */}
+      <div className="flex h-full w-full items-center justify-center rounded-[30px] border-b border-t border-white/10 bg-transparent text-[#1d75a1] tracking-[1px] z-1 transition-all duration-600 ease-in-out
+        shadow-[4px_4px_6px_0_rgba(255,255,255,0.5),-4px_-4px_6px_0_rgba(116,125,136,0.5),inset_-4px_-4px_6px_0_rgba(255,255,255,0.2),inset_4px_4px_6px_0_rgba(0,0,0,0.4)]
+        group-hover:tracking-[4px] group-hover:text-[#4a4a4a] group-hover:bg-[#FFFFF0]">
+        חשב
+      </div>
+    </div>
+
+
+
+
+
+
+
+
+
+
+
+             </div>
         </form>
 
         {/* תוצאות */}
