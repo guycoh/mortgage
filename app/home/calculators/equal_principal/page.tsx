@@ -105,32 +105,6 @@ export default function EqualPrincipalCalculator() {
               className="w-full rounded-md p-2 text-gray-900 text-sm bg-white/95 shadow-inner focus:outline-none focus:ring-2 focus:ring-main focus:bg-orange-50"
             />
 
-
-
-
-
-
-
-   
-    <div className="relative top-0 left-0 m-0 flex h-12.5 w-40 items-center justify-center bg-white rounded-[30px] group cursor-pointer">
-      {/* הדיב הפנימי עם הצבעים החדשים שביקשת */}
-      <div className="flex h-full w-full items-center justify-center rounded-[30px] border-b border-t border-white/10 bg-transparent text-[#1d75a1] tracking-[1px] z-1 transition-all duration-600 ease-in-out
-        shadow-[4px_4px_6px_0_rgba(255,255,255,0.5),-4px_-4px_6px_0_rgba(116,125,136,0.5),inset_-4px_-4px_6px_0_rgba(255,255,255,0.2),inset_4px_4px_6px_0_rgba(0,0,0,0.4)]
-        group-hover:tracking-[4px] group-hover:text-[#4a4a4a] group-hover:bg-[#FFFFF0]">
-        חשב
-      </div>
-    </div>
-
-
-
-
-
-
-
-
-
-
-
              </div>
         </form>
 
