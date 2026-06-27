@@ -2,403 +2,149 @@
 
 import { useMemo } from "react";
 
-
 type Props = {
-
-  loan:number;
-
-  interestRate:number;
-
-  indexRate:number;
-
-  months:number;
-
-  type:"balloon" | "grace";
-
+  loan: number;
+  interestRate: number;
+  indexRate: number;
+  months: number;
+  type: "balloon" | "grace";
 };
 
-
-
 export default function ReverseMortgageAmortizationTable({
+  loan,
+  interestRate,
+  indexRate,
+  months,
+  type
+}: Props) {
 
-loan,
+  const table = useMemo(() => {
+    const yearlyInterest = interestRate / 100;
+    const yearlyIndex = indexRate / 100;
 
-interestRate,
+    const monthlyInterest = Math.pow(1 + yearlyInterest, 1 / 12) - 1;
+    const monthlyIndex = Math.pow(1 + yearlyIndex, 1 / 12) - 1;
 
-indexRate,
+    // חודש 0 המייצג את קבלת המשכנתא
+    const initialRow = {
+      month: 0,
+      startBalance: 0,
+      interest: 0,
+      index: 0,
+      payment: 0,
+      endBalance: loan
+    };
 
-months,
+    /*
+    =====================
+    בלון מלא (אין תשלום שוטף, הכל נדחה וי.ס גדלה)
+    =====================
+    */
+    let balloonBalance = loan;
+    const balloonRows = [initialRow];
 
-type
+    for (let m = 1; m <= months; m++) {
+      const startBalance = balloonBalance;
 
-}:Props){
+      // 1. חישוב ריבית חודשית והוספתה לחוב
+      const interest = startBalance * monthlyInterest;
+      balloonBalance += interest;
 
+      // 2. חישוב הצמדה על היתרה החדשה
+      const index = balloonBalance * monthlyIndex;
+      balloonBalance += index;
 
+      balloonRows.push({
+        month: m,
+        startBalance,
+        interest,
+        index,
+        payment: 0, // אין תשלום חודשי בבלון מלא
+        endBalance: balloonBalance
+      });
+    }
 
-const table = useMemo(()=>{
+    /*
+    =====================
+    גרייס / בלון חלקי (הריבית משולמת מדי חודש, הקרן גדלה רק לפי המדד)
+    =====================
+    */
+    let graceBalance = loan;
+    const graceRows = [initialRow];
 
+    for (let m = 1; m <= months; m++) {
+      const startBalance = graceBalance;
 
-const yearlyInterest =
-interestRate / 100;
+      // הריבית משולמת בפועל באותו חודש מתוך היתרה הנוכחית
+      const interestPayment = startBalance * monthlyInterest;
 
+      // הקרן עצמה צוברת מדד וגדלה
+      const index = startBalance * monthlyIndex;
+      graceBalance += index;
 
-const yearlyIndex =
-indexRate / 100;
+      graceRows.push({
+        month: m,
+        startBalance,
+        interest: interestPayment,
+        index,
+        payment: interestPayment, // התשלום החודשי הוא הריבית בלבד
+        endBalance: graceBalance
+      });
+    }
 
+    return {
+      balloonRows,
+      graceRows
+    };
+  }, [loan, interestRate, indexRate, months]);
 
+  const rows = type === "balloon" ? table.balloonRows : table.graceRows;
 
-const monthlyInterest =
-Math.pow(
-1 + yearlyInterest,
-1 / 12
-) - 1;
+  return (
+    <div className="w-full">
+      <div className="mb-4 bg-gray-100 rounded-xl p-3 text-center font-bold text-blue-900">
+        {type === "balloon" ? "בלון מלא - דחיית קרן וריבית" : "גרייס - תשלום ריבית בלבד"}
+      </div>
 
-
-
-const monthlyIndex =
-Math.pow(
-1 + yearlyIndex,
-1 / 12
-) - 1;
-
-
-
-
-
-/*
-=====================
-בלון מלא
-=====================
-*/
-
-
-let balloonBalance = loan;
-
-
-const balloonRows = [];
-
-
-for(let m = 1; m <= months; m++){
-
-
-const startBalance =
-balloonBalance;
-
-
-
-const interest =
-startBalance *
-monthlyInterest;
-
-
-
-balloonBalance += interest;
-
-
-
-const index =
-balloonBalance *
-monthlyIndex;
-
-
-
-balloonBalance += index;
-
-
-
-balloonRows.push({
-
-month:m,
-
-interest,
-
-index,
-
-balance:
-balloonBalance
-
-});
-
-
+      <div className="overflow-auto max-h-[65vh] rounded-xl border">
+        <table className="w-full text-sm text-gray-800 text-center">
+          <thead className="sticky top-0 bg-gray-200">
+            <tr>
+              <th className="p-3">חודש</th>
+              <th className="p-3">יתרת פתיחה (י.פ)</th>
+              <th className="p-3">ריבית חודשית</th>
+              <th className="p-3">הצמדה למדד</th>
+              <th className="p-3">תשלום חודשי</th>
+              <th className="p-3">יתרת סגירה (י.ס)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.month} className="border-b hover:bg-gray-50">
+                <td className="p-3 font-semibold">{row.month}</td>
+                <td className="p-3">
+                  {row.month === 0 ? "-" : `₪${Math.round(row.startBalance).toLocaleString()}`}
+                </td>
+                <td className="p-3">
+                  {row.month === 0 ? "-" : `₪${Math.round(row.interest).toLocaleString()}`}
+                </td>
+                <td className="p-3">
+                  {row.month === 0 ? "-" : `₪${Math.round(row.index).toLocaleString()}`}
+                </td>
+                <td className="p-3 font-bold text-orange-600">
+                  {row.month === 0 ? "-" : `₪${Math.round(row.payment).toLocaleString()}`}
+                </td>
+                <td className="p-3 font-bold text-blue-900">
+                  ₪{Math.round(row.endBalance).toLocaleString()}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
 }
-
-
-
-
-
-/*
-=====================
-גרייס
-=====================
-*/
-
-
-let graceBalance = loan;
-
-
-const graceRows = [];
-
-
-
-for(let m = 1; m <= months; m++){
-
-
-const interest =
-graceBalance *
-monthlyInterest;
-
-
-
-const index =
-graceBalance *
-monthlyIndex;
-
-
-
-graceBalance += index;
-
-
-
-graceRows.push({
-
-month:m,
-
-interest,
-
-index,
-
-balance:
-graceBalance
-
-});
-
-
-}
-
-
-
-
-
-return {
-
-balloonRows,
-
-graceRows
-
-}
-
-
-
-},[
-loan,
-interestRate,
-indexRate,
-months
-]);
-
-
-
-
-
-
-const rows =
-type === "balloon"
-?
-table.balloonRows
-:
-table.graceRows;
-
-
-
-
-
-
-return (
-
-<div className="w-full">
-
-
-<div className="
-mb-4
-bg-gray-100
-rounded-xl
-p-3
-text-center
-font-bold
-text-blue-900
-">
-
-{
-type === "balloon"
-?
-"בלון מלא - דחיית קרן וריבית"
-:
-"גרייס - תשלום ריבית בלבד"
-}
-
-</div>
-
-
-
-
-<div className="
-overflow-auto
-max-h-[65vh]
-rounded-xl
-border
-">
-
-
-<table className="
-w-full
-text-sm
-text-gray-800
-">
-
-
-<thead
-className="
-sticky
-top-0
-bg-gray-200
-"
->
-
-
-<tr>
-
-
-<th className="p-3">
-חודש
-</th>
-
-
-{
-type==="grace" &&
-<th className="p-3">
-החזר ריבית
-</th>
-}
-
-
-
-<th className="p-3">
-מדד
-</th>
-
-
-
-<th className="p-3">
-יתרה
-</th>
-
-
-</tr>
-
-
-</thead>
-
-
-
-
-
-<tbody>
-
-
-{
-rows.map((row:any)=>(
-
-
-<tr
-key={row.month}
-className="
-border-b
-hover:bg-gray-50
-"
->
-
-
-<td className="p-3 text-center">
-
-{row.month}
-
-</td>
-
-
-
-{
-type==="grace" &&
-
-<td className="p-3 text-center">
-
-₪
-{Math.round(row.interest)
-.toLocaleString()}
-
-</td>
-
-}
-
-
-
-
-<td className="p-3 text-center">
-
-
-₪
-{Math.round(row.index)
-.toLocaleString()}
-
-
-</td>
-
-
-
-
-<td className="
-p-3
-text-center
-font-bold
-">
-
-
-₪
-{Math.round(row.balance)
-.toLocaleString()}
-
-
-</td>
-
-
-
-</tr>
-
-
-))
-
-}
-
-
-
-</tbody>
-
-
-
-</table>
-
-
-</div>
-
-
-</div>
-
-)
-
-
-}
-
-
-
 
 
 
