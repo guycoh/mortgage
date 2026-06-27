@@ -134,7 +134,7 @@ export default function SimulatorPage() {
             
             {/* 1. מדד מחירים צפוי */}
             <div className="w-full">
-              <label className="block text-xs font-bold text-gray-700 mb-1 flex items-center gap-1">
+              <label className="text-xs font-bold text-gray-700 mb-1 flex items-center gap-1">
                 <Percent size={14} className="text-[#1d75a1]" />
                 מדד מחירים צפוי שנתי:
               </label>
