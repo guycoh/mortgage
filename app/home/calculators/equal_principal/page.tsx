@@ -126,18 +126,18 @@ export default function EqualPrincipalCalculator() {
       </div>
 
       {/* קצה תחתון */}
-      <div className="absolute bottom-0 left-0 w-full h-[14px] bg-black/20 blur-[2px]"></div>
+      <div className="absolute bottom-0 left-0 w-full h-3.5 bg-black/20 blur-[2px]"></div>
     </div>
 
     {/* בסיס/שולחן */}
-    <div className="mt-4 w-full h-[12px] bg-gradient-to-b from-[#a9b7bf] to-[#6c7b84] rounded-b-xl shadow-md"></div>
+    <div className="mt-4 w-full h-3 bg-linear-to-b from-[#a9b7bf] to-[#6c7b84] rounded-b-xl shadow-md"></div>
 
     {/* צל רך מתחת */}
-    <div className="mt-2 w-4/5 h-[20px] bg-black/20 blur-2xl rounded-full"></div>
+    <div className="mt-2 w-4/5 h-5 bg-black/20 blur-2xl rounded-full"></div>
   </div>
 
   {/* גרפים */}
-  <section className="mt-12 w-full max-w-[900px]">
+  <section className="mt-12 w-full max-w-225">
     <div className="bg-gray-50 rounded-2xl shadow-md p-6">
       <h2 className="text-xl font-bold text-main mb-2">גרף תשלומים - קרן שווה</h2>
       <EqualPrincipalGraph payments={equalPrincipalPayments} />
