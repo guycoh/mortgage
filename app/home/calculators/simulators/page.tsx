@@ -1,13 +1,18 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react";
-
-import LoanTable , { Loan } from "./components/LoanTable";
+//import LoanTable, { Loan } from "../components/LoanTable"; // שים לב: אם התיקייה זזה, ודא שהנתיב תואם למיקום החדש (למשל: "@/components/LoanTable" או התאמה לפי מבנה הפרויקט)
+import LoanTable , { Loan }  from "./components/LoanTable";
 import { useLoanPaths } from "@/app/data/hooks/useLoanPaths";
 import { Percent, Copy, Calendar } from "lucide-react";
+
+//import UnifiedScheduleModal from "../components/UnifiedScheduleModal";
 import UnifiedScheduleModal from "./components/UnifiedScheduleModal";
+//import MixComparisonTable from "../components/MixComparisonTable";
 import MixComparisonTable from "./components/MixComparisonTable";
+//import MixScheduleChartSVG from "../components/MixScheduleChartSVG";
 import MixScheduleChartSVG from "./components/MixScheduleChartSVG";
+
 
 type Mix = {
   id: string;

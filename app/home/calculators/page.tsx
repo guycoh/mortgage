@@ -19,6 +19,7 @@ const calculators = [
   { title: "מחשבון יכולות", description: "", link: "/home/calculators/mortgage_capability", icon: Calculator3 },
   { title: "מחשבון מס רכישה", description: "בדוק כמה מס רכישה תצטרך לשלם.", link: "/home/calculators/purchase_tax_calculator", icon: Calculator4 },
   { title: "מחשבון משכנתא הפוכה", description: "בדוק כמה מימון תקבל בהפוכה.", link: "/home/calculators/reverse_calculator", icon: ReverseIcon },
+   { title: "מחשבון משכנתא ", description: " מחשבון משכנתא.", link: "/home/calculators/mortgage_calculator", icon: Calculator1 },
   { title: "מחשבון מחיר למשתכן", description: "חשב את ההוצאות והתנאים לזכאות.", link: "/home/calculators/mechir_la_mishtaken", icon: Calculator7 },
   { title: "מחשבון עלויות נלוות", description: "בדוק מה העלויות הנלוות", link: "/home/calculators/costs_calculator", icon: Calculator8 },
   { title: "מחשבון קרן שווה", description: "קרן שווה", link: "/home/calculators/equal_principal", icon: Calculator8 },
@@ -123,7 +124,7 @@ export default function Calculators3DGrid() {
       </h1>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-12 justify-items-center">
-        {calculators.slice(0, 9).map((calc, i) => (
+        {calculators.slice(0, 10).map((calc, i) => (
           <CalculatorCube key={i} {...calc} />
         ))}
       </div>

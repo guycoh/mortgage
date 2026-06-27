@@ -1,11 +1,11 @@
-"use client";
+"use client"
 
 import { useState } from "react";
 
 // רשימת המאגרים עם אייקון וקטגוריה מוגדרים לכל אחד
 const repositories = [
   { name: "דירה בהנחה", description: "מידע, זכאות ונתונים על הגרלות דירה בהנחה", href: "/home/repositories/aa", category: "נדל״ן והגרלות", icon: "home" },
-  { name: "מאגר שמאים", description: "רשימת שמאים מוסמכים והשוואת עלויות", href: "/muhni/repositories/appraisers", category: "אנשי מקצוע", icon: "users" },
+  { name: "מאגר שמאים", description: "רשימת שמאים מוסמכים והשוואת עלויות", href: "/home/repositories/appraisers", category: "אנשי מקצוע", icon: "users" },
   { name: "מתחמים בהתחדשות עירונית", description: "בדיקת סטטוס פרויקטים של פינוי בינוי ותמ״א 38", href: "/home/repositories/urban_renewal", category: "נדל״ן והגרלות", icon: "building" },
   { name: "רשימת סניפי בנקים", description: "איתור סניפים, שעות פעילות ופרטי התקשרות", href: "/muhni/repositories/banks", category: "פיננסים", icon: "bank" },
   { name: "מאגר טפסים", description: "טפסים חשובים להורדה, הגשה וחתימה ישירה", href: "/repositories/forms", category: "כלים וטפסים", icon: "file" },

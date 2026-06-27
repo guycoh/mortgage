@@ -6,7 +6,7 @@ import { graceTypes } from "@/app/data/graceTypes";
 
 
 import DatePicker from "react-datepicker";
-import "react-datepicker/dist/react-datepicker.css";
+
 import LoanAmortization from "./LoanAmortization";
 import { useState } from "react";
 
@@ -134,7 +134,8 @@ const [activeLoan, setActiveLoan] = React.useState<Loan | null>(null);
       </button>
 
 
-      <table className="w-full border-collapse border border-gray-300 text-sm"><thead className="bg-gray-300">
+      <table className="w-full border-collapse border border-gray-300 text-sm">
+        <thead className="bg-gray-300">
           <tr>
             <th className="border p-2">סכום הלוואה</th>
             <th className="border p-2">לוח סילוקין</th>
