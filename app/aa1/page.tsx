@@ -1,8 +1,15 @@
 "use client"
 
-import { useState } from "react";
+import { useState ,ReactNode,  } from "react";
 import BalloonLoanModal from "./BalloonLoanModal"
 import LoanConsolidation from "./LoanConsolidationModal";
+
+import Modal from "./Modal";
+import ReverseMortgageCalculator from "../home/calculators/reverse_calculator/ReverseMortgageCalculator";
+
+
+
+
 
 type Purpose =
   | "single"
@@ -52,9 +59,22 @@ const [interest, setInterest] = useState(4.8);   // ברירת מחדל 4.8%
 
 //  פתיחת מודלים
 const [isLoanConsolidationOpen, setIsLoanConsolidationOpen] = useState(false);
+const [isModalOpen, setIsModalOpen] = useState(false);
 
+// ה-State הזה יחזיק את הקומפוננטה שתרצה להציג כרגע במודל
+  const [modalContent, setModalContent] = useState<ReactNode | null>(null);
 
+  // פונקציית עזר לפתיחת המודל עם תוכן ספציפי
+  const openModalWith = (content: ReactNode) => {
+    setModalContent(content);
+    setIsModalOpen(true);
+  };
 
+  // פונקציה לסגירת המודל ואיפוס התוכן
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setModalContent(null);
+  };
 
 
 
@@ -234,6 +254,7 @@ const crmText = [
 
   <button
     type="button"
+    onClick={() => openModalWith(<ReverseMortgageCalculator />)}
     className="
       px-2.5 py-1
       rounded-lg
@@ -254,6 +275,8 @@ const crmText = [
 
   <button
     type="button"
+    
+    
     className="
       px-2.5 py-1
       rounded-lg
@@ -678,7 +701,10 @@ const crmText = [
         onClose={() => setIsOpen(false)}
       />
 
-
+      {/* שימוש במודל הכללי */}
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
+        <ReverseMortgageCalculator />
+      </Modal>
 
 
 
