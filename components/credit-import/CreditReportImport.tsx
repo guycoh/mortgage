@@ -1,9 +1,26 @@
 "use client";
 
-// Compact drag-and-drop for the Israeli "דוח ריכוז נתונים" (Credit Data System
-// report). Parses the PDF entirely in the browser, streams the extracted loans
-// & mortgages into the consolidation calculator on /aa4, and opens a side panel
-// with the full report as organized JSON.
+// Universal, reusable credit-report import control.
+//
+// Drop-in for ANY calculator on the site: it drag-drops + parses an Israeli
+// "דוח ריכוז נתונים" (Credit Data System report) entirely in the browser, lets
+// the user pick which debts to use, and hands the selected loans back through
+// `onSelect` — the host maps them to whatever shape its calculator needs. It
+// also exposes the full parsed report and an organized JSON side panel.
+//
+// Example (loan-consolidation calculator):
+//   <CreditReportImport
+//     onSelect={(loans) => setRows(loans.map(toLoanRows))}
+//     onImported={highlightCalculator}
+//   />
+//
+// Example (a "total exposure" widget — take everything, no list, no JSON):
+//   <CreditReportImport
+//     candidateFilter={() => true}
+//     showCandidates={false}
+//     showJsonPanel={false}
+//     onSelect={(loans) => setTotal(loans.reduce((s, l) => s + l.balance, 0))}
+//   />
 
 import { useCallback, useRef, useState } from "react";
 import {
@@ -19,27 +36,53 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { parsePdfFile } from "@/lib/credit-parser/extract.client";
-import {
-  extractLoans,
-  toLoanRows,
-  type ExtractedLoan,
-  type LoanRow,
-} from "@/lib/credit-parser/loan-mapping";
+import { extractLoans, type ExtractedLoan } from "@/lib/credit-parser/loan-mapping";
 import type { CreditReport } from "@/lib/credit-parser/types";
 import ReportJsonPanel from "./ReportJsonPanel";
 
 type Status = "idle" | "loading" | "done" | "error";
 
-interface Props {
-  /** Rows to load into the "הלוואות קיימות" calculator (active loans & mortgages). */
-  onImport: (rows: LoanRow[]) => void;
-  /** Fired once after a successful import (e.g. to scroll/highlight). */
-  onImported?: () => void;
+export interface CreditReportImportProps {
+  /** Fires with the currently-selected loans (on parse and on every toggle). */
+  onSelect?: (loans: ExtractedLoan[], report: CreditReport) => void;
+  /** Fires once after each successful parse, with the full report. */
+  onImported?: (report: CreditReport) => void;
+  /** Which extracted debts appear in the selectable list. Default: loans & mortgages. */
+  candidateFilter?: (loan: ExtractedLoan) => boolean;
+  /** Which candidates are pre-checked. Default: the client's own active loans & mortgages. */
+  isDefaultSelected?: (loan: ExtractedLoan) => boolean;
+  /** Show the collapsible full-report JSON side panel. Default true. */
+  showJsonPanel?: boolean;
+  /** Auto-open the JSON panel after a successful parse. Default true. */
+  autoOpenJson?: boolean;
+  /** Show the checkbox candidate list. Default true. */
+  showCandidates?: boolean;
+  /** Side the JSON panel slides in from. Default "left". */
+  jsonSide?: "left" | "right";
+  /** Dropzone headline / subtitle overrides. */
+  title?: string;
+  hint?: string;
+  /** Extra classes for the outer wrapper. */
+  className?: string;
 }
 
 const shekel = (n: number) => `${Math.round(n).toLocaleString("en-US")} ₪`;
+const defaultCandidate = (l: ExtractedLoan) => l.isLoanOrMortgage;
+const defaultSelected = (l: ExtractedLoan) => l.defaultInclude;
 
-export default function CreditReportDropzone({ onImport, onImported }: Props) {
+export default function CreditReportImport({
+  onSelect,
+  onImported,
+  candidateFilter = defaultCandidate,
+  isDefaultSelected = defaultSelected,
+  showJsonPanel = true,
+  autoOpenJson = true,
+  showCandidates = true,
+  jsonSide = "left",
+  title,
+  hint,
+  className,
+}: CreditReportImportProps) {
   const [status, setStatus] = useState<Status>("idle");
   const [drag, setDrag] = useState(false);
   const [error, setError] = useState("");
@@ -51,10 +94,10 @@ export default function CreditReportDropzone({ onImport, onImported }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const emit = useCallback(
-    (all: ExtractedLoan[], sel: Set<string>) => {
-      onImport(toLoanRows(all.filter((l) => sel.has(l.uid))));
+    (all: ExtractedLoan[], sel: Set<string>, rep: CreditReport) => {
+      onSelect?.(all.filter((l) => sel.has(l.uid)), rep);
     },
-    [onImport]
+    [onSelect]
   );
 
   const handleFile = useCallback(
@@ -71,28 +114,31 @@ export default function CreditReportDropzone({ onImport, onImported }: Props) {
       try {
         const parsed = await parsePdfFile(file);
         const all = extractLoans(parsed);
-        const sel = new Set(all.filter((l) => l.defaultInclude).map((l) => l.uid));
+        const sel = new Set(
+          all.filter((l) => candidateFilter(l) && isDefaultSelected(l)).map((l) => l.uid)
+        );
         setReport(parsed);
         setLoans(all);
         setSelected(sel);
         setStatus("done");
-        emit(all, sel);
-        onImported?.();
-        setJsonOpen(true); // pop the full-report panel open
+        emit(all, sel, parsed);
+        onImported?.(parsed);
+        if (showJsonPanel && autoOpenJson) setJsonOpen(true);
       } catch (e) {
         setStatus("error");
         setError((e as Error).message || "לא ניתן לקרוא את הקובץ.");
       }
     },
-    [emit, onImported]
+    [candidateFilter, isDefaultSelected, emit, onImported, showJsonPanel, autoOpenJson]
   );
 
   const toggle = (uid: string) => {
+    if (!report) return;
     const next = new Set(selected);
     if (next.has(uid)) next.delete(uid);
     else next.add(uid);
     setSelected(next);
-    emit(loans, next);
+    emit(loans, next, report);
   };
 
   const reset = () => {
@@ -103,21 +149,26 @@ export default function CreditReportDropzone({ onImport, onImported }: Props) {
     setSelected(new Set());
     setReport(null);
     setJsonOpen(false);
-    onImport([]);
+    onSelect?.([], report as CreditReport);
     if (inputRef.current) inputRef.current.value = "";
   };
 
-  // Only real loans & mortgages are candidates for the calculator; revolving
-  // facilities / overdrafts / guarantees stay in the JSON panel only.
-  const candidates = loans.filter((l) => l.isLoanOrMortgage);
+  const candidates = loans.filter(candidateFilter);
   const chosen = candidates.filter((l) => selected.has(l.uid));
   const totalBalance = chosen.reduce((s, l) => s + l.balance, 0);
 
   // ---- success / results panel -------------------------------------------
   if (status === "done") {
     return (
-      <>
-        <ReportJsonPanel report={report} open={jsonOpen} onClose={() => setJsonOpen(false)} />
+      <div className={className}>
+        {showJsonPanel && (
+          <ReportJsonPanel
+            report={report}
+            open={jsonOpen}
+            onClose={() => setJsonOpen(false)}
+            side={jsonSide}
+          />
+        )}
 
         <div className="animate-fade-in-up rounded-2xl border border-emerald-200 bg-gradient-to-l from-emerald-50/60 to-white p-3 shadow-sm">
           <div className="flex items-center justify-between gap-2">
@@ -136,13 +187,15 @@ export default function CreditReportDropzone({ onImport, onImported }: Props) {
               </div>
             </div>
             <div className="flex shrink-0 items-center gap-1.5">
-              <button
-                onClick={() => setJsonOpen(true)}
-                className="flex items-center gap-1 rounded-lg bg-[#1d75a1] px-2.5 py-1.5 text-[11px] font-semibold text-white shadow-sm transition hover:bg-[#155f84]"
-              >
-                <FileJson className="size-3.5" />
-                נתוני הדוח
-              </button>
+              {showJsonPanel && (
+                <button
+                  onClick={() => setJsonOpen(true)}
+                  className="flex items-center gap-1 rounded-lg bg-[#1d75a1] px-2.5 py-1.5 text-[11px] font-semibold text-white shadow-sm transition hover:bg-[#155f84]"
+                >
+                  <FileJson className="size-3.5" />
+                  נתוני הדוח
+                </button>
+              )}
               <button
                 onClick={reset}
                 className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-slate-600 transition hover:bg-slate-50"
@@ -153,7 +206,7 @@ export default function CreditReportDropzone({ onImport, onImported }: Props) {
             </div>
           </div>
 
-          {candidates.length > 0 && (
+          {showCandidates && candidates.length > 0 && (
             <div className="mt-3 overflow-hidden rounded-xl border border-slate-200 bg-white">
               <div className="border-b border-slate-100 bg-slate-50 px-3 py-1.5 text-[11px] font-semibold text-slate-500">
                 הלוואות ומשכנתאות פעילות — סמנו מה להזרים למחשבון
@@ -211,19 +264,20 @@ export default function CreditReportDropzone({ onImport, onImported }: Props) {
             </div>
           )}
 
-          {chosen.length === 0 && candidates.length > 0 && (
+          {showCandidates && chosen.length === 0 && candidates.length > 0 && (
             <div className="mt-2 text-center text-[11px] text-slate-400">
-              לא נבחרו חובות — טבלת ההלוואות רוקנה.
+              לא נבחרו חובות — הבחירה רוקנה.
             </div>
           )}
 
-          {candidates.length === 0 && (
+          {showCandidates && candidates.length === 0 && (
             <div className="mt-2 text-center text-[11px] text-slate-400">
-              לא נמצאו הלוואות או משכנתאות פעילות בדוח. פתחו את «נתוני הדוח» לפירוט המלא.
+              לא נמצאו הלוואות או משכנתאות פעילות בדוח.
+              {showJsonPanel && " פתחו את «נתוני הדוח» לפירוט המלא."}
             </div>
           )}
         </div>
-      </>
+      </div>
     );
   }
 
@@ -249,7 +303,8 @@ export default function CreditReportDropzone({ onImport, onImported }: Props) {
           : status === "error"
           ? "border-red-200 bg-red-50/40"
           : "border-slate-300 bg-white hover:border-[#1d75a1]/50 hover:bg-slate-50/60",
-        loading && "pointer-events-none"
+        loading && "pointer-events-none",
+        className
       )}
     >
       <input
@@ -285,14 +340,14 @@ export default function CreditReportDropzone({ onImport, onImported }: Props) {
             ? "מנתח את הדוח…"
             : status === "error"
             ? "לא הצלחנו לקרוא את הדוח"
-            : "גררו לכאן דוח ריכוז נתונים"}
+            : title ?? "גררו לכאן דוח ריכוז נתונים"}
         </div>
         <div className="truncate text-[11px] text-slate-400">
           {loading
-            ? "מחלץ הלוואות ומשכנתאות ומזרים למחשבון. רגע אחד."
+            ? "מחלץ הלוואות ומשכנתאות מהדוח. רגע אחד."
             : status === "error"
             ? error
-            : "PDF של מערכת נתוני אשראי — חילוץ אוטומטי של ההלוואות אל המחשבון."}
+            : hint ?? "PDF של מערכת נתוני אשראי — חילוץ אוטומטי של ההלוואות."}
         </div>
       </div>
 

@@ -3,8 +3,7 @@
 import { useRef, useState } from "react";
 import ExistingLoans, { Loan } from "./ExistingLoans";
 import InitialMixConsolidation, { InitialMixLoan } from "./InitialMixConsolidation";
-import CreditReportDropzone from "./CreditReportDropzone";
-import type { LoanRow } from "@/lib/credit-parser/loan-mapping";
+import { CreditReportImport, toLoanRows, type ExtractedLoan } from "@/components/credit-import";
 
 export default function FinancialForm() {
   // קוביה 1: נכסים ומשכנתאות
@@ -45,9 +44,10 @@ export default function FinancialForm() {
   const loansCardRef = useRef<HTMLDivElement>(null);
   const [flash, setFlash] = useState(false);
 
-  // Sync the loans table with the current selection (fires on import and on
-  // every toggle in the results panel) — data only, no viewport side-effects.
-  const handleImport = (rows: LoanRow[]) => {
+  // Map the selected report loans into this calculator's rows (fires on import
+  // and on every toggle) — data only, no viewport side-effects.
+  const handleSelect = (selected: ExtractedLoan[]) => {
+    const rows = toLoanRows(selected);
     setLoans(rows.length ? rows : [{ balance: "", interest: "", months: "" }]);
   };
 
@@ -115,8 +115,8 @@ export default function FinancialForm() {
 
       {/* ייבוא אוטומטי מדוח ריכוז נתונים (מערכת נתוני אשראי) */}
       <div className="mb-4">
-        <CreditReportDropzone
-          onImport={handleImport}
+        <CreditReportImport
+          onSelect={handleSelect}
           onImported={handleImported}
         />
       </div>

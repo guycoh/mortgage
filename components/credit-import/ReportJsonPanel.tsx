@@ -1,7 +1,8 @@
 "use client";
 
-// Slide-in side panel showing the full extracted credit report as an organized,
-// collapsible JSON tree (react-json-view-lite) with copy / download.
+// Slide-in side panel showing a full extracted credit report as an organized,
+// collapsible JSON tree (react-json-view-lite) with expand/collapse-all, copy
+// and download. Generic — usable anywhere a CreditReport needs to be inspected.
 
 import { useMemo, useState } from "react";
 import { JsonView, defaultStyles, allExpanded } from "react-json-view-lite";
@@ -13,9 +14,10 @@ interface Props {
   report: CreditReport | null;
   open: boolean;
   onClose: () => void;
+  side?: "left" | "right";
 }
 
-export default function ReportJsonPanel({ report, open, onClose }: Props) {
+export default function ReportJsonPanel({ report, open, onClose, side = "left" }: Props) {
   const [expandAll, setExpandAll] = useState(false);
   const pretty = useMemo(
     () => (report ? JSON.stringify(report, null, 2) : ""),
@@ -44,6 +46,10 @@ export default function ReportJsonPanel({ report, open, onClose }: Props) {
     </div>
   );
 
+  const onLeft = side === "left";
+  const edge = onLeft ? "left-0" : "right-0";
+  const hidden = onLeft ? "-translate-x-full" : "translate-x-full";
+
   return (
     <>
       {/* backdrop */}
@@ -54,11 +60,11 @@ export default function ReportJsonPanel({ report, open, onClose }: Props) {
         }`}
       />
 
-      {/* drawer (slides in from the left edge) */}
+      {/* drawer */}
       <aside
         dir="rtl"
-        className={`fixed inset-y-0 left-0 z-50 flex w-[min(92vw,460px)] flex-col bg-slate-50 shadow-2xl transition-transform duration-300 ease-out ${
-          open ? "translate-x-0" : "-translate-x-full"
+        className={`fixed inset-y-0 ${edge} z-50 flex w-[min(92vw,460px)] flex-col bg-slate-50 shadow-2xl transition-transform duration-300 ease-out ${
+          open ? "translate-x-0" : hidden
         }`}
       >
         {/* header */}
