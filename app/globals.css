@@ -166,6 +166,19 @@
   scrollbar-width:none;
 }
 
+/* Compact styling for the credit-report JSON tree (react-json-view-lite) */
+.cdv-json {
+  font-size: 11.5px;
+  line-height: 1.55;
+}
+.cdv-json ul {
+  padding-inline-start: 14px !important;
+}
+.cdv-json [class*="punctuation"],
+.cdv-json [class*="Punctuation"] {
+  color: #94a3b8;
+}
+
 
 
 
