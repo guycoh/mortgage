@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import ExistingLoans, { Loan } from "./ExistingLoans";
 import InitialMixConsolidation, { InitialMixLoan } from "./InitialMixConsolidation";
 import { CreditReportImport, toLoanRows, type ExtractedLoan } from "@/components/credit-import";
+import { shortBank } from "./debtTags";
 
 interface PropertyRow {
   assetValue: number;
@@ -66,6 +67,24 @@ export default function FinancialForm() {
     const rows = toLoanRows(selected);
     setLoans(rows.length ? rows : [{ balance: "", interest: "", months: "" }]);
   };
+
+  // חובות שאינם הלוואה/משכנתה (מסגרות אשראי, עו״ש וכו׳) — לתצוגה וסיכום
+  const [otherDebts, setOtherDebts] = useState<ExtractedLoan[]>([]);
+
+  // כל החובות שחולצו: סוכם את המשכנתאות אל נכס 1 ומרכז את יתר החובות
+  const handleExtract = (all: ExtractedLoan[]) => {
+    const mortgageSum = all
+      .filter((l) => l.isMortgage)
+      .reduce((sum, l) => sum + l.balance, 0);
+    setOtherDebts(all.filter((l) => !l.isLoanOrMortgage));
+    setProperties((prev) => {
+      const copy = [...prev];
+      copy[0] = { ...copy[0], mortgageValue: mortgageSum };
+      return copy;
+    });
+  };
+
+  const otherDebtsTotal = otherDebts.reduce((sum, l) => sum + l.balance, 0);
 
   const handleImported = () => {
     setFlash(true);
@@ -142,7 +161,12 @@ export default function FinancialForm() {
 
       {/* ייבוא אוטומטי מדוח ריכוז נתונים */}
       <div className="mb-4">
-        <CreditReportImport onSelect={handleSelect} onImported={handleImported} />
+        <CreditReportImport
+          onSelect={handleSelect}
+          onExtract={handleExtract}
+          onImported={handleImported}
+          autoOpenJson={false}
+        />
       </div>
 
       <div className="flex flex-col gap-4">
@@ -353,10 +377,36 @@ export default function FinancialForm() {
                   </div>
                 </div>
 
-                {/* מקום לחישובים עתידיים */}
-                <div className="text-xs text-gray-400 italic text-center p-3 border border-dashed border-gray-200 rounded mt-2">
-                  מקום לחישובים נוספים...
-                </div>
+                {/* חובות נוספים (לא הלוואה/משכנתה) — מסגרות אשראי, עו״ש וכו׳ */}
+                {otherDebts.length > 0 ? (
+                  <div className="bg-amber-50/50 p-3 rounded border border-amber-100 mt-2">
+                    <div className="flex items-center justify-between">
+                      <span className="block text-xs text-amber-800 font-medium">
+                        חובות נוספים <span className="text-amber-500">({otherDebts.length})</span>
+                      </span>
+                      <span className="text-[10px] text-amber-500">מסגרות / עו״ש</span>
+                    </div>
+                    <span className="text-lg font-bold text-amber-700 mt-0.5 block">
+                      {otherDebtsTotal.toLocaleString()} ₪
+                    </span>
+                    <div className="mt-1.5 pt-1.5 border-t border-amber-200/60 space-y-1 max-h-28 overflow-y-auto">
+                      {otherDebts.map((d) => (
+                        <div key={d.uid} className="flex items-center justify-between gap-2 text-[11px]">
+                          <span className="truncate text-amber-900/70" title={`${d.source} · ${d.type}`}>
+                            {shortBank(d.source)}
+                          </span>
+                          <span className="shrink-0 font-semibold text-amber-800">
+                            {d.balance.toLocaleString()} ₪
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-xs text-gray-400 italic text-center p-3 border border-dashed border-gray-200 rounded mt-2">
+                    מקום לחישובים נוספים...
+                  </div>
+                )}
               </div>
             </div>
           </div>
