@@ -1,8 +1,9 @@
 "use client"
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import ExistingLoans, { Loan } from "./ExistingLoans";
 import InitialMixConsolidation, { InitialMixLoan } from "./InitialMixConsolidation";
+import { CreditReportImport, toLoanRows, type ExtractedLoan } from "@/components/credit-import";
 
 export default function FinancialForm() {
   // קוביה 1: נכסים ומשכנתאות
@@ -37,6 +38,27 @@ export default function FinancialForm() {
 
   const addLoan = () => {
     setLoans([...loans, { balance: "", interest: "", months: "" }]);
+  };
+
+  // --- ייבוא אוטומטי מדוח ריכוז נתונים ---
+  const loansCardRef = useRef<HTMLDivElement>(null);
+  const [flash, setFlash] = useState(false);
+
+  // Map the selected report loans into this calculator's rows (fires on import
+  // and on every toggle) — data only, no viewport side-effects.
+  const handleSelect = (selected: ExtractedLoan[]) => {
+    const rows = toLoanRows(selected);
+    setLoans(rows.length ? rows : [{ balance: "", interest: "", months: "" }]);
+  };
+
+  // Fires once per successful parse: draw attention to the calculator.
+  const handleImported = () => {
+    setFlash(true);
+    setTimeout(
+      () => loansCardRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }),
+      60
+    );
+    setTimeout(() => setFlash(false), 1800);
   };
 
 
@@ -90,6 +112,14 @@ export default function FinancialForm() {
   return (
     <div className="w-full max-w-5xl mx-auto p-2 md:p-4" dir="rtl">
       <h2 className="text-xl font-bold text-[#1d75a1] mb-4 border-b pb-1.5">טופס איחוד הלוואות</h2>
+
+      {/* ייבוא אוטומטי מדוח ריכוז נתונים (מערכת נתוני אשראי) */}
+      <div className="mb-4">
+        <CreditReportImport
+          onSelect={handleSelect}
+          onImported={handleImported}
+        />
+      </div>
 
       <div className="flex flex-col gap-4">
         
@@ -227,7 +257,14 @@ export default function FinancialForm() {
 
         {/* קוביות ההלוואות והתמהיל - חצי מסך לכל אחת בדסקטופ */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
+          <div
+            ref={loansCardRef}
+            className={`bg-white p-4 rounded-lg shadow-sm border transition-all duration-500 ${
+              flash
+                ? "border-[#1d75a1] ring-4 ring-[#1d75a1]/15"
+                : "border-gray-100"
+            }`}
+          >
             <ExistingLoans
               loans={loans}
               onUpdateLoan={updateLoan}
