@@ -4,10 +4,58 @@
 export function shortBank(name?: string): string {
   if (!name) return "";
   return name
+    .replace(/בנק/g, "")
     .replace(/בע["״׳']?מ/g, "")
     .replace(/לישראל/g, "")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+// --- Bank branding: a colored monogram mark per reporting institution. ---
+// Colors approximate each brand's identity so banks are distinguishable at a
+// glance; the badge carries the initial, the row still shows the full name.
+export interface BankBrand {
+  color: string;
+  initial: string;
+}
+
+const BANK_BRANDS: { test: RegExp; color: string; initial: string }[] = [
+  { test: /לאומי/, color: "#0c4a8b", initial: "ל" },        // Leumi navy
+  { test: /פועלים/, color: "#c8102e", initial: "פ" },        // Hapoalim red
+  { test: /מזרחי|טפחות/, color: "#c56a12", initial: "מ" },   // Mizrahi-Tefahot
+  { test: /דיסקונט/, color: "#0a7d3b", initial: "ד" },       // Discount green
+  { test: /מרכנתיל/, color: "#0a7d3b", initial: "מר" },
+  { test: /בינלאומי/, color: "#12579e", initial: "ב" },      // FIBI
+  { test: /ירושלים/, color: "#8a6d1f", initial: "י" },
+  { test: /יהב/, color: "#1a7a3f", initial: "יה" },
+  { test: /איגוד/, color: "#00477d", initial: "א" },
+  { test: /ישראכרט|isracard/i, color: "#c8102e", initial: "יש" },
+  { test: /כאל|cal|ויזה/i, color: "#0b5fa5", initial: "כ" },
+  { test: /\bמקס\b|max/i, color: "#cc0070", initial: "מ" },
+  { test: /טריא|triya/i, color: "#5b4bd6", initial: "ט" },
+  { test: /אמריקן|amex|אמקס/i, color: "#1f6fb2", initial: "A" },
+  { test: /כרטיסי אשראי|אשראי/, color: "#4f57a6", initial: "כ" },
+];
+
+export function bankBrand(source?: string): BankBrand {
+  const s = source || "";
+  const hit = BANK_BRANDS.find((b) => b.test.test(s));
+  if (hit) return { color: hit.color, initial: hit.initial };
+  const first = s.replace(/^בנק\s*/, "").trim().charAt(0) || "?";
+  return { color: "#5f7883", initial: first };
+}
+
+// --- Debt category (mortgage vs plain loan) visual encoding. ---
+export interface CatMeta {
+  color: string;
+  tint: string;
+  label: string;
+}
+export function catMeta(kind: "mortgage" | "loan" | undefined, typeLabel?: string): CatMeta {
+  if (kind === "mortgage") {
+    return { color: "var(--brand)", tint: "var(--brand-tint)", label: typeLabel || "משכנתה" };
+  }
+  return { color: "var(--cat-loan)", tint: "var(--cat-loan-tint)", label: typeLabel || "הלוואה" };
 }
 
 export interface TagColor {

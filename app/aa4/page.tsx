@@ -1,900 +1,159 @@
-"use client"
+"use client";
 
 import { useRef, useState } from "react";
-import ExistingLoans, { Loan } from "./ExistingLoans";
-import InitialMixConsolidation, { InitialMixLoan } from "./InitialMixConsolidation";
-import { CreditReportImport, toLoanRows, type ExtractedLoan } from "@/components/credit-import";
-import { shortBank } from "./debtTags";
+import { Lock } from "@phosphor-icons/react";
+import { toLoanRows, type ExtractedLoan } from "@/components/credit-import";
 
-interface PropertyRow {
-  assetValue: number;
-  mortgageValue: number;
-}
+// Self-hosted fonts (no runtime Google fetch, sans/mono fallbacks -> never Times).
+import "@fontsource/ibm-plex-sans-hebrew/400.css";
+import "@fontsource/ibm-plex-sans-hebrew/500.css";
+import "@fontsource/ibm-plex-sans-hebrew/600.css";
+import "@fontsource/ibm-plex-sans-hebrew/700.css";
+import "@fontsource/ibm-plex-mono/400.css";
+import "@fontsource/ibm-plex-mono/500.css";
+import "@fontsource/ibm-plex-mono/600.css";
+import "./aa4-theme.css";
 
-export default function FinancialForm() {
-  // קוביה 1 דינמית: מערך נכסים ומשכנתאות משולב
-  const [properties, setProperties] = useState<PropertyRow[]>([
-    { assetValue: 0, mortgageValue: 0 }
-  ]);
+import ImportBar from "./components/ImportBar";
+import ResultHero from "./components/ResultHero";
+import { AssetsCard, IncomeCard, SummaryRail, type PropertyRow } from "./components/InputCards";
+import { LoanLedger, MixLedger, type LoanRow, type MixRow } from "./components/Ledger";
+import { monthlyPayment, parseNum } from "./lib/calc";
 
-  // קוביה 2: הכנסות
+// Stable row ids so Framer layout/AnimatePresence track the correct row across
+// middle-of-list deletes (array-index keys misattribute the animation).
+let rowSeq = 0;
+const nid = () => `row_${++rowSeq}`;
+
+export default function ConsolidationSimulator() {
+  /* ---- assets / mortgages ------------------------------------------------ */
+  const [properties, setProperties] = useState<PropertyRow[]>([{ _id: nid(), assetValue: 0, mortgageValue: 0 }]);
+  const totalAssets = properties.reduce((s, p) => s + p.assetValue, 0);
+  const totalMortgages = properties.reduce((s, p) => s + p.mortgageValue, 0);
+
+  const updateProperty = (i: number, field: keyof PropertyRow, value: number) =>
+    setProperties((prev) => prev.map((p, idx) => (idx === i ? { ...p, [field]: value } : p)));
+  const addProperty = () => setProperties((prev) => [...prev, { _id: nid(), assetValue: 0, mortgageValue: 0 }]);
+  const deleteProperty = (i: number) =>
+    setProperties((prev) => (prev.length === 1 ? prev : prev.filter((_, idx) => idx !== i)));
+
+  /* ---- income / ages ----------------------------------------------------- */
   const [incomes, setIncomes] = useState({ primary: 0, secondary: 0, guarantor: 0 });
+  const [ages, setAges] = useState({ primary: "", secondary: "", guarantor: "" });
+  const totalIncome = incomes.primary + incomes.secondary + incomes.guarantor * 0.5;
 
-  const [ages, setAges] = useState({
-    primary: "",
-    secondary: "",
-    guarantor: "",
-  });
+  /* ---- existing loans ---------------------------------------------------- */
+  const [loans, setLoans] = useState<LoanRow[]>([{ _id: nid(), balance: "", interest: "", months: "" }]);
+  const updateLoan = (i: number, key: keyof LoanRow, value: string) =>
+    setLoans((prev) => prev.map((l, idx) => (idx === i ? { ...l, [key]: value } : l)));
+  const addLoan = () => setLoans((prev) => [...prev, { _id: nid(), balance: "", interest: "", months: "" }]);
+  const deleteLoan = (i: number) =>
+    setLoans((prev) => (prev.length === 1 ? prev : prev.filter((_, idx) => idx !== i)));
 
-  // חישובים אוטומטיים דינמיים - קוביה 1
-  const totalAssets = properties.reduce((sum, item) => sum + item.assetValue, 0);
-  const totalMortgages = properties.reduce((sum, item) => sum + item.mortgageValue, 0);
+  /* ---- new mix ----------------------------------------------------------- */
+  const [mixLoans, setMixLoans] = useState<MixRow[]>([{ _id: nid(), balance: "", interest: "", months: "", type: "" }]);
+  const updateMix = (i: number, key: keyof MixRow, value: string) =>
+    setMixLoans((prev) => prev.map((l, idx) => (idx === i ? { ...l, [key]: value } : l)));
+  const addMix = () => setMixLoans((prev) => [...prev, { _id: nid(), balance: "", interest: "", months: "", type: "" }]);
+  const deleteMix = (i: number) =>
+    setMixLoans((prev) => (prev.length === 1 ? prev : prev.filter((_, idx) => idx !== i)));
 
-  // חישובים אוטומטיים - קוביה 2 (ערב נחשב 50%)
-  const totalIncome = incomes.primary + incomes.secondary + (incomes.guarantor * 0.5);
-
-  // --- ניהול הלוואות קיימות ---
-  const [loans, setLoans] = useState<Loan[]>([
-    { balance: "", interest: "", months: "" }
-  ]);
-
-  const formatThousands = (value: number | string) => {
-    if (value === "" || value === undefined || value === null) return "";
-    const num = Number(String(value).replace(/,/g, ""));
-    return isNaN(num) ? "" : num.toLocaleString("he-IL");
-  };
-
-  const updateLoan = (i: number, key: keyof Loan, value: string) => {
-    const copy = [...loans];
-    copy[i] = { ...copy[i], [key]: value };
-    setLoans(copy);
-  };
-
-  const deleteLoan = (i: number) => {
-    if (loans.length === 1) return;
-    setLoans(loans.filter((_, index) => index !== i));
-  };
-
-  const addLoan = () => {
-    setLoans([...loans, { balance: "", interest: "", months: "" }]);
-  };
-
-  // --- ייבוא אוטומטי מדוח ריכוז נתונים ---
+  /* ---- credit-report import --------------------------------------------- */
+  const [otherDebts, setOtherDebts] = useState<ExtractedLoan[]>([]);
+  const otherDebtsTotal = otherDebts.reduce((s, l) => s + l.balance, 0);
   const loansCardRef = useRef<HTMLDivElement>(null);
   const [flash, setFlash] = useState(false);
 
   const handleSelect = (selected: ExtractedLoan[]) => {
-    const rows = toLoanRows(selected);
-    setLoans(rows.length ? rows : [{ balance: "", interest: "", months: "" }]);
+    const rows = toLoanRows(selected).map((r) => ({ ...r, _id: nid() }));
+    setLoans(rows.length ? rows : [{ _id: nid(), balance: "", interest: "", months: "" }]);
   };
 
-  // חובות שאינם הלוואה/משכנתה (מסגרות אשראי, עו״ש וכו׳) — לתצוגה וסיכום
-  const [otherDebts, setOtherDebts] = useState<ExtractedLoan[]>([]);
-
-  // כל החובות שחולצו: סוכם את המשכנתאות אל נכס 1 ומרכז את יתר החובות
   const handleExtract = (all: ExtractedLoan[]) => {
-    const mortgageSum = all
-      .filter((l) => l.isMortgage)
-      .reduce((sum, l) => sum + l.balance, 0);
+    const mortgageSum = all.filter((l) => l.isMortgage).reduce((s, l) => s + l.balance, 0);
     setOtherDebts(all.filter((l) => !l.isLoanOrMortgage));
-    setProperties((prev) => {
-      const copy = [...prev];
-      copy[0] = { ...copy[0], mortgageValue: mortgageSum };
-      return copy;
-    });
+    setProperties((prev) => prev.map((p, idx) => (idx === 0 ? { ...p, mortgageValue: mortgageSum } : p)));
   };
-
-  const otherDebtsTotal = otherDebts.reduce((sum, l) => sum + l.balance, 0);
 
   const handleImported = () => {
     setFlash(true);
-    setTimeout(
-      () => loansCardRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }),
-      60
-    );
-    setTimeout(() => setFlash(false), 1800);
+    setTimeout(() => loansCardRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 80);
+    setTimeout(() => setFlash(false), 2000);
   };
 
-  // --- ניהול תמהיל ראשוני חדש ---
-  const [mixLoans, setMixLoans] = useState<InitialMixLoan[]>([
-    { balance: "", interest: "", months: "", type: "" }
-  ]);
-
-  const updateMixLoan = (i: number, key: keyof InitialMixLoan, value: string) => {
-    const copy = [...mixLoans];
-    copy[i] = { ...copy[i], [key]: value };
-    setMixLoans(copy);
-  };
-
-  const deleteMixLoan = (i: number) => {
-    if (mixLoans.length === 1) return;
-    setMixLoans(mixLoans.filter((_, index) => index !== i));
-  };
-
-  const addMixLoan = () => {
-    setMixLoans([...mixLoans, { balance: "", interest: "", months: "", type: "" }]);
-  };
-
-  // --- פונקציות עזר כלליות ---
-  const format = (v: string) =>
-    v.replace(/\D/g, "").replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-
-  const parse = (v: string) => Number(v.replace(/,/g, "") || 0);
-
-  const calcPayment = (balance: string, interest: string, months: string) => {
-    const amount = parse(balance);
-    const r = parseFloat(interest) / 100 / 12;
-    const m = Number(months);
-    if (!amount || !m || !r) return 0;
-    return amount * (r / (1 - Math.pow(1 + r, -m)));
-  };
-
-  // פונקציות לניהול טבלת הנכסים הדינמית
-  const handlePropertyChange = (index: number, field: keyof PropertyRow, value: string) => {
-    const numericValue = Number(value.replace(/[^\d]/g, "")) || 0;
-    const updated = [...properties];
-    updated[index] = { ...updated[index], [field]: numericValue };
-    setProperties(updated);
-  };
-
-  const addPropertyRow = () => {
-    setProperties([...properties, { assetValue: 0, mortgageValue: 0 }]);
-  };
-
-  const deletePropertyRow = (index: number) => {
-    if (properties.length === 1) return;
-    setProperties(properties.filter((_, i) => i !== index));
-  };
-
-  const handleAgeChange = (field: "primary" | "secondary" | "guarantor", value: string) => {
-    setAges((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const handleIncomeChange = (field: "primary" | "secondary" | "guarantor", value: string) => {
-    const numericValue = Number(value.replace(/[^\d]/g, ""));
-    setIncomes((prev) => ({ ...prev, [field]: numericValue }));
-  };
+  /* ---- derived headline figures ----------------------------------------- */
+  const existingPayment = loans.reduce((s, l) => s + monthlyPayment(l.balance, l.interest, l.months), 0);
+  const mixBalance = mixLoans.reduce((s, l) => s + parseNum(l.balance), 0);
+  const mixPayment = mixLoans.reduce((s, l) => s + monthlyPayment(l.balance, l.interest, l.months), 0);
 
   return (
-    <div className="w-full max-w-5xl mx-auto p-2 md:p-4" dir="rtl">
-      <h2 className="text-3xl font-bold text-[#1d75a1] mb-4 border-b pb-1.5">סימולטור איחוד הלוואות</h2>
-
-      {/* ייבוא אוטומטי מדוח ריכוז נתונים */}
-      <div className="mb-4">
-        <CreditReportImport
-          onSelect={handleSelect}
-          onExtract={handleExtract}
-          onImported={handleImported}
-          autoOpenJson={false}
-        />
-      </div>
-
-      <div className="flex flex-col gap-4">
-        
-        {/* חלק עליון: חלוקת 3/4 ו-1/4 */}
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-          
-          {/* צד ימין (3/4 מהמסך) */}
-          <div className="lg:col-span-3 flex flex-col gap-4">
-            
-            {/* קוביה 1: טבלת נכסים ומשכנתאות דינמית */}
-            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
-              <div className="flex justify-between items-center mb-3 pb-1 border-b border-gray-100">
-                <h3 className="text-base font-semibold text-gray-800">
-                   שווי נכסים ויתרות משכנתא
-                </h3>
-                <button
-                  type="button"
-                  onClick={addPropertyRow}
-                  className="text-xs font-semibold text-[#1d75a1] hover:text-[#155b7f] transition flex items-center gap-1 bg-blue-50 px-2 py-1 rounded border border-blue-200"
-                >
-                  <span>+ הוספת נכס</span>
-                </button>
-              </div>
-              
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm border-collapse">
-                  <thead>
-                    <tr className="border-b border-gray-200 text-gray-500 bg-gray-50/50">
-                      <th className="text-right p-2 font-medium text-xs w-12">#</th>
-                      <th className="text-right p-2 font-medium text-xs">שווי נכס</th>
-                      <th className="text-right p-2 font-medium text-xs">יתרת משכנתא קיימת</th>
-                      <th className="p-2 w-10"></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {properties.map((row, index) => (
-                      <tr key={index} className="border-b border-gray-100 last:border-0 hover:bg-gray-50/30 transition">
-                        <td className="p-2 text-gray-400 font-medium text-xs vertical-middle align-middle pt-3">
-                          נכס {index + 1}
-                        </td>
-                        <td className="p-1">
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            placeholder="0"
-                            value={row.assetValue === 0 ? "" : row.assetValue.toLocaleString("he-IL")}
-                            onChange={(e) => handlePropertyChange(index, "assetValue", e.target.value)}
-                            className="w-full p-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-[#1d75a1] focus:border-transparent outline-none transition"
-                          />
-                        </td>
-                        <td className="p-1">
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            placeholder="0"
-                            value={row.mortgageValue === 0 ? "" : row.mortgageValue.toLocaleString("he-IL")}
-                            onChange={(e) => handlePropertyChange(index, "mortgageValue", e.target.value)}
-                            className="w-full p-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-[#1d75a1] focus:border-transparent outline-none transition"
-                          />
-                        </td>
-                        <td className="p-1 text-center align-middle">
-                          {properties.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => deletePropertyRow(index)}
-                              className="text-red-500 hover:text-red-700 transition font-bold p-1 text-base leading-none"
-                              title="מחיקת שורה"
-                            >
-                              ✕
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* קוביה 2: פרטים אישיים והכנסות */}
-            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 flex flex-col justify-between">
-              <div>
-                <h3 className="text-base font-semibold text-gray-800 mb-4 pb-1 border-b border-gray-100">
-                  פרטים אישיים והכנסות
-                </h3>
-
-                {/* גילאים */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">גיל בן זוג ראשי</label>
-                    <input
-                      type="number"
-                      min={18}
-                      max={100}
-                      placeholder="35"
-                      value={ages.primary}
-                      onChange={(e) => handleAgeChange("primary", e.target.value)}
-                      className="w-full p-2 text-sm border border-gray-300 rounded focus:bg-orange-50/50 focus:ring-2 focus:ring-orange-200 focus:border-orange-400 outline-none transition bg-white text-gray-900"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">גיל בן זוג משני</label>
-                    <input
-                      type="number"
-                      min={18}
-                      max={100}
-                      placeholder="35"
-                      value={ages.secondary}
-                      onChange={(e) => handleAgeChange("secondary", e.target.value)}
-                      className="w-full p-2 text-sm border border-gray-300 rounded focus:bg-orange-50/50 focus:ring-2 focus:ring-orange-200 focus:border-orange-400 outline-none transition bg-white text-gray-900"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">גיל ערב</label>
-                    <input
-                      type="number"
-                      min={18}
-                      max={100}
-                      placeholder="35"
-                      value={ages.guarantor}
-                      onChange={(e) => handleAgeChange("guarantor", e.target.value)}
-                      className="w-full p-2 text-sm border border-gray-300 rounded focus:bg-orange-50/50 focus:ring-2 focus:ring-orange-200 focus:border-orange-400 outline-none transition bg-white text-gray-900"
-                    />
-                  </div>
-                </div>
-
-                {/* הכנסות */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">הכנסות בן זוג ראשי</label>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      placeholder="0"
-                      value={formatThousands(incomes.primary)}
-                      onChange={(e) => handleIncomeChange("primary", e.target.value)}
-                      className="w-full p-2 text-sm border border-gray-300 rounded focus:bg-orange-50/50 focus:ring-2 focus:ring-orange-200 focus:border-orange-400 outline-none transition bg-white text-gray-900"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">הכנסות בן זוג משני</label>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      placeholder="0"
-                      value={formatThousands(incomes.secondary)}
-                      onChange={(e) => handleIncomeChange("secondary", e.target.value)}
-                      className="w-full p-2 text-sm border border-gray-300 rounded focus:bg-orange-50/50 focus:ring-2 focus:ring-orange-200 focus:border-orange-400 outline-none transition bg-white text-gray-900"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      הכנסות ערב <span className="text-gray-400 text-xs font-normal">(לפי 50%)</span>
-                    </label>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      placeholder="0"
-                      value={formatThousands(incomes.guarantor)}
-                      onChange={(e) => handleIncomeChange("guarantor", e.target.value)}
-                      className="w-full p-2 text-sm border border-gray-300 rounded focus:bg-orange-50/50 focus:ring-2 focus:ring-orange-200 focus:border-orange-400 outline-none transition bg-white text-gray-900"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-          </div>
-
-          {/* צד שמאל (1/4 מהמסך) - קוביה מאוחדת */}
-          <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 lg:col-span-1 flex flex-col justify-between">
+    <div className="aa4-root aa4-grain" dir="rtl">
+      <div className="relative z-[1] mx-auto w-full max-w-6xl px-4 py-6 md:px-6 md:py-9">
+        {/* header */}
+        <header className="mb-6 md:mb-7">
+          <div className="aa4-hairline mb-5" />
+          <div className="flex items-end justify-between gap-4">
             <div>
-              <h3 className="text-base font-semibold text-gray-800 mb-4 pb-1 border-b border-gray-100">
-                ריכוז נתונים וחישובים
-              </h3>
-              
-              <div className="flex flex-col gap-3">
-                {/* סה"כ שווי נכסים */}
-                <div className="bg-blue-50/50 p-3 rounded border border-blue-100 flex flex-col justify-center">
-                  <span className="block text-xs text-blue-700 font-medium">סה"כ שווי נכסים</span>
-                  <span className="text-lg font-bold text-[#1d75a1] mt-0.5">
-                    {totalAssets.toLocaleString()} ₪
-                  </span>
-                </div>
-
-                {/* סה"כ חובות משכנתא */}
-                <div className="bg-red-50/40 p-3 rounded border border-red-100 flex flex-col justify-center">
-                  <span className="block text-xs text-red-700 font-medium">סה"כ חובות משכנתא</span>
-                  <span className="text-lg font-bold text-red-600 mt-0.5">
-                    {totalMortgages.toLocaleString()} ₪
-                  </span>
-                </div>
-
-                {/* סה"כ הכנסה מוכרת */}
-                <div className="bg-emerald-50/60 p-3 rounded border border-emerald-100 flex flex-col justify-center">
-                  <span className="block text-xs text-emerald-800 font-medium">סה"כ הכנסה מוכרת</span>
-                  <span className="text-lg font-bold text-emerald-600 mt-0.5">
-                    {totalIncome.toLocaleString("he-IL")} ₪
-                  </span>
-                  
-                  {/* שדה מחושב בקטן: 40% יחס החזר מקסימלי */}
-                  <div className="mt-1.5 pt-1.5 border-t border-emerald-200/60 flex justify-between items-center text-[11px] text-emerald-700">
-                    <span>40% יחס החזר מקסימלי:</span>
-                    <span className="font-semibold">
-                      {((totalIncome || 0) * 0.4).toLocaleString("he-IL")} ₪
-                    </span>
-                  </div>
-                </div>
-
-                {/* חובות נוספים (לא הלוואה/משכנתה) — מסגרות אשראי, עו״ש וכו׳ */}
-                {otherDebts.length > 0 ? (
-                  <div className="bg-amber-50/50 p-3 rounded border border-amber-100 mt-2">
-                    <div className="flex items-center justify-between">
-                      <span className="block text-xs text-amber-800 font-medium">
-                        חובות נוספים <span className="text-amber-500">({otherDebts.length})</span>
-                      </span>
-                      <span className="text-[10px] text-amber-500">מסגרות / עו״ש</span>
-                    </div>
-                    <span className="text-lg font-bold text-amber-700 mt-0.5 block">
-                      {otherDebtsTotal.toLocaleString()} ₪
-                    </span>
-                    <div className="mt-1.5 pt-1.5 border-t border-amber-200/60 space-y-1 max-h-28 overflow-y-auto">
-                      {otherDebts.map((d) => (
-                        <div key={d.uid} className="flex items-center justify-between gap-2 text-[11px]">
-                          <span className="truncate text-amber-900/70" title={`${d.source} · ${d.type}`}>
-                            {shortBank(d.source)}
-                          </span>
-                          <span className="shrink-0 font-semibold text-amber-800">
-                            {d.balance.toLocaleString()} ₪
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-xs text-gray-400 italic text-center p-3 border border-dashed border-gray-200 rounded mt-2">
-                    מקום לחישובים נוספים...
-                  </div>
-                )}
-              </div>
+              <span className="aa4-kicker">מחשבון ייעוץ משכנתאות</span>
+              <h1 className="aa4-display mt-1.5 text-[clamp(1.7rem,3.6vw,2.35rem)] font-bold leading-[1.08] text-[var(--ink)]">
+                סימולטור איחוד הלוואות
+              </h1>
+              <p className="mt-2 max-w-xl text-[13.5px] leading-relaxed text-[var(--ink-2)]">
+                ייבאו דוח ריכוז נתונים, בדקו את החובות הקיימים ובנו תמהיל חדש. ההשוואה והחיסכון מתעדכנים בזמן אמת.
+              </p>
+            </div>
+            <div
+              className="hidden shrink-0 items-center gap-2 rounded-[var(--r-pill)] border px-3 py-1.5 text-[11.5px] font-semibold text-[var(--ink-3)] sm:flex"
+              style={{ borderColor: "var(--line-2)", background: "var(--surface)" }}
+            >
+              <Lock className="size-3.5 text-[var(--pos-strong)]" />
+              עיבוד מקומי בדפדפן
             </div>
           </div>
+        </header>
 
-        </div>
-        
-        {/* קוביות ההלוואות והתמהיל */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div
-            ref={loansCardRef}
-            className={`bg-white p-4 rounded-lg shadow-sm border transition-all duration-500 ${
-              flash ? "border-[#1d75a1] ring-4 ring-[#1d75a1]/15" : "border-gray-100"
-            }`}
-          >
-            <ExistingLoans
-              loans={loans}
-              onUpdateLoan={updateLoan}
-              onDeleteLoan={deleteLoan}
-              onAddLoan={addLoan}
-              calcPayment={calcPayment}
-              parse={parse}
-              format={format}
+        <div className="flex flex-col gap-4 md:gap-5">
+          <ImportBar onSelect={handleSelect} onExtract={handleExtract} onImported={handleImported} />
+
+          <ResultHero currentPayment={existingPayment} newPayment={mixPayment} income={totalIncome} />
+
+          {/* inputs + summary rail */}
+          <div className="grid gap-4 md:gap-5 lg:grid-cols-[1.85fr_1fr]">
+            <div className="flex flex-col gap-4 md:gap-5">
+              <AssetsCard properties={properties} onChange={updateProperty} onAdd={addProperty} onDelete={deleteProperty} />
+              <IncomeCard
+                ages={ages}
+                incomes={incomes}
+                onAge={(f, v) => setAges((p) => ({ ...p, [f]: v }))}
+                onIncome={(f, v) => setIncomes((p) => ({ ...p, [f]: v }))}
+              />
+            </div>
+            <SummaryRail
+              totalAssets={totalAssets}
+              totalMortgages={totalMortgages}
+              totalIncome={totalIncome}
+              otherDebts={otherDebts}
+              otherDebtsTotal={otherDebtsTotal}
             />
           </div>
 
-          <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
-            <InitialMixConsolidation
-              loans={mixLoans}
-              onUpdateLoan={updateMixLoan}
-              onDeleteLoan={deleteMixLoan}
-              onAddLoan={addMixLoan}
-              calcPayment={calcPayment}
-              parse={parse}
-              format={format}
-            />
+          {/* ledgers */}
+          <div className="grid gap-4 md:gap-5 lg:grid-cols-2">
+            <div
+              ref={loansCardRef}
+              className="rounded-[var(--r-card)] transition-shadow duration-500"
+              style={flash ? { boxShadow: "0 0 0 4px var(--brand-tint), var(--shadow-raise)" } : undefined}
+            >
+              <LoanLedger loans={loans} onUpdate={updateLoan} onDelete={deleteLoan} onAdd={addLoan} />
+            </div>
+            <MixLedger loans={mixLoans} onUpdate={updateMix} onDelete={deleteMix} onAdd={addMix} />
+          </div>
+
+          <div className="pt-1 text-center text-[11.5px] text-[var(--ink-2)]">
+            החישובים להמחשה בלבד ואינם מהווים ייעוץ או הצעה מחייבת
           </div>
         </div>
-
       </div>
     </div>
   );
 }
-
-
-
-
-
-// "use client"
-
-// import { useRef, useState } from "react";
-// import ExistingLoans, { Loan } from "./ExistingLoans";
-// import InitialMixConsolidation, { InitialMixLoan } from "./InitialMixConsolidation";
-// import { CreditReportImport, toLoanRows, type ExtractedLoan } from "@/components/credit-import";
-
-// export default function FinancialForm() {
-//   // קוביה 1: נכסים ומשכנתאות
-//   const [assets, setAssets] = useState({ asset1: 0, asset2: 0, asset3: 0 });
-//   const [mortgages, setMortgages] = useState({ mort1: 0, mort2: 0, mort3: 0 });
-
-//   // קוביה 2: הכנסות
-//   const [incomes, setIncomes] = useState({ primary: 0, secondary: 0, guarantor: 0 });
-
-//   const [ages, setAges] = useState({
-//     primary: "",
-//     secondary: "",
-//     guarantor: "",
-//   });
-
-
-
-//   // חישובים אוטומטיים - קוביה 1
-//   const totalAssets = assets.asset1 + assets.asset2 + assets.asset3;
-//   const totalMortgages = mortgages.mort1 + mortgages.mort2 + mortgages.mort3;
-
-//   // חישובים אוטומטיים - קוביה 2 (ערב נחשב 50%)
-//   const totalIncome = incomes.primary + incomes.secondary + (incomes.guarantor * 0.5);
-
-//   // --- ניהול הלוואות קיימות ---
-//   const [loans, setLoans] = useState<Loan[]>([
-//     { balance: "", interest: "", months: "" }
-//   ]);
-
-
-// const formatThousands = (value: number | string) => {
-//   if (value === "" || value === undefined || value === null) return "";
-//   const num = Number(String(value).replace(/,/g, ""));
-//   return isNaN(num) ? "" : num.toLocaleString("he-IL");
-// };
-
-
-//   const updateLoan = (i: number, key: keyof Loan, value: string) => {
-//     const copy = [...loans];
-//     copy[i] = { ...copy[i], [key]: value };
-//     setLoans(copy);
-//   };
-
-//   const deleteLoan = (i: number) => {
-//     if (loans.length === 1) return;
-//     setLoans(loans.filter((_, index) => index !== i));
-//   };
-
-//   const addLoan = () => {
-//     setLoans([...loans, { balance: "", interest: "", months: "" }]);
-//   };
-
-//   // --- ייבוא אוטומטי מדוח ריכוז נתונים ---
-//   const loansCardRef = useRef<HTMLDivElement>(null);
-//   const [flash, setFlash] = useState(false);
-
-//   // Map the selected report loans into this calculator's rows (fires on import
-//   // and on every toggle) — data only, no viewport side-effects.
-//   const handleSelect = (selected: ExtractedLoan[]) => {
-//     const rows = toLoanRows(selected);
-//     setLoans(rows.length ? rows : [{ balance: "", interest: "", months: "" }]);
-//   };
-
-//   // Fires once per successful parse: draw attention to the calculator.
-//   const handleImported = () => {
-//     setFlash(true);
-//     setTimeout(
-//       () => loansCardRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }),
-//       60
-//     );
-//     setTimeout(() => setFlash(false), 1800);
-//   };
-
-
-//   // --- ניהול תמהיל ראשוני חדש ---
-//   const [mixLoans, setMixLoans] = useState<InitialMixLoan[]>([
-//     { balance: "", interest: "", months: "", type: "" }
-//   ]);
-
-//   const updateMixLoan = (i: number, key: keyof InitialMixLoan, value: string) => {
-//     const copy = [...mixLoans];
-//     copy[i] = { ...copy[i], [key]: value };
-//     setMixLoans(copy);
-//   };
-
-//   const deleteMixLoan = (i: number) => {
-//     if (mixLoans.length === 1) return;
-//     setMixLoans(mixLoans.filter((_, index) => index !== i));
-//   };
-
-//   const addMixLoan = () => {
-//     setMixLoans([...mixLoans, { balance: "", interest: "", months: "", type: "" }]);
-//   };
-
-
-//   // --- פונקציות עזר כלליות ---
-//   const format = (v: string) =>
-//     v.replace(/\D/g, "").replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-
-//   const parse = (v: string) => Number(v.replace(/,/g, "") || 0);
-
-//   const calcPayment = (balance: string, interest: string, months: string) => {
-//     const amount = parse(balance);
-//     const r = parseFloat(interest) / 100 / 12;
-//     const m = Number(months);
-//     if (!amount || !m || !r) return 0;
-//     return amount * (r / (1 - Math.pow(1 + r, -m)));
-//   };
-
-//   const handleAssetChange = (field: string, value: string) => {
-//     setAssets(prev => ({ ...prev, [field]: Number(value) || 0 }));
-//   };
-
-//   const handleMortgageChange = (field: string, value: string) => {
-//     setMortgages(prev => ({ ...prev, [field]: Number(value) || 0 }));
-//   };
-
-
-//   const handleAgeChange = (
-//     field: "primary" | "secondary" | "guarantor",
-//     value: string
-//   ) => {
-//     setAges((prev) => ({
-//       ...prev,
-//       [field]: value,
-//     }));
-//   };
-
-
-//   const handleIncomeChange = (
-//   field: "primary" | "secondary" | "guarantor",
-//   value: string
-// ) => {
-//   const numericValue = Number(value.replace(/[^\d]/g, ""));
-
-//   setIncomes((prev) => ({
-//     ...prev,
-//     [field]: numericValue,
-//   }));
-// };
-
-//   return (
-
-// <div className="w-full max-w-5xl mx-auto p-2 md:p-4" dir="rtl">
-//   <h2 className="text-xl font-bold text-[#1d75a1] mb-4 border-b pb-1.5">טופס איחוד הלוואות</h2>
-
-//   {/* ייבוא אוטומטי מדוח ריכוז נתונים (מערכת נתוני אשראי) */}
-//   <div className="mb-4">
-//     <CreditReportImport
-//       onSelect={handleSelect}
-//       onImported={handleImported}
-//     />
-//   </div>
-
-//   <div className="flex flex-col gap-4">
-    
-//     {/* חלק עליון: חלוקת 3/4 ו-1/4 במסכים גדולים */}
-//     <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-      
-//       {/* צד ימין (3/4 מהמסך) - מכיל את קוביה 1 וקוביה 2 */}
-//       <div className="lg:col-span-3 flex flex-col gap-4">
-        
-//         {/* קוביה 1: נכסים והתחייבויות (ללא סכומים) */}
-//         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
-//           <h3 className="text-base font-semibold text-gray-800 mb-3 pb-1 border-b border-gray-100">
-//             קוביה 1: שווי נכסים ויתרות משכנתא
-//           </h3>
-          
-//           <div className="flex flex-col gap-4">
-//             {/* שורה 1: שווי נכסים */}
-//             <div>
-//               <span className="block text-xs font-semibold text-gray-400 mb-1">פירוט שווי נכסים</span>
-//               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-//                 <div>
-//                   <label className="block text-[11px] text-gray-600 mb-0.5">נכס 1</label>
-//                   <input
-//                     type="number"
-//                     placeholder="0"
-//                     onChange={(e) => handleAssetChange("asset1", e.target.value)}
-//                     className="w-full p-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-[#1d75a1] focus:border-transparent outline-none transition"
-//                   />
-//                 </div>
-//                 <div>
-//                   <label className="block text-[11px] text-gray-600 mb-0.5">נכס 2</label>
-//                   <input
-//                     type="number"
-//                     placeholder="0"
-//                     onChange={(e) => handleAssetChange("asset2", e.target.value)}
-//                     className="w-full p-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-[#1d75a1] focus:border-transparent outline-none transition"
-//                   />
-//                 </div>
-//                 <div>
-//                   <label className="block text-[11px] text-gray-600 mb-0.5">נכס 3</label>
-//                   <input
-//                     type="number"
-//                     placeholder="0"
-//                     onChange={(e) => handleAssetChange("asset3", e.target.value)}
-//                     className="w-full p-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-[#1d75a1] focus:border-transparent outline-none transition"
-//                   />
-//                 </div>
-//               </div>
-//             </div>
-
-//             {/* שורה 2: יתרת משכנתא */}
-//             <div>
-//               <span className="block text-xs font-semibold text-gray-400 mb-1">פירוט יתרות משכנתא</span>
-//               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-//                 <div>
-//                   <label className="block text-[11px] text-gray-600 mb-0.5">משכנתא 1</label>
-//                   <input
-//                     type="number"
-//                     placeholder="0"
-//                     onChange={(e) => handleMortgageChange("mort1", e.target.value)}
-//                     className="w-full p-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-[#1d75a1] focus:border-transparent outline-none transition"
-//                   />
-//                 </div>
-//                 <div>
-//                   <label className="block text-[11px] text-gray-600 mb-0.5">משכנתא 2</label>
-//                   <input
-//                     type="number"
-//                     placeholder="0"
-//                     onChange={(e) => handleMortgageChange("mort2", e.target.value)}
-//                     className="w-full p-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-[#1d75a1] focus:border-transparent outline-none transition"
-//                   />
-//                 </div>
-//                 <div>
-//                   <label className="block text-[11px] text-gray-600 mb-0.5">משכנתא 3</label>
-//                   <input
-//                     type="number"
-//                     placeholder="0"
-//                     onChange={(e) => handleMortgageChange("mort3", e.target.value)}
-//                     className="w-full p-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-[#1d75a1] focus:border-transparent outline-none transition"
-//                   />
-//                 </div>
-//               </div>
-//             </div>
-//           </div>
-//         </div>
-
-//         {/* קוביה 2: פרטים אישיים והכנסות */}
-//         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 flex flex-col justify-between">
-//           <div>
-//             <h3 className="text-base font-semibold text-gray-800 mb-4 pb-1 border-b border-gray-100">
-//               פרטים אישיים והכנסות
-//             </h3>
-
-//             {/* גילאים */}
-//             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
-//               <div>
-//                 <label className="block text-sm font-medium text-gray-700 mb-1">
-//                   גיל בן זוג ראשי
-//                 </label>
-//                 <input
-//                   type="number"
-//                   min={18}
-//                   max={100}
-//                   placeholder="35"
-//                   onChange={(e) => handleAgeChange("primary", e.target.value)}
-//                   className="w-full p-2 text-sm border border-gray-300 rounded focus:bg-orange-50/50 focus:ring-2 focus:ring-orange-200 focus:border-orange-400 outline-none transition bg-white text-gray-900"
-//                 />
-//               </div>
-
-//               <div>
-//                 <label className="block text-sm font-medium text-gray-700 mb-1">
-//                   גיל בן זוג משני
-//                 </label>
-//                 <input
-//                   type="number"
-//                   min={18}
-//                   max={100}
-//                   placeholder="35"
-//                   onChange={(e) => handleAgeChange("secondary", e.target.value)}
-//                   className="w-full p-2 text-sm border border-gray-300 rounded focus:bg-orange-50/50 focus:ring-2 focus:ring-orange-200 focus:border-orange-400 outline-none transition bg-white text-gray-900"
-//                 />
-//               </div>
-
-//               <div>
-//                 <label className="block text-sm font-medium text-gray-700 mb-1">
-//                   גיל ערב
-//                 </label>
-//                 <input
-//                   type="number"
-//                   min={18}
-//                   max={100}
-//                   placeholder="35"
-//                   onChange={(e) => handleAgeChange("guarantor", e.target.value)}
-//                   className="w-full p-2 text-sm border border-gray-300 rounded focus:bg-orange-50/50 focus:ring-2 focus:ring-orange-200 focus:border-orange-400 outline-none transition bg-white text-gray-900"
-//                 />
-//               </div>
-//             </div>
-
-//             {/* הכנסות */}
-//             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-//               <div>
-//                 <label className="block text-sm font-medium text-gray-700 mb-1">
-//                   הכנסות בן זוג ראשי
-//                 </label>
-//                 <input
-//                   type="text"
-//                   inputMode="numeric"
-//                   placeholder="0"
-//                   value={formatThousands(incomes.primary)}
-//                   onChange={(e) => handleIncomeChange("primary", e.target.value)}
-//                   className="w-full p-2 text-sm border border-gray-300 rounded focus:bg-orange-50/50 focus:ring-2 focus:ring-orange-200 focus:border-orange-400 outline-none transition bg-white text-gray-900"
-//                 />
-//               </div>
-
-//               <div>
-//                 <label className="block text-sm font-medium text-gray-700 mb-1">
-//                   הכנסות בן זוג משני
-//                 </label>
-//                 <input
-//                   type="text"
-//                   inputMode="numeric"
-//                   placeholder="0"
-//                   value={formatThousands(incomes.secondary)}
-//                   onChange={(e) => handleIncomeChange("secondary", e.target.value)}
-//                   className="w-full p-2 text-sm border border-gray-300 rounded focus:bg-orange-50/50 focus:ring-2 focus:ring-orange-200 focus:border-orange-400 outline-none transition bg-white text-gray-900"
-//                 />
-//               </div>
-
-//               <div>
-//                 <label className="block text-sm font-medium text-gray-700 mb-1">
-//                   הכנסות ערב <span className="text-gray-400 text-xs font-normal">(לפי 50%)</span>
-//                 </label>
-//                 <input
-//                   type="text"
-//                   inputMode="numeric"
-//                   placeholder="0"
-//                   value={formatThousands(incomes.guarantor)}
-//                   onChange={(e) => handleIncomeChange("guarantor", e.target.value)}
-//                   className="w-full p-2 text-sm border border-gray-300 rounded focus:bg-orange-50/50 focus:ring-2 focus:ring-orange-200 focus:border-orange-400 outline-none transition bg-white text-gray-900"
-//                 />
-//               </div>
-//             </div>
-//           </div>
-//         </div>
-
-//       </div>
-
-//       {/* צד שמאל (1/4 מהמסך) - קוביה מאוחדת לכל החישובים והסיכומים */}
-//       <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 lg:col-span-1 flex flex-col justify-between">
-//         <div>
-//           <h3 className="text-base font-semibold text-gray-800 mb-4 pb-1 border-b border-gray-100">
-//             ריכוז נתונים וחישובים
-//           </h3>
-          
-//           <div className="flex flex-col gap-3">
-//             {/* סה"כ שווי נכסים */}
-//             <div className="bg-blue-50/50 p-3 rounded border border-blue-100 flex flex-col justify-center">
-//               <span className="block text-xs text-blue-700 font-medium">סה"כ שווי נכסים</span>
-//               <span className="text-lg font-bold text-[#1d75a1] mt-0.5">
-//                 {totalAssets.toLocaleString()} ₪
-//               </span>
-//             </div>
-
-//             {/* סה"כ חובות משכנתא */}
-//             <div className="bg-red-50/40 p-3 rounded border border-red-100 flex flex-col justify-center">
-//               <span className="block text-xs text-red-700 font-medium">סה"כ חובות משכנתא</span>
-//               <span className="text-lg font-bold text-red-600 mt-0.5">
-//                 {totalMortgages.toLocaleString()} ₪
-//               </span>
-//             </div>
-
-//            {/* סה"כ הכנסה מוכרת */}
-//             <div className="bg-emerald-50/60 p-3 rounded border border-emerald-100 flex flex-col justify-center">
-//               <span className="block text-xs text-emerald-800 font-medium">
-//                 סה"כ הכנסה מוכרת
-//               </span>
-//               <span className="text-lg font-bold text-emerald-600 mt-0.5">
-//                 {totalIncome.toLocaleString("he-IL")} ₪
-//               </span>
-              
-//               {/* שדה מחושב בקטן: 40% יחס החזר מקסימלי */}
-//               <div className="mt-1.5 pt-1.5 border-t border-emerald-200/60 flex justify-between items-center text-[11px] text-emerald-700">
-//                 <span>40% יחס החזר מקסימלי:</span>
-//                 <span className="font-semibold">
-//                   {((totalIncome || 0) * 0.4).toLocaleString("he-IL")} ₪
-//                 </span>
-//               </div>
-//             </div>
-
-//             {/* מקום לחישובים עתידיים */}
-//             <div className="text-xs text-gray-400 italic text-center p-3 border border-dashed border-gray-200 rounded mt-2">
-//               מקום לחישובים נוספים...
-//             </div>
-//           </div>
-//         </div>
-//       </div>
-
-//     </div>
-    
-//     {/* קוביות ההלוואות והתמהיל - חצי מסך לכל אחת בדסקטופ */}
-//     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-//       <div
-//         ref={loansCardRef}
-//         className={`bg-white p-4 rounded-lg shadow-sm border transition-all duration-500 ${
-//           flash
-//             ? "border-[#1d75a1] ring-4 ring-[#1d75a1]/15"
-//             : "border-gray-100"
-//         }`}
-//       >
-//         <ExistingLoans
-//           loans={loans}
-//           onUpdateLoan={updateLoan}
-//           onDeleteLoan={deleteLoan}
-//           onAddLoan={addLoan}
-//           calcPayment={calcPayment}
-//           parse={parse}
-//           format={format}
-//         />
-//       </div>
-
-//       <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
-//         <InitialMixConsolidation
-//           loans={mixLoans}
-//           onUpdateLoan={updateMixLoan}
-//           onDeleteLoan={deleteMixLoan}
-//           onAddLoan={addMixLoan}
-//           calcPayment={calcPayment}
-//           parse={parse}
-//           format={format}
-//         />
-//       </div>
-//     </div>
-
-//   </div>
-// </div>
-
-//   );
-// }
-
-
-
-
-
-
-
