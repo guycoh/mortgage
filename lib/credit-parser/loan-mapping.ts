@@ -36,6 +36,12 @@ export interface LoanRow {
   balance: string;
   interest: string;
   months: string;
+  /** Reporting bank — for tagging the row in the calculator. */
+  source?: string;
+  /** Transaction type label (e.g. משכנתה / הלוואה). */
+  typeLabel?: string;
+  /** Whether this row is a mortgage or a plain loan. */
+  kind?: "mortgage" | "loan";
 }
 
 // ---------------------------------------------------------------------------
@@ -253,6 +259,9 @@ export function toLoanRows(loans: ExtractedLoan[]): LoanRow[] {
     balance: l.balanceStr,
     interest: l.interest,
     months: l.months,
+    source: l.source,
+    typeLabel: l.type,
+    kind: l.isMortgage ? ("mortgage" as const) : ("loan" as const),
   }));
 }
 

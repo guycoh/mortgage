@@ -48,11 +48,15 @@ type Status = "idle" | "loading" | "done" | "error";
 export interface CreditReportImportProps {
   /** Fires with the currently-selected loans (on parse and on every toggle). */
   onSelect?: (loans: ExtractedLoan[], report: CreditReport) => void;
+  /** Fires once after each parse with EVERY extracted debt (empty on reset). */
+  onExtract?: (all: ExtractedLoan[], report: CreditReport | null) => void;
   /** Fires once after each successful parse, with the full report. */
   onImported?: (report: CreditReport) => void;
-  /** Which extracted debts appear in the selectable list. Default: loans & mortgages. */
+  /** Which extracted debts appear in the list. Default: all active debts. */
   candidateFilter?: (loan: ExtractedLoan) => boolean;
-  /** Which candidates are pre-checked. Default: the client's own active loans & mortgages. */
+  /** Which listed debts are selectable / pulled into the calculator. Default: loans & mortgages. */
+  isInjectable?: (loan: ExtractedLoan) => boolean;
+  /** Which injectable debts are pre-checked. Default: the client's own active loans & mortgages. */
   isDefaultSelected?: (loan: ExtractedLoan) => boolean;
   /** Show the collapsible full-report JSON side panel. Default true. */
   showJsonPanel?: boolean;
@@ -72,13 +76,16 @@ export interface CreditReportImportProps {
 }
 
 const shekel = (n: number) => `${Math.round(n).toLocaleString("en-US")} ₪`;
-const defaultCandidate = (l: ExtractedLoan) => l.isLoanOrMortgage;
+const showAll = () => true;
+const defaultInjectable = (l: ExtractedLoan) => l.isLoanOrMortgage;
 const defaultSelected = (l: ExtractedLoan) => l.defaultInclude;
 
 export default function CreditReportImport({
   onSelect,
+  onExtract,
   onImported,
-  candidateFilter = defaultCandidate,
+  candidateFilter = showAll,
+  isInjectable = defaultInjectable,
   isDefaultSelected = defaultSelected,
   showJsonPanel = true,
   autoOpenJson = true,
@@ -122,13 +129,14 @@ export default function CreditReportImport({
         const parsed = await parsePdfFile(file);
         const all = extractLoans(parsed);
         const sel = new Set(
-          all.filter((l) => candidateFilter(l) && isDefaultSelected(l)).map((l) => l.uid)
+          all.filter((l) => isInjectable(l) && isDefaultSelected(l)).map((l) => l.uid)
         );
         setReport(parsed);
         setLoans(all);
         setSelected(sel);
         setStatus("done");
         emit(all, sel, parsed);
+        onExtract?.(all, parsed);
         onImported?.(parsed);
         if (showJsonPanel && autoOpenJson) setJsonOpen(true);
       } catch (e) {
@@ -136,11 +144,13 @@ export default function CreditReportImport({
         setError((e as Error).message || "לא ניתן לקרוא את הקובץ.");
       }
     },
-    [candidateFilter, isDefaultSelected, emit, onImported, showJsonPanel, autoOpenJson]
+    [isInjectable, isDefaultSelected, emit, onExtract, onImported, showJsonPanel, autoOpenJson]
   );
 
   const toggle = (uid: string) => {
     if (!report) return;
+    const loan = loans.find((l) => l.uid === uid);
+    if (!loan || !isInjectable(loan)) return; // only loans/mortgages are selectable
     const next = new Set(selected);
     if (next.has(uid)) next.delete(uid);
     else next.add(uid);
@@ -158,12 +168,65 @@ export default function CreditReportImport({
     setJsonOpen(false);
     setReportOpen(false);
     onSelect?.([], report as CreditReport);
+    onExtract?.([], null);
     if (inputRef.current) inputRef.current.value = "";
   };
 
   const candidates = loans.filter(candidateFilter);
-  const chosen = candidates.filter((l) => selected.has(l.uid));
+  const injectables = candidates.filter(isInjectable);
+  const others = candidates.filter((l) => !isInjectable(l));
+  const chosen = injectables.filter((l) => selected.has(l.uid));
   const totalBalance = chosen.reduce((s, l) => s + l.balance, 0);
+  const othersTotal = others.reduce((s, l) => s + l.balance, 0);
+
+  const renderDebtRow = (l: ExtractedLoan, injectable: boolean) => {
+    const on = injectable && selected.has(l.uid);
+    return (
+      <li
+        key={l.uid}
+        onClick={injectable ? () => toggle(l.uid) : undefined}
+        className={cn(
+          "flex items-center gap-2 px-3 py-2 text-[11px] transition",
+          injectable
+            ? on
+              ? "cursor-pointer bg-white hover:bg-slate-50/70"
+              : "cursor-pointer bg-slate-50/40 opacity-60 hover:opacity-90"
+            : "bg-white"
+        )}
+      >
+        {injectable ? (
+          <span
+            className={cn(
+              "grid size-4 shrink-0 place-items-center rounded border transition",
+              on ? "border-[#1d75a1] bg-[#1d75a1] text-white" : "border-slate-300 bg-white"
+            )}
+          >
+            {on && <CheckCircle2 className="size-3.5" />}
+          </span>
+        ) : (
+          <span className="size-1.5 shrink-0 rounded-full bg-slate-300" />
+        )}
+        {l.isMortgage && <Landmark className="size-3.5 shrink-0 text-[#1d75a1]" />}
+        <span className="min-w-0 flex-1 truncate font-medium text-slate-700">{l.source}</span>
+        <span
+          className={cn(
+            "shrink-0 rounded px-1.5 py-0.5 text-[9px] font-semibold",
+            l.role === "debtor" ? "bg-blue-50 text-blue-600" : "bg-amber-50 text-amber-600"
+          )}
+        >
+          {l.role === "debtor" ? "חייב" : "ערב"}
+        </span>
+        <span className="hidden shrink-0 text-slate-400 sm:inline">{l.type}</span>
+        <span className="w-[70px] shrink-0 text-left font-bold text-slate-800">{shekel(l.balance)}</span>
+        <span className="w-[42px] shrink-0 text-center text-slate-500">
+          {l.interest ? `${l.interest}%` : "—"}
+        </span>
+        <span className="w-[46px] shrink-0 text-center text-slate-500">
+          {l.months ? `${l.months} ח׳` : "—"}
+        </span>
+      </li>
+    );
+  };
 
   // ---- success / results panel -------------------------------------------
   if (status === "done") {
@@ -193,11 +256,19 @@ export default function CreditReportImport({
                 <CheckCircle2 className="size-5" />
               </span>
               <div className="min-w-0">
-                <div className="text-sm font-bold text-slate-800">
-                  יובאו {chosen.length} הלוואות ומשכנתאות · יתרה כוללת{" "}
-                  <span className="text-[#1d75a1]">{shekel(totalBalance)}</span>
+                <div className="flex items-center gap-1.5 text-sm font-bold text-slate-800">
+                  <span className="truncate">{report?.client.name || "לקוח"}</span>
+                  {report?.client.idNumber && (
+                    <span className="shrink-0 font-mono text-[11px] font-medium text-slate-400" dir="ltr">
+                      ת.ז {report.client.idNumber}
+                    </span>
+                  )}
                 </div>
-                <div className="truncate text-[11px] text-slate-400">
+                <div className="text-[11px] text-slate-500">
+                  יובאו {chosen.length} הלוואות ומשכנתאות · יתרה{" "}
+                  <span className="font-semibold text-[#1d75a1]">{shekel(totalBalance)}</span>
+                </div>
+                <div className="truncate text-[10px] text-slate-400">
                   מתוך <FileText className="inline size-3 -mt-0.5" /> {fileName}
                 </div>
               </div>
@@ -242,73 +313,39 @@ export default function CreditReportImport({
             </button>
           )}
 
-          {showCandidates && candidates.length > 0 && (
+          {showCandidates && injectables.length > 0 && (
             <div className="mt-3 overflow-hidden rounded-xl border border-slate-200 bg-white">
-              <div className="border-b border-slate-100 bg-slate-50 px-3 py-1.5 text-[11px] font-semibold text-slate-500">
-                הלוואות ומשכנתאות פעילות — סמנו מה להזרים למחשבון
+              <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-3 py-1.5 text-[11px] font-semibold text-slate-500">
+                <span>הלוואות ומשכנתאות — מוזרמות אוטומטית למחשבון</span>
+                <span className="text-slate-400">סמנו/בטלו</span>
               </div>
               <ul className="divide-y divide-slate-100">
-                {candidates.map((l) => {
-                  const on = selected.has(l.uid);
-                  return (
-                    <li
-                      key={l.uid}
-                      onClick={() => toggle(l.uid)}
-                      className={cn(
-                        "flex cursor-pointer items-center gap-2 px-3 py-2 text-[11px] transition",
-                        on
-                          ? "bg-white hover:bg-slate-50/70"
-                          : "bg-slate-50/40 opacity-60 hover:opacity-90"
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          "grid size-4 shrink-0 place-items-center rounded border transition",
-                          on ? "border-[#1d75a1] bg-[#1d75a1] text-white" : "border-slate-300 bg-white"
-                        )}
-                      >
-                        {on && <CheckCircle2 className="size-3.5" />}
-                      </span>
-                      {l.isMortgage && <Landmark className="size-3.5 shrink-0 text-[#1d75a1]" />}
-                      <span className="min-w-0 flex-1 truncate font-medium text-slate-700">
-                        {l.source}
-                      </span>
-                      <span
-                        className={cn(
-                          "shrink-0 rounded px-1.5 py-0.5 text-[9px] font-semibold",
-                          l.role === "debtor"
-                            ? "bg-blue-50 text-blue-600"
-                            : "bg-amber-50 text-amber-600"
-                        )}
-                      >
-                        {l.role === "debtor" ? "חייב" : "ערב"}
-                      </span>
-                      <span className="hidden shrink-0 text-slate-400 sm:inline">{l.type}</span>
-                      <span className="w-[70px] shrink-0 text-left font-bold text-slate-800">
-                        {shekel(l.balance)}
-                      </span>
-                      <span className="w-[42px] shrink-0 text-center text-slate-500">
-                        {l.interest ? `${l.interest}%` : "—"}
-                      </span>
-                      <span className="w-[46px] shrink-0 text-center text-slate-500">
-                        {l.months ? `${l.months} ח׳` : "—"}
-                      </span>
-                    </li>
-                  );
-                })}
+                {injectables.map((l) => renderDebtRow(l, true))}
               </ul>
             </div>
           )}
 
-          {showCandidates && chosen.length === 0 && candidates.length > 0 && (
+          {showCandidates && others.length > 0 && (
+            <div className="mt-2 overflow-hidden rounded-xl border border-slate-200 bg-white">
+              <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-3 py-1.5 text-[11px] font-semibold text-slate-500">
+                <span>חובות נוספים — לצפייה בלבד (לא מוזרמים)</span>
+                <span className="font-bold text-slate-600">{shekel(othersTotal)}</span>
+              </div>
+              <ul className="divide-y divide-slate-100">
+                {others.map((l) => renderDebtRow(l, false))}
+              </ul>
+            </div>
+          )}
+
+          {showCandidates && injectables.length > 0 && chosen.length === 0 && (
             <div className="mt-2 text-center text-[11px] text-slate-400">
-              לא נבחרו חובות — הבחירה רוקנה.
+              לא נבחרו הלוואות — טבלת המחשבון רוקנה.
             </div>
           )}
 
           {showCandidates && candidates.length === 0 && (
             <div className="mt-2 text-center text-[11px] text-slate-400">
-              לא נמצאו הלוואות או משכנתאות פעילות בדוח.
+              לא נמצאו חובות פעילים בדוח.
               {showJsonPanel && " פתחו את «נתוני הדוח» לפירוט המלא."}
             </div>
           )}
