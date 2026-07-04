@@ -1,0 +1,405 @@
+/* ============================================================================
+   /aa4 design system — institutional fintech, cool & precise.
+   Cool neutral canvas · deep petrol ink · petrol as the single accent ·
+   emerald=saving / red=debt as SEMANTIC colours only. Self-hosted IBM Plex
+   Sans Hebrew (UI) + IBM Plex Mono (figures). Everything is namespaced under
+   .aa4-root so it never leaks into the globally-styled app.
+   ========================================================================== */
+
+.aa4-root {
+  /* fonts — sans/mono fallbacks only, so a missing webfont degrades to a clean
+     system sans, never a serif (no Times New Roman fallback). */
+  --font-ui: "IBM Plex Sans Hebrew", system-ui, "Segoe UI", Arial, sans-serif;
+  --font-num: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  /* surfaces — cool neutrals */
+  --bg: #eef1f5;
+  --bg-deep: #e6ebf0;
+  --surface: #ffffff;
+  --surface-2: #f5f8fa;
+  --surface-3: #eef3f6;
+
+  /* ink — off-black, petrol-tinted (never pure black) */
+  --ink: #0f2028;
+  --ink-2: #40606c;
+  --ink-3: #526872;   /* AA >= 4.5:1 on all surfaces */
+  --ink-4: #64777f;   /* faint captions / placeholders, ~4.7:1 on white */
+
+  /* hairlines */
+  --line: #dde4ea;
+  --line-2: #cbd6dd;
+  --line-soft: rgba(15, 32, 40, 0.07);
+
+  /* the single accent — petrol brand */
+  --brand: #1d75a1;
+  --brand-deep: #135573;
+  --brand-bright: #2f92c4;
+  --brand-tint: rgba(29, 117, 161, 0.09);
+  --brand-tint-2: rgba(29, 117, 161, 0.14);
+
+  /* semantic status colours (not decoration) */
+  --pos: #0d8a62;          /* saving — AA on white at 18px+ bold */
+  --pos-strong: #0a6349;   /* small positive text */
+  --pos-tint: rgba(13, 138, 98, 0.1);
+  --neg: #c23b2e;          /* debt / increase */
+  --neg-strong: #a02c20;
+  --neg-tint: rgba(194, 59, 46, 0.09);
+
+  /* debt category encoding: mortgage = petrol brand, loan = muted indigo */
+  --cat-loan: #4f57a6;
+  --cat-loan-tint: rgba(79, 87, 166, 0.1);
+
+  /* shape lock — three radii, used consistently */
+  --r-card: 16px;
+  --r-control: 10px;
+  --r-pill: 999px;
+
+  /* elevation — shadows tinted to the cool bg hue, never pure black */
+  --shadow-card: 0 1px 2px rgba(15, 32, 40, 0.04), 0 16px 34px -26px rgba(15, 32, 40, 0.3);
+  --shadow-raise: 0 2px 6px rgba(15, 32, 40, 0.06), 0 28px 52px -30px rgba(15, 32, 40, 0.36);
+
+  position: relative;
+  min-height: 100dvh;
+  color: var(--ink);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+  background:
+    radial-gradient(115% 70% at 84% -10%, rgba(29, 117, 161, 0.08), transparent 58%),
+    linear-gradient(180deg, var(--bg), var(--bg-deep));
+  background-attachment: fixed;
+}
+
+/* whisper of paper grain on a fixed, non-scrolling layer */
+.aa4-grain::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.025;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* headings / display — bold sans (no serif) */
+.aa4-display {
+  font-family: var(--font-ui);
+  letter-spacing: -0.015em;
+}
+
+/* numeric figures — mono, tabular, tight */
+.aa4-fig {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums lining-nums;
+  letter-spacing: -0.03em;
+}
+
+/* one context label, header-only (eyebrow rationing) */
+.aa4-kicker {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--brand-deep);
+}
+
+/* — card — */
+.aa4-card {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-card);
+}
+.aa4-card-pad {
+  padding: clamp(1.25rem, 2.2vw, 1.625rem);
+}
+.aa4-card-title {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+.aa4-card-sub {
+  margin-top: 2px;
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+
+/* — labels + inputs — */
+.aa4-label {
+  display: block;
+  margin-bottom: 7px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.aa4-field {
+  width: 100%;
+  min-width: 0;
+  background: var(--surface);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-control);
+  padding: 0.62rem 0.8rem;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums lining-nums;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+  outline: none;
+}
+.aa4-field::placeholder {
+  color: var(--ink-4);
+  font-weight: 400;
+}
+.aa4-field:hover {
+  border-color: var(--brand-bright);
+}
+.aa4-field:focus {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px var(--brand-tint);
+}
+.aa4-field-num {
+  font-family: var(--font-num);
+  letter-spacing: -0.02em;
+}
+.aa4-field-affix {
+  position: relative;
+}
+.aa4-field-affix > .aa4-field {
+  padding-inline-start: 1.85rem;
+}
+.aa4-field-affix > .aa4-affix {
+  position: absolute;
+  inset-inline-start: 0.7rem;
+  top: 50%;
+  transform: translateY(-50%);
+  font-family: var(--font-num);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-4);
+  pointer-events: none;
+}
+
+/* — buttons — */
+.aa4-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border-radius: var(--r-control);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 0.5rem 0.85rem;
+  cursor: pointer;
+  white-space: nowrap;
+  border: 1px solid transparent;
+  transition: transform 0.14s ease, box-shadow 0.18s ease, background 0.18s ease,
+    border-color 0.18s ease, color 0.18s ease;
+}
+.aa4-btn:active {
+  transform: translateY(1px);
+}
+.aa4-btn:focus-visible,
+.aa4-iconbtn:focus-visible,
+.aa4-drop:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--brand-tint);
+}
+.aa4-drop:focus-visible {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px var(--brand-tint), var(--shadow-card);
+}
+.aa4-btn-primary {
+  color: #fff;
+  background: var(--brand);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.12) inset, 0 8px 16px -10px rgba(19, 85, 115, 0.7);
+}
+.aa4-btn-primary:hover {
+  background: var(--brand-deep);
+}
+.aa4-btn-ghost {
+  color: var(--ink-2);
+  background: var(--surface);
+  border-color: var(--line-2);
+}
+.aa4-btn-ghost:hover {
+  border-color: var(--brand);
+  color: var(--brand-deep);
+}
+.aa4-btn-soft {
+  color: var(--brand-deep);
+  background: var(--brand-tint);
+}
+.aa4-btn-soft:hover {
+  background: var(--brand-tint-2);
+}
+
+/* — small icon action — */
+.aa4-iconbtn {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-control);
+  color: var(--ink-4);
+  transition: background 0.14s ease, color 0.14s ease;
+}
+.aa4-iconbtn:hover {
+  background: var(--neg-tint);
+  color: var(--neg);
+}
+
+/* — ledger cell input (borderless, fills its grid cell) — */
+.aa4-ledger-input {
+  width: 100%;
+  min-width: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--r-control);
+  padding: 0.5rem 0.6rem;
+  font-family: var(--font-num);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums lining-nums;
+  letter-spacing: -0.02em;
+  transition: border-color 0.14s ease, background 0.14s ease, box-shadow 0.14s ease;
+  outline: none;
+}
+.aa4-ledger-input::placeholder { color: var(--ink-4); }
+.aa4-ledger-input:hover { background: var(--surface-2); }
+.aa4-ledger-input:focus {
+  background: var(--surface);
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px var(--brand-tint);
+}
+select.aa4-ledger-input {
+  appearance: none;
+  -webkit-appearance: none;
+  font-family: var(--font-ui);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%235f7883' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: left 0.55rem center;
+  padding-inline-start: 1.4rem;
+}
+
+/* — custom type dropdown (mix track) — */
+.aa4-typetrigger {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  gap: 0.4rem;
+  border-radius: var(--r-control);
+  border: 1px solid transparent;
+  padding: 0.32rem 0.45rem;
+  font-family: var(--font-ui);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+  transition: background 0.14s ease, border-color 0.14s ease, box-shadow 0.14s ease;
+}
+.aa4-typetrigger:hover {
+  background: var(--surface-2);
+}
+.aa4-typetrigger[aria-expanded="true"],
+.aa4-typetrigger:focus-visible {
+  outline: none;
+  background: var(--surface);
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px var(--brand-tint);
+}
+.aa4-typemenu {
+  z-index: 60;
+  padding: 5px;
+  margin: 0;
+  list-style: none;
+  background: var(--surface);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-control);
+  box-shadow: var(--shadow-raise);
+}
+.aa4-typeopt {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.55rem;
+  border: 0;
+  background: transparent;
+  border-radius: 9px;
+  padding: 0.45rem 0.5rem;
+  font-family: var(--font-ui);
+  font-size: 12.5px;
+  font-weight: 600;
+  text-align: start;
+  color: var(--ink);
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.aa4-typeopt:hover,
+.aa4-typeopt:focus-visible {
+  outline: none;
+  background: var(--surface-2);
+}
+
+/* — comparison bars — */
+.aa4-bar-track {
+  position: relative;
+  height: 10px;
+  border-radius: var(--r-pill);
+  background: var(--surface-3);
+  overflow: hidden;
+}
+.aa4-bar-fill {
+  position: absolute;
+  inset-inline-start: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: var(--r-pill);
+}
+
+/* — dropzone — */
+.aa4-drop {
+  position: relative;
+  border-radius: var(--r-card);
+  border: 1.5px dashed var(--line-2);
+  background: var(--surface);
+  transition: border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease,
+    transform 0.18s ease;
+}
+.aa4-drop:hover {
+  border-color: var(--brand);
+  box-shadow: var(--shadow-card);
+}
+.aa4-drop[data-drag="true"] {
+  border-color: var(--brand);
+  border-style: solid;
+  background: var(--brand-tint);
+  box-shadow: 0 0 0 4px var(--brand-tint), var(--shadow-raise);
+}
+
+.aa4-hairline {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--line-2) 16%, var(--line-2) 84%, transparent);
+}
+
+/* kill number spinners inside the aa4 subtree */
+.aa4-root input[type="number"]::-webkit-inner-spin-button,
+.aa4-root input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.aa4-root input[type="number"] { -moz-appearance: textfield; }
+
+/* Honour the OS reduced-motion preference for CSS-driven motion. Framer-driven
+   entrance/count-up motion is gated separately via useReducedMotion(). */
+@media (prefers-reduced-motion: reduce) {
+  .aa4-root *,
+  .aa4-root *::before,
+  .aa4-root *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
