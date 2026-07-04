@@ -44,7 +44,7 @@ export default function ReverseMortgageCalculator() {
     }
 
     const decidingAge = age2 ? Math.min(borrower1, borrower2) : borrower1;
-    const percent = 15 + Math.max(0, decidingAge - 55);
+    const percent = 15+5 + Math.max(0, decidingAge - 55);
     const loan = value * (percent / 100);
 
     setResult({
