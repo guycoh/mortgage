@@ -9,6 +9,8 @@
 export { default as CreditReportImport } from "./CreditReportImport";
 export type { CreditReportImportProps } from "./CreditReportImport";
 export { default as ReportJsonPanel } from "./ReportJsonPanel";
+export { default as ReportSheet } from "./report-view/ReportSheet";
+export { ReportView } from "./report-view/ReportView";
 
 // Parsing + mapping helpers, re-exported for convenience.
 export {

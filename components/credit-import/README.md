@@ -3,7 +3,10 @@
 Drag-and-drop that parses an Israeli **"דוח ריכוז נתונים"** (Credit Data System report)
 PDF **entirely in the browser** (the file is never uploaded), lets the user pick which
 debts to use, and hands them back so **any calculator** can consume the data. Includes a
-collapsible full-report **JSON side panel** (copy / download / expand-all).
+collapsible full-report **JSON side panel** (copy / download / expand-all) and a full
+**searchable report view** (KPIs, identity, transactions, interest tracks, execution,
+inquiries, glossary — the same dashboard as credit-report-viewer.vercel.app), opened from
+a clickable line in a full-screen sheet.
 
 ## Quick start
 
@@ -29,6 +32,7 @@ selected loans. Map `ExtractedLoan[]` to whatever shape your calculator needs.
 | `isDefaultSelected(loan)` | `l => l.defaultInclude` | Which candidates are pre-checked |
 | `showJsonPanel` | `true` | Render the full-report JSON side panel |
 | `autoOpenJson` | `true` | Auto-open that panel after a parse |
+| `showReportView` | `true` | Offer the full searchable report view (opens in a full-screen sheet) |
 | `showCandidates` | `true` | Render the checkbox pick-list |
 | `jsonSide` | `"left"` | Side the JSON panel slides in from |
 | `title` / `hint` | Hebrew defaults | Dropzone copy overrides |

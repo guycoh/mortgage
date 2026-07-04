@@ -33,12 +33,15 @@ import {
   Landmark,
   RotateCcw,
   FileJson,
+  ScrollText,
+  ChevronLeft,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { parsePdfFile } from "@/lib/credit-parser/extract.client";
 import { extractLoans, type ExtractedLoan } from "@/lib/credit-parser/loan-mapping";
 import type { CreditReport } from "@/lib/credit-parser/types";
 import ReportJsonPanel from "./ReportJsonPanel";
+import ReportSheet from "./report-view/ReportSheet";
 
 type Status = "idle" | "loading" | "done" | "error";
 
@@ -55,6 +58,8 @@ export interface CreditReportImportProps {
   showJsonPanel?: boolean;
   /** Auto-open the JSON panel after a successful parse. Default true. */
   autoOpenJson?: boolean;
+  /** Offer the full searchable report view (opens in a full-screen sheet). Default true. */
+  showReportView?: boolean;
   /** Show the checkbox candidate list. Default true. */
   showCandidates?: boolean;
   /** Side the JSON panel slides in from. Default "left". */
@@ -77,6 +82,7 @@ export default function CreditReportImport({
   isDefaultSelected = defaultSelected,
   showJsonPanel = true,
   autoOpenJson = true,
+  showReportView = true,
   showCandidates = true,
   jsonSide = "left",
   title,
@@ -91,6 +97,7 @@ export default function CreditReportImport({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [report, setReport] = useState<CreditReport | null>(null);
   const [jsonOpen, setJsonOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const emit = useCallback(
@@ -149,6 +156,7 @@ export default function CreditReportImport({
     setSelected(new Set());
     setReport(null);
     setJsonOpen(false);
+    setReportOpen(false);
     onSelect?.([], report as CreditReport);
     if (inputRef.current) inputRef.current.value = "";
   };
@@ -167,6 +175,14 @@ export default function CreditReportImport({
             open={jsonOpen}
             onClose={() => setJsonOpen(false)}
             side={jsonSide}
+          />
+        )}
+        {showReportView && (
+          <ReportSheet
+            report={report}
+            fileName={fileName}
+            open={reportOpen}
+            onClose={() => setReportOpen(false)}
           />
         )}
 
@@ -205,6 +221,26 @@ export default function CreditReportImport({
               </button>
             </div>
           </div>
+
+          {showReportView && (
+            <button
+              onClick={() => setReportOpen(true)}
+              className="mt-3 flex w-full items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-right transition hover:border-[#1d75a1]/40 hover:bg-slate-50"
+            >
+              <span className="flex min-w-0 items-center gap-2.5">
+                <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-[#1d75a1]/10 text-[#1d75a1]">
+                  <ScrollText className="size-4" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-[13px] font-bold text-slate-800">צפייה בדוח האשראי המלא</span>
+                  <span className="block truncate text-[11px] text-slate-400">
+                    כל הפרמטרים, עסקאות, מסלולי ריבית, חיפוש ומילון מונחים
+                  </span>
+                </span>
+              </span>
+              <ChevronLeft className="size-4 shrink-0 text-slate-400" />
+            </button>
+          )}
 
           {showCandidates && candidates.length > 0 && (
             <div className="mt-3 overflow-hidden rounded-xl border border-slate-200 bg-white">
