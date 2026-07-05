@@ -83,6 +83,8 @@ export default function ConsolidationSimulator() {
 
   /* ---- derived headline figures ----------------------------------------- */
   const existingPayment = loans.reduce((s, l) => s + monthlyPayment(l.balance, l.interest, l.months), 0);
+  // total loan balances (excluding any mortgage rows — those live in totalMortgages)
+  const totalLoans = loans.reduce((s, l) => (l.kind === "mortgage" ? s : s + parseNum(l.balance)), 0);
   const mixBalance = mixLoans.reduce((s, l) => s + parseNum(l.balance), 0);
   const mixPayment = mixLoans.reduce((s, l) => s + monthlyPayment(l.balance, l.interest, l.months), 0);
 
@@ -129,6 +131,7 @@ export default function ConsolidationSimulator() {
             <SummaryRail
               totalAssets={totalAssets}
               totalMortgages={totalMortgages}
+              totalLoans={totalLoans}
               totalIncome={totalIncome}
               otherDebts={otherDebts}
               otherDebtsTotal={otherDebtsTotal}
