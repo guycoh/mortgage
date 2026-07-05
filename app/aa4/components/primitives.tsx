@@ -126,6 +126,7 @@ const STAT_TONES = {
   brand: { fg: "var(--brand-deep)", tint: "var(--brand-tint)" },
   neg: { fg: "var(--neg-strong)", tint: "var(--neg-tint)" },
   pos: { fg: "var(--pos-strong)", tint: "var(--pos-tint)" },
+  loan: { fg: "var(--cat-loan)", tint: "var(--cat-loan-tint)" },
 } as const;
 
 export function Stat({

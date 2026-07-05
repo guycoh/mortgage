@@ -2,7 +2,7 @@
 
 import { useId } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { Plus, X, House, Bank, Wallet, TrendUp } from "@phosphor-icons/react";
+import { Plus, X, House, Bank, Wallet, TrendUp, HandCoins } from "@phosphor-icons/react";
 import type { ExtractedLoan } from "@/components/credit-import";
 import { shekel } from "../lib/calc";
 import { shortBank } from "../debtTags";
@@ -147,12 +147,14 @@ export function IncomeCard({
 export function SummaryRail({
   totalAssets,
   totalMortgages,
+  totalLoans,
   totalIncome,
   otherDebts,
   otherDebtsTotal,
 }: {
   totalAssets: number;
   totalMortgages: number;
+  totalLoans: number;
   totalIncome: number;
   otherDebts: ExtractedLoan[];
   otherDebtsTotal: number;
@@ -165,6 +167,7 @@ export function SummaryRail({
       <div className="mt-1 [&>*+*]:border-t [&>*+*]:border-[color:var(--line)]">
         <Stat label="שווי נכסים" value={totalAssets} tone="brand" icon={<House className="size-5" weight="duotone" />} />
         <Stat label="יתרות משכנתא" value={totalMortgages} tone="neg" icon={<Bank className="size-5" weight="duotone" />} />
+        <Stat label="יתרות הלוואה" value={totalLoans} tone="loan" icon={<HandCoins className="size-5" weight="duotone" />} />
         <Stat
           label="הכנסה מוכרת"
           value={totalIncome}

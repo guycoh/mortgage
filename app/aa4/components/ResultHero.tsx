@@ -35,6 +35,16 @@ export default function ResultHero({
   const accentStrong = saving ? "var(--pos-strong)" : "var(--neg-strong)";
   const accentTint = saving ? "var(--pos-tint)" : "var(--neg-tint)";
 
+  // Subtle tinted panel for the headline saving figure (green) / added-cost (red):
+  // a soft diagonal gradient with a faint top-left sheen for depth.
+  const panelBg = saving
+    ? "radial-gradient(135% 105% at 24% -12%, #f5fbf8 0%, transparent 62%), linear-gradient(152deg, #e8f7f0 0%, #d2eee1 100%)"
+    : "radial-gradient(135% 105% at 24% -12%, #fdf5f3 0%, transparent 62%), linear-gradient(152deg, #f9e9e6 0%, #f1dbd6 100%)";
+  const panelBorder = saving ? "rgba(13,138,98,0.22)" : "rgba(194,59,46,0.2)";
+  const panelShadow = saving
+    ? "0 10px 26px -18px rgba(13,138,98,0.4)"
+    : "0 10px 26px -18px rgba(194,59,46,0.38)";
+
   const cap = income * 0.4;
   const newDti = income > 0 ? newPayment / income : null;
   const withinBudget = newDti !== null ? newPayment <= cap : null;
@@ -87,15 +97,21 @@ export default function ResultHero({
             <div className="mt-5 grid grid-cols-1 items-stretch gap-3 md:grid-cols-[1fr_auto_1fr]">
               <FigurePanel label="החזר חודשי נוכחי" value={currentPayment} color="var(--ink)" align="right" />
 
-              <div className="flex flex-col items-center justify-center px-2">
-                <span className="flex items-center gap-1.5 text-[12px] font-semibold" style={{ color: accentStrong }}>
-                  {saving ? <TrendDown className="size-4" /> : <TrendUp className="size-4" />}
+              <div
+                className="flex flex-col items-center justify-center rounded-[16px] border px-6 py-5 text-center"
+                style={{ background: panelBg, borderColor: panelBorder, boxShadow: panelShadow }}
+              >
+                <span className="flex items-center gap-1.5 text-[12.5px] font-semibold" style={{ color: accentStrong }}>
+                  {saving ? <TrendDown className="size-4" weight="bold" /> : <TrendUp className="size-4" weight="bold" />}
                   {saving ? "חיסכון חודשי" : "תוספת חודשית"}
                 </span>
-                <div className="aa4-fig text-[clamp(2.3rem,6.4vw,3.5rem)] font-semibold leading-none" style={{ color: accent }}>
+                <div className="mt-1 aa4-fig text-[clamp(2.3rem,6.4vw,3.5rem)] font-semibold leading-none" style={{ color: accentStrong }}>
                   <Money value={Math.abs(delta)} />
                 </div>
-                <span className="mt-2 flex items-center gap-1.5 rounded-[var(--r-pill)] px-2.5 py-1 text-[12px] font-semibold" style={{ color: accentStrong, background: accentTint }}>
+                <span
+                  className="mt-2.5 flex items-center gap-1.5 rounded-[var(--r-pill)] px-2.5 py-1 text-[12px] font-semibold"
+                  style={{ background: saving ? "rgba(13,138,98,0.13)" : "rgba(194,59,46,0.12)", color: accentStrong }}
+                >
                   {Math.round(pctChange * 100)}%
                   <span className="opacity-40">·</span>
                   <span className="aa4-fig">{shekel(Math.abs(delta) * 12)}</span> בשנה
