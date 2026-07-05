@@ -115,8 +115,6 @@ export default function ConsolidationSimulator() {
         <div className="flex flex-col gap-4 md:gap-5">
           <ImportBar onSelect={handleSelect} onExtract={handleExtract} onImported={handleImported} />
 
-          <ResultHero currentPayment={existingPayment} newPayment={mixPayment} income={totalIncome} />
-
           {/* inputs + summary rail */}
           <div className="grid gap-4 md:gap-5 lg:grid-cols-[1.85fr_1fr]">
             <div className="flex flex-col gap-4 md:gap-5">
@@ -148,6 +146,9 @@ export default function ConsolidationSimulator() {
             </div>
             <MixLedger loans={mixLoans} onUpdate={updateMix} onDelete={deleteMix} onAdd={addMix} />
           </div>
+
+          {/* result summary — below the calculators */}
+          <ResultHero currentPayment={existingPayment} newPayment={mixPayment} income={totalIncome} />
 
           <div className="pt-1 text-center text-[11.5px] text-[var(--ink-2)]">
             החישובים להמחשה בלבד ואינם מהווים ייעוץ או הצעה מחייבת
