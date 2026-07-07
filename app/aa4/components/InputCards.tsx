@@ -3,7 +3,6 @@
 import { useId } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Plus, X, House, Bank, Wallet, TrendUp, HandCoins } from "@phosphor-icons/react";
-import type { ExtractedLoan } from "@/components/credit-import";
 import { shekel } from "../lib/calc";
 import { shortBank } from "../debtTags";
 import { MoneyField, PlainField, Money, Stat } from "./primitives";
@@ -144,6 +143,15 @@ export function IncomeCard({
 }
 
 /* ------------------------------------------------------------- Summary --- */
+
+/** A non-calculator debt (revolving facility / overdraft) for the rail. */
+export interface OtherDebt {
+  uid: string;
+  source: string;
+  type: string;
+  balance: number;
+}
+
 export function SummaryRail({
   totalAssets,
   totalMortgages,
@@ -156,7 +164,7 @@ export function SummaryRail({
   totalMortgages: number;
   totalLoans: number;
   totalIncome: number;
-  otherDebts: ExtractedLoan[];
+  otherDebts: OtherDebt[];
   otherDebtsTotal: number;
 }) {
   return (
