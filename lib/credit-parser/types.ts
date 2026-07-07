@@ -99,7 +99,9 @@ export interface Transaction {
   interestTracks: InterestTrack[];
   collateral: Collateral[];
   relatedCorps: RelatedCorp[];
-  grids: MonthlyGrid[]; // checks / direct-debits / arrears (current accounts)
+  grids: MonthlyGrid[]; // checks / direct-debits / arrears history
+  /** Coded remark lines (הערות), e.g. "העסקה בטיפול ההוצאה לפועל". */
+  remarks: string[];
 }
 
 export interface InquiryByDate {
@@ -128,6 +130,10 @@ export interface ExecutionCase {
   fields: Record<string, string>; // 197-xxx -> value
 }
 
+export interface InsolvencyCase {
+  fields: Record<string, string>; // 151-xxx -> value
+}
+
 export interface AdminAction {
   ref: string;
   date: string;
@@ -142,6 +148,8 @@ export interface CreditReport {
   nonPaymentIndicators: NonPaymentIndicator[];
   transactions: Transaction[];
   execution: ExecutionCase[];
+  /** הליכי חדלות פירעון ושיקום כלכלי (151-xxx). */
+  insolvency: InsolvencyCase[];
   inquiriesByDate: InquiryByDate[];
   newCreditInquiries: NewCreditInquiry[];
   inquirySummary: InquirySummaryRow[];

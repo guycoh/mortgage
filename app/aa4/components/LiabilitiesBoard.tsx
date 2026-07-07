@@ -214,6 +214,19 @@ export default function LiabilitiesBoard({
           </div>
         </div>
         <div className="flex items-center gap-6">
+          {totals.overdue > 0 && (
+            <>
+              <div className="text-left">
+                <div className="text-[10.5px] font-semibold" style={{ color: "var(--neg-strong)" }}>
+                  לא שולם במועד
+                </div>
+                <div className="aa4-fig text-[1.4rem] font-semibold leading-tight" style={{ color: "var(--neg)" }}>
+                  <Money value={totals.overdue} />
+                </div>
+              </div>
+              <div className="h-9 w-px" style={{ background: "var(--line-2)" }} />
+            </>
+          )}
           <div className="text-left">
             <div className="text-[10.5px] font-semibold text-[var(--ink-3)]">יתרת חוב כוללת</div>
             <div className="aa4-fig text-[1.4rem] font-semibold leading-tight text-[var(--ink)]">
@@ -412,6 +425,15 @@ function Row({
               </span>
             </span>
           </>
+        )}
+        {row.overdue > 0 && (
+          <span
+            className="shrink-0 rounded-[var(--r-pill)] px-1.5 py-px text-[9px] font-bold"
+            style={{ background: "var(--neg-tint)", color: "var(--neg-strong)" }}
+            title={`לא שולם במועד: ${shekel(row.overdue)}${row.arrearsRange ? ` · ${row.arrearsRange}` : ""}`}
+          >
+            בפיגור
+          </span>
         )}
         {multi && <OwnerDots owners={row.owners} personas={personas} joint={row.joint} />}
       </div>

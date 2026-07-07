@@ -64,6 +64,9 @@ export function ReportView({
   const exec = report.execution.filter((c) =>
     matchesQuery(Object.values(c.fields).join(" ").toLowerCase(), q)
   );
+  const insolvency = (report.insolvency ?? []).filter((c) =>
+    matchesQuery(Object.values(c.fields).join(" ").toLowerCase(), q)
+  );
   const indicators = report.nonPaymentIndicators.filter((c) =>
     matchesQuery(`${c.source} ${c.id} ${c.reportDate} ${c.description}`.toLowerCase(), q)
   );
@@ -86,7 +89,7 @@ export function ReportView({
 
   const resultCount =
     txns.length + inqByDate.length + newCredit.length + admin.length +
-    exec.length + indicators.length + glossary.length;
+    exec.length + insolvency.length + indicators.length + glossary.length;
 
   return (
     <div className="flex min-h-full flex-col bg-slate-50 text-slate-800" dir="rtl">
@@ -149,9 +152,14 @@ export function ReportView({
             <div className="text-sm">
               <div className="font-semibold">נמצאו אינדיקציות לאי-עמידה בתשלומים</div>
               <div className="text-red-500">
-                {report.execution.length > 0 && `${report.execution.length} תיק הוצאה לפועל`}
-                {report.execution.length > 0 && report.nonPaymentIndicators.length > 0 && " · "}
-                {report.nonPaymentIndicators.length > 0 && `${report.nonPaymentIndicators.length} נתון מובהק לאי-פירעון`}
+                {[
+                  report.execution.length > 0 && `${report.execution.length} תיק הוצאה לפועל`,
+                  (report.insolvency?.length ?? 0) > 0 && `${report.insolvency.length} הליך חדלות פירעון`,
+                  report.nonPaymentIndicators.length > 0 && `${report.nonPaymentIndicators.length} נתון מובהק לאי-פירעון`,
+                  kpis.overdueTotal > 0 && `${formatMoney(String(kpis.overdueTotal))} לא שולמו במועד`,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
               </div>
             </div>
           </div>
@@ -160,7 +168,13 @@ export function ReportView({
         {/* KPI cards */}
         {!searching && (
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <Kpi icon={Wallet} tone="primary" label="יתרת חוב כחייב" value={formatMoney(String(kpis.debtorDebt))} />
+            <Kpi
+              icon={Wallet}
+              tone="primary"
+              label="יתרת חוב כחייב"
+              value={formatMoney(String(kpis.debtorDebt))}
+              sub={kpis.overdueTotal > 0 ? `מתוכה בפיגור: ${formatMoney(String(kpis.overdueTotal))}` : undefined}
+            />
             <Kpi icon={HandCoins} tone="warning" label="יתרת חוב כערב" value={formatMoney(String(kpis.guarantorDebt))} />
             <Kpi icon={Activity} tone="primary" label="עסקאות פעילות" value={String(kpis.activeCount)} sub={`+ ${kpis.inactiveCount} לא פעילות`} />
             <Kpi icon={FileSearch} tone="muted" label="פניות לקבלת מידע" value={String(kpis.inquiries)} sub={`${kpis.newCredit} בקשות אשראי`} />
@@ -216,6 +230,7 @@ export function ReportView({
                               <th className="px-3 py-1.5 text-start font-medium">{b.col2Label || "מזהה"}</th>
                               <th className="px-3 py-1.5 text-start font-medium">{b.col3Label || "מסגרת"}</th>
                               <th className="px-3 py-1.5 text-start font-medium">יתרת חוב</th>
+                              <th className="px-3 py-1.5 text-start font-medium">לא שולם במועד</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -225,6 +240,7 @@ export function ReportView({
                                 <td className="px-3 py-1.5 font-mono text-xs" dir="ltr">{r.idOrCount || "—"}</td>
                                 <td className="px-3 py-1.5 tabular-nums">{formatMoney(r.limit)}</td>
                                 <td className={cn("px-3 py-1.5 tabular-nums", parseFloat(r.debtBalance || "0") > 0 && "text-red-600")}>{formatMoney(r.debtBalance)}</td>
+                                <td className={cn("px-3 py-1.5 tabular-nums", parseFloat((r.overdue || "0").replace(/,/g, "")) > 0 ? "font-semibold text-red-600" : "text-slate-400")}>{formatMoney(r.overdue)}</td>
                               </tr>
                             ))}
                           </tbody>
@@ -279,6 +295,44 @@ export function ReportView({
               ))}
             </div>
           </Section>
+        )}
+
+        {/* Insolvency proceedings */}
+        {insolvency.length > 0 && (
+          <Section icon={Gavel} title="הליכי חדלות פירעון ושיקום כלכלי" count={insolvency.length} danger>
+            <div className="space-y-3">
+              {insolvency.map((c, i) => (
+                <div key={i} className="rounded-lg border border-slate-200 bg-white p-4">
+                  <dl className="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-3 lg:grid-cols-4">
+                    {Object.entries(c.fields).map(([code, v]) => {
+                      const def = FIELD_BY_CODE[code];
+                      const isMoney = def?.kind === "money";
+                      return (
+                        <div key={code} className="border-b border-dashed border-slate-200 py-1">
+                          <dt className="text-xs text-slate-500">{def?.he ?? code}</dt>
+                          <dd className={cn("text-sm font-medium tabular-nums", isMoney && "text-red-600")} dir={def?.kind === "date" || def?.kind === "id" ? "ltr" : undefined}>
+                            <Highlight text={isMoney ? formatMoney(v) : v} query={query} />
+                          </dd>
+                        </div>
+                      );
+                    })}
+                  </dl>
+                </div>
+              ))}
+            </div>
+          </Section>
+        )}
+
+        {/* Parser self-validation warnings */}
+        {!searching && report.warnings.length > 0 && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
+            <div className="mb-1 font-semibold">בדיקות אימות הדוח העלו אי-התאמות — מומלץ לוודא מול ה-PDF:</div>
+            <ul className="list-inside list-disc space-y-0.5">
+              {report.warnings.map((w, i) => (
+                <li key={i}>{w}</li>
+              ))}
+            </ul>
+          </div>
         )}
 
         {/* Inquiries */}

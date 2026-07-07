@@ -47,6 +47,8 @@ export interface LiabilityRow {
   months: string; // remaining term
   endDate: string;
   limit: number; // credit limit (revolving facilities)
+  overdue: number; // amount unpaid on time (201-051), 0 when current
+  arrearsRange: string; // days-in-arrears range, "" when current
   include: boolean; // streamed into the consolidation calculator
   joint: boolean; // matched across two reports
   manual: boolean;
@@ -102,6 +104,8 @@ export function rowFromLoan(person: number, loan: ExtractedLoan): LiabilityRow {
     months: loan.months,
     endDate: loan.endDate,
     limit: loan.limit,
+    overdue: loan.overdue,
+    arrearsRange: loan.arrearsRange,
     include: loan.defaultInclude,
     joint: false,
     manual: false,
@@ -127,6 +131,8 @@ export function manualRow(
     months: "",
     endDate: "",
     limit: 0,
+    overdue: 0,
+    arrearsRange: "",
     include: category === "mortgage" || category === "loan",
     joint: false,
     manual: true,
@@ -287,6 +293,7 @@ export function splitRow(rows: LiabilityRow[], id: string): LiabilityRow[] {
 export interface LiabilityTotals {
   balance: number;
   monthly: number;
+  overdue: number;
   count: number;
   joint: number;
 }
@@ -297,9 +304,10 @@ export function rowTotals(rows: LiabilityRow[]): LiabilityTotals {
     (t, r) => ({
       balance: t.balance + parseNum(r.balance),
       monthly: t.monthly + parseNum(r.monthly),
+      overdue: t.overdue + r.overdue,
       count: t.count + 1,
       joint: t.joint + (r.joint ? 1 : 0),
     }),
-    { balance: 0, monthly: 0, count: 0, joint: 0 }
+    { balance: 0, monthly: 0, overdue: 0, count: 0, joint: 0 }
   );
 }

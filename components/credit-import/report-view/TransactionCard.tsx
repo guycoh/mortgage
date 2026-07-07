@@ -1,12 +1,12 @@
 "use client";
 
-import { ChevronDown, Building2, ShieldCheck, Car, Phone, Mail, MapPin } from "lucide-react";
+import { ChevronDown, Building2, ShieldCheck, Car, Phone, Mail, MapPin, AlertTriangle } from "lucide-react";
 import type { Transaction } from "@/lib/credit-parser/types";
 import { cn } from "@/lib/utils";
 import { Badge } from "./ui";
 import { Highlight } from "./Highlight";
 import { MonthlyGridTable } from "./MonthlyGrid";
-import { transactionGroups, formatMoney, enumEn, ROLE_LABELS } from "@/lib/credit-parser/report";
+import { transactionGroups, formatMoney, enumEn, ROLE_LABELS, parseNum } from "@/lib/credit-parser/report";
 
 function statusTone(status?: string): "success" | "muted" | "danger" {
   if (!status) return "muted";
@@ -27,7 +27,8 @@ export function TransactionCard({
   onToggle: () => void;
 }) {
   const status = t.fields["201-022"];
-  const tone = statusTone(status);
+  const overdue = parseNum(t.fields["201-051"]);
+  const tone = overdue > 0 ? "danger" : statusTone(status);
   const type = t.fields["201-002"];
   const debt = t.fields["201-049"];
   const limit = t.fields["201-020"] ?? t.fields["201-045"];
@@ -78,6 +79,7 @@ export function TransactionCard({
         <div className="hidden shrink-0 items-center gap-5 sm:flex">
           <Stat label="מסגרת / סכום" value={formatMoney(limit)} />
           <Stat label="יתרת חוב" value={formatMoney(debt)} strong={parseFloat(debt ?? "0") > 0} />
+          {overdue > 0 && <Stat label="לא שולם במועד" value={formatMoney(t.fields["201-051"])} strong />}
         </div>
         {status && (
           <span
@@ -206,7 +208,19 @@ export function TransactionCard({
             </div>
           )}
 
-          {/* Monthly grids (checks / direct debits) */}
+          {/* Coded remarks (הערות) */}
+          {(t.remarks?.length ?? 0) > 0 && (
+            <div className="mt-4 space-y-1.5">
+              {t.remarks.map((r, i) => (
+                <div key={i} className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+                  <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
+                  <Highlight text={r} query={query} />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Monthly grids (checks / direct debits / arrears history) */}
           {t.grids.length > 0 && (
             <div className="mt-4 space-y-3">
               {t.grids.map((g, i) => (

@@ -46,6 +46,8 @@ export interface ExtractedLoan {
   endDate: string; // 201-018 planned end (dd/mm/yyyy, "" when absent)
   limit: number; // 201-020 credit limit (revolving facilities), 0 when absent
   origAmount: number; // 201-045 original loan amount, 0 when absent
+  overdue: number; // 201-051 amount unpaid on time, 0 when not in arrears
+  arrearsRange: string; // 201-050 days-in-arrears range ("" when not in arrears)
   /** Pre-checked for the loans table: the client's own, non-mortgage debts. */
   defaultInclude: boolean;
 }
@@ -290,6 +292,8 @@ function deriveLoan(t: Transaction, asOf: Date): ExtractedLoan {
     endDate: t.fields["201-018"] || "",
     limit: parseNum(t.fields["201-020"]),
     origAmount: parseNum(t.fields["201-045"]),
+    overdue: parseNum(t.fields["201-051"]),
+    arrearsRange: t.fields["201-050"] || "",
     // Auto-inject the client's own active loans & mortgages only.
     defaultInclude:
       t.role === "debtor" &&
