@@ -27,6 +27,7 @@ import "./aa4-theme.css";
 
 import ImportBar from "./components/ImportBar";
 import ResultHero from "./components/ResultHero";
+import CustomerSummary from "./components/CustomerSummary";
 import LiabilitiesBoard, { type Persona } from "./components/LiabilitiesBoard";
 import { AssetsCard, IncomeCard, SummaryRail, type PropertyRow, type OtherDebt } from "./components/InputCards";
 import { LoanLedger, MixLedger, type LoanRow, type MixRow } from "./components/Ledger";
@@ -78,6 +79,7 @@ export default function ConsolidationSimulator() {
   const otherDebtsTotal = otherDebts.reduce((s, l) => s + l.balance, 0);
   const loansCardRef = useRef<HTMLDivElement>(null);
   const [flash, setFlash] = useState(false);
+  const [summaryOpen, setSummaryOpen] = useState(false);
 
   const personas: Persona[] = slots.map((s, i) => ({
     name: (s.report.client.name || `דוח ${i + 1}`).split(" ")[0],
@@ -244,13 +246,32 @@ export default function ConsolidationSimulator() {
           </div>
 
           {/* result summary — below the calculators */}
-          <ResultHero currentPayment={existingPayment} newPayment={mixPayment} income={totalIncome} />
+          <ResultHero
+            currentPayment={existingPayment}
+            newPayment={mixPayment}
+            income={totalIncome}
+            onPresent={() => setSummaryOpen(true)}
+          />
 
           <div className="pt-1 text-center text-[11.5px] text-[var(--ink-2)]">
             החישובים להמחשה בלבד ואינם מהווים ייעוץ או הצעה מחייבת
           </div>
         </div>
       </div>
+
+      {/* customer-facing one-page summary */}
+      <CustomerSummary
+        open={summaryOpen}
+        onClose={() => setSummaryOpen(false)}
+        loans={loans}
+        mixLoans={mixLoans}
+        liabRows={liabRows}
+        slots={slots}
+        personas={personas}
+        currentPayment={existingPayment}
+        newPayment={mixPayment}
+        income={totalIncome}
+      />
     </div>
   );
 }

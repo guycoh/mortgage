@@ -7,7 +7,7 @@
 // feedback as the mix is edited.
 
 import { motion, useReducedMotion } from "motion/react";
-import { ArrowLeft, TrendDown, TrendUp, Sparkle, ShieldCheck, ShieldWarning, Path } from "@phosphor-icons/react";
+import { ArrowLeft, TrendDown, TrendUp, Sparkle, ShieldCheck, ShieldWarning, Path, PresentationChart } from "@phosphor-icons/react";
 import { shekel } from "../lib/calc";
 import { Money } from "./primitives";
 
@@ -15,10 +15,13 @@ export default function ResultHero({
   currentPayment,
   newPayment,
   income,
+  onPresent,
 }: {
   currentPayment: number;
   newPayment: number;
   income: number;
+  /** Opens the customer-facing one-page summary. Shown once a comparison exists. */
+  onPresent?: () => void;
 }) {
   const reduce = useReducedMotion();
   const ease = [0.22, 1, 0.36, 1] as const;
@@ -122,6 +125,16 @@ export default function ResultHero({
             </div>
 
             <ComparisonBar current={currentPayment} next={newPayment} income={income} saving={saving} trans={barTrans} reduce={reduce} />
+
+            {onPresent && (
+              <div className="mt-5 flex flex-col items-center gap-1.5 border-t pt-4" style={{ borderColor: "var(--line)" }}>
+                <button onClick={onPresent} className="aa4-btn aa4-btn-primary !px-6 !py-2.5 !text-[13.5px]">
+                  <PresentationChart className="size-[18px]" weight="duotone" />
+                  הצגת סיכום ללקוח
+                </button>
+                <span className="text-[11px] text-[var(--ink-3)]">עמוד סיכום מעוצב, מוכן להצגה או להדפסה כ-PDF</span>
+              </div>
+            )}
 
             {newDti !== null && (
               <div className="mt-4 flex items-center gap-3 rounded-[var(--r-control)] border p-3.5" style={{ borderColor: "var(--line)", background: "var(--surface-2)" }}>

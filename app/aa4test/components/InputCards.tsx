@@ -127,8 +127,8 @@ export function IncomeCard({
       </div>
 
       <div className="mb-3 grid grid-cols-3 gap-3">
-        <PlainField label="גיל לווה ראשי" value={ages.primary} onChange={(v) => onAge("primary", v)} placeholder="35" max={120} />
-        <PlainField label="גיל לווה משני" value={ages.secondary} onChange={(v) => onAge("secondary", v)} placeholder="35" max={120} />
+        <PlainField label="גיל לווה ראשי" value={ages.primary} onChange={(v) => onAge("primary", v)} max={120} />
+        <PlainField label="גיל לווה משני" value={ages.secondary} onChange={(v) => onAge("secondary", v)} max={120} />
         <PlainField label="גיל ערב" value={ages.guarantor} onChange={(v) => onAge("guarantor", v)} placeholder="" max={120} />
       </div>
 

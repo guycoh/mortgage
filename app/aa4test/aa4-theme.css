@@ -420,6 +420,35 @@ select.aa4-ledger-input {
 }
 .aa4-root input[type="number"] { -moz-appearance: textfield; }
 
+/* — customer summary sheet: print only the sheet, as a clean document — */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .aa4-summary-sheet,
+  .aa4-summary-sheet * {
+    visibility: visible;
+  }
+  .aa4-summary-overlay {
+    position: static !important;
+    padding: 0 !important;
+    background: none !important;
+    backdrop-filter: none !important;
+  }
+  .aa4-summary-sheet {
+    position: absolute !important;
+    inset: 0 0 auto 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+    max-height: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+  .aa4-no-print {
+    display: none !important;
+  }
+}
+
 /* Honour the OS reduced-motion preference for CSS-driven motion. Framer-driven
    entrance/count-up motion is gated separately via useReducedMotion(). */
 @media (prefers-reduced-motion: reduce) {
