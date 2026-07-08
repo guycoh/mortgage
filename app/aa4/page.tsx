@@ -55,10 +55,10 @@ export default function ConsolidationSimulator() {
   const totalIncome = incomes.primary + incomes.secondary + incomes.guarantor * 0.5;
 
   /* ---- existing loans ---------------------------------------------------- */
-  const [loans, setLoans] = useState<LoanRow[]>([{ _id: nid(), balance: "", interest: "", months: "" }]);
+  const [loans, setLoans] = useState<LoanRow[]>([{ _id: nid(), balance: "", interest: "", months: "", manual: true }]);
   const updateLoan = (i: number, key: keyof LoanRow, value: string) =>
     setLoans((prev) => prev.map((l, idx) => (idx === i ? { ...l, [key]: value } : l)));
-  const addLoan = () => setLoans((prev) => [...prev, { _id: nid(), balance: "", interest: "", months: "" }]);
+  const addLoan = () => setLoans((prev) => [...prev, { _id: nid(), balance: "", interest: "", months: "", manual: true }]);
   const deleteLoan = (i: number) =>
     setLoans((prev) => (prev.length === 1 ? prev : prev.filter((_, idx) => idx !== i)));
 
@@ -102,7 +102,7 @@ export default function ConsolidationSimulator() {
             typeLabel: r.typeLabel || undefined,
             kind: r.category === "mortgage" ? ("mortgage" as const) : ("loan" as const),
           }))
-        : [{ _id: nid(), balance: "", interest: "", months: "" }]
+        : [{ _id: nid(), balance: "", interest: "", months: "", manual: true }]
     );
     const mortgageSum = rows
       .filter((r) => r.category === "mortgage")

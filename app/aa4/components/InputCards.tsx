@@ -31,15 +31,9 @@ export function AssetsCard({
   const reduce = useReducedMotion();
   return (
     <section className="aa4-card aa4-card-pad">
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <div>
-          <h3 className="aa4-card-title">שווי נכסים ויתרות משכנתא</h3>
-          <p className="aa4-card-sub">הנכסים והמשכנתאות הרשומות על שמם.</p>
-        </div>
-        <button onClick={onAdd} className="aa4-btn aa4-btn-soft">
-          <Plus className="size-4" />
-          הוספת נכס
-        </button>
+      <div className="mb-4">
+        <h3 className="aa4-card-title">שווי נכסים ויתרות משכנתא</h3>
+        <p className="aa4-card-sub">הנכסים והמשכנתאות הרשומות על שמם.</p>
       </div>
 
       <div className="space-y-2.5">
@@ -71,6 +65,11 @@ export function AssetsCard({
           ))}
         </AnimatePresence>
       </div>
+
+      <button onClick={onAdd} className="aa4-row-add mt-2.5">
+        <Plus className="size-4" />
+        הוספת נכס
+      </button>
     </section>
   );
 }
