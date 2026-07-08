@@ -3,7 +3,6 @@
 import { useId } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Plus, X, House, Bank, Wallet, TrendUp, HandCoins } from "@phosphor-icons/react";
-import type { ExtractedLoan } from "@/components/credit-import";
 import { shekel } from "../lib/calc";
 import { shortBank } from "../debtTags";
 import { MoneyField, PlainField, Money, Stat } from "./primitives";
@@ -32,15 +31,9 @@ export function AssetsCard({
   const reduce = useReducedMotion();
   return (
     <section className="aa4-card aa4-card-pad">
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <div>
-          <h3 className="aa4-card-title">שווי נכסים ויתרות משכנתא</h3>
-          <p className="aa4-card-sub">הנכסים והמשכנתאות הרשומות על שמם.</p>
-        </div>
-        <button onClick={onAdd} className="aa4-btn aa4-btn-soft">
-          <Plus className="size-4" />
-          הוספת נכס
-        </button>
+      <div className="mb-4">
+        <h3 className="aa4-card-title">שווי נכסים ויתרות משכנתא</h3>
+        <p className="aa4-card-sub">הנכסים והמשכנתאות הרשומות על שמם.</p>
       </div>
 
       <div className="space-y-2.5">
@@ -72,6 +65,11 @@ export function AssetsCard({
           ))}
         </AnimatePresence>
       </div>
+
+      <button onClick={onAdd} className="aa4-row-add mt-2.5">
+        <Plus className="size-4" />
+        הוספת נכס
+      </button>
     </section>
   );
 }
@@ -144,6 +142,15 @@ export function IncomeCard({
 }
 
 /* ------------------------------------------------------------- Summary --- */
+
+/** A non-calculator debt (revolving facility / overdraft) for the rail. */
+export interface OtherDebt {
+  uid: string;
+  source: string;
+  type: string;
+  balance: number;
+}
+
 export function SummaryRail({
   totalAssets,
   totalMortgages,
@@ -156,7 +163,7 @@ export function SummaryRail({
   totalMortgages: number;
   totalLoans: number;
   totalIncome: number;
-  otherDebts: ExtractedLoan[];
+  otherDebts: OtherDebt[];
   otherDebtsTotal: number;
 }) {
   return (

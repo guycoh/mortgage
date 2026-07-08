@@ -1,10 +1,10 @@
 "use client";
 
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { Plus, X, Stack, ListChecks } from "@phosphor-icons/react";
+import { Plus, X, Stack, ListChecks, House, HandCoins, CaretUpDown } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 import { monthlyPayment, parseNum, groupDigits, shekel } from "../lib/calc";
-import { shortBank } from "../debtTags";
+import { shortBank, catMeta } from "../debtTags";
 import { BankBadge, TypeTag } from "./badges";
 import { Money } from "./primitives";
 import TypeSelect from "./TypeSelect";
@@ -20,6 +20,8 @@ export interface LoanRow {
   source?: string;
   kind?: "mortgage" | "loan";
   typeLabel?: string;
+  /** A hand-added row: name + kind stay editable in place. */
+  manual?: boolean;
 }
 export interface MixRow {
   _id?: string;
@@ -107,6 +109,63 @@ function Col({ divider, center, children }: { divider?: boolean; center?: boolea
   );
 }
 
+/* The manual row's type tag: looks exactly like an imported row's TypeTag,
+   but a click flips it between הלוואה and משכנתה. */
+function KindTagPicker({
+  kind,
+  onChange,
+  row,
+}: {
+  kind: "mortgage" | "loan";
+  onChange: (k: "mortgage" | "loan") => void;
+  row: number;
+}) {
+  const m = catMeta(kind);
+  const Icon = kind === "mortgage" ? House : HandCoins;
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(kind === "mortgage" ? "loan" : "mortgage")}
+      title="לחיצה מחליפה בין הלוואה למשכנתה"
+      aria-label={`סוג שורה ${row}: ${m.label}, לחיצה להחלפה`}
+      className="inline-flex w-fit cursor-pointer items-center gap-1 rounded-[var(--r-pill)] px-1.5 py-px text-[9.5px] font-semibold transition hover:shadow-[inset_0_0_0_1px_currentColor] focus-visible:outline-none focus-visible:shadow-[0_0_0_2px_var(--brand-tint)]"
+      style={{ color: m.color, background: m.tint }}
+    >
+      <Icon className="size-3" weight="fill" />
+      {m.label}
+      <CaretUpDown className="size-2.5 opacity-70" />
+    </button>
+  );
+}
+
+/* Editable identity for a hand-added row — same anatomy as an imported row
+   (mark + name + type tag), only everything stays editable in place. */
+function ManualIdentity({
+  row,
+  i,
+  onUpdate,
+}: {
+  row: LoanRow;
+  i: number;
+  onUpdate: (i: number, key: keyof LoanRow, value: string) => void;
+}) {
+  return (
+    <div className="flex items-center gap-2 py-0.5">
+      <BankBadge source={row.source || undefined} size={22} />
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <input
+          value={row.source ?? ""}
+          onChange={(e) => onUpdate(i, "source", e.target.value)}
+          placeholder="שם הבנק / ההלוואה"
+          aria-label={`שם ההלוואה, שורה ${i + 1}`}
+          className="w-full min-w-0 border-b border-dashed border-transparent bg-transparent text-[12px] font-semibold leading-tight text-[var(--ink)] outline-none transition-colors placeholder:font-normal placeholder:text-[var(--ink-4)] hover:border-[var(--line-2)] focus:border-[var(--brand)]"
+        />
+        <KindTagPicker kind={row.kind ?? "loan"} row={i + 1} onChange={(k) => onUpdate(i, "kind", k)} />
+      </span>
+    </div>
+  );
+}
+
 /* ---------------------------------------------------------- Existing loans */
 export function LoanLedger({
   loans,
@@ -126,18 +185,12 @@ export function LoanLedger({
 
   return (
     <section className="aa4-card aa4-card-pad flex flex-col">
-      <div className="mb-3.5 flex items-start justify-between">
-        <div>
-          <h3 className="aa4-card-title flex items-center gap-2">
-            <ListChecks className="size-[18px] text-[var(--brand)]" />
-            הלוואות קיימות
-          </h3>
-          <p className="aa4-card-sub">המצב הנוכחי, לפני איחוד.</p>
-        </div>
-        <button onClick={onAdd} className="aa4-btn aa4-btn-soft">
-          <Plus className="size-4" />
-          הלוואה
-        </button>
+      <div className="mb-3.5">
+        <h3 className="aa4-card-title flex items-center gap-2">
+          <ListChecks className="size-[18px] text-[var(--brand)]" />
+          הלוואות קיימות
+        </h3>
+        <p className="aa4-card-sub">המצב הנוכחי, לפני איחוד.</p>
       </div>
 
       <ColHeads cols={cols} labels={["הלוואה", "יתרה", "ריבית", "חודשים", "החזר", ""]} />
@@ -146,7 +199,7 @@ export function LoanLedger({
         <AnimatePresence initial={false}>
           {loans.map((l, i) => {
             const pay = monthlyPayment(l.balance, l.interest, l.months);
-            const hasMeta = !!l.source;
+            const editable = l.manual || !l.source;
             return (
               <motion.div
                 key={l._id ?? i}
@@ -157,21 +210,19 @@ export function LoanLedger({
                 className={cn("grid items-stretch gap-1.5 rounded-[var(--r-control)] border px-2 py-1 [&>*]:min-w-0", cols)}
                 style={{ borderColor: "var(--line)", background: "var(--surface)" }}
               >
-                <div className="flex items-center gap-2 py-0.5">
-                  {hasMeta ? (
-                    <>
-                      <BankBadge source={l.source} size={22} />
-                      <span className="flex min-w-0 flex-col gap-0.5">
-                        <span className="truncate text-[12px] font-semibold leading-tight text-[var(--ink)]" title={l.source}>
-                          {shortBank(l.source)}
-                        </span>
-                        <TypeTag kind={l.kind} typeLabel={l.typeLabel} />
+                {editable ? (
+                  <ManualIdentity row={l} i={i} onUpdate={onUpdate} />
+                ) : (
+                  <div className="flex items-center gap-2 py-0.5">
+                    <BankBadge source={l.source} size={22} />
+                    <span className="flex min-w-0 flex-col gap-0.5">
+                      <span className="truncate text-[12px] font-semibold leading-tight text-[var(--ink)]" title={l.source}>
+                        {shortBank(l.source)}
                       </span>
-                    </>
-                  ) : (
-                    <span className="self-center ps-0.5 text-[11px] text-[var(--ink-4)]">שורה ידנית</span>
-                  )}
-                </div>
+                      <TypeTag kind={l.kind} typeLabel={l.typeLabel} />
+                    </span>
+                  </div>
+                )}
                 <Col divider>
                   <Cell value={l.balance} onChange={(v) => onUpdate(i, "balance", groupDigits(v))} placeholder="0" maxLength={11} ariaLabel={`יתרת הלוואה, שורה ${i + 1}`} />
                 </Col>
@@ -194,6 +245,11 @@ export function LoanLedger({
           })}
         </AnimatePresence>
       </div>
+
+      <button onClick={onAdd} className="aa4-row-add mt-2">
+        <Plus className="size-4" />
+        הוספת הלוואה
+      </button>
 
       <LedgerFooter totalBalance={totalBalance} totalPayment={totalPayment} paymentLabel="החזר נוכחי" />
     </section>
@@ -219,18 +275,12 @@ export function MixLedger({
 
   return (
     <section className="aa4-card aa4-card-pad flex flex-col">
-      <div className="mb-3.5 flex items-start justify-between">
-        <div>
-          <h3 className="aa4-card-title flex items-center gap-2">
-            <Stack className="size-[18px] text-[var(--pos)]" />
-            תמהיל איחוד חדש
-          </h3>
-          <p className="aa4-card-sub">בנו את התמהיל המוצע והשוו.</p>
-        </div>
-        <button onClick={onAdd} className="aa4-btn aa4-btn-soft">
-          <Plus className="size-4" />
-          מסלול
-        </button>
+      <div className="mb-3.5">
+        <h3 className="aa4-card-title flex items-center gap-2">
+          <Stack className="size-[18px] text-[var(--pos)]" />
+          תמהיל איחוד חדש
+        </h3>
+        <p className="aa4-card-sub">בנו את התמהיל המוצע והשוו.</p>
       </div>
 
       <ColHeads cols={cols} labels={["סוג", "סכום", "ריבית", "חודשים", "החזר", ""]} />
@@ -278,6 +328,11 @@ export function MixLedger({
           })}
         </AnimatePresence>
       </div>
+
+      <button onClick={onAdd} className="aa4-row-add mt-2">
+        <Plus className="size-4" />
+        הוספת מסלול
+      </button>
 
       <LedgerFooter totalBalance={totalBalance} totalPayment={totalPayment} paymentLabel="החזר תמהיל" />
     </section>
