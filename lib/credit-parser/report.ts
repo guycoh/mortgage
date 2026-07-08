@@ -67,6 +67,7 @@ export function transactionGroups(t: Transaction): FieldGroup[] {
     g("מעורבים בעסקה", ["201-009", "201-010", "201-011"]),
     g("מהות וסטטוס", ["201-022", "201-017", "201-021"]),
     g("סכומים ותשלומים", ["201-020", "201-072", "201-049", "201-045", "201-044", "201-047", "201-046", "201-048", "201-053", "201-054", "201-055"]),
+    g("פיגורים", ["201-051", "201-050", "201-052"]),
   ].filter((grp) => grp.fields.length > 0);
 }
 
@@ -88,6 +89,8 @@ export const ROLE_LABELS = {
 export interface Kpis {
   debtorDebt: number;
   guarantorDebt: number;
+  /** Total unpaid-on-time amounts (201-051) across the debtor's open debts. */
+  overdueTotal: number;
   totalLimit: number;
   activeCount: number;
   inactiveCount: number;
@@ -100,6 +103,7 @@ export interface Kpis {
 export function computeKpis(r: CreditReport): Kpis {
   let debtorDebt = 0;
   let guarantorDebt = 0;
+  let overdueTotal = 0;
   let totalLimit = 0;
   let activeCount = 0;
   let inactiveCount = 0;
@@ -111,19 +115,25 @@ export function computeKpis(r: CreditReport): Kpis {
     }
     activeCount++;
     totalLimit += parseNum(t.fields["201-020"]) + parseNum(t.fields["201-045"]);
-    if (t.role === "debtor") debtorDebt += debt;
-    else guarantorDebt += debt;
+    if (t.role === "debtor") {
+      debtorDebt += debt;
+      overdueTotal += parseNum(t.fields["201-051"]);
+    } else {
+      guarantorDebt += debt;
+    }
   }
+  const insolvency = r.insolvency?.length ?? 0;
   return {
     debtorDebt,
     guarantorDebt,
+    overdueTotal,
     totalLimit,
     activeCount,
     inactiveCount,
     inquiries: r.inquiriesByDate.length,
     newCredit: r.newCreditInquiries.length,
-    hasFlag: r.nonPaymentIndicators.length > 0 || r.execution.length > 0,
-    flagCount: r.nonPaymentIndicators.length + r.execution.length,
+    hasFlag: r.nonPaymentIndicators.length > 0 || r.execution.length > 0 || insolvency > 0,
+    flagCount: r.nonPaymentIndicators.length + r.execution.length + insolvency,
   };
 }
 
@@ -137,6 +147,7 @@ export function transactionSearchText(t: Transaction): string {
     SECTION_LABELS[t.section],
     ROLE_LABELS[t.role],
     ...Object.entries(t.fields).map(([code, v]) => `${FIELD_BY_CODE[code]?.he ?? ""} ${v}`),
+    ...(t.remarks ?? []),
     ...t.interestTracks.map((tr) => `${tr.type} ${tr.anchor} ${tr.nominal} ${tr.effective}`),
     ...t.collateral.map((c) => `${c.type} ${c.value} ${c.fileId}`),
     ...t.relatedCorps.map((c) => `${c.name} ${c.number} ${c.country}`),

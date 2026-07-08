@@ -20,6 +20,23 @@ export {
   parseNum,
   type ExtractedLoan,
   type LoanRow,
+  type LiabilityCategory,
 } from "@/lib/credit-parser/loan-mapping";
+
+// Liability board (BDI page-2 view): grouping, joint-debt matching, totals.
+export {
+  buildLiabilities,
+  mergeRows,
+  splitRow,
+  manualRow,
+  rowTotals,
+  CATEGORY_ORDER,
+  CATEGORY_LABEL,
+  PERSON_COLORS,
+  type ReportSlot,
+  type LiabilityRow,
+  type MatchSuggestion,
+  type LiabilityTotals,
+} from "@/lib/credit-parser/liabilities";
 export { parsePdfFile, extractPages } from "@/lib/credit-parser/extract.client";
 export type { CreditReport, Transaction } from "@/lib/credit-parser/types";

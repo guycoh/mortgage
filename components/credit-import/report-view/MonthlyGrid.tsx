@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 
 const MONTHS = ["ינו׳", "פבר׳", "מרץ", "אפר׳", "מאי", "יוני", "יולי", "אוג׳", "ספט׳", "אוק׳", "נוב׳", "דצמ׳"];
 
-const DANGER_LABEL = /לא כובדו|חזרו/;
+const DANGER_LABEL = /לא כובדו|חזרו|פיגורים/;
 
 export function MonthlyGridTable({ grid }: { grid: Grid }) {
   const danger = DANGER_LABEL.test(grid.label);

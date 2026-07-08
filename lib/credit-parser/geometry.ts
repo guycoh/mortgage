@@ -74,7 +74,7 @@ export function detectCodes(line: Line): CodeHit[] {
     if (used.has(i)) continue;
     const s = toks[i].str;
     // Intact code, possibly with surrounding text glued on, e.g. "(201-029)מזהה".
-    const intact = s.match(/\((201|197)-(\d{3})\)/);
+    const intact = s.match(/\((201|197|151)-(\d{3})\)/);
     if (intact) {
       hits.push({
         code: `${intact[1]}-${intact[2]}`,
@@ -84,8 +84,8 @@ export function detectCodes(line: Line): CodeHit[] {
       used.add(i);
       continue;
     }
-    // Split-code seed: a token containing the "201-" / "197-" stem.
-    const seed = s.match(/(201|197)-(\d{1,3})/);
+    // Split-code seed: a token containing the "201-" / "197-" / "151-" stem.
+    const seed = s.match(/(201|197|151)-(\d{1,3})/);
     if (!seed) continue;
     const prefix = seed[1];
     let digits = seed[2];
@@ -178,11 +178,20 @@ export function despace(s: string): string {
   return s.replace(/[\s‏‎]/g, "");
 }
 
-/** Find which of `phrases` appears in the block (de-spaced match). */
+/**
+ * Normalization for enum-phrase matching: beyond whitespace, strip punctuation
+ * whose direction/shape varies between the canonical phrase and the PDF's RTL
+ * token stream (parentheses are mirrored, commas/hyphens split into tokens).
+ */
+export function normEnum(s: string): string {
+  return s.replace(/[\s‏‎().,;:־–-]/g, "");
+}
+
+/** Find which of `phrases` appears in the block (normalized match). */
 export function matchEnum(lines: Line[], phrases: readonly string[]): string {
-  const hay = despace(blockText(lines));
+  const hay = normEnum(blockText(lines));
   for (const p of phrases) {
-    if (hay.includes(despace(p))) return p;
+    if (hay.includes(normEnum(p))) return p;
   }
   return "";
 }
@@ -241,8 +250,8 @@ export function enumByCell(
     }
   }
   valToks.sort((a, b) => b.y - a.y || b.x - a.x);
-  const hay = despace(valToks.map((t) => t.str).join(""));
-  for (const p of phrases) if (hay.includes(despace(p))) return p;
+  const hay = normEnum(valToks.map((t) => t.str).join(""));
+  for (const p of phrases) if (hay.includes(normEnum(p))) return p;
   return matchEnum(lines, phrases);
 }
 
@@ -269,8 +278,8 @@ export function detectByBand(
     }
   }
   toks.sort((a, b) => b.y - a.y || b.x - a.x);
-  const hay = despace(toks.map((t) => t.str).join(""));
-  for (const p of phrases) if (hay.includes(despace(p))) return p;
+  const hay = normEnum(toks.map((t) => t.str).join(""));
+  for (const p of phrases) if (hay.includes(normEnum(p))) return p;
   return matchEnum(lines, phrases);
 }
 

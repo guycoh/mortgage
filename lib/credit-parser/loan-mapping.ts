@@ -13,6 +13,14 @@
 
 import type { CreditReport, Transaction, InterestTrack } from "./types";
 
+/** BDI page-2 grouping: the four liability families + a catch-all. */
+export type LiabilityCategory =
+  | "mortgage"
+  | "loan"
+  | "card"
+  | "overdraft"
+  | "other";
+
 export interface ExtractedLoan {
   uid: string;
   source: string; // reporting bank
@@ -22,12 +30,24 @@ export interface ExtractedLoan {
   isMortgage: boolean;
   /** A real loan or mortgage (vs. a revolving facility / overdraft / guarantee). */
   isLoanOrMortgage: boolean;
+  /** Which BDI page-2 section the debt belongs to. */
+  category: LiabilityCategory;
+  /** Human mortgage-track label derived from the interest tracks (e.g. "פריים"). */
+  trackLabel: string;
   balance: number; // numeric outstanding balance
   balanceStr: string; // "89,223" (grouped, for the input field)
   interest: string; // annual nominal %, e.g. "8.42" ("" when unknown)
   months: string; // remaining term in months, e.g. "26" ("" when unknown)
   monthlyPayment: number; // payment recomputed from the row above
   knownPayment: number; // reported monthly payment (201-046), 0 when absent
+  /** Monthly repayment to display: the reported payment when present, else computed. */
+  displayMonthly: number;
+  startDate: string; // 201-016 transaction start (dd/mm/yyyy, "" when absent)
+  endDate: string; // 201-018 planned end (dd/mm/yyyy, "" when absent)
+  limit: number; // 201-020 credit limit (revolving facilities), 0 when absent
+  origAmount: number; // 201-045 original loan amount, 0 when absent
+  overdue: number; // 201-051 amount unpaid on time, 0 when not in arrears
+  arrearsRange: string; // 201-050 days-in-arrears range ("" when not in arrears)
   /** Pre-checked for the loans table: the client's own, non-mortgage debts. */
   defaultInclude: boolean;
 }
@@ -136,6 +156,50 @@ function isLoanOrMortgage(t: Transaction): boolean {
   return LOAN_OR_MORTGAGE_RE.test(t.fields["201-002"] ?? "");
 }
 
+const OVERDRAFT_RE = /עובר ושב|עו["״]?ש/;
+const CARD_RE = /מסגרת|כרטיס/;
+
+/** Classify a transaction into its BDI page-2 section. */
+export function liabilityCategory(t: Transaction): LiabilityCategory {
+  if (isMortgageTxn(t)) return "mortgage";
+  const type = t.fields["201-002"] ?? "";
+  if (/הלוואה/.test(type)) return "loan";
+  if (OVERDRAFT_RE.test(type)) return "overdraft";
+  if (CARD_RE.test(type)) return "card";
+  return "other";
+}
+
+/** Short human name for one interest track: "פריים", "קבועה צמודה", ... */
+function trackName(tr: InterestTrack): string {
+  if (tr.anchor.includes("פריים")) return "פריים";
+  if (isInterestFree(tr)) return "ללא ריבית";
+  const kind = tr.type.includes("משתנה")
+    ? "משתנה"
+    : tr.type.includes("קבועה")
+      ? "קבועה"
+      : tr.type.trim();
+  const linkage = /לא\s*צמוד/.test(tr.linkage)
+    ? "לא צמודה"
+    : tr.linkage.includes("צמוד")
+      ? "צמודה"
+      : "";
+  return [kind, linkage].filter(Boolean).join(" ");
+}
+
+/**
+ * Mortgage track/type label: the dominant (highest-utilization) track's name,
+ * with a "+N" suffix when the loan is split across several tracks.
+ */
+export function trackLabel(tracks: InterestTrack[]): string {
+  if (!tracks.length) return "";
+  const top = [...tracks].sort(
+    (a, b) => parseNum(b.utilization) - parseNum(a.utilization)
+  )[0];
+  const name = trackName(top);
+  if (!name) return "";
+  return tracks.length > 1 ? `${name} +${tracks.length - 1}` : name;
+}
+
 /** True when the track is flagged interest-free (ללא ריבית / הריבית = אפס). */
 function isInterestFree(tr: InterestTrack): boolean {
   return tr.type.includes("ללא") || tr.type.includes("אפס");
@@ -215,12 +279,21 @@ function deriveLoan(t: Transaction, asOf: Date): ExtractedLoan {
     section: t.section,
     isMortgage: mortgage,
     isLoanOrMortgage: isLoanOrMortgage(t),
+    category: liabilityCategory(t),
+    trackLabel: trackLabel(t.interestTracks),
     balance,
     balanceStr: groupThousands(balance),
     interest,
     months: months ? String(months) : "",
     monthlyPayment,
     knownPayment,
+    displayMonthly: knownPayment > 0 ? knownPayment : monthlyPayment,
+    startDate: t.fields["201-016"] || "",
+    endDate: t.fields["201-018"] || "",
+    limit: parseNum(t.fields["201-020"]),
+    origAmount: parseNum(t.fields["201-045"]),
+    overdue: parseNum(t.fields["201-051"]),
+    arrearsRange: t.fields["201-050"] || "",
     // Auto-inject the client's own active loans & mortgages only.
     defaultInclude:
       t.role === "debtor" &&

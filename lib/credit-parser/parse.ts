@@ -18,7 +18,7 @@ import {
   type CodeHit,
   type Tok,
 } from "./geometry";
-import { ENUMS } from "./dictionary";
+import { ENUMS, REMARK_CODES, FIELD_BY_CODE } from "./dictionary";
 import type {
   CreditReport,
   Transaction,
@@ -31,6 +31,7 @@ import type {
   MonthlyGrid,
   NonPaymentIndicator,
   ExecutionCase,
+  InsolvencyCase,
   InquiryByDate,
   NewCreditInquiry,
   InquirySummaryRow,
@@ -41,8 +42,8 @@ import type {
 const SCALAR_CODES = [
   "201-002", "201-003", "201-006", "201-008", "201-009", "201-010", "201-011",
   "201-016", "201-018", "201-020", "201-023", "201-029", "201-030", "201-044",
-  "201-045", "201-046", "201-048", "201-049", "201-053", "201-054", "201-055",
-  "201-072",
+  "201-045", "201-046", "201-048", "201-049", "201-051", "201-052", "201-053",
+  "201-054", "201-055", "201-072",
 ];
 
 const DATE_RE = /\b\d{2}\/\d{2}\/\d{4}\b/;
@@ -256,6 +257,17 @@ function parseSummary(flat: FlatLine[], bounds: [number, number]): SummaryGroup[
     const hasNums = line.toks.some((t) => /^\d[\d,]*$/.test(t.str));
     const isTotal = txt.includes('סה"כ') || txt.includes("סהכ");
     const sourceTok = line.toks.filter((t) => isHebrew(t.str) && t.x > 400);
+    // A long source name wraps to its own lines above/below the numbers line
+    // (e.g. "כרטיסי אשראי לישראל" / "בע"מ"); pull it from the neighbours.
+    if (hasNums && !isTotal && !sourceTok.length) {
+      for (const j of [i - 2, i - 1, i + 1, i + 2]) {
+        const fl2 = flat[j];
+        if (!fl2 || fl2.page !== flat[i].page) continue;
+        if (Math.abs(fl2.line.y - line.y) > 9) continue;
+        sourceTok.push(...fl2.line.toks.filter((t) => isHebrew(t.str) && t.x > 400));
+      }
+    }
+    sourceTok.sort((a, b) => b.y - a.y || b.x - a.x);
     if (hasNums && (sourceTok.length || isTotal)) {
       const byCol = (cx: number, tol: number) =>
         line.toks
@@ -264,7 +276,9 @@ function parseSummary(flat: FlatLine[], bounds: [number, number]): SummaryGroup[
           .map((t) => t.str)
           .join("")
           .trim();
-      const source = isTotal ? 'סה"כ' : NAME_JOIN(sourceTok);
+      const source = isTotal
+        ? 'סה"כ'
+        : sourceTok.map((t) => t.str).join(" ").replace(/\s+/g, " ").trim();
       // id (single o/s) appears as XX-NNN near c2; counts are single digits.
       const c2raw = line.toks
         .filter((t) => t.x > 330 && t.x < 410 && (/\d/.test(t.str) || t.str === "XX-"))
@@ -428,29 +442,81 @@ function parseRelatedCorps(lines: Line[]): RelatedCorp[] {
   return out;
 }
 
+// Fallback month-column centers (measured on the reference template); each
+// grid's own header line overrides these, since column positions drift a few
+// points between report variants.
 const MONTH_CENTERS = [478, 441, 400, 362, 323, 286, 246, 208, 166, 129, 91, 50];
 
-function gridRowFromLine(line: Line): { year: string; months: (string | null)[] } | null {
-  const yearTok = line.toks.find((t) => /^20\d\d$/.test(t.str) && t.x > 430);
-  if (!yearTok) return null;
-  const months: (string | null)[] = Array(12).fill(null);
+const MONTH_NAMES = ["ינו", "פבר", "מרץ", "אפר", "מאי", "יוני", "יולי", "אוג", "ספט", "אוק", "נוב", "דצמ"];
+
+/** Month-column centers measured off a grid's own "חודש ינו' פבר'…" header. */
+function monthCentersOf(line: Line): number[] | null {
+  const centers: (number | null)[] = Array(12).fill(null);
+  let found = 0;
   for (const t of line.toks) {
-    if (t.x > 430) continue;
+    const s = t.str.replace(/['׳]/g, "").trim();
+    const mi = MONTH_NAMES.indexOf(s);
+    if (mi >= 0 && centers[mi] === null) {
+      centers[mi] = t.x + t.w / 2;
+      found++;
+    }
+  }
+  if (found < 8) return null;
+  // Fill any unmatched month from its neighbours (columns are evenly spaced).
+  for (let m = 0; m < 12; m++) {
+    if (centers[m] !== null) continue;
+    let lo = m - 1;
+    while (lo >= 0 && centers[lo] === null) lo--;
+    let hi = m + 1;
+    while (hi < 12 && centers[hi] === null) hi++;
+    if (lo >= 0 && hi < 12) {
+      centers[m] = centers[lo]! + ((centers[hi]! - centers[lo]!) * (m - lo)) / (hi - lo);
+    } else if (lo >= 0 && lo > 0 && centers[lo - 1] !== null) {
+      centers[m] = centers[lo]! + (centers[lo]! - centers[lo - 1]!) * (m - lo);
+    } else if (hi < 11 && centers[hi + 1] !== null) {
+      centers[m] = centers[hi]! - (centers[hi + 1]! - centers[hi]!) * (hi - m);
+    } else {
+      centers[m] = MONTH_CENTERS[m];
+    }
+  }
+  return centers as number[];
+}
+
+/** Assign a row's numeric tokens to month columns by nearest header center. */
+function gridRowValues(
+  line: Line,
+  centers: number[],
+  yearTok: Tok | undefined
+): (string | null)[] {
+  const months: (string | null)[] = Array(12).fill(null);
+  // Column tolerance = just under half the narrowest column gap.
+  let tol = 18;
+  for (let m = 1; m < 12; m++) tol = Math.min(tol, Math.abs(centers[m - 1] - centers[m]) / 2 - 1);
+  for (const t of line.toks) {
+    if (t === yearTok) continue;
     if (!/^\d{1,3}$/.test(t.str)) continue;
+    const tc = t.x + t.w / 2;
     let best = 0;
     let bestD = Infinity;
     for (let m = 0; m < 12; m++) {
-      const d = Math.abs(t.x - MONTH_CENTERS[m]);
+      const d = Math.abs(tc - centers[m]);
       if (d < bestD) {
         bestD = d;
         best = m;
       }
     }
-    if (bestD <= 18) months[best] = t.str;
+    if (bestD <= tol) months[best] = t.str;
   }
-  return { year: yearTok.str, months };
+  return months;
 }
 
+const yearTokOf = (line: Line) => line.toks.find((t) => /^20\d\d$/.test(t.str) && t.x > 420);
+
+/**
+ * Coded monthly grids (checks / direct debits, 201-067..070). The year prints
+ * only on the first row of each year band — a 201-068/070 row inherits the
+ * year of the 201-067/069 row above it.
+ */
 function parseGrids(lines: Line[]): MonthlyGrid[] {
   const defs: { codes: string[]; label: string }[] = [
     { codes: ["201-067"], label: "מספר שיקים שהוצגו" },
@@ -459,14 +525,57 @@ function parseGrids(lines: Line[]): MonthlyGrid[] {
     { codes: ["201-070"], label: "הוראות לחיוב חשבון שלא כובדו" },
   ];
   const grids: MonthlyGrid[] = defs.map((d) => ({ label: d.label, rows: [] }));
+  let centers = MONTH_CENTERS;
+  let bandYear = "";
   for (const line of lines) {
+    const hdr = monthCentersOf(line);
+    if (hdr) {
+      centers = hdr;
+      bandYear = "";
+      continue;
+    }
     const codes = detectCodes(line).map((c) => c.code);
     const di = defs.findIndex((d) => d.codes.some((c) => codes.includes(c)));
     if (di < 0) continue;
-    const row = gridRowFromLine(line);
-    if (row && row.months.some((m) => m !== null)) grids[di].rows.push(row);
+    const yearTok = yearTokOf(line);
+    if (yearTok) bandYear = yearTok.str;
+    if (!bandYear) continue;
+    const months = gridRowValues(line, centers, yearTok);
+    if (months.some((m) => m !== null)) grids[di].rows.push({ year: bandYear, months });
   }
   return grids.filter((g) => g.rows.length);
+}
+
+/**
+ * The per-transaction "היסטוריית פיגורים לעסקה" grid: uncoded year rows whose
+ * values are days-in-arrears buckets (1=30-59 … 6=180 ומעלה).
+ */
+function parseArrearsGrid(lines: Line[]): MonthlyGrid[] {
+  const rows: { year: string; months: (string | null)[] }[] = [];
+  let inGrid = false;
+  let centers = MONTH_CENTERS;
+  for (const line of lines) {
+    const txt = despace(blockText([line]));
+    if (txt.includes("היסטורייתפיגורים")) {
+      inGrid = true;
+      continue;
+    }
+    if (!inGrid) continue;
+    if (txt.includes("מקרא")) break;
+    const hdr = monthCentersOf(line);
+    if (hdr) {
+      centers = hdr;
+      continue;
+    }
+    if (detectCodes(line).length) break; // a new sub-section started
+    const yearTok = yearTokOf(line);
+    if (!yearTok) continue;
+    const months = gridRowValues(line, centers, yearTok);
+    if (months.some((m) => m !== null)) rows.push({ year: yearTok.str, months });
+  }
+  return rows.length
+    ? [{ label: "היסטוריית פיגורים לעסקה (1=30-59 ימים … 6=180 ומעלה)", rows }]
+    : [];
 }
 
 function parseContact(lines: Line[]): { phone: string; email: string; address: string } {
@@ -516,11 +625,28 @@ function buildTransaction(
   setEnum("201-021", ENUMS.currency);
   setEnum("201-044", ENUMS.frequency);
   setEnum("201-047", ENUMS.paymentType);
+  // Days-in-arrears range (only printed when the transaction is in arrears).
+  if (fields["201-051"] || fields["201-052"]) setEnum("201-050", ENUMS.arrearsRange);
   if (section === "current") {
     fields["201-002"] = "חשבון עובר ושב";
   } else {
     const t = detectByBand(lines, "201-002", [363, 420], ENUMS.transactionType);
     if (t) fields["201-002"] = t;
+  }
+
+  // Coded remark lines (הערות): the fixed legal wording printed next to the code.
+  const remarks: string[] = [];
+  for (const line of lines) {
+    const rc = detectCodes(line).find((c) => REMARK_CODES.has(c.code));
+    if (!rc) continue;
+    const text = line.toks
+      .filter((t) => isHebrew(t.str) && t.x < rc.xStart - 0.5)
+      .sort((a, b) => b.x - a.x)
+      .map((t) => t.str)
+      .join(" ")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (text && !remarks.includes(text)) remarks.push(text);
   }
 
   return {
@@ -533,7 +659,8 @@ function buildTransaction(
     interestTracks: parseInterestTracks(lines),
     collateral: parseCollateral(lines),
     relatedCorps: parseRelatedCorps(lines),
-    grids: section === "current" ? parseGrids(lines) : [],
+    grids: [...(section === "current" ? parseGrids(lines) : []), ...parseArrearsGrid(lines)],
+    remarks,
   };
 }
 
@@ -637,21 +764,73 @@ function parseExecution(flat: FlatLine[], bounds: [number, number]): ExecutionCa
   for (let i = start; i < end; i++) {
     const codes = detectCodes(flat[i].line).filter((c) => c.code.startsWith("197-"));
     if (codes.length < 5) continue;
-    // Header code row found; gather following data rows on this page.
+    // Header code row found: one case per data line, until the next block
+    // (insolvency / another authority) begins.
     const page = flat[i].page;
-    const dataToks: Tok[] = [];
     for (let j = i + 1; j < end; j++) {
       if (flat[j].page !== page) break;
-      const txt = despace(blockText([flat[j].line]));
+      const line = flat[j].line;
+      const txt = despace(blockText([line]));
       if (/^\d{1,2}$/.test(txt)) break; // footer page number
-      dataToks.push(...flat[j].line.toks);
+      if (txt.includes("פרטיהתקשרות") || txt.includes("הממונה")) break;
+      if (detectCodes(line).some((c) => !c.code.startsWith("197-"))) break;
+      const valueToks = line.toks.filter((t) => /\d/.test(t.str));
+      if (valueToks.length < 2) continue; // wrapped-label fragments
+      const fields = rowByColumns(line, codes);
+      if (Object.keys(fields).length >= 3) cases.push({ fields });
     }
-    const synthetic: Line = { y: 0, toks: dataToks };
-    const fields = rowByColumns(synthetic, codes);
-    if (Object.keys(fields).length) cases.push({ fields });
     break;
   }
   return cases;
+}
+
+// ---------------------------------------------------------------------------
+// §5 Insolvency proceedings (151-xxx)
+// ---------------------------------------------------------------------------
+
+/**
+ * The insolvency block prints `(code) <label> <value>` pairs, two per line.
+ * Values can be Hebrew (e.g. "פשיטת רגל"), so instead of digit-only scalars we
+ * take the whole cell and strip the field's known label off its right edge.
+ */
+function insolvencyValue(line: Line, me: CodeHit, codes: CodeHit[]): string {
+  let leftBound = 0;
+  for (const c of codes) {
+    if (c.xEnd <= me.xStart + 1 && c.xEnd > leftBound) leftBound = c.xEnd;
+  }
+  const cell = line.toks
+    .filter((t) => t.x < me.xStart - 0.5 && t.x > leftBound - 0.5 && t.str.trim().length > 0)
+    .sort((a, b) => b.x - a.x); // RTL: label first, value after
+  const label = despace(FIELD_BY_CODE[me.code]?.he ?? "");
+  let vi = 0;
+  while (vi < cell.length && label.includes(despace(cell[vi].str))) vi++;
+  return cell
+    .slice(vi)
+    .map((t) => t.str)
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function parseInsolvency(flat: FlatLine[], bounds: [number, number]): InsolvencyCase[] {
+  const [start, end] = bounds;
+  const out: InsolvencyCase[] = [];
+  let fields: Record<string, string> | null = null;
+  for (let i = start; i < end; i++) {
+    const line = flat[i].line;
+    const codes = detectCodes(line).filter((c) => c.code.startsWith("151-"));
+    if (!codes.length) continue;
+    // A new case starts at its file-id line.
+    if (codes.some((c) => c.code === "151-001") || !fields) {
+      fields = {};
+      out.push({ fields });
+    }
+    for (const c of codes) {
+      const v = insolvencyValue(line, c, codes);
+      if (v) fields[c.code] = v;
+    }
+  }
+  return out.filter((c) => Object.keys(c.fields).length > 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -721,10 +900,11 @@ function parseInquiries(flat: FlatLine[], bounds: [number, number]) {
     }
 
     if (mode === "sum") {
-      const bank = line.toks.filter((t) => isHebrew(t.str) && t.x > 430);
+      if (txt.includes("הפונההמבקש")) continue; // header row
+      const requesterToks = line.toks.filter((t) => isHebrew(t.str) && t.x > 420);
       const nums = line.toks.filter((t) => /^\d+$/.test(t.str)).map((t) => t.str);
-      const name = NAME_JOIN(bank);
-      if (name.includes("בנק") && nums.length) {
+      const name = NAME_JOIN(requesterToks);
+      if (name && nums.length) {
         summary.push({ requester: name, counts: nums });
       }
       continue;
@@ -855,22 +1035,93 @@ export function parseReport(raw: RawPage[]): CreditReport {
   const inactive = safe(() => (bounds.s4 ? parseTransactionsSection(flat, bounds.s4, "inactive") : []), [], warnings, "inactive");
 
   const execution = safe(() => (bounds.s5 ? parseExecution(flat, bounds.s5) : []), [], warnings, "execution");
+  const insolvency = safe(() => (bounds.s5 ? parseInsolvency(flat, bounds.s5) : []), [], warnings, "insolvency");
   const inq = safe(() => (bounds.s6 ? parseInquiries(flat, bounds.s6) : { byDate: [], newCredit: [], summary: [] }), { byDate: [], newCredit: [], summary: [] }, warnings, "inquiries");
   const adminActions = safe(() => (bounds.s7 ? parseAdmin(flat, bounds.s7) : []), [], warnings, "admin");
 
-  return {
+  const report: CreditReport = {
     meta,
     client,
     summary,
     nonPaymentIndicators,
     transactions: [...current, ...active, ...inactive],
     execution,
+    insolvency,
     inquiriesByDate: inq.byDate,
     newCreditInquiries: inq.newCredit,
     inquirySummary: inq.summary,
     adminActions,
     warnings,
   };
+  // Self-validation: cross-check the parsed transactions against the report's
+  // own printed §1 totals, so a template drift can never fail silently.
+  try {
+    warnings.push(...validateReport(report));
+  } catch (e) {
+    warnings.push(`validate: ${(e as Error).message}`);
+  }
+  return report;
+}
+
+// ---------------------------------------------------------------------------
+// Self-validation
+// ---------------------------------------------------------------------------
+
+const toNum = (v?: string) => {
+  if (!v) return 0;
+  const n = Number(v.replace(/[^\d.-]/g, ""));
+  return Number.isFinite(n) ? n : 0;
+};
+
+function summaryTypeMatches(blockType: string, txnType: string): boolean {
+  const b = despace(blockType);
+  const t = despace(txnType);
+  if (b.includes("עובר")) return t.includes("עובר");
+  if (b.includes("מסגרת")) return t.includes("מסגרת");
+  if (b.includes("משכנת") || b.includes("לדיור")) return t.includes("משכנת") || t.includes("לדיור");
+  if (b.includes("הלוואה")) return t === "הלוואה";
+  return t.includes(b);
+}
+
+/**
+ * Advisory accuracy checks, appended to `report.warnings`:
+ *  1. each §1 block's data rows must add up to its printed סה"כ row;
+ *  2. the open transactions of each type must reproduce that printed total.
+ */
+export function validateReport(r: CreditReport): string[] {
+  const warns: string[] = [];
+  const open = r.transactions.filter((t) => t.section !== "inactive");
+  for (const g of r.summary) {
+    for (const b of g.blocks) {
+      const total = b.rows.find((x) => x.isTotal);
+      if (!total) continue;
+      const dataRows = b.rows.filter((x) => !x.isTotal);
+      const rowSum = dataRows.reduce((s, x) => s + toNum(x.debtBalance), 0);
+      const printed = toNum(total.debtBalance);
+      if (rowSum !== printed) {
+        warns.push(
+          `אימות תמצית: שורות "${b.transactionType}" מסתכמות ל-${rowSum.toLocaleString("en-US")} אך הסה"כ המודפס הוא ${printed.toLocaleString("en-US")}`
+        );
+      }
+      const matched = open.filter(
+        (t) => t.role === g.role && summaryTypeMatches(b.transactionType, t.fields["201-002"] ?? "")
+      );
+      const txnSum = matched.reduce((s, t) => s + toNum(t.fields["201-049"]), 0);
+      if (txnSum !== printed) {
+        warns.push(
+          `אימות עסקאות: יתרות "${b.transactionType}" בפרקים 2-3 מסתכמות ל-${txnSum.toLocaleString("en-US")} אך תמצית הדוח מציינת ${printed.toLocaleString("en-US")}`
+        );
+      }
+      const printedCount = toNum(total.idOrCount);
+      const openWithDebt = matched.filter((t) => toNum(t.fields["201-049"]) > 0).length;
+      if (printedCount > 0 && printedCount !== openWithDebt) {
+        warns.push(
+          `אימות ספירה: בתמצית מצוינות ${printedCount} עסקאות "${b.transactionType}" אך חולצו ${openWithDebt}`
+        );
+      }
+    }
+  }
+  return warns;
 }
 
 function safe<T>(fn: () => T, fallback: T, warnings: string[], label: string): T {
