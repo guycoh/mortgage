@@ -3,8 +3,9 @@
 /** Trim a bank's legal name down to something short for a row tag. */
 export function shortBank(name?: string): string {
   if (!name) return "";
+  // Strip "הבנק" before "בנק" — otherwise "הבנק הבינלאומי" leaves a stray "ה".
   return name
-    .replace(/בנק/g, "")
+    .replace(/הבנק|בנק/g, "")
     .replace(/בע["״׳']?מ/g, "")
     .replace(/לישראל/g, "")
     .replace(/\s+/g, " ")
