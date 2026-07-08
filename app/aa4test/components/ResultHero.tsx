@@ -7,9 +7,13 @@
 // feedback as the mix is edited.
 
 import { motion, useReducedMotion } from "motion/react";
-import { ArrowLeft, TrendDown, TrendUp, Sparkle, ShieldCheck, ShieldWarning, Path, PresentationChart } from "@phosphor-icons/react";
+import { ArrowLeft, CaretLeft, TrendDown, TrendUp, Sparkle, ShieldCheck, ShieldWarning, Path, PresentationChart } from "@phosphor-icons/react";
 import { shekel } from "../lib/calc";
 import { Money } from "./primitives";
+
+/* Grouped digits without the currency mark — the ₪ is set separately, smaller
+   and quieter, so the figure reads first. */
+const plainNum = (n: number) => Math.round(n || 0).toLocaleString("en-US");
 
 export default function ResultHero({
   currentPayment,
@@ -36,17 +40,6 @@ export default function ResultHero({
   const pctChange = currentPayment > 0 ? Math.abs(delta) / currentPayment : 0;
   const accent = saving ? "var(--pos)" : "var(--neg)";
   const accentStrong = saving ? "var(--pos-strong)" : "var(--neg-strong)";
-  const accentTint = saving ? "var(--pos-tint)" : "var(--neg-tint)";
-
-  // Subtle tinted panel for the headline saving figure (green) / added-cost (red):
-  // a soft diagonal gradient with a faint top-left sheen for depth.
-  const panelBg = saving
-    ? "radial-gradient(135% 105% at 24% -12%, #f5fbf8 0%, transparent 62%), linear-gradient(152deg, #e8f7f0 0%, #d2eee1 100%)"
-    : "radial-gradient(135% 105% at 24% -12%, #fdf5f3 0%, transparent 62%), linear-gradient(152deg, #f9e9e6 0%, #f1dbd6 100%)";
-  const panelBorder = saving ? "rgba(13,138,98,0.22)" : "rgba(194,59,46,0.2)";
-  const panelShadow = saving
-    ? "0 10px 26px -18px rgba(13,138,98,0.4)"
-    : "0 10px 26px -18px rgba(194,59,46,0.38)";
 
   const cap = income * 0.4;
   const newDti = income > 0 ? newPayment / income : null;
@@ -63,7 +56,7 @@ export default function ResultHero({
         background: "radial-gradient(120% 90% at 50% -30%, var(--brand-tint), transparent 62%), var(--surface)",
       }}
     >
-      <div className="aa4-card-pad">
+      <div className="aa4-card-pad !py-[1.1rem] md:!px-5">
         <div className="flex items-center justify-between gap-3">
           <span className="aa4-kicker">סיכום האיחוד</span>
           {comparable && withinBudget !== null && (
@@ -97,37 +90,66 @@ export default function ResultHero({
         ) : (
           /* ---- real before -> after ---- */
           <>
-            <div className="mt-5 grid grid-cols-1 items-stretch gap-3 md:grid-cols-[1fr_auto_1fr]">
-              <FigurePanel label="החזר חודשי נוכחי" value={currentPayment} color="var(--ink)" align="right" />
-
+            {/* One segmented strip instead of three floating cards: equal cells,
+                hairline seams, and flow connectors so it reads was -> saved -> is. */}
+            <div className="relative mt-4">
               <div
-                className="flex flex-col items-center justify-center rounded-[16px] border px-6 py-5 text-center"
-                style={{ background: panelBg, borderColor: panelBorder, boxShadow: panelShadow }}
+                className="grid grid-cols-1 overflow-hidden rounded-[14px] border md:grid-cols-3"
+                style={{
+                  borderColor: "var(--line)",
+                  background: "var(--surface)",
+                  boxShadow: "0 1px 2px rgba(15,32,40,0.03), 0 16px 32px -28px rgba(15,32,40,0.3)",
+                }}
               >
-                <span className="flex items-center gap-1.5 text-[12.5px] font-semibold" style={{ color: accentStrong }}>
-                  {saving ? <TrendDown className="size-4" weight="bold" /> : <TrendUp className="size-4" weight="bold" />}
-                  {saving ? "חיסכון חודשי" : "תוספת חודשית"}
-                </span>
-                <div className="mt-1 aa4-fig text-[clamp(2.3rem,6.4vw,3.5rem)] font-semibold leading-none" style={{ color: accentStrong }}>
-                  <Money value={Math.abs(delta)} />
-                </div>
-                <span
-                  className="mt-2.5 flex items-center gap-1.5 rounded-[var(--r-pill)] px-2.5 py-1 text-[12px] font-semibold"
-                  style={{ background: saving ? "rgba(13,138,98,0.13)" : "rgba(194,59,46,0.12)", color: accentStrong }}
-                >
-                  {Math.round(pctChange * 100)}%
-                  <span className="opacity-40">·</span>
-                  <span className="aa4-fig">{shekel(Math.abs(delta) * 12)}</span> בשנה
-                </span>
+                <KpiCell label="החזר חודשי נוכחי" value={currentPayment} color="var(--ink)" sub="לחודש" />
+                <KpiCell
+                  divider
+                  label={saving ? "חיסכון חודשי" : "תוספת חודשית"}
+                  labelIcon={saving ? <TrendDown className="size-3.5" weight="bold" /> : <TrendUp className="size-3.5" weight="bold" />}
+                  labelColor={accentStrong}
+                  value={Math.abs(delta)}
+                  color={accentStrong}
+                  wash={
+                    saving
+                      ? "linear-gradient(180deg, rgba(13,138,98,0.045), rgba(13,138,98,0.1))"
+                      : "linear-gradient(180deg, rgba(194,59,46,0.04), rgba(194,59,46,0.09))"
+                  }
+                  sub={
+                    <span
+                      className="flex items-center gap-1 rounded-[var(--r-pill)] px-2 py-[3px] text-[11px] font-semibold"
+                      style={{ background: saving ? "rgba(13,138,98,0.12)" : "rgba(194,59,46,0.11)", color: accentStrong }}
+                    >
+                      {Math.round(pctChange * 100)}%
+                      <span className="opacity-40">·</span>
+                      <span className="aa4-fig">{shekel(Math.abs(delta) * 12)}</span> בשנה
+                    </span>
+                  }
+                />
+                <KpiCell divider label="החזר לאחר איחוד" value={newPayment} color={accent} sub="לחודש" />
               </div>
-
-              <FigurePanel label="החזר לאחר איחוד" value={newPayment} color={accent} align="left" />
+              {/* connectors on the seams, pointing along the RTL flow */}
+              {["33.333%", "66.666%"].map((pos) => (
+                <span
+                  key={pos}
+                  aria-hidden
+                  className="pointer-events-none absolute top-1/2 z-10 hidden size-6 -translate-y-1/2 translate-x-1/2 place-items-center rounded-full border md:grid"
+                  style={{
+                    insetInlineStart: pos,
+                    borderColor: "var(--line)",
+                    background: "var(--surface)",
+                    color: accentStrong,
+                    boxShadow: "0 1px 3px rgba(15,32,40,0.08)",
+                  }}
+                >
+                  <CaretLeft className="size-3" weight="bold" />
+                </span>
+              ))}
             </div>
 
             <ComparisonBar current={currentPayment} next={newPayment} income={income} saving={saving} trans={barTrans} reduce={reduce} />
 
             {onPresent && (
-              <div className="mt-5 flex flex-col items-center gap-1.5 border-t pt-4" style={{ borderColor: "var(--line)" }}>
+              <div className="mt-4 flex flex-col items-center gap-1.5 border-t pt-3.5" style={{ borderColor: "var(--line)" }}>
                 <button onClick={onPresent} className="aa4-btn aa4-btn-primary !px-6 !py-2.5 !text-[13.5px]">
                   <PresentationChart className="size-[18px]" weight="duotone" />
                   הצגת סיכום ללקוח
@@ -136,7 +158,7 @@ export default function ResultHero({
             )}
 
             {newDti !== null && (
-              <div className="mt-4 flex items-center gap-3 rounded-[var(--r-control)] border p-3.5" style={{ borderColor: "var(--line)", background: "var(--surface-2)" }}>
+              <div className="mt-3 flex items-center gap-3 rounded-[var(--r-control)] border p-3" style={{ borderColor: "var(--line)", background: "var(--surface-2)" }}>
                 <span className="flex items-center gap-2 text-[12.5px] font-semibold text-[var(--ink-2)]">
                   <ArrowLeft className="size-4 text-[var(--ink-3)]" />
                   יחס החזר לאחר איחוד
@@ -221,14 +243,42 @@ function PartialState({
   );
 }
 
-function FigurePanel({ label, value, color, align }: { label: string; value: number; color: string; align: "right" | "left" }) {
+/* One cell of the comparison strip. All three share the same row skeleton
+   (fixed-height label, figure, fixed-height sub) so the number baselines land
+   on one line across the strip. */
+function KpiCell({
+  label,
+  labelIcon,
+  labelColor,
+  value,
+  color,
+  sub,
+  wash,
+  divider,
+}: {
+  label: string;
+  labelIcon?: React.ReactNode;
+  labelColor?: string;
+  value: number;
+  color: string;
+  sub: React.ReactNode;
+  wash?: string;
+  divider?: boolean;
+}) {
   return (
-    <div className="rounded-[var(--r-control)] border p-4" style={{ borderColor: "var(--line)", background: "var(--surface)", textAlign: align }}>
-      <div className="text-[12px] font-semibold text-[var(--ink-3)]">{label}</div>
-      <div className="mt-1.5 aa4-fig text-[clamp(1.6rem,3.6vw,2.1rem)] font-semibold leading-none" style={{ color }}>
-        <Money value={value} />
+    <div
+      className={`flex flex-col items-center px-4 py-4 text-center ${divider ? "border-t md:border-t-0 md:border-s" : ""}`}
+      style={{ background: wash, borderColor: "var(--line)" }}
+    >
+      <span className="flex h-[18px] items-center gap-1.5 text-[11.5px] font-semibold" style={{ color: labelColor ?? "var(--ink-3)" }}>
+        {labelIcon}
+        {label}
+      </span>
+      <div dir="ltr" className="mt-1.5 flex items-baseline justify-center gap-1 aa4-fig text-[clamp(1.85rem,3.3vw,2.4rem)] font-semibold leading-none" style={{ color }}>
+        <span className="text-[0.55em] font-medium opacity-55">₪</span>
+        <Money value={value} format={plainNum} />
       </div>
-      <div className="mt-1.5 text-[11px] text-[var(--ink-3)]">לחודש</div>
+      <div className="mt-1.5 flex min-h-[22px] items-center text-[11px] text-[var(--ink-4)]">{sub}</div>
     </div>
   );
 }
@@ -261,9 +311,9 @@ function ComparisonBar({
   const capPct = income > 0 ? Math.min((cap / max) * 100, 100) : null;
 
   return (
-    <div className="mt-6">
+    <div className="mt-4">
       <div className="relative">
-        <div className="aa4-bar-track" style={{ height: 16 }}>
+        <div className="aa4-bar-track" style={{ height: 10 }}>
           <motion.span
             className="absolute inset-y-0"
             style={{ insetInlineStart: 0, background: "var(--brand)" }}
@@ -280,11 +330,11 @@ function ComparisonBar({
           />
         </div>
         {capPct !== null && (
-          <span className="absolute top-1/2 h-5 -translate-y-1/2 border-l border-dashed" style={{ insetInlineStart: `${capPct}%`, borderColor: "var(--ink-3)" }} />
+          <span className="absolute top-1/2 h-4 -translate-y-1/2 border-l border-dashed" style={{ insetInlineStart: `${capPct}%`, borderColor: "var(--ink-3)" }} />
         )}
       </div>
 
-      <div className="mt-2.5 flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 text-[11.5px]">
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-[11px]">
         <span className="flex items-center gap-1.5 text-[var(--ink-2)]">
           <span className="size-2.5 rounded-[var(--r-pill)]" style={{ background: "var(--brand)" }} />
           החזר לאחר איחוד
