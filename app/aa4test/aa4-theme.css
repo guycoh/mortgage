@@ -420,6 +420,14 @@ select.aa4-ledger-input {
 }
 .aa4-root input[type="number"] { -moz-appearance: textfield; }
 
+/* — customer summary tables: quiet row hover — */
+.aa4-sheet-table tbody tr {
+  transition: background 0.16s ease;
+}
+.aa4-sheet-table tbody tr:hover {
+  background: rgba(29, 117, 161, 0.045);
+}
+
 /* — customer summary sheet: print only the sheet, as a clean document — */
 @media print {
   body * {

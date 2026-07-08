@@ -132,7 +132,6 @@ export default function ResultHero({
                   <PresentationChart className="size-[18px]" weight="duotone" />
                   הצגת סיכום ללקוח
                 </button>
-                <span className="text-[11px] text-[var(--ink-3)]">עמוד סיכום מעוצב, מוכן להצגה או להדפסה כ-PDF</span>
               </div>
             )}
 

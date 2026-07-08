@@ -12,6 +12,7 @@ import {
   Printer,
   TrendDown,
   TrendUp,
+  ArrowDown,
   Wallet,
   WarningCircle,
   SealCheck,
@@ -21,9 +22,20 @@ import { parseNum as liabNum, type LiabilityRow, type ReportSlot } from "@/compo
 import { monthlyPayment, parseNum, shekel } from "../lib/calc";
 import { shortBank } from "../debtTags";
 import { BankBadge, TypeTag } from "./badges";
+import { Money } from "./primitives";
 import type { LoanRow, MixRow } from "./Ledger";
 import { mixTypeMeta } from "./mixTypes";
 import type { Persona } from "./LiabilitiesBoard";
+
+/** A figure with a quiet, smaller ₪ mark — reads like a statement, not a label. */
+function Fig({ v, className }: { v: number; className?: string }) {
+  return (
+    <span className={cn("aa4-fig font-semibold", className)}>
+      <span className="me-0.5 text-[0.6em] font-medium opacity-60">₪</span>
+      {Math.round(v).toLocaleString("en-US")}
+    </span>
+  );
+}
 
 const ease = [0.22, 1, 0.36, 1] as const;
 
@@ -122,7 +134,11 @@ export default function CustomerSummary({
                 {slots.length > 0 ? (
                   <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5">
                     {slots.map((s, i) => (
-                      <span key={s.id} className="flex items-center gap-1.5 text-[12.5px] font-semibold text-[var(--ink-2)]">
+                      <span
+                        key={s.id}
+                        className="flex items-center gap-1.5 rounded-[var(--r-pill)] border py-1 pe-2.5 ps-1 text-[12px] font-semibold text-[var(--ink-2)]"
+                        style={{ borderColor: "var(--line-2)", background: "var(--surface-2)" }}
+                      >
                         <span
                           className="grid size-5 place-items-center rounded-full text-[10px] font-bold text-white"
                           style={{ background: personas[i]?.color ?? "var(--brand)" }}
@@ -132,7 +148,7 @@ export default function CustomerSummary({
                         {s.report.client.name}
                         {s.report.client.idNumber && (
                           <span className="aa4-fig text-[10.5px] font-medium text-[var(--ink-3)]" dir="ltr">
-                            ת.ז {s.report.client.idNumber}
+                            · {s.report.client.idNumber}
                           </span>
                         )}
                       </span>
@@ -157,65 +173,142 @@ export default function CustomerSummary({
             </header>
 
             <div className="px-6 py-5 md:px-8">
-              {/* the story in three figures */}
-              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
-                <SheetFigure label="החזר חודשי היום" value={currentPayment} color="var(--ink)" />
+              {/* the savings story: before -> after ladder + the saving hero */}
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_1.45fr]">
                 <div
-                  className="order-first rounded-[12px] border px-4 py-3.5 text-center sm:order-none"
+                  className="flex flex-col justify-center rounded-[14px] border px-5 py-4"
+                  style={{ borderColor: "var(--line)", background: "var(--surface-2)" }}
+                >
+                  <div className="grid grid-cols-[14px_1fr_auto] items-center gap-x-3">
+                    <span className="mx-auto size-2.5 rounded-full" style={{ background: "var(--ink-4)" }} />
+                    <span className="text-[12px] font-semibold text-[var(--ink-3)]">החזר חודשי היום</span>
+                    <Fig v={currentPayment} className="text-[1.25rem] leading-none text-[var(--ink)]" />
+                  </div>
+                  <div className="grid grid-cols-[14px_1fr] items-center">
+                    <span className="mx-auto flex flex-col items-center py-0.5">
+                      <span className="h-2 w-px" style={{ background: "var(--line-2)" }} />
+                      <ArrowDown className="my-0.5 size-3 text-[var(--ink-4)]" weight="bold" />
+                      <span className="h-2 w-px" style={{ background: "var(--line-2)" }} />
+                    </span>
+                    <span className="text-[10.5px] text-[var(--ink-4)]">איחוד לתמהיל אחד</span>
+                  </div>
+                  <div className="grid grid-cols-[14px_1fr_auto] items-center gap-x-3">
+                    <span
+                      className="mx-auto size-2.5 rounded-full"
+                      style={{ background: "var(--brand)", boxShadow: "0 0 0 3px var(--brand-tint)" }}
+                    />
+                    <span className="text-[12px] font-bold text-[var(--ink-2)]">החזר לאחר איחוד</span>
+                    <Fig v={newPayment} className="text-[1.5rem] leading-none text-[var(--brand-deep)]" />
+                  </div>
+                </div>
+
+                <div
+                  className="relative order-first overflow-hidden rounded-[14px] border px-5 py-4 text-center md:order-none"
                   style={{
                     background: saving
-                      ? "linear-gradient(152deg, #e8f7f0 0%, #d2eee1 100%)"
-                      : "linear-gradient(152deg, #f9e9e6 0%, #f1dbd6 100%)",
-                    borderColor: saving ? "rgba(13,138,98,0.25)" : "rgba(194,59,46,0.22)",
+                      ? "radial-gradient(120% 130% at 20% -18%, rgba(255,255,255,0.9), transparent 55%), linear-gradient(150deg, #e6f6ef 0%, #cfeee0 100%)"
+                      : "radial-gradient(120% 130% at 20% -18%, rgba(255,255,255,0.9), transparent 55%), linear-gradient(150deg, #f9e9e6 0%, #f1dbd6 100%)",
+                    borderColor: saving ? "rgba(13,138,98,0.28)" : "rgba(194,59,46,0.24)",
+                    boxShadow: saving ? "0 14px 30px -22px rgba(13,138,98,0.5)" : "0 14px 30px -22px rgba(194,59,46,0.45)",
                   }}
                 >
                   <span
-                    className="flex items-center justify-center gap-1.5 text-[11.5px] font-bold"
+                    className="flex items-center justify-center gap-1.5 text-[12px] font-bold"
                     style={{ color: saving ? "var(--pos-strong)" : "var(--neg-strong)" }}
                   >
-                    {saving ? <TrendDown className="size-3.5" weight="bold" /> : <TrendUp className="size-3.5" weight="bold" />}
+                    {saving ? <TrendDown className="size-4" weight="bold" /> : <TrendUp className="size-4" weight="bold" />}
                     {saving ? "חיסכון חודשי" : "תוספת חודשית"}
                   </span>
-                  <div className="aa4-fig mt-0.5 text-[2rem] font-semibold leading-none" style={{ color: saving ? "var(--pos-strong)" : "var(--neg-strong)" }}>
-                    {shekel(Math.abs(delta))}
+                  <div
+                    className="mt-1 flex items-baseline justify-center gap-1"
+                    style={{ color: saving ? "var(--pos-strong)" : "var(--neg-strong)" }}
+                  >
+                    <span className="aa4-fig text-[1.2rem] font-medium opacity-60">₪</span>
+                    <Money
+                      value={Math.abs(delta)}
+                      format={(n) => Math.round(n).toLocaleString("en-US")}
+                      className="text-[clamp(2.3rem,5vw,2.9rem)] font-semibold leading-none"
+                    />
                   </div>
-                  <div className="mt-1 text-[11px] font-semibold" style={{ color: saving ? "var(--pos-strong)" : "var(--neg-strong)" }}>
-                    {pct}% · <span className="aa4-fig">{shekel(Math.abs(delta) * 12)}</span> בשנה
+                  <div className="mt-2.5 flex flex-wrap items-center justify-center gap-1.5">
+                    <span
+                      className="rounded-[var(--r-pill)] px-2.5 py-1 text-[11px] font-bold"
+                      style={{
+                        background: saving ? "rgba(13,138,98,0.13)" : "rgba(194,59,46,0.12)",
+                        color: saving ? "var(--pos-strong)" : "var(--neg-strong)",
+                      }}
+                    >
+                      {pct}% {saving ? "פחות" : "יותר"}
+                    </span>
+                    <span
+                      className="rounded-[var(--r-pill)] px-2.5 py-1 text-[11px] font-semibold"
+                      style={{
+                        background: saving ? "rgba(13,138,98,0.13)" : "rgba(194,59,46,0.12)",
+                        color: saving ? "var(--pos-strong)" : "var(--neg-strong)",
+                      }}
+                    >
+                      <Fig v={Math.abs(delta) * 12} /> בשנה
+                    </span>
                   </div>
                 </div>
-                <SheetFigure label="החזר חודשי לאחר איחוד" value={newPayment} color={saving ? "var(--pos-strong)" : "var(--neg-strong)"} />
               </div>
 
               {/* one bar: what remains vs. what's saved */}
-              <div className="mt-4">
-                <div className="aa4-bar-track" style={{ height: 12 }}>
-                  <span
-                    className="absolute inset-y-0"
-                    style={{ insetInlineStart: 0, width: `${(Math.min(currentPayment, newPayment) / Math.max(currentPayment, newPayment, 1)) * 100}%`, background: "var(--brand)" }}
-                  />
-                  <span
-                    className="absolute inset-y-0"
-                    style={{
-                      insetInlineStart: `${(Math.min(currentPayment, newPayment) / Math.max(currentPayment, newPayment, 1)) * 100}%`,
-                      width: `${(Math.abs(delta) / Math.max(currentPayment, newPayment, 1)) * 100}%`,
-                      background: saving ? "var(--pos)" : "var(--neg)",
-                      opacity: 0.35,
-                    }}
-                  />
-                </div>
-                <div className="mt-1.5 flex items-center justify-between text-[10.5px] text-[var(--ink-3)]">
-                  <span>
-                    החזר לאחר איחוד <b className="aa4-fig text-[var(--ink-2)]">{shekel(newPayment)}</b>
-                  </span>
-                  <span style={{ color: saving ? "var(--pos-strong)" : "var(--neg-strong)" }}>
-                    {saving ? "נחסך" : "תוספת"} <b className="aa4-fig">{shekel(Math.abs(delta))}</b>
-                  </span>
-                </div>
-              </div>
+              {(() => {
+                const max = Math.max(currentPayment, newPayment, 1);
+                const basePct = (Math.min(currentPayment, newPayment) / max) * 100;
+                const diffPct = (Math.abs(delta) / max) * 100;
+                return (
+                  <div className="mt-4">
+                    <div className="aa4-bar-track" style={{ height: 14 }}>
+                      <motion.span
+                        className="absolute inset-y-0"
+                        style={{ insetInlineStart: 0, background: "var(--brand)" }}
+                        initial={reduce ? false : { width: "0%" }}
+                        animate={{ width: `${basePct}%` }}
+                        transition={reduce ? { duration: 0 } : { duration: 0.7, ease, delay: 0.15 }}
+                      />
+                      <motion.span
+                        className="absolute inset-y-0"
+                        style={{
+                          insetInlineStart: `${basePct}%`,
+                          background: saving ? "var(--pos)" : "var(--neg)",
+                          opacity: 0.3,
+                        }}
+                        initial={reduce ? false : { width: "0%" }}
+                        animate={{ width: `${diffPct}%` }}
+                        transition={reduce ? { duration: 0 } : { duration: 0.7, ease, delay: 0.3 }}
+                      />
+                      {diffPct > 14 && (
+                        <span
+                          className="absolute inset-y-0 grid place-items-center"
+                          style={{ insetInlineStart: `${basePct}%`, width: `${diffPct}%` }}
+                        >
+                          <span className="text-[9.5px] font-bold" style={{ color: saving ? "var(--pos-strong)" : "var(--neg-strong)" }}>
+                            {pct}%
+                          </span>
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-[11px]">
+                      <span className="flex items-center gap-1.5 text-[var(--ink-3)]">
+                        <span className="size-2 rounded-full" style={{ background: "var(--brand)" }} />
+                        החזר לאחר איחוד
+                        <Fig v={newPayment} className="text-[11.5px] text-[var(--ink-2)]" />
+                      </span>
+                      <span className="flex items-center gap-1.5" style={{ color: saving ? "var(--pos-strong)" : "var(--neg-strong)" }}>
+                        <span className="size-2 rounded-full" style={{ background: saving ? "var(--pos)" : "var(--neg)", opacity: 0.45 }} />
+                        {saving ? "נחסך" : "תוספת"}
+                        <Fig v={Math.abs(delta)} className="text-[11.5px]" />
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* existing liabilities */}
               <SheetSection title="ההתחייבויות הקיימות" sub={`${realLoans.length} הלוואות ומשכנתאות · יתרה כוללת ${shekel(totalBalance)}`}>
-                <table className="w-full border-collapse text-[12px]">
+                <table className="aa4-sheet-table w-full border-collapse text-[12px]">
                   <thead>
                     <tr className="border-b text-[10px] font-semibold text-[var(--ink-3)]" style={{ borderColor: "var(--line)" }}>
                       <th className="py-1.5 pe-2 text-right font-semibold">גורם מלווה</th>
@@ -275,7 +368,7 @@ export default function CustomerSummary({
 
               {/* proposed mix */}
               <SheetSection title="התמהיל המוצע" sub={`${realMix.length} מסלולים · סך ${shekel(totalMix)}`}>
-                <table className="w-full border-collapse text-[12px]">
+                <table className="aa4-sheet-table w-full border-collapse text-[12px]">
                   <thead>
                     <tr className="border-b text-[10px] font-semibold text-[var(--ink-3)]" style={{ borderColor: "var(--line)" }}>
                       <th className="py-1.5 pe-2 text-right font-semibold">מסלול</th>
@@ -317,25 +410,69 @@ export default function CustomerSummary({
                 </table>
               </SheetSection>
 
-              {/* closing statement */}
+              {/* closing statement — the signature moment */}
               <div
-                className="mt-5 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 rounded-[var(--r-control)] border px-4 py-3.5"
+                className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-3 rounded-[14px] border px-5 py-4"
                 style={
                   saving
-                    ? { background: "var(--pos-tint)", borderColor: "rgba(13,138,98,0.22)" }
-                    : { background: "var(--neg-tint)", borderColor: "rgba(194,59,46,0.2)" }
+                    ? {
+                        background: "linear-gradient(135deg, #e9f7f1 0%, #d8f0e4 55%, #e4f4ed 100%)",
+                        borderColor: "rgba(13,138,98,0.26)",
+                      }
+                    : {
+                        background: "linear-gradient(135deg, #f9ecea 0%, #f2ddd8 55%, #f7e8e4 100%)",
+                        borderColor: "rgba(194,59,46,0.22)",
+                      }
                 }
               >
-                <span className="flex items-center gap-2 text-[13px] font-bold" style={{ color: saving ? "var(--pos-strong)" : "var(--neg-strong)" }}>
-                  <SealCheck className="size-[18px]" weight="duotone" />
-                  {saving
-                    ? `האיחוד המוצע חוסך ${shekel(Math.abs(delta))} בכל חודש — ${shekel(Math.abs(delta) * 12)} בשנה`
-                    : `האיחוד המוצע מוסיף ${shekel(Math.abs(delta))} לחודש`}
+                <span
+                  className="grid size-11 shrink-0 place-items-center rounded-full text-white"
+                  style={{
+                    background: saving ? "var(--pos)" : "var(--neg)",
+                    boxShadow: saving ? "0 8px 18px -8px rgba(13,138,98,0.6)" : "0 8px 18px -8px rgba(194,59,46,0.55)",
+                  }}
+                >
+                  <SealCheck className="size-6" weight="fill" />
                 </span>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[15px] font-bold leading-snug" style={{ color: saving ? "var(--pos-strong)" : "var(--neg-strong)" }}>
+                    {saving ? (
+                      <>
+                        חיסכון של <Fig v={Math.abs(delta)} className="text-[1.1em]" /> בכל חודש
+                      </>
+                    ) : (
+                      <>
+                        תוספת של <Fig v={Math.abs(delta)} className="text-[1.1em]" /> בכל חודש
+                      </>
+                    )}
+                  </div>
+                  <div className="mt-0.5 text-[12px] font-medium text-[var(--ink-2)]">
+                    <Fig v={Math.abs(delta) * 12} className="text-[12px]" /> בשנה · {pct}%{" "}
+                    {saving ? "פחות מההחזר הנוכחי" : "מעל ההחזר הנוכחי"}
+                  </div>
+                </div>
                 {newDti !== null && (
-                  <span className="text-[11.5px] font-semibold text-[var(--ink-2)]">
-                    יחס החזר להכנסה לאחר איחוד: <b className="aa4-fig" dir="ltr">{newDti}%</b>
-                  </span>
+                  <div className="shrink-0">
+                    <div className="text-[10.5px] font-semibold text-[var(--ink-3)]">יחס החזר להכנסה לאחר איחוד</div>
+                    <div className="mt-1.5 flex items-center gap-2.5">
+                      <div className="aa4-bar-track" style={{ width: 110, height: 6, background: "rgba(15,32,40,0.09)" }}>
+                        <motion.span
+                          className="aa4-bar-fill"
+                          initial={reduce ? false : { width: "0%" }}
+                          animate={{ width: `${Math.min(newDti / 40, 1) * 100}%` }}
+                          transition={reduce ? { duration: 0 } : { duration: 0.6, ease, delay: 0.4 }}
+                          style={{ background: newDti <= 40 ? "var(--pos)" : "var(--neg)" }}
+                        />
+                      </div>
+                      <span
+                        dir="ltr"
+                        className="aa4-fig text-[13px] font-bold leading-none"
+                        style={{ color: newDti <= 40 ? "var(--pos-strong)" : "var(--neg-strong)" }}
+                      >
+                        {newDti}%<span className="text-[9.5px] font-medium text-[var(--ink-3)]"> /40%</span>
+                      </span>
+                    </div>
+                  </div>
                 )}
               </div>
 
@@ -350,23 +487,14 @@ export default function CustomerSummary({
   );
 }
 
-function SheetFigure({ label, value, color }: { label: string; value: number; color: string }) {
-  return (
-    <div className="rounded-[12px] border px-4 py-3.5 text-center" style={{ borderColor: "var(--line)", background: "var(--surface)" }}>
-      <div className="text-[11.5px] font-semibold text-[var(--ink-3)]">{label}</div>
-      <div className="aa4-fig mt-0.5 text-[1.6rem] font-semibold leading-none" style={{ color }}>
-        {shekel(value)}
-      </div>
-      <div className="mt-1 text-[10.5px] text-[var(--ink-4)]">לחודש</div>
-    </div>
-  );
-}
-
 function SheetSection({ title, sub, children }: { title: string; sub?: string; children: React.ReactNode }) {
   return (
-    <section className="mt-5">
-      <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5">
-        <h3 className="text-[13.5px] font-bold text-[var(--ink)]">{title}</h3>
+    <section className="mt-6">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-0.5">
+        <h3 className="flex items-center gap-2 text-[13.5px] font-bold text-[var(--ink)]">
+          <span className="h-3.5 w-[3px] rounded-full" style={{ background: "var(--brand)" }} />
+          {title}
+        </h3>
         {sub && <span className="aa4-fig text-[11px] text-[var(--ink-3)]">{sub}</span>}
       </div>
       <div className={cn("overflow-hidden rounded-[var(--r-control)] border px-3 py-1", "bg-[var(--surface)]")} style={{ borderColor: "var(--line)" }}>
