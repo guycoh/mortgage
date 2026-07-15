@@ -668,25 +668,7 @@ const crmText = [
             </button>
            
            
-            <button
-        onClick={() => setIsOpen(true)}
-        className="
-          px-8 py-4
-          rounded-2xl
-          bg-linear-to-r
-          from-orange-500
-          to-orange-600
-          text-white
-          font-bold
-          shadow-lg
-          hover:scale-105
-          transition
-        "
-      >
-        פתח מחשבון בלון
-      </button>
-
-           
+             
            
            
            
