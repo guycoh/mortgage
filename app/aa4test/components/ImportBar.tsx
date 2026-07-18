@@ -36,9 +36,11 @@ const sid = () => `rep_${++slotSeq}`;
 interface Props {
   onReports: (slots: ReportSlot[]) => void;
   onImported: () => void;
+  /** Sits in the loaded-reports header — the page supplies the Excel export. */
+  headerAction?: React.ReactNode;
 }
 
-export default function ImportBar({ onReports, onImported }: Props) {
+export default function ImportBar({ onReports, onImported, headerAction }: Props) {
   const reduce = useReducedMotion();
   const [slots, setSlots] = useState<ReportSlot[]>([]);
   const [busy, setBusy] = useState(false);
@@ -180,10 +182,13 @@ export default function ImportBar({ onReports, onImported }: Props) {
                 {slots.length}
               </span>
             </span>
-            <button onClick={resetAll} className="aa4-btn aa4-btn-ghost !px-2.5 !py-1.5 !text-[12px]">
-              <ArrowsClockwise className="size-3.5" />
-              התחלה מחדש
-            </button>
+            <div className="flex shrink-0 items-center gap-2">
+              {headerAction}
+              <button onClick={resetAll} className="aa4-btn aa4-btn-ghost !px-2.5 !py-1.5 !text-[12px]">
+                <ArrowsClockwise className="size-3.5" />
+                התחלה מחדש
+              </button>
+            </div>
           </div>
 
           <ul>
