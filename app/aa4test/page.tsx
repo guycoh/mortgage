@@ -28,6 +28,7 @@ import "./aa4-theme.css";
 import ImportBar from "./components/ImportBar";
 import ResultHero from "./components/ResultHero";
 import CustomerSummary from "./components/CustomerSummary";
+import ExportExcelButton from "./components/ExportExcelButton";
 import LiabilitiesBoard, { type Persona } from "./components/LiabilitiesBoard";
 import { AssetsCard, IncomeCard, SummaryRail, type PropertyRow, type OtherDebt } from "./components/InputCards";
 import { LoanLedger, MixLedger, type LoanRow, type MixRow } from "./components/Ledger";
@@ -195,7 +196,11 @@ export default function ConsolidationSimulator() {
         </header>
 
         <div className="flex flex-col gap-4 md:gap-5">
-          <ImportBar onReports={handleReports} onImported={handleImported} />
+          <ImportBar
+            onReports={handleReports}
+            onImported={handleImported}
+            headerAction={<ExportExcelButton slots={slots} rows={liabRows} />}
+          />
 
           {/* liabilities board — the report's "עסקות בהן הלקוח חייב", editable */}
           {slots.length > 0 && (
