@@ -7,8 +7,9 @@
 // plus the credit-report intake that fills a mix in a single drop.
 //
 // The lead arrives as a prop from the route, never from storage: /aa100test/3
-// IS the state. That is what makes the bare /aa100test genuinely empty instead
-// of silently reopening whatever was looked at last.
+// IS the state. With no lead the same surface opens on a blank board — you can
+// drag a report in and work — but there is nowhere to save it until a lead is
+// picked, and nothing is restored from a previous visit.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
@@ -91,7 +92,7 @@ function nameFor(mix: Mix, summary: ImportSummary, first: boolean): string {
   return mix.mix_name.includes(summary.clientName) ? mix.mix_name : `${mix.mix_name} + ${summary.clientName}`;
 }
 
-export default function Simulator({ lead }: { lead: Lead }) {
+export default function Simulator({ lead }: { lead: Lead | null }) {
   const [mixes, setMixes] = useState<Mix[] | null>(null);
   const [activeMixId, setActiveMixId] = useState<string | null>(null);
   const [compareMixId, setCompareMixId] = useState<string | null>(null);
@@ -113,6 +114,10 @@ export default function Simulator({ lead }: { lead: Lead }) {
 
   const list = mixes ?? [];
   const activeMix = list.find((m) => m.id === activeMixId) ?? null;
+  // A report describes what the client owes TODAY, so it belongs to the first
+  // mix — the one that means "as things stand". Dropping it onto a proposal
+  // would silently overwrite the alternative being drafted.
+  const isPrimaryMix = !!activeMixId && (list[0]?.id === activeMixId || !!activeMix?.is_base);
   const loans = activeMix?.loans ?? [];
   const dirty = mixes !== null && snapshot(mixes) !== saved;
 
@@ -138,6 +143,12 @@ export default function Simulator({ lead }: { lead: Lead }) {
   }, []);
 
   useEffect(() => {
+    // No lead: a blank board, every time. Nothing is carried over from a
+    // previous visit — the server is the only store this page has.
+    if (!lead) {
+      adopt([]);
+      return;
+    }
     let cancelled = false;
     setMixes(null);
     fetch(`/api/aa100/mixes?lead=${lead.id}`)
@@ -164,7 +175,7 @@ export default function Simulator({ lead }: { lead: Lead }) {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lead.id, adopt]);
+  }, [lead?.id, adopt]);
 
   useEffect(() => setCompareMixId(null), [activeMixId]);
 
@@ -247,7 +258,7 @@ export default function Simulator({ lead }: { lead: Lead }) {
   };
 
   const save = async () => {
-    if (!mixes) return;
+    if (!mixes || !lead) return;
     setSaving(true);
     try {
       const res = await fetch("/api/aa100/mixes", {
@@ -362,8 +373,14 @@ export default function Simulator({ lead }: { lead: Lead }) {
             <h1 className="fin-display text-[30px]">סימולטור תמהילים</h1>
             <LeadPicker
               lead={lead}
-              onPick={(l) => router.push(`/aa100test/${l.id}`)}
-              onClear={() => router.push("/aa100test")}
+              onPick={(l) => {
+                if (dirty && !window.confirm("יש שינויים שלא נשמרו. לעבור לליד אחר ולאבד אותם?")) return;
+                router.push(`/aa100test/${l.id}`);
+              }}
+              onClear={() => {
+                if (dirty && !window.confirm("יש שינויים שלא נשמרו. לצאת מהליד ולאבד אותם?")) return;
+                router.push("/aa100test");
+              }}
             />
           </div>
 
@@ -418,8 +435,8 @@ export default function Simulator({ lead }: { lead: Lead }) {
             <button
               className="fin-btn fin-btn-primary"
               onClick={save}
-              disabled={!dirty || saving}
-              title={`שמירה לליד ${lead.id}`}
+              disabled={!dirty || saving || !lead}
+              title={lead ? `שמירה לליד ${lead.id}` : "בחרו ליד כדי לשמור"}
             >
               {saving ? (
                 <CircleNotch size={14} weight="bold" className="animate-spin" />
@@ -477,7 +494,7 @@ export default function Simulator({ lead }: { lead: Lead }) {
         </motion.div>
 
         {/* ------------------------------------------------------ the intake */}
-        {activeMixId && (
+        {activeMixId && isPrimaryMix && (
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
