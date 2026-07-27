@@ -127,7 +127,7 @@ export default function RowSettings({
           </header>
 
           <div className="fin-sheet-body">
-            {field("עוגן", "anchor", "text", "פריים")}
+            {field("עוגן", "anchor", "number", "0")}
             {field("מרווח מהעוגן", "anchor_margin", "number", "0")}
             {field("תדירות שינוי", "change_frequency", "text", "—")}
             <label className="flex flex-col gap-1">

@@ -137,7 +137,9 @@ function toLoanRow(src: ExtractedLoan, mixId: string, group: DebtGroup): Importe
     amortization_schedule_id: 1, // שפיצר — what a bank mortgage almost always is
     grace_type_id: 1, // ללא
     grace_months: 0,
-    anchor: /פריים/.test(src.trackLabel ?? "") ? "פריים" : null,
+    // anchor is a numeric column (the anchor rate). The prime track is
+    // already carried by path_id, so there is nothing to put here.
+    anchor: null,
     group,
     is_guarantor: guarantor,
     source_bank: src.source,
