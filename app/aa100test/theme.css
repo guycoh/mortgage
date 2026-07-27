@@ -310,40 +310,13 @@
 /* the one calculated figure people actually read: the monthly payment */
 .fin-pay { padding: 0 8px; font-size: 16px; font-weight: 700; color: var(--ink); line-height: 1.15; }
 
-/* HIGH RATE — a slow warm tide across the well. It has to be noticeable on a
-   second look and invisible on the first, so: 8s, low alpha, no motion at all
-   for anyone who asked for none. */
-.fin-cell[data-heat] { border-color: var(--warn-line); color: var(--warn-deep, #8a5200); }
-.fin-cell[data-heat="warm"] {
-  background:
-    linear-gradient(100deg, rgba(214, 141, 16, 0) 34%, rgba(214, 141, 16, 0.1) 50%, rgba(214, 141, 16, 0) 66%)
-      0 0 / 320% 100% no-repeat,
-    #fffdf8;
-  animation: fin-heat 9s cubic-bezier(0.45, 0, 0.55, 1) infinite;
-}
-.fin-cell[data-heat="hot"] {
-  border-color: #e0b26a;
-  background:
-    linear-gradient(100deg, rgba(199, 88, 20, 0) 32%, rgba(199, 88, 20, 0.17) 50%, rgba(199, 88, 20, 0) 68%)
-      0 0 / 320% 100% no-repeat,
-    #fff8f0;
-  animation: fin-heat 7s cubic-bezier(0.45, 0, 0.55, 1) infinite;
-}
-.fin-cell[data-heat]:focus { animation: none; }
-@keyframes fin-heat {
-  0%, 100% { background-position: 118% 0, 0 0; }
-  50% { background-position: -18% 0, 0 0; }
-}
-/* the non-colour half of the signal, so heat is never colour alone */
-.fin-heat-mark {
-  display: block;
-  margin: 2px auto 0;
-  width: 22px;
-  height: 2px;
-  border-radius: 1px;
-  background: var(--warn-line);
-}
-.fin-heat-mark[data-heat="hot"] { width: 30px; background: #d3872c; }
+/* HIGH RATE — the figure itself carries it, and nothing else.
+   No fill, no border, no motion: the column reads normally at a glance, and a
+   rate that is out of line for its family shows up the moment you look at it.
+   Thresholds are per family (see rateHeat) because 6.5% is expensive for a
+   mortgage and cheap for a credit-card loan. */
+.fin-cell[data-heat="warm"] { color: #9a6410; }
+.fin-cell[data-heat="hot"] { color: #ac4a13; font-weight: 700; }
 
 /* native spinners fight the grid */
 .fin-cell[type="number"] { -moz-appearance: textfield; appearance: textfield; }
@@ -425,6 +398,22 @@ tr:hover .fin-act { color: var(--ink-3); }
 .fin-act:active { transform: translateY(1px); box-shadow: none; }
 .fin-act[data-danger="true"]:hover { border-color: var(--neg-line); background: var(--neg-tint); color: var(--neg); box-shadow: 0 1px 0 var(--neg-line); }
 .fin-act[data-armed="true"] { border-color: var(--neg-deep, #8d0c2d); background: var(--neg); color: #fff; box-shadow: 0 1px 0 #8d0c2d; }
+
+/* the Excel export — Excel's green, on this project's button */
+.fin-btn-excel {
+  background: linear-gradient(180deg, #ffffff, #f4fbf7);
+  border-color: #b9dfcc;
+  box-shadow: 0 2px 0 #b9dfcc, inset 0 1px 0 #fff;
+  color: #135f3d;
+}
+.fin-btn-excel:hover:not(:disabled) {
+  border-color: #77bd98;
+  box-shadow: 0 2px 0 #77bd98, inset 0 1px 0 #fff;
+  color: #0e4a2f;
+}
+.fin-btn-excel:active:not(:disabled) { box-shadow: 0 0 0 #b9dfcc; }
+.fin-btn-excel:focus-visible { border-color: #1d6f42; box-shadow: 0 2px 0 #77bd98, 0 0 0 3px #e3f4ec; }
+.fin-btn-excel .fin-excel-ico { color: #1d6f42; }
 
 /* ------------------------------------------------------------------- tabs */
 
@@ -562,7 +551,7 @@ tr:hover .fin-act { color: var(--ink-3); }
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 5px 10px 5px 7px;
+  padding: 7px 10px 7px 7px;
   border-inline-start: 3px solid var(--fam);
 }
 .fin-groupbar-title {
@@ -572,7 +561,8 @@ tr:hover .fin-act { color: var(--ink-3); }
 }
 .fin-groupbar-sum {
   font-family: var(--num); font-variant-numeric: tabular-nums;
-  font-size: 12px; font-weight: 600; color: var(--ink-2);
+  font-size: 15px; font-weight: 700; color: var(--ink);
+  letter-spacing: -0.02em;
 }
 
 /* ------------------------------------------------------- composition bar */

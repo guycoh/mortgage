@@ -21,6 +21,8 @@ export type ImportedLoan = Loan & {
   /** The client guarantees this debt rather than owing it. Still real exposure,
    *  so it is imported — but marked, because it is not their own repayment. */
   is_guarantor?: boolean;
+  /** The same debt was found in more than one report — counted once. */
+  is_shared?: boolean;
   source_bank?: string;
   source_type?: string;
   source_track?: string;
@@ -216,4 +218,58 @@ export function importReportToLoans(
       .filter((l) => l.category === "mortgage" || l.category === "loan")
       .reduce((s, l) => s + l.displayMonthly, 0),
   };
+}
+
+/* ----------------------------------------------------- more than one report */
+
+/**
+ * A household's two reports overlap. A jointly-held mortgage is listed in full
+ * on both spouses' דוח ריכוז נתונים, so importing both naively doubles the
+ * balance and the monthly payment — the two numbers this whole page is about.
+ *
+ * The identity of a debt across two reports is the lender plus the shape of the
+ * obligation: same bank, same balance, same rate, same remaining term, same
+ * track. The balance is bucketed to ₪50 because two reports are rarely pulled
+ * the same morning and a month of amortization moves it slightly; anything
+ * coarser started merging genuinely separate loans from the same bank.
+ */
+export function loanKey(l: ImportedLoan): string {
+  return [
+    l.group ?? "mortgage",
+    (l.source_bank ?? "").replace(/\s+/g, ""),
+    Math.round((Number(l.amount) || 0) / 50),
+    (Number(l.rate) || 0).toFixed(2),
+    Number(l.months) || 0,
+    (l.source_track ?? "").replace(/\s+/g, ""),
+  ].join("|");
+}
+
+/**
+ * Fold a further report's rows into the mix. Anything already present is
+ * marked shared rather than added again, and the count comes back so the UI
+ * can say what it did instead of silently dropping rows.
+ */
+export function mergeReportLoans(
+  existing: ImportedLoan[],
+  incoming: ImportedLoan[]
+): { merged: ImportedLoan[]; duplicates: number } {
+  const at = new Map<string, number>();
+  const merged = existing.map((l, i) => {
+    at.set(loanKey(l), i);
+    return { ...l };
+  });
+
+  let duplicates = 0;
+  for (const l of incoming) {
+    const k = loanKey(l);
+    const hit = at.get(k);
+    if (hit !== undefined) {
+      merged[hit] = { ...merged[hit], is_shared: true };
+      duplicates += 1;
+      continue;
+    }
+    at.set(k, merged.length);
+    merged.push(l);
+  }
+  return { merged, duplicates };
 }
