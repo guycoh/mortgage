@@ -49,6 +49,16 @@ let hasExtra = true;
 
 type Row = Record<string, unknown>;
 
+const numOrNull = (v: unknown) => {
+  if (v === null || v === undefined || v === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+};
+const intOrNull = (v: unknown) => {
+  const n = numOrNull(v);
+  return n === null ? null : Math.round(n);
+};
+
 const isMissingColumn = (e: { code?: string; message?: string } | null) =>
   e?.code === "PGRST204" || /column .* does not exist/i.test(e?.message ?? "");
 
@@ -59,6 +69,11 @@ function toDbRow(loan: Row, mixId: string): Row {
   out.amount = Number(loan.amount) || 0;
   out.rate = Number(loan.rate) || 0;
   out.months = Number(loan.months) || 0;
+  // anchor and anchor_interval are numeric/integer columns; a stray string
+  // from the UI would be rejected by Postgres rather than coerced
+  out.anchor = numOrNull(loan.anchor);
+  out.anchor_margin = numOrNull(loan.anchor_margin);
+  out.anchor_interval = intOrNull(loan.anchor_interval);
   if (hasExtra) {
     out.debt_group = loan.group === "loan" ? "loan" : "mortgage";
     out.is_guarantor = !!loan.is_guarantor;
