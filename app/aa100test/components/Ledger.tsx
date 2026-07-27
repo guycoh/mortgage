@@ -292,7 +292,7 @@ export default function Ledger({
                                 tone: FAMILY[k].color,
                               }))}
                             />
-                            <div className="fin-share mt-1" title={`${share.toFixed(1)}% מהתמהיל`}>
+                            <div className="fin-share mt-0.5" title={`${share.toFixed(1)}% מהתמהיל`}>
                               <span style={{ width: `${Math.min(100, share)}%` }} />
                             </div>
                           </td>

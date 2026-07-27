@@ -8,8 +8,8 @@
 //   · one column grid for both families, so a row reads the same wherever it is
 //   · money carries no ₪ in the cell — the mark lives in the column head, so
 //     columns of figures stay clean and stay sortable as numbers
-//   · the group bands are NOT merged — a merged cell inside the filter range
-//     breaks sorting, and those rows sit inside it
+//   · no freeze panes and no auto-filter: this is a document to read and hand
+//     over, not a grid to sort — nothing sticks while you scroll
 //   · Arial, because it is the one family guaranteed to carry Hebrew glyphs on
 //     both Windows and macOS Excel
 //
@@ -139,7 +139,7 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
   const { loans, annualInflation, clients } = input;
 
   const ws = wb.addWorksheet("תמהיל", {
-    views: [{ rightToLeft: true, showGridLines: false, state: "frozen", ySplit: 0 }],
+    views: [{ rightToLeft: true, showGridLines: false }],
     properties: { defaultRowHeight: 17, tabColor: { argb: C.primary } },
     pageSetup: {
       orientation: "landscape",
@@ -161,21 +161,21 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
   ws.getCell(r, 1).fill = solid(C.primary);
   r += 1;
 
-  ws.mergeCells(r, 1, r, SPAN);
+  // Title on the right, who this is on the left — one row instead of two.
+  const half = Math.ceil(SPAN / 2);
+  ws.mergeCells(r, 1, r, half);
   const title = ws.getCell(r, 1);
   title.value = "סימולטור תמהילים";
-  title.font = { name: FONT, size: 17, bold: true, color: { argb: C.ink } };
+  title.font = { name: FONT, size: 16, bold: true, color: { argb: C.ink } };
   title.alignment = { horizontal: "right", vertical: "middle" };
-  ws.getRow(r).height = 27;
-  r += 1;
 
-  ws.mergeCells(r, 1, r, SPAN);
-  const sub = ws.getCell(r, 1);
+  ws.mergeCells(r, half + 1, r, SPAN);
+  const sub = ws.getCell(r, half + 1);
   const who = clients.map((c) => (c.id ? `${c.name} (${c.id})` : c.name)).filter(Boolean).join("  ·  ");
-  sub.value = [input.mixName, who].filter(Boolean).join("   |   ");
+  sub.value = [input.mixName, who].filter(Boolean).join("   ·   ");
   sub.font = { name: FONT, size: 10.5, color: { argb: C.ink3 } };
-  sub.alignment = { horizontal: "right", vertical: "middle" };
-  ws.getRow(r).height = 16;
+  sub.alignment = { horizontal: "left", vertical: "middle" };
+  ws.getRow(r).height = 24;
   r += 1;
 
   ws.mergeCells(r, 1, r, SPAN);
@@ -186,7 +186,10 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
   stamp.value = `הופק ב-${dd}   ·   אינפלציה שנתית בהנחה: ${annualInflation}%   ·   עלות לשקל: ${perShekel.toFixed(2)}`;
   stamp.font = { name: FONT, size: 9, color: { argb: C.ink3 } };
   stamp.alignment = { horizontal: "right", vertical: "middle" };
-  r += 2;
+  ws.getRow(r).height = 14;
+  r += 1;
+  ws.getRow(r).height = 5; // hairline of air, not a whole empty row
+  r += 1;
 
   /* ------------------------------------------------------------ totals --- */
 
@@ -232,8 +235,9 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
       ws.getCell(kpiStart + 1, c).border = { bottom: thin(C.line2) };
     }
   });
-  ws.getRow(kpiStart).height = 15;
-  ws.getRow(kpiStart + 1).height = 25;
+  ws.getRow(kpiStart).height = 14;
+  ws.getRow(kpiStart + 1).height = 23;
+  ws.getRow(kpiStart + 2).height = 6;
   r = kpiStart + 3;
 
   /* -------------------------------------------------- composition ------ */
@@ -289,6 +293,7 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
       ws.getCell(r, 1).border = { bottom: thin(C.line), right: { style: "thick", color: { argb: TRACK_ARGB[t.id] } } };
       r += 1;
     }
+    ws.getRow(r).height = 6;
     r += 1;
   }
 
@@ -303,7 +308,6 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
     cell.alignment = { horizontal: i <= 3 || i === SPAN - 1 ? "right" : "center", vertical: "middle", wrapText: true };
   });
   ws.getRow(headRow).height = 24;
-  ws.views = [{ rightToLeft: true, showGridLines: false, state: "frozen", ySplit: headRow }];
   r += 1;
 
   const famOf = (l: ImportedLoan): DebtGroup => (l.group === "loan" ? "loan" : "mortgage");
@@ -313,7 +317,6 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
   // subtotal rows sitting between them — a single first..last span would count
   // every mortgage twice.
   const dataRanges: [number, number][] = [];
-  let lastDataRow = 0;
 
   for (const g of groups) {
     const rows = per.filter((x) => famOf(x.l) === g);
@@ -322,8 +325,7 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
     const accent = g === "mortgage" ? C.mortgage : C.loan;
     const wash = g === "mortgage" ? C.mortgageWash : C.loanWash;
 
-    // Group band. Deliberately NOT merged: a merged cell inside the filter
-    // range breaks sorting, and this row sits inside it.
+    // Group band, left unmerged so a column can still be copied out cleanly.
     const band = ws.getCell(r, 1);
     band.value = `${FAMILY[g].plural}   (${rows.length})`;
     band.font = { name: FONT, size: 10.5, bold: true, color: { argb: accent } };
@@ -391,7 +393,6 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
     });
 
     dataRanges.push([groupFirst, r - 1]);
-    lastDataRow = r - 1;
 
     // group subtotal — a live formula, with the value cached so the figure is
     // already there the moment the file opens, before any recalculation
@@ -411,7 +412,9 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
       cell.border = { top: thin(accent), bottom: thin(C.line2) };
     });
     ws.getRow(r).height = 20;
-    r += 2;
+    r += 1;
+    ws.getRow(r).height = 6;
+    r += 1;
   }
 
   /* ---------------------------------------------------- grand total ----- */
@@ -432,21 +435,11 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
       cell.fill = solid(C.ink);
     });
     ws.getRow(r).height = 24;
-    r += 2;
+    r += 1;
+    ws.getRow(r).height = 6;
+    r += 1;
   }
 
-  /* ------------------------------------------------------------ footer -- */
-
-  ws.mergeCells(r, 1, r, SPAN);
-  const foot = ws.getCell(r, 1);
-  foot.value =
-    "החזר חודשי, סך ריבית ועלות כוללת מחושבים לפי לוח הסילוקין של כל שורה ולפי הנחת האינפלציה שלמעלה. חובות המופיעים בשני דוחות נספרים פעם אחת.";
-  foot.font = { name: FONT, size: 8.5, italic: true, color: { argb: C.ink3 } };
-  foot.alignment = { horizontal: "right", vertical: "middle" };
-
-  // auto-filter over the detail table only
-  if (dataRanges.length)
-    ws.autoFilter = { from: { row: headRow, column: 1 }, to: { row: lastDataRow, column: SPAN } };
 }
 
 /** 1 → A, 27 → AA. */

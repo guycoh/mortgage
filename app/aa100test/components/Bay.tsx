@@ -19,15 +19,12 @@ import {
   Plus,
   CircleNotch,
   IdentificationCard,
-  ShieldCheck,
   UploadSimple,
   WarningCircle,
   X,
 } from "@phosphor-icons/react";
 import { parsePdfFile } from "@/lib/credit-parser/extract.client";
-import { TRACK_HEX, importReportToLoans, type ImportSummary } from "../lib/credit";
-
-const STEPS = ["גוררים את קובץ ה־PDF", "המסלולים מזוהים אוטומטית", "התמהיל מתמלא"];
+import { importReportToLoans, type ImportSummary } from "../lib/credit";
 
 export default function Bay({
   mixId,
@@ -227,12 +224,8 @@ export default function Bay({
 
       {(drag || busy) && <span className="fin-beam" aria-hidden />}
 
-      {/* what comes out of this bay: the five tracks, as a hairline */}
-      <div className="fin-bay-accent" aria-hidden>
-        {[1, 2, 3, 4, 5].map((id) => (
-          <span key={id} style={{ background: TRACK_HEX[id], opacity: drag ? 1 : 0.55 }} />
-        ))}
-      </div>
+      {/* the two families this bay produces, as a hairline */}
+      <div className="fin-bay-accent" data-drag={drag || undefined} aria-hidden />
 
       <div className="relative flex flex-wrap items-center gap-x-5 gap-y-3 px-4 py-4">
         {/* the paper, half-fed into the slot */}
@@ -267,48 +260,16 @@ export default function Bay({
           </AnimatePresence>
         </div>
 
-        <div className="min-w-[240px] flex-1">
+        <div className="min-w-[220px] flex-1">
           <div className="fin-display text-[21px]" style={{ color: error ? "var(--neg)" : "var(--ink)" }}>
             {headline}
           </div>
-          <div className="mt-2">
-            {error ? (
-              <p className="text-[11.5px] font-semibold" style={{ color: "var(--neg)" }}>
-                {error}
-              </p>
-            ) : busy ? (
-              <p className="text-[11.5px]" style={{ color: "var(--ink-3)" }}>
-                מחלצים יתרות, ריביות ומסלולי הצמדה מתוך הדוח…
-              </p>
-            ) : (
-              <div className="fin-steps">
-                {STEPS.map((s, i) => (
-                  <span key={s} className="contents">
-                    {i > 0 && <span className="fin-step-sep" aria-hidden />}
-                    <span className="fin-step">
-                      <b>{i + 1}</b>
-                      {s}
-                    </span>
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="flex flex-none items-center gap-3">
-          {!busy && !error && (
-            <span
-              className="hidden items-center gap-1.5 text-[10.5px] leading-tight lg:flex"
-              style={{ color: "var(--ink-4)" }}
-            >
-              <ShieldCheck size={15} />
-              הקובץ נשאר
-              <br />
-              בדפדפן שלכם
-            </span>
+          {error && (
+            <p className="mt-1 text-[11.5px] font-semibold" style={{ color: "var(--neg)" }}>
+              {error}
+            </p>
           )}
-          <span className="fin-btn fin-btn-primary !h-9 !px-4" aria-hidden>
+          <span className="fin-btn fin-btn-primary mt-2.5 !h-9 !px-4" aria-hidden>
             {busy ? (
               <CircleNotch size={14} weight="bold" className="animate-spin" />
             ) : error ? (
@@ -318,19 +279,20 @@ export default function Bay({
             )}
             {busy ? "מפענח…" : error ? "נסו שוב" : "בחירת קובץ"}
           </span>
-          {error && (
-            <button
-              className="fin-act"
-              aria-label="סגירת ההודעה"
-              onClick={(e) => {
-                e.stopPropagation();
-                setError("");
-              }}
-            >
-              <X size={13} weight="bold" />
-            </button>
-          )}
         </div>
+
+        {error && (
+          <button
+            className="fin-act self-start"
+            aria-label="סגירת ההודעה"
+            onClick={(e) => {
+              e.stopPropagation();
+              setError("");
+            }}
+          >
+            <X size={13} weight="bold" />
+          </button>
+        )}
       </div>
     </div>
   );

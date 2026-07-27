@@ -13,6 +13,7 @@ import { AnimatePresence, motion } from "motion/react";
 import NumberFlow from "@number-flow/react";
 import {
   CheckCircle,
+  CircleNotch,
   Copy,
   DotsThree,
   FloppyDisk,
@@ -311,23 +312,6 @@ export default function Aa100TestPage() {
         >
           <div className="flex items-center gap-2.5">
             <h1 className="fin-display text-[30px]">סימולטור תמהילים</h1>
-            <span className="fin-chip" style={{ borderColor: "var(--line-2)", color: "var(--ink-3)" }}>
-              aa100test
-            </span>
-            <AnimatePresence>
-              {dirty && (
-                <motion.span
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.9 }}
-                  className="fin-chip"
-                  style={{ borderColor: "var(--warn-line)", background: "var(--warn-tint)", color: "var(--warn)" }}
-                >
-                  <span className="fin-dot" style={{ background: "var(--warn)" }} />
-                  לא נשמר
-                </motion.span>
-              )}
-            </AnimatePresence>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -528,13 +512,18 @@ export default function Aa100TestPage() {
           </button>
 
           <button
-            className="fin-btn fin-btn-sm fin-btn-excel ms-auto"
+            className="fin-btn fin-btn-excel ms-auto"
             onClick={exportExcel}
             disabled={!loans.length || exporting}
+            aria-busy={exporting}
             title={loans.length ? "ייצוא התמהיל לגיליון אקסל" : "אין שורות לייצוא"}
           >
-            <MicrosoftExcelLogo size={15} weight="fill" className="fin-excel-ico" />
-            {exporting ? "מייצא…" : "יצוא לאקסל"}
+            {exporting ? (
+              <CircleNotch size={16} weight="bold" className="fin-excel-ico animate-spin" />
+            ) : (
+              <MicrosoftExcelLogo size={16} weight="fill" className="fin-excel-ico" />
+            )}
+            יצוא לאקסל
           </button>
         </div>
 

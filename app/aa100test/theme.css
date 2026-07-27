@@ -399,21 +399,32 @@ tr:hover .fin-act { color: var(--ink-3); }
 .fin-act[data-danger="true"]:hover { border-color: var(--neg-line); background: var(--neg-tint); color: var(--neg); box-shadow: 0 1px 0 var(--neg-line); }
 .fin-act[data-armed="true"] { border-color: var(--neg-deep, #8d0c2d); background: var(--neg); color: #fff; box-shadow: 0 1px 0 #8d0c2d; }
 
-/* the Excel export — Excel's green, on this project's button */
+/* The Excel export — Excel's green, on this project's button. A step taller
+   and heavier than its neighbours because it is the one thing on this rail
+   that leaves the page. The label never changes while exporting: swapping it
+   for "מייצא…" resized the button mid-click and it jumped. */
 .fin-btn-excel {
-  background: linear-gradient(180deg, #ffffff, #f4fbf7);
-  border-color: #b9dfcc;
-  box-shadow: 0 2px 0 #b9dfcc, inset 0 1px 0 #fff;
-  color: #135f3d;
+  height: 36px;
+  padding: 0 15px;
+  font-size: 13.5px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  background: linear-gradient(180deg, #ffffff, #f2faf6);
+  border-color: #a9d8c0;
+  box-shadow: 0 2px 0 #a9d8c0, inset 0 1px 0 #fff;
+  color: #12603d;
 }
 .fin-btn-excel:hover:not(:disabled) {
-  border-color: #77bd98;
-  box-shadow: 0 2px 0 #77bd98, inset 0 1px 0 #fff;
-  color: #0e4a2f;
+  background: linear-gradient(180deg, #f4fbf7, #e2f3ea);
+  border-color: #2f8a5c;
+  box-shadow: 0 2px 0 #2f8a5c, inset 0 1px 0 #fff;
+  color: #0c4a2e;
 }
-.fin-btn-excel:active:not(:disabled) { box-shadow: 0 0 0 #b9dfcc; }
-.fin-btn-excel:focus-visible { border-color: #1d6f42; box-shadow: 0 2px 0 #77bd98, 0 0 0 3px #e3f4ec; }
+.fin-btn-excel:active:not(:disabled) { box-shadow: 0 0 0 #2f8a5c; }
+.fin-btn-excel:focus-visible { border-color: #1d6f42; box-shadow: 0 2px 0 #2f8a5c, 0 0 0 3px #e0f3e9; }
+.fin-btn-excel:disabled { box-shadow: 0 2px 0 #d6e7de; }
 .fin-btn-excel .fin-excel-ico { color: #1d6f42; }
+.fin-btn-excel:hover:not(:disabled) .fin-excel-ico { color: #14603a; }
 
 /* ------------------------------------------------------------------- tabs */
 
@@ -542,8 +553,8 @@ tr:hover .fin-act { color: var(--ink-3); }
 .fin-fam-ico { flex: none; opacity: 0.85; }
 
 /* share-of-mix meter under the chip */
-.fin-share { height: 3px; border-radius: 2px; background: var(--line); overflow: hidden; }
-.fin-share span { display: block; height: 100%; background: var(--fam); border-radius: 2px; transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+.fin-share { height: 2px; border-radius: 1px; background: var(--line); overflow: hidden; }
+.fin-share span { display: block; height: 100%; background: var(--fam); border-radius: 1px; transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
 
 /* the in-table group divider — one continuous table, still scannable */
 .fin-groupbar > td { padding: 0; border-bottom: 1px solid var(--line-2); background: var(--card-3); }
@@ -671,9 +682,17 @@ tr:hover .fin-act { color: var(--ink-3); }
   100% { transform: translateX(350%); }
 }
 
-/* the five-track accent: a hairline promise of what comes out of the bay */
-.fin-bay-accent { display: flex; height: 3px; }
-.fin-bay-accent span { flex: 1; }
+/* The hairline promise of what comes out of this bay: the two debt families.
+   Interpolated through oklab — a straight sRGB ramp from violet to orange
+   passes through a muddy brown, and oklab keeps the midpoint clean. */
+.fin-bay-accent {
+  height: 3px;
+  opacity: 0.5;
+  background: linear-gradient(90deg, var(--mortgage), var(--loan));
+  background: linear-gradient(90deg in oklab, var(--mortgage), var(--loan));
+  transition: opacity 0.18s ease;
+}
+.fin-bay-accent[data-drag="true"] { opacity: 1; }
 
 /* the intake slot the paper goes into */
 .fin-slot {
@@ -938,8 +957,8 @@ tr:hover .fin-act { color: var(--ink-3); }
 /* The chip IS the control: it shows what the row is and opens to the other. */
 .fin-fam-sel {
   width: 100%;
-  height: 23px;
-  padding: 0 6px 0 5px;
+  height: 26px;
+  padding: 0 7px 0 5px;
   border: 1px solid var(--fam-line, var(--line-2));
   border-radius: 5px;
   background: var(--fam-tint, #fff);
