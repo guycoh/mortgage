@@ -122,8 +122,23 @@
   letter-spacing: 0.06em;
   color: var(--ink-3);
 }
-/* the currency mark is always quieter than the amount it follows */
-.fin-cur { margin-inline-start: 3px; font-size: 0.68em; font-weight: 500; opacity: 0.45; }
+/* MONEY — ₪ leads, digits align on the units place. See Money.tsx for why the
+   bidi isolate is mandatory rather than cosmetic. */
+.fin-money {
+  direction: ltr;
+  unicode-bidi: isolate;
+  text-align: right;
+  font-family: var(--num);
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: "tnum" 1, "lnum" 1;
+  letter-spacing: -0.01em;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.fin-money-block { display: block; }
+/* the mark is quieter than the amount it introduces, and never crowds it */
+.fin-cur { margin-inline-end: 0.22em; font-size: 0.78em; font-weight: 500; opacity: 0.42; }
+.fin-per { margin-inline-start: 0.1em; font-size: 0.72em; font-weight: 500; opacity: 0.45; }
 
 /* ------------------------------------------------------------------ card */
 
@@ -287,15 +302,48 @@
 .fin-calc {
   display: block;
   padding: 0 8px;
-  font-family: var(--num);
-  font-variant-numeric: tabular-nums lining-nums;
   font-size: 13px;
-  font-weight: 600;
   color: var(--ink-2);
-  text-align: end;
   cursor: default;
 }
 .fin-calc[data-muted="true"] { color: var(--ink-4); font-weight: 500; }
+/* the one calculated figure people actually read: the monthly payment */
+.fin-pay { padding: 0 8px; font-size: 16px; font-weight: 700; color: var(--ink); line-height: 1.15; }
+
+/* HIGH RATE — a slow warm tide across the well. It has to be noticeable on a
+   second look and invisible on the first, so: 8s, low alpha, no motion at all
+   for anyone who asked for none. */
+.fin-cell[data-heat] { border-color: var(--warn-line); color: var(--warn-deep, #8a5200); }
+.fin-cell[data-heat="warm"] {
+  background:
+    linear-gradient(100deg, rgba(214, 141, 16, 0) 34%, rgba(214, 141, 16, 0.1) 50%, rgba(214, 141, 16, 0) 66%)
+      0 0 / 320% 100% no-repeat,
+    #fffdf8;
+  animation: fin-heat 9s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+.fin-cell[data-heat="hot"] {
+  border-color: #e0b26a;
+  background:
+    linear-gradient(100deg, rgba(199, 88, 20, 0) 32%, rgba(199, 88, 20, 0.17) 50%, rgba(199, 88, 20, 0) 68%)
+      0 0 / 320% 100% no-repeat,
+    #fff8f0;
+  animation: fin-heat 7s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+.fin-cell[data-heat]:focus { animation: none; }
+@keyframes fin-heat {
+  0%, 100% { background-position: 118% 0, 0 0; }
+  50% { background-position: -18% 0, 0 0; }
+}
+/* the non-colour half of the signal, so heat is never colour alone */
+.fin-heat-mark {
+  display: block;
+  margin: 2px auto 0;
+  width: 22px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--warn-line);
+}
+.fin-heat-mark[data-heat="hot"] { width: 30px; background: #d3872c; }
 
 /* native spinners fight the grid */
 .fin-cell[type="number"] { -moz-appearance: textfield; appearance: textfield; }
@@ -415,6 +463,9 @@ tr:hover .fin-act { color: var(--ink-3); }
 /* Fixed layout: the column widths are a design decision, not a side effect of
    whatever happens to be typed in a cell. */
 .fin-table { width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0; }
+/* Every header reads the same way: Hebrew, start-aligned. Numeric cells are
+   LTR-isolated but text-aligned right, which in an RTL table is the same edge —
+   so a column's header and its figures sit on one line, always. */
 .fin-table th {
   position: sticky;
   top: 0;
@@ -429,15 +480,34 @@ tr:hover .fin-act { color: var(--ink-3); }
   border-bottom: 1px solid var(--line-2);
   white-space: nowrap;
 }
-.fin-table th[data-num="true"] { text-align: end; }
 .fin-table td { padding: 3px 5px; border-bottom: 1px solid var(--line); vertical-align: middle; }
 .fin-table tbody tr { transition: background 0.1s ease; }
+
+/* THE TOTALS BAR — the one line that has to be unmissable. Raised off the
+   sheet, ruled top and bottom, its figures a full step larger than the rows'. */
 .fin-table tfoot td {
-  padding: 9px 6px;
-  border-top: 1px solid var(--ink-2);
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  padding: 10px 6px;
+  border-top: 2px solid var(--ink);
   border-bottom: 0;
-  background: var(--card-2);
+  background: linear-gradient(180deg, #fff, var(--card-3));
+  box-shadow: inset 0 -1px 0 var(--line-2);
 }
+.fin-total-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding-inline-start: 4px;
+  font-family: var(--display);
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+.fin-total-fig { font-size: 16px; font-weight: 700; color: var(--ink); }
+.fin-total-fig[data-hot="true"] { color: var(--primary); }
 
 /* THE SPINE — family identity drawn on the row's start edge. */
 .fin-row > td:first-child { border-inline-start: 3px solid var(--fam, var(--line-2)); }
@@ -503,6 +573,36 @@ tr:hover .fin-act { color: var(--ink-3); }
 .fin-groupbar-sum {
   font-family: var(--num); font-variant-numeric: tabular-nums;
   font-size: 12px; font-weight: 600; color: var(--ink-2);
+}
+
+/* ------------------------------------------------------- composition bar */
+/* Segments are lit from the top and separated by a hairline of the page, so a
+   4%-wide track still reads as its own block rather than a colour smear. */
+.fin-bar {
+  display: flex;
+  height: 46px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+.fin-bar-seg {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-width: 3px;
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(0, 0, 0, 0.06));
+  transition: filter 0.15s ease;
+}
+.fin-bar-seg + .fin-bar-seg { box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.55); }
+.fin-bar-seg:hover { filter: brightness(1.08) saturate(1.05); }
+.fin-bar-pct {
+  font-family: var(--num);
+  font-variant-numeric: tabular-nums;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.22);
 }
 
 /* ------------------------------------------------------------------ chips */
@@ -748,6 +848,9 @@ tr:hover .fin-act { color: var(--ink-3); }
 }
 .fin-sel-item[data-hi="true"] { background: var(--primary-tint); color: var(--ink); }
 .fin-sel-item[data-on="true"] { color: var(--ink); font-weight: 700; }
+/* an option that carries its own colour (the debt families) keeps it in the list */
+.fin-sel-item[style*="--tone"] { color: var(--tone); }
+.fin-sel-item[style*="--tone"][data-hi="true"] { background: color-mix(in srgb, var(--tone) 9%, #fff); }
 .fin-sel-check { margin-inline-start: auto; flex: none; color: var(--primary); }
 .fin-sel-note { margin-inline-start: auto; font-family: var(--num); font-size: 11px; color: var(--ink-4); }
 
@@ -789,6 +892,106 @@ tr:hover .fin-act { color: var(--ink-3); }
 .fin-cal-day[data-on="true"] { background: var(--primary); border-color: var(--primary-deep); color: #fff; font-weight: 700; }
 .fin-cal-foot { display: flex; align-items: center; gap: 6px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
 .fin-cal-hint { margin-inline-start: auto; font-family: var(--ui); font-size: 10.5px; color: var(--ink-4); }
+
+/* ------------------------------------------------------------- annotations */
+
+/* Numeric wells read LTR and flush right so a column's units digits line up. */
+.fin-num-in { direction: ltr; unicode-bidi: isolate; text-align: right; }
+
+/* A derived note pinned in the well's bottom-left corner. Absolute, so it can
+   never change the row's height — which is what made the months cell jump.
+   (Named fin-note, not fin-sub: fin-sub is the card-header subtitle, and giving
+   both the same name once flung every subtitle into the page margin.) */
+.fin-note {
+  position: absolute;
+  bottom: 0;
+  left: 6px;
+  font-family: var(--num);
+  font-variant-numeric: tabular-nums;
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--ink-4);
+  pointer-events: none;
+}
+
+/* ---------------------------------------------------------------- tooltips */
+/* Opens to the row's inside, never past the scroll container, so it cannot be
+   clipped by the table's overflow. Delayed, so hovering across a row is quiet. */
+.fin-tip { position: relative; }
+.fin-tip::after {
+  content: attr(data-tip);
+  position: absolute;
+  left: calc(100% + 7px);
+  top: 50%;
+  padding: 4px 8px;
+  border-radius: 5px;
+  background: var(--ink);
+  color: #fff;
+  font-family: var(--ui);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-50%) translateX(4px) scale(0.97);
+  transition: opacity 0.13s ease 0.3s, transform 0.18s cubic-bezier(0.16, 1, 0.3, 1) 0.3s;
+  z-index: 60;
+}
+.fin-tip:hover::after,
+.fin-tip:focus-visible::after { opacity: 1; transform: translateY(-50%) translateX(0) scale(1); }
+.fin-tip[data-tip-side="start"]::after { left: auto; right: calc(100% + 7px); transform: translateY(-50%) translateX(-4px) scale(0.97); }
+.fin-tip[data-tip-side="start"]:hover::after { transform: translateY(-50%) translateX(0) scale(1); }
+
+/* -------------------------------------------------------- the family select */
+/* The chip IS the control: it shows what the row is and opens to the other. */
+.fin-fam-sel {
+  width: 100%;
+  height: 23px;
+  padding: 0 6px 0 5px;
+  border: 1px solid var(--fam-line, var(--line-2));
+  border-radius: 5px;
+  background: var(--fam-tint, #fff);
+  box-shadow: none;
+  color: var(--fam, var(--ink-2));
+  font-family: var(--ui);
+  font-size: 11.5px;
+  font-weight: 700;
+}
+.fin-fam-sel:hover:not(:disabled) { border-color: var(--fam); }
+.fin-fam-sel[data-open="true"] { border-color: var(--fam); box-shadow: 0 0 0 3px var(--fam-tint); }
+.fin-fam-sel .fin-sel-caret { color: currentColor; opacity: 0.55; }
+
+/* ------------------------------------------------------------- the add row */
+
+.fin-addrow > td { padding: 0; border-bottom: 1px solid var(--line); background: var(--card-2); }
+.fin-addrow-in {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-inline-start: 3px dashed var(--line-2);
+}
+.fin-addrow-hint { font-size: 11px; color: var(--ink-4); }
+
+/* ------------------------------------------------- the row-settings popover */
+
+.fin-sheet { width: 348px; padding: 0; overflow: hidden; }
+.fin-sheet-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--card-2);
+}
+.fin-sheet-body { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 12px; }
+.fin-sheet-foot {
+  padding: 7px 12px;
+  border-top: 1px solid var(--line);
+  background: var(--card-2);
+  font-size: 10.5px;
+  color: var(--ink-4);
+}
 
 /* the expander tray under a row */
 .fin-tray { background: var(--card-2); box-shadow: inset 0 3px 5px -4px rgba(14, 21, 36, 0.2); }

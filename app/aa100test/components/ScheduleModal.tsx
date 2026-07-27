@@ -13,9 +13,8 @@ import {
   type ScheduleRow,
 } from "@/app/private/crm/leads/simulators/components/calculate/loanCalculators";
 import { calculateUnifiedSchedule } from "@/app/private/crm/leads/simulators/components/calculate/mixScheduleCalculators";
+import Money from "./Money";
 import { FAMILY, PATH_LABEL, TRACK_HEX, type ImportedLoan } from "../lib/credit";
-
-const nis = (n: number) => Math.round(n || 0).toLocaleString("he-IL");
 
 type Subject =
   | { kind: "mix"; name: string; loans: ImportedLoan[] }
@@ -161,10 +160,7 @@ export default function ScheduleModal({
               style={{ borderInlineStart: i ? "1px solid var(--line)" : undefined }}
             >
               <div className="fin-label">{c.label}</div>
-              <div className="fin-fig mt-0.5 text-[16px] font-bold">
-                {nis(c.v)}
-                <span className="fin-cur">₪</span>
-              </div>
+              <Money value={c.v} className="mt-0.5" size={17} weight={700} style={{ textAlign: "start" }} />
             </div>
           ))}
         </div>
@@ -188,25 +184,19 @@ export default function ScheduleModal({
                     {r.month}
                   </td>
                   <td>
-                    <span className="fin-calc" data-muted="true">
-                      {nis(r.openingBalance)}
-                    </span>
+                    <Money value={r.openingBalance} color="var(--ink-4)" weight={500} />
                   </td>
                   <td>
-                    <span className="fin-calc font-bold">{nis(r.payment)}</span>
+                    <Money value={r.payment} weight={700} color="var(--ink)" />
                   </td>
                   <td>
-                    <span className="fin-calc">{nis(r.principal)}</span>
+                    <Money value={r.principal} color="var(--ink-2)" />
                   </td>
                   <td>
-                    <span className="fin-calc" style={{ color: "var(--loan)" }}>
-                      {nis(r.interest)}
-                    </span>
+                    <Money value={r.interest} color="var(--loan)" />
                   </td>
                   <td>
-                    <span className="fin-calc" data-muted="true">
-                      {nis(r.closingBalance)}
-                    </span>
+                    <Money value={r.closingBalance} color="var(--ink-4)" weight={500} />
                   </td>
                 </tr>
               ))}
