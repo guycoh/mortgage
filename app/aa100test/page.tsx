@@ -13,10 +13,12 @@ import { AnimatePresence, motion } from "motion/react";
 import NumberFlow from "@number-flow/react";
 import {
   CheckCircle,
+  CircleNotch,
   Copy,
   DotsThree,
   FloppyDisk,
   ListChecks,
+  MicrosoftExcelLogo,
   PencilSimple,
   Plus,
   Trash,
@@ -32,7 +34,14 @@ import Charts from "./components/Charts";
 import Compare from "./components/Compare";
 import ScheduleModal from "./components/ScheduleModal";
 import Select from "./components/Select";
-import { PATH_LABEL, TRACK_HEX, type ImportedLoan, type ImportSummary } from "./lib/credit";
+import {
+  PATH_LABEL,
+  TRACK_HEX,
+  mergeReportLoans,
+  type ImportedLoan,
+  type ImportSummary,
+} from "./lib/credit";
+import { exportMixToExcel } from "./lib/excel";
 import "@fontsource-variable/rubik";
 import "@fontsource-variable/archivo";
 import "@fontsource/assistant/hebrew-400.css";
@@ -72,6 +81,13 @@ const makeMix = (name: string, isBase = false, rows = 3): Mix => {
 
 const snapshot = (mixes: Mix[]) => JSON.stringify(mixes);
 
+/** The base mix is named after whoever's reports built it. */
+function nameFor(mix: Mix, summary: ImportSummary, first: boolean): string {
+  if (!mix.is_base || !summary.clientName) return mix.mix_name;
+  if (first) return `משכנתא נוכחית · ${summary.clientName}`;
+  return mix.mix_name.includes(summary.clientName) ? mix.mix_name : `${mix.mix_name} + ${summary.clientName}`;
+}
+
 export default function Aa100TestPage() {
   const [mixes, setMixes] = useState<Mix[] | null>(null);
   const [activeMixId, setActiveMixId] = useState<string | null>(null);
@@ -85,6 +101,9 @@ export default function Aa100TestPage() {
   /** Row values as of the last load / import / save — drives the change marks. */
   const [baseline, setBaseline] = useState<Record<string, ImportedLoan>>({});
   const [saved, setSaved] = useState("");
+  /** Reports folded into the active mix, oldest first. */
+  const [reports, setReports] = useState<ImportSummary[]>([]);
+  const [exporting, setExporting] = useState(false);
   const boardRef = useRef<HTMLDivElement>(null);
 
   const list = mixes ?? [];
@@ -205,33 +224,80 @@ export default function Aa100TestPage() {
     }
   };
 
-  /** A dropped report replaces the active mix's rows and names it after the client. */
+  /**
+   * The first report replaces the mix's empty starter rows. Every report after
+   * it is folded in — a household's two reports both list the joint mortgage in
+   * full, so the overlap is merged instead of doubling the balance.
+   */
   const applyImport = useCallback(
     (summary: ImportSummary) => {
       if (!activeMixId) return;
+      const first = reports.length === 0;
+      let duplicates = 0;
+
       setMixes((prev) => {
-        const next = (prev ?? []).map((m) =>
-          m.id === activeMixId
-            ? {
-                ...m,
-                mix_name:
-                  m.is_base && summary.clientName ? `משכנתא נוכחית · ${summary.clientName}` : m.mix_name,
-                loans: summary.loans.map((l) => ({ ...l, mix_id: activeMixId })),
-              }
-            : m
-        );
+        const next = (prev ?? []).map((m) => {
+          if (m.id !== activeMixId) return m;
+          const incoming = summary.loans.map((l) => ({ ...l, mix_id: activeMixId }));
+          const loans = first ? incoming : undefined;
+          if (!first) {
+            const res = mergeReportLoans(m.loans, incoming);
+            duplicates = res.duplicates;
+            return { ...m, mix_name: nameFor(m, summary, first), loans: res.merged };
+          }
+          return { ...m, mix_name: nameFor(m, summary, first), loans: loans! };
+        });
         // the freshly imported rows are the new "unchanged" reference
         const map: Record<string, ImportedLoan> = {};
         for (const m of next) for (const l of m.loans) map[l.id] = { ...l };
         setBaseline(map);
         return next;
       });
+
+      setReports((prev) => [...prev, summary]);
+      if (!first) {
+        flash4s(
+          duplicates > 0
+            ? { kind: "ok", text: `${duplicates} התחייבויות משותפות אוחדו ולא נספרו פעמיים` }
+            : { kind: "ok", text: "הדוח נוסף — לא נמצאו חפיפות" }
+        );
+      }
       setFlash(true);
       setTimeout(() => boardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
       setTimeout(() => setFlash(false), 1600);
     },
-    [activeMixId]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [activeMixId, reports.length]
   );
+
+  /** Start over: drop the reports and give the mix its blank rows back. */
+  const clearImport = useCallback(() => {
+    setReports([]);
+    setMixes((prev) =>
+      (prev ?? []).map((m) =>
+        m.id === activeMixId
+          ? { ...m, mix_name: m.is_base ? "משכנתא נוכחית" : m.mix_name, loans: [newLoan(m.id), newLoan(m.id), newLoan(m.id)] }
+          : m
+      )
+    );
+  }, [activeMixId]);
+
+  const exportExcel = async () => {
+    if (!activeMix || !loans.length) return;
+    setExporting(true);
+    try {
+      await exportMixToExcel({
+        mixName: activeMix.mix_name,
+        loans,
+        annualInflation,
+        clients: reports.map((r) => ({ name: r.clientName, id: r.clientId, reportDate: r.reportDate })),
+      });
+    } catch {
+      flash4s({ kind: "err", text: "ייצוא האקסל נכשל" });
+    } finally {
+      setExporting(false);
+    }
+  };
 
   /* ----------------------------------------------------------------- ui */
   return (
@@ -246,23 +312,6 @@ export default function Aa100TestPage() {
         >
           <div className="flex items-center gap-2.5">
             <h1 className="fin-display text-[30px]">סימולטור תמהילים</h1>
-            <span className="fin-chip" style={{ borderColor: "var(--line-2)", color: "var(--ink-3)" }}>
-              aa100test
-            </span>
-            <AnimatePresence>
-              {dirty && (
-                <motion.span
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.9 }}
-                  className="fin-chip"
-                  style={{ borderColor: "var(--warn-line)", background: "var(--warn-tint)", color: "var(--warn)" }}
-                >
-                  <span className="fin-dot" style={{ background: "var(--warn)" }} />
-                  לא נשמר
-                </motion.span>
-              )}
-            </AnimatePresence>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -373,7 +422,7 @@ export default function Aa100TestPage() {
             transition={{ delay: 0.08, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
             className="mb-3"
           >
-            <Bay mixId={activeMixId} onImport={applyImport} />
+            <Bay mixId={activeMixId} reports={reports} onImport={applyImport} onClear={clearImport} />
           </motion.div>
         )}
 
@@ -460,6 +509,21 @@ export default function Aa100TestPage() {
           <button className="fin-btn fin-btn-sm" onClick={addMix}>
             <Plus size={13} weight="bold" />
             תמהיל
+          </button>
+
+          <button
+            className="fin-btn fin-btn-excel ms-auto"
+            onClick={exportExcel}
+            disabled={!loans.length || exporting}
+            aria-busy={exporting}
+            title={loans.length ? "ייצוא התמהיל לגיליון אקסל" : "אין שורות לייצוא"}
+          >
+            {exporting ? (
+              <CircleNotch size={16} weight="bold" className="fin-excel-ico animate-spin" />
+            ) : (
+              <MicrosoftExcelLogo size={16} weight="fill" className="fin-excel-ico" />
+            )}
+            יצוא לאקסל
           </button>
         </div>
 

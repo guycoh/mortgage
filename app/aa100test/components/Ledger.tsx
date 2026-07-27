@@ -206,7 +206,7 @@ export default function Ledger({
           <div className="mt-1">{addBtns("md")}</div>
         </div>
       ) : (
-        <div className="fin-scroll max-h-[64vh] overflow-auto">
+        <div className="fin-scroll overflow-auto" style={{ maxHeight: "calc(100dvh - 200px)" }}>
           <table className="fin-table">
             <colgroup>
               {["10%", "14%", "13%", "12%", "8%", "8%", "13%", "15%", "7%"].map((w, i) => (
@@ -254,7 +254,7 @@ export default function Ledger({
                             per="ח׳"
                             block={false}
                             className="fin-groupbar-sum"
-                            style={{ color: fam.color, minWidth: 104 }}
+                            style={{ color: fam.color, minWidth: 124 }}
                           />
                           <span style={{ width: 68 }} />
                         </div>
@@ -292,7 +292,7 @@ export default function Ledger({
                                 tone: FAMILY[k].color,
                               }))}
                             />
-                            <div className="fin-share mt-1" title={`${share.toFixed(1)}% מהתמהיל`}>
+                            <div className="fin-share mt-0.5" title={`${share.toFixed(1)}% מהתמהיל`}>
                               <span style={{ width: `${Math.min(100, share)}%` }} />
                             </div>
                           </td>
@@ -311,14 +311,23 @@ export default function Ledger({
                                   patch(loan.id, { amount: Number(e.target.value.replace(/[^\d]/g, "")) || 0 })
                                 }
                               />
-                              {(loan.source_bank || loan.is_guarantor) && (
-                                <span className="fin-note truncate" style={{ maxWidth: "62%" }} title={loan.source_bank}>
+                              {(loan.source_bank || loan.is_guarantor || loan.is_shared) && (
+                                <span className="fin-note truncate" style={{ maxWidth: "68%" }} title={loan.source_bank}>
                                   {loan.is_guarantor && (
                                     <span
                                       className="fin-tag me-1"
                                       style={{ background: FAMILY.loan.tint, color: FAMILY.loan.color }}
                                     >
                                       ערב
+                                    </span>
+                                  )}
+                                  {loan.is_shared && (
+                                    <span
+                                      className="fin-tag me-1"
+                                      style={{ background: "var(--primary-tint)", color: "var(--primary)" }}
+                                      title="החוב מופיע בשני הדוחות — נספר פעם אחת"
+                                    >
+                                      משותף
                                     </span>
                                   )}
                                   {loan.source_bank?.replace(/בע"?מ|בנק/g, "").trim()}
@@ -379,7 +388,6 @@ export default function Ledger({
                                 onChange={(e) => patch(loan.id, { rate: Number(e.target.value) || 0 })}
                               />
                             </div>
-                            {heat && <span className="fin-heat-mark" data-heat={heat} aria-hidden />}
                           </td>
 
                           {/* --- חודשים (synced with the end date) --- */}
