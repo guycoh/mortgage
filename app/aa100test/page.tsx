@@ -29,6 +29,7 @@ import type { LoanPath } from "@/app/data/hooks/useLoanPaths";
 import { paths as STATIC_PATHS } from "@/app/data/paths";
 import { calculateLoan } from "@/app/private/crm/leads/simulators/components/calculate/loanCalculators";
 import Bay from "./components/Bay";
+import LeadPicker, { type Lead } from "./components/LeadPicker";
 import Ledger from "./components/Ledger";
 import Charts from "./components/Charts";
 import Compare from "./components/Compare";
@@ -52,6 +53,7 @@ import "./theme.css";
 type Mix = { id: string; mix_name: string; loans: ImportedLoan[]; is_base?: boolean };
 
 const STORE = "aa100test.workbook.v1";
+const LEAD_STORE = "aa100test.lead.v1";
 
 /** The five canonical tracks, shaped like the hook's rows. */
 const PATHS: LoanPath[] = STATIC_PATHS.map((p) => ({
@@ -104,6 +106,10 @@ export default function Aa100TestPage() {
   /** Reports folded into the active mix, oldest first. */
   const [reports, setReports] = useState<ImportSummary[]>([]);
   const [exporting, setExporting] = useState(false);
+  /** The lead this board belongs to. Null = local-only scratch workbook. */
+  const [lead, setLead] = useState<Lead | null>(null);
+  const [loadingLead, setLoadingLead] = useState(false);
+  const [saving, setSaving] = useState(false);
   const boardRef = useRef<HTMLDivElement>(null);
 
   const list = mixes ?? [];
@@ -119,19 +125,86 @@ export default function Aa100TestPage() {
   };
 
   /* ---------------------------------------------------------------- load */
+  // Which lead: the ?lead= deep link wins, otherwise the last one used here.
   useEffect(() => {
-    let start: Mix[];
+    const fromUrl = Number(new URLSearchParams(window.location.search).get("lead"));
+    const stored = Number(localStorage.getItem(LEAD_STORE));
+    const id = Number.isFinite(fromUrl) && fromUrl > 0 ? fromUrl : stored;
+    if (!Number.isFinite(id) || id <= 0) {
+      adopt(localWorkbook());
+      return;
+    }
+    fetch(`/api/aa100/leads?id=${id}`)
+      .then((r) => r.json())
+      .then((d) => {
+        const found = d.leads?.[0];
+        if (found) setLead(found);
+        else adopt(localWorkbook());
+      })
+      .catch(() => adopt(localWorkbook()));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /** The scratch workbook, for when no lead is selected. */
+  const localWorkbook = (): Mix[] => {
     try {
       const raw = localStorage.getItem(STORE);
       const parsed = raw ? (JSON.parse(raw) as Mix[]) : null;
-      start = parsed?.length ? parsed : [makeMix("משכנתא נוכחית", true)];
+      if (parsed?.length) return parsed;
     } catch {
-      start = [makeMix("משכנתא נוכחית", true)];
+      /* fall through to a fresh base mix */
     }
+    return [makeMix("משכנתא נוכחית", true)];
+  };
+
+  // Whenever the mix set is (re)established, adopt it and reset the baselines.
+  const adopt = useCallback((ms: Mix[]) => {
+    const start = ms.length ? ms : [makeMix("משכנתא נוכחית", true)];
     setMixes(start);
     setActiveMixId(start[0].id);
-    rebaseline(start);
+    const map: Record<string, ImportedLoan> = {};
+    for (const m of start) for (const l of m.loans) map[l.id] = { ...l };
+    setBaseline(map);
+    setSaved(snapshot(start));
+    setReports([]);
   }, []);
+
+  /* --- the lead's board, straight from Supabase --- */
+  useEffect(() => {
+    if (!lead) return;
+    let cancelled = false;
+    setLoadingLead(true);
+    setMixes(null);
+    localStorage.setItem(LEAD_STORE, String(lead.id));
+    fetch(`/api/aa100/mixes?lead=${lead.id}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (cancelled) return;
+        if (d.error) throw new Error(d.error);
+        adopt(
+          (d.mixes ?? []).map((m: Mix) => ({
+            ...m,
+            loans: (m.loans ?? []).map((l) => ({ ...l, mix_id: m.id })),
+          }))
+        );
+        if (d.hasExtra === false) {
+          flash4s({
+            kind: "err",
+            text: "העמודות הנוספות טרם נוספו — סוג ההתחייבות והמקור לא יישמרו",
+          });
+        }
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        adopt([]);
+        flash4s({ kind: "err", text: `טעינת הליד נכשלה: ${e.message ?? "שגיאה"}` });
+      })
+      .finally(() => !cancelled && setLoadingLead(false));
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lead, adopt]);
 
   useEffect(() => setCompareMixId(null), [activeMixId]);
 
@@ -213,14 +286,42 @@ export default function Aa100TestPage() {
     setTimeout(() => setToast(null), 4000);
   };
 
-  const save = () => {
+  const save = async () => {
     if (!mixes) return;
+
+    // no lead: this is a scratch workbook, and the browser is its home
+    if (!lead) {
+      try {
+        localStorage.setItem(STORE, snapshot(mixes));
+        rebaseline(mixes);
+        flash4s({ kind: "ok", text: "נשמר בדפדפן — בחרו ליד כדי לשמור בשרת" });
+      } catch {
+        flash4s({ kind: "err", text: "השמירה נכשלה — אחסון הדפדפן מלא או חסום" });
+      }
+      return;
+    }
+
+    setSaving(true);
     try {
-      localStorage.setItem(STORE, snapshot(mixes));
+      const res = await fetch("/api/aa100/mixes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lead: lead.id, mixes }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error ?? `HTTP ${res.status}`);
       rebaseline(mixes);
-      flash4s({ kind: "ok", text: "התמהיל נשמר בדפדפן" });
-    } catch {
-      flash4s({ kind: "err", text: "השמירה נכשלה — אחסון הדפדפן מלא או חסום" });
+      flash4s({
+        kind: "ok",
+        text:
+          data.hasExtra === false
+            ? "נשמר — אך סוג ההתחייבות והמקור לא נשמרו (חסרות עמודות)"
+            : `נשמר לליד ${lead.id}`,
+      });
+    } catch (e) {
+      flash4s({ kind: "err", text: `השמירה נכשלה: ${(e as Error).message}` });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -310,8 +411,17 @@ export default function Aa100TestPage() {
           transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
           className="mb-4 flex flex-wrap items-center justify-between gap-x-5 gap-y-3"
         >
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-3">
             <h1 className="fin-display text-[30px]">סימולטור תמהילים</h1>
+            <LeadPicker
+              lead={lead}
+              onPick={setLead}
+              onClear={() => {
+                localStorage.removeItem(LEAD_STORE);
+                setLead(null);
+                adopt(localWorkbook());
+              }}
+            />
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -362,8 +472,17 @@ export default function Aa100TestPage() {
               <Copy size={14} weight="bold" />
               שכפל
             </button>
-            <button className="fin-btn fin-btn-primary" onClick={save} disabled={!dirty}>
-              <FloppyDisk size={14} weight="bold" />
+            <button
+              className="fin-btn fin-btn-primary"
+              onClick={save}
+              disabled={!dirty || saving}
+              title={lead ? `שמירה לליד ${lead.id}` : "שמירה מקומית בדפדפן — בחרו ליד לשמירה בשרת"}
+            >
+              {saving ? (
+                <CircleNotch size={14} weight="bold" className="animate-spin" />
+              ) : (
+                <FloppyDisk size={14} weight="bold" />
+              )}
               {dirty ? "שמור שינויים" : "נשמר"}
             </button>
           </div>
@@ -533,7 +652,7 @@ export default function Aa100TestPage() {
           className="rounded-[var(--r)] transition-shadow duration-500"
           style={flash ? { boxShadow: "0 0 0 3px var(--primary-tint)" } : undefined}
         >
-          {mixes === null ? (
+          {mixes === null || loadingLead ? (
             <div className="fin-card overflow-hidden">
               <div className="fin-head">
                 <div className="fin-skel h-4 w-32" />
