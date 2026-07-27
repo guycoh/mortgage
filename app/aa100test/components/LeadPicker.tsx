@@ -168,7 +168,7 @@ export default function LeadPicker({
                       }}
                     >
                       <X size={13} weight="bold" />
-                      עבודה מקומית ללא ליד
+                      חזרה לבחירת ליד
                     </button>
                   </div>
                 )}
