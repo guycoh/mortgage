@@ -7,7 +7,7 @@
 // Keyboard: Enter/Space/arrows open, arrows move, Home/End jump, Enter picks,
 // Esc closes.
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
 import { CaretDown, Check } from "@phosphor-icons/react";
@@ -17,6 +17,10 @@ export type Opt = {
   label: string;
   /** Swatch shown before the label (track colours). */
   dot?: string;
+  /** Glyph shown before the label, in place of a swatch (debt families). */
+  icon?: ReactNode;
+  /** Colour the option carries into the list, so the menu looks like the row. */
+  tone?: string;
   /** Quiet trailing text, e.g. a code or a count. */
   note?: string;
 };
@@ -35,8 +39,9 @@ export default function Select({
   value: number | string | null;
   options: Opt[];
   onChange: (value: number | string) => void;
-  /** "cell" matches the grid wells, "input" the toolbar controls. */
-  variant?: "cell" | "input";
+  /** "cell" matches the grid wells, "input" the toolbar controls, "chip" the
+   *  family badge that sits inside a row. */
+  variant?: "cell" | "input" | "chip";
   placeholder?: string;
   ariaLabel?: string;
   className?: string;
@@ -144,7 +149,9 @@ export default function Select({
       <button
         ref={btnRef}
         type="button"
-        className={`${variant === "input" ? "fin-input" : "fin-cell"} fin-sel-btn${className ? ` ${className}` : ""}`}
+        className={`${
+          variant === "input" ? "fin-input" : variant === "chip" ? "fin-fam-sel" : "fin-cell"
+        } fin-sel-btn${className ? ` ${className}` : ""}`}
         style={style}
         data-text="true"
         data-open={open}
@@ -155,6 +162,7 @@ export default function Select({
         onClick={() => (open ? setOpen(false) : openPop())}
         onKeyDown={onKey}
       >
+        {current?.icon}
         {current?.dot && <span className="fin-dot" style={{ background: current.dot }} />}
         <span className="truncate">{current ? current.label : placeholder}</span>
         <CaretDown size={12} weight="bold" className="fin-sel-caret" />
@@ -184,6 +192,7 @@ export default function Select({
                     data-idx={i}
                     aria-selected={o.value === value}
                     className="fin-sel-item"
+                    style={o.tone ? ({ "--tone": o.tone } as React.CSSProperties) : undefined}
                     data-hi={i === hi || undefined}
                     data-on={o.value === value || undefined}
                     onMouseEnter={() => setHi(i)}
@@ -193,6 +202,7 @@ export default function Select({
                       btnRef.current?.focus();
                     }}
                   >
+                    {o.icon}
                     {o.dot && <span className="fin-dot" style={{ background: o.dot }} />}
                     <span className="truncate">{o.label}</span>
                     {o.note && <span className="fin-sel-note">{o.note}</span>}

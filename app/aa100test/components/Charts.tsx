@@ -2,36 +2,27 @@
 
 // Two reads on the same mix, both keyed to the track palette so a colour means
 // the same thing everywhere on the page:
-//   · composition — how the money splits across tracks, right now
+//   · composition — how the money splits across tracks and families, right now
 //   · runoff      — how the balance and the payment behave over the term
 // Both series come from calculateLoan, so the charts and the grid can never
 // disagree about the maths.
 
 import { useMemo, useState } from "react";
-import {
-  Area,
-  AreaChart,
-  CartesianGrid,
-  Line,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+import dynamic from "next/dynamic";
 import { motion } from "motion/react";
 import { Bank, ChartPieSlice, HandCoins, TrendDown } from "@phosphor-icons/react";
 import { calculateLoan } from "@/app/private/crm/leads/simulators/components/calculate/loanCalculators";
+import Money from "./Money";
+import type { RunoffSeries } from "./RunoffChart";
 import { FAMILY, PATH_LABEL, TRACK_HEX, type ImportedLoan } from "../lib/credit";
 
-const TRACKS = [1, 2, 3, 4, 5] as const;
+// ECharts is canvas-only — browser render, no SSR pass.
+const RunoffChart = dynamic(() => import("./RunoffChart"), {
+  ssr: false,
+  loading: () => <div className="fin-skel m-3 h-[244px]" />,
+});
 
-const nis = (n: number) => `${Math.round(n).toLocaleString("he-IL")} ₪`;
-const short = (n: number) =>
-  n >= 1_000_000
-    ? `${(n / 1_000_000).toFixed(1)}M`
-    : n >= 1000
-      ? `${Math.round(n / 1000)}K`
-      : String(Math.round(n));
+const TRACKS = [1, 2, 3, 4, 5] as const;
 
 /* ------------------------------------------------------------- composition */
 
@@ -52,43 +43,49 @@ function Composition({ loans }: { loans: ImportedLoan[] }) {
   return (
     <div className="px-3.5 pb-3.5 pt-3">
       {/* one bar, every track in proportion */}
-      <div className="flex h-11 w-full overflow-hidden rounded-md border" style={{ borderColor: "var(--line-2)" }} dir="ltr">
-        {byTrack.map((t, i) => (
-          <motion.div
-            key={t.id}
-            className="relative grid place-items-center"
-            style={{ background: TRACK_HEX[t.id] }}
-            initial={{ width: 0 }}
-            animate={{ width: `${(t.amount / total) * 100}%` }}
-            transition={{ duration: 0.65, delay: i * 0.04, ease: [0.16, 1, 0.3, 1] }}
-            title={`${PATH_LABEL[t.id]} · ${nis(t.amount)}`}
-          >
-            {t.amount / total > 0.085 && (
-              <span className="fin-fig text-[11px] font-bold text-white">
-                {Math.round((t.amount / total) * 100)}%
-              </span>
-            )}
-          </motion.div>
-        ))}
+      <div className="fin-bar" dir="ltr">
+        {byTrack.map((t, i) => {
+          const pct = (t.amount / total) * 100;
+          return (
+            <motion.div
+              key={t.id}
+              className="fin-bar-seg"
+              style={{ background: TRACK_HEX[t.id] }}
+              initial={{ width: 0 }}
+              animate={{ width: `${pct}%` }}
+              transition={{ duration: 0.62, delay: i * 0.04, ease: [0.16, 1, 0.3, 1] }}
+              title={`${PATH_LABEL[t.id]} · ${Math.round(t.amount).toLocaleString("he-IL")} ₪`}
+            >
+              {pct > 8.5 && <span className="fin-bar-pct">{Math.round(pct)}%</span>}
+            </motion.div>
+          );
+        })}
       </div>
 
       {/* the legend doubles as the numbers table */}
-      <div className="mt-2.5 flex flex-col">
+      <div className="mt-3 flex flex-col">
         {byTrack.map((t) => (
           <div
             key={t.id}
-            className="flex items-center gap-2 border-b py-1.5 text-[12px] last:border-b-0"
-            style={{ borderColor: "var(--line)" }}
+            className="grid items-center gap-x-2 border-b py-[5px] text-[12px] last:border-b-0"
+            style={{ borderColor: "var(--line)", gridTemplateColumns: "auto 1fr auto auto" }}
           >
             <span className="fin-dot" style={{ background: TRACK_HEX[t.id] }} />
-            <span style={{ color: "var(--ink-2)" }}>{PATH_LABEL[t.id]}</span>
-            <span className="fin-fig text-[10.5px]" style={{ color: "var(--ink-4)" }}>
-              ({t.count})
+            <span className="flex items-baseline gap-1.5" style={{ color: "var(--ink-2)" }}>
+              {PATH_LABEL[t.id]}
+              <span className="fin-fig text-[10.5px]" style={{ color: "var(--ink-4)" }}>
+                ({t.count})
+              </span>
             </span>
-            <span className="fin-fig ms-auto font-bold">{nis(t.amount)}</span>
-            <span className="fin-fig w-[86px] text-left text-[11.5px]" style={{ color: "var(--ink-3)" }}>
-              {nis(t.monthly)}/ח׳
-            </span>
+            <Money value={t.amount} weight={700} block={false} style={{ minWidth: 92 }} />
+            <Money
+              value={t.monthly}
+              per="ח׳"
+              block={false}
+              size={11.5}
+              color="var(--ink-3)"
+              style={{ minWidth: 86 }}
+            />
           </div>
         ))}
       </div>
@@ -99,27 +96,30 @@ function Composition({ loans }: { loans: ImportedLoan[] }) {
           const rows = loans.filter((l) => (k === "loan" ? l.group === "loan" : l.group !== "loan"));
           const amount = rows.reduce((s, l) => s + (Number(l.amount) || 0), 0);
           const monthly = rows.reduce((s, l) => s + calculateLoan(l, 0).monthlyPayment, 0);
+          const pct = total ? Math.round((amount / total) * 100) : 0;
           const fam = FAMILY[k];
           return (
             <div
               key={k}
-              className="rounded-[var(--r-sm)] border px-2.5 py-2"
+              className="relative overflow-hidden rounded-[var(--r-sm)] border px-2.5 py-2"
               style={{ borderColor: fam.line, background: fam.tint }}
             >
-              <div className="flex items-center gap-1.5 text-[11px] font-bold" style={{ color: fam.color }}>
+              {/* the share, drawn as a quiet fill behind the figure */}
+              <motion.span
+                className="absolute inset-y-0 start-0 block"
+                style={{ background: fam.color, opacity: 0.07 }}
+                initial={{ width: 0 }}
+                animate={{ width: `${pct}%` }}
+                transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+                aria-hidden
+              />
+              <div className="relative flex items-center gap-1.5 text-[11px] font-bold" style={{ color: fam.color }}>
                 {k === "mortgage" ? <Bank size={12} weight="fill" /> : <HandCoins size={12} weight="fill" />}
                 {fam.plural}
-                <span className="fin-fig ms-auto opacity-70">
-                  {total ? Math.round((amount / total) * 100) : 0}%
-                </span>
+                <span className="fin-fig ms-auto opacity-75">{pct}%</span>
               </div>
-              <div className="fin-fig mt-1 text-[15px] font-bold" style={{ color: "var(--ink)" }}>
-                {Math.round(amount).toLocaleString("he-IL")}
-                <span className="fin-cur">₪</span>
-              </div>
-              <div className="fin-fig text-[11px]" style={{ color: "var(--ink-3)" }}>
-                {Math.round(monthly).toLocaleString("he-IL")} ₪/ח׳
-              </div>
+              <Money value={amount} className="relative mt-1" size={15} weight={700} color="var(--ink)" style={{ textAlign: "start" }} />
+              <Money value={monthly} per="ח׳" className="relative" size={11} color="var(--ink-3)" style={{ textAlign: "start" }} />
             </div>
           );
         })}
@@ -130,37 +130,37 @@ function Composition({ loans }: { loans: ImportedLoan[] }) {
 
 /* ------------------------------------------------------------------ runoff */
 
-type Row = { month: number; balance: number; payment: number } & Record<string, number>;
-
 function Runoff({ loans, annualInflation }: { loans: ImportedLoan[]; annualInflation: number }) {
   const [mode, setMode] = useState<"balance" | "payment">("balance");
 
-  const { data, activeTracks, maxMonth } = useMemo(() => {
+  const { months, series, maxMonth } = useMemo(() => {
     const priced = loans.filter((l) => (Number(l.amount) || 0) > 0 && (Number(l.months) || 0) > 0);
     const results = priced.map((l) => ({ loan: l, res: calculateLoan(l, annualInflation) }));
     const longest = results.reduce((m, r) => Math.max(m, r.res.schedule.length), 0);
-    if (!longest) return { data: [] as Row[], activeTracks: [] as number[], maxMonth: 0 };
+    if (!longest) return { months: [] as number[], series: [] as RunoffSeries[], maxMonth: 0 };
 
-    // Sampled so a 30-year mix doesn't render 360 points.
+    // Sampled so a 30-year mix doesn't render 360 points per track.
     const step = longest > 240 ? 3 : longest > 96 ? 2 : 1;
-    const rows: Row[] = [];
-    for (let m = 1; m <= longest; m += step) {
-      const row = { month: m, balance: 0, payment: 0 } as Row;
-      for (const id of TRACKS) row[`t${id}`] = 0;
-      for (const { loan, res } of results) {
-        const s = res.schedule[m - 1];
-        if (!s) continue;
-        row.balance += s.closingBalance;
-        row.payment += s.payment;
-        row[`t${loan.path_id}`] += mode === "balance" ? s.closingBalance : s.payment;
-      }
-      rows.push(row);
+    const ms: number[] = [];
+    for (let m = 1; m <= longest; m += step) ms.push(m);
+
+    const out: RunoffSeries[] = [];
+    for (const id of TRACKS) {
+      const mine = results.filter((r) => r.loan.path_id === id);
+      if (!mine.length) continue;
+      const values = ms.map((m) =>
+        mine.reduce((s, { res }) => {
+          const row = res.schedule[m - 1];
+          if (!row) return s;
+          return s + (mode === "balance" ? row.closingBalance : row.payment);
+        }, 0)
+      );
+      if (values.some((v) => v > 0)) out.push({ id, values: values.map((v) => Math.round(v)) });
     }
-    const active = TRACKS.filter((id) => rows.some((r) => (r[`t${id}`] ?? 0) > 0));
-    return { data: rows, activeTracks: active, maxMonth: longest };
+    return { months: ms, series: out, maxMonth: longest };
   }, [loans, annualInflation, mode]);
 
-  if (!data.length) {
+  if (!months.length) {
     return <div className="fin-empty">צריך סכום ומספר חודשים כדי לצייר את מהלך התמהיל</div>;
   }
 
@@ -177,72 +177,13 @@ function Runoff({ loans, annualInflation }: { loans: ImportedLoan[]; annualInfla
             {label}
           </button>
         ))}
-        <span className="fin-fig ms-auto text-[11px]" style={{ color: "var(--ink-4)" }}>
-          {Math.round(maxMonth / 12)} שנים
+        <span className="ms-auto flex items-center gap-1.5 text-[11px]" style={{ color: "var(--ink-4)" }}>
+          <span className="fin-fig">{Math.round(maxMonth / 12)}</span> שנים
         </span>
       </div>
 
-      <div className="h-[228px] w-full px-1 pb-2 pt-3" dir="ltr">
-        <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={data} margin={{ top: 4, right: 12, bottom: 0, left: -14 }}>
-            <defs>
-              {activeTracks.map((id) => (
-                <linearGradient key={id} id={`fg${id}`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={TRACK_HEX[id]} stopOpacity={0.5} />
-                  <stop offset="100%" stopColor={TRACK_HEX[id]} stopOpacity={0.06} />
-                </linearGradient>
-              ))}
-            </defs>
-            <CartesianGrid stroke="var(--line)" vertical={false} />
-            <XAxis
-              dataKey="month"
-              tickFormatter={(m) => `${Math.round(m / 12)}שנ׳`}
-              tick={{ fontSize: 10, fill: "var(--ink-4)", fontFamily: "var(--num)" }}
-              axisLine={{ stroke: "var(--line-2)" }}
-              tickLine={false}
-              minTickGap={30}
-            />
-            <YAxis
-              tickFormatter={short}
-              width={52}
-              tick={{ fontSize: 10, fill: "var(--ink-4)", fontFamily: "var(--num)" }}
-              axisLine={false}
-              tickLine={false}
-            />
-            <Tooltip
-              cursor={{ stroke: "var(--line-2)" }}
-              contentStyle={{
-                borderRadius: 8,
-                border: "1px solid var(--line-2)",
-                boxShadow: "var(--shadow-lift)",
-                fontFamily: "var(--ui)",
-                fontSize: 12,
-                direction: "rtl",
-              }}
-              formatter={((v: unknown, name: unknown) => [
-                nis(Number(v) || 0),
-                PATH_LABEL[Number(String(name).replace("t", ""))] ?? String(name),
-              ]) as never}
-              labelFormatter={(m) => `חודש ${m}`}
-            />
-            {activeTracks.map((id) => (
-              <Area
-                key={id}
-                type="monotone"
-                dataKey={`t${id}`}
-                stackId="1"
-                stroke={TRACK_HEX[id]}
-                strokeWidth={1.5}
-                fill={`url(#fg${id})`}
-                isAnimationActive
-                animationDuration={600}
-              />
-            ))}
-            {mode === "payment" && (
-              <Line type="monotone" dataKey="payment" stroke="var(--ink)" strokeWidth={1} dot={false} />
-            )}
-          </AreaChart>
-        </ResponsiveContainer>
+      <div className="px-1 pb-1 pt-2">
+        <RunoffChart months={months} series={series} mode={mode} />
       </div>
     </div>
   );

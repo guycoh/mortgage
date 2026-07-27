@@ -91,6 +91,11 @@ export default function DateField({
     };
     const onScroll = (e: Event) => {
       if (popRef.current?.contains(e.target as Node)) return;
+      // Opening the month/year listbox scrolls its own popover to the selected
+      // option. That scroll used to bubble up here and close the calendar out
+      // from under the user before they could pick a year.
+      const t = e.target as HTMLElement | Document;
+      if (t instanceof HTMLElement && t.closest?.(".fin-pop")) return;
       setOpen(false);
     };
     const onResize = () => setOpen(false);

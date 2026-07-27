@@ -46,14 +46,27 @@ export const PATH_LABEL: Record<number, string> = {
   5: "משתנה צמודה",
 };
 
-/** Compact names, for the places a full label will not fit. */
+/** The trade's own shorthand — what a broker actually says out loud. */
 export const PATH_SHORT: Record<number, string> = {
   1: "פריים",
-  2: "ק. לא צמודה",
-  3: "ק. צמודה",
-  4: "מ. לא צמודה",
-  5: "מ. צמודה",
+  2: 'קל"צ',
+  3: 'ק"צ',
+  4: 'מל"צ',
+  5: 'מ"צ',
 };
+
+/**
+ * Where a rate stops being ordinary. A mortgage and a consumer loan live on
+ * completely different scales, so the thresholds are per family — 6.5% is
+ * expensive for a mortgage and cheap for a credit-card loan.
+ */
+export function rateHeat(rate: number, group: DebtGroup): "hot" | "warm" | null {
+  const r = Number(rate) || 0;
+  const [warm, hot] = group === "loan" ? [8, 10] : [5.5, 6.5];
+  if (r >= hot) return "hot";
+  if (r >= warm) return "warm";
+  return null;
+}
 
 /** Track colours by path id — one source for dots, dropdowns, charts, rail. */
 export const TRACK_HEX: Record<number, string> = {

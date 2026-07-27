@@ -24,10 +24,7 @@ import {
   X,
 } from "@phosphor-icons/react";
 import { parsePdfFile } from "@/lib/credit-parser/extract.client";
-import { calculateLoan } from "@/app/private/crm/leads/simulators/components/calculate/loanCalculators";
-import { FAMILY, PATH_SHORT, TRACK_HEX, importReportToLoans, type ImportSummary } from "../lib/credit";
-
-const nis = (n: number) => Math.round(n).toLocaleString("he-IL");
+import { TRACK_HEX, importReportToLoans, type ImportSummary } from "../lib/credit";
 
 const STEPS = ["גוררים את קובץ ה־PDF", "המסלולים מזוהים אוטומטית", "התמהיל מתמלא"];
 
@@ -85,19 +82,10 @@ export default function Bay({
   );
 
   /* -------------------------------------------------- imported: the receipt */
+  // Once the rows are in the grid, the numbers belong to the grid — repeating
+  // them here was just a second, staler copy. All this strip still owes the
+  // user is: whose report this is, and a way back out.
   if (done) {
-    const total = done.totalBalance || 1;
-    const byTrack = Object.entries(
-      done.loans.reduce<Record<number, number>>((acc, l) => {
-        acc[l.path_id] = (acc[l.path_id] ?? 0) + l.amount;
-        return acc;
-      }, {})
-    )
-      .map(([id, v]) => ({ id: Number(id), pct: (v / total) * 100 }))
-      .sort((a, b) => b.pct - a.pct);
-
-    const monthly = done.loans.reduce((s, l) => s + calculateLoan(l, 0).monthlyPayment, 0);
-
     return (
       <motion.div
         initial={{ opacity: 0, y: 6 }}
@@ -105,127 +93,46 @@ export default function Bay({
         transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
         className="fin-card overflow-hidden"
       >
-        <div className="fin-recv">
-          <div className="fin-recv-cell flex-row items-center gap-2.5" style={{ background: "var(--pos-tint)" }}>
-            <CheckCircle size={20} weight="fill" style={{ color: "var(--pos)" }} />
-            <div>
-              <div className="text-[10.5px] font-bold tracking-wide" style={{ color: "var(--pos)" }}>
-                הדוח יובא
-              </div>
-              <div className="truncate text-[10.5px]" style={{ color: "var(--ink-4)", maxWidth: 190 }} title={done.fileName}>
-                {done.fileName || "—"}
-              </div>
-            </div>
-          </div>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-3.5 py-2.5">
+          <span
+            className="grid size-8 flex-none place-items-center rounded-full"
+            style={{ background: "var(--pos-tint)", color: "var(--pos)" }}
+          >
+            <CheckCircle size={18} weight="fill" />
+          </span>
 
-          <div className="fin-recv-cell min-w-0">
-            <span className="fin-label">לקוח</span>
-            <div className="flex items-center gap-2 truncate text-[13.5px] font-bold">
-              {done.clientName || "לא זוהה שם"}
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="fin-display text-[17px]">{done.clientName || "דוח ללא שם"}</span>
               {done.clientId && (
-                <span className="fin-chip !h-5 !px-1.5 !text-[10.5px]" style={{ color: "var(--ink-3)" }}>
+                <span className="fin-chip !h-[21px] !px-1.5 !text-[10.5px]" style={{ color: "var(--ink-3)" }}>
                   <IdentificationCard size={11} />
                   <span className="fin-fig">{done.clientId}</span>
                 </span>
               )}
             </div>
-          </div>
-
-          <div className="fin-recv-cell">
-            <span className="fin-label">נקלט</span>
-            <div className="flex items-center gap-1.5">
-              {(["mortgage", "loan"] as const).map((k) => {
-                const n = k === "mortgage" ? done.mortgages.length : done.others.length;
-                if (!n) return null;
-                return (
-                  <span
-                    key={k}
-                    className="fin-chip !h-[22px]"
-                    style={{ borderColor: FAMILY[k].line, background: FAMILY[k].tint, color: FAMILY[k].color }}
-                  >
-                    <span className="fin-fig font-bold">{n}</span>
-                    {FAMILY[k].plural}
-                  </span>
-                );
-              })}
+            <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[10.5px]" style={{ color: "var(--ink-4)" }}>
+              <span className="truncate" style={{ maxWidth: 220 }} title={done.fileName}>
+                {done.fileName}
+              </span>
+              {done.reportDate && <span>· דוח מ־{done.reportDate}</span>}
               {done.guaranteed > 0 && (
-                <span className="fin-chip !h-[22px]" style={{ color: "var(--ink-3)" }} title="חובות שהלקוח ערב להם">
-                  <span className="fin-fig font-bold">{done.guaranteed}</span>
-                  בערבות
-                </span>
+                <span title="חובות שהלקוח ערב להם">· {done.guaranteed} בערבות</span>
               )}
             </div>
           </div>
 
-          <div className="fin-recv-cell">
-            <span className="fin-label">יתרה כוללת</span>
-            <span className="fin-fig text-[15px] font-bold">
-              {nis(done.totalBalance)}
-              <span className="fin-cur">₪</span>
-            </span>
-          </div>
-
-          <div className="fin-recv-cell">
-            <span className="fin-label">החזר חודשי</span>
-            <span className="fin-fig text-[15px] font-bold">
-              {nis(monthly)}
-              <span className="fin-cur">₪</span>
-            </span>
-          </div>
-
-          <div className="fin-recv-cell" style={{ width: 168 }}>
-            <span className="fin-label">תמהיל שהתקבל</span>
-            <div className="fin-rail-strip !bg-[var(--line)]" dir="ltr" style={{ height: 7, minWidth: 0 }}>
-              {byTrack.map((t) => (
-                <motion.span
-                  key={t.id}
-                  style={{ background: TRACK_HEX[t.id] }}
-                  initial={{ width: 0 }}
-                  animate={{ width: `${t.pct}%` }}
-                  transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
-                />
-              ))}
-            </div>
-            <div className="flex flex-wrap gap-x-2 text-[10px]" style={{ color: "var(--ink-4)" }}>
-              {byTrack.slice(0, 2).map((t) => (
-                <span key={t.id} className="inline-flex items-center gap-1">
-                  <span className="fin-dot !h-1.5 !w-1.5" style={{ background: TRACK_HEX[t.id] }} />
-                  {PATH_SHORT[t.id]}
-                  <b className="fin-fig">{Math.round(t.pct)}%</b>
-                </span>
-              ))}
-            </div>
-          </div>
-
-          <div className="fin-recv-cell ms-auto justify-center">
-            <button
-              className="fin-btn fin-btn-sm"
-              onClick={() => {
-                setDone(null);
-                setError("");
-              }}
-            >
-              <ArrowClockwise size={13} weight="bold" />
-              ייבוא דוח אחר
-            </button>
-          </div>
-        </div>
-
-        {done.skipped.length > 0 && (
-          <div
-            className="flex flex-wrap items-center gap-x-2 gap-y-1 border-t px-4 py-1.5 text-[11px]"
-            style={{ borderColor: "var(--line)", color: "var(--ink-4)" }}
+          <button
+            className="fin-btn fin-btn-sm ms-auto"
+            onClick={() => {
+              setDone(null);
+              setError("");
+            }}
           >
-            <WarningCircle size={12} />
-            לא יובאו לתמהיל (אין להם תקופה או לוח סילוקין):
-            {done.skipped.map((s, i) => (
-              <span key={s.label}>
-                {i > 0 && " · "}
-                <b style={{ color: "var(--ink-3)" }}>{s.label}</b> ({s.count})
-              </span>
-            ))}
-          </div>
-        )}
+            <ArrowClockwise size={13} weight="bold" />
+            ייבוא דוח אחר
+          </button>
+        </div>
       </motion.div>
     );
   }

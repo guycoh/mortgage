@@ -1,14 +1,24 @@
 "use client";
 
-// Head-to-head between the active mix and one other. Every row is a cost, so a
-// NEGATIVE difference (the active mix costs less) is the good outcome and reads
-// green; a positive one reads red. עלות לשקל is the ratio, not a currency.
+// Head-to-head between the active mix and one other: the numbers on the right,
+// the verdict on the left. Every row is a cost, so a NEGATIVE difference (the
+// active mix costs less) is the good outcome and reads green; a positive one
+// reads red. עלות לשקל is a ratio, not a currency.
 
+import dynamic from "next/dynamic";
 import {
   calculateMixFullTotals,
   type MixFullTotals,
 } from "@/app/private/crm/leads/simulators/components/calculate/mixScheduleCalculators";
+import Money from "./Money";
+import type { DeltaRow } from "./CompareChart";
 import type { ImportedLoan } from "../lib/credit";
+
+// ECharts is a canvas library with no server render — load it in the browser only.
+const CompareChart = dynamic(() => import("./CompareChart"), {
+  ssr: false,
+  loading: () => <div className="fin-skel m-3 h-[268px]" />,
+});
 
 type Mix = { id: string; mix_name: string; loans?: ImportedLoan[] };
 
@@ -22,7 +32,6 @@ const ROWS = [
   { label: "עלות לשקל", field: "costPerShekel" },
 ] as const;
 
-const nis = (v: number) => Math.round(v || 0).toLocaleString("he-IL");
 const ratio = (v: number) => (isFinite(v) ? v.toFixed(2) : "0.00");
 
 export default function Compare({
@@ -56,79 +65,126 @@ export default function Compare({
     return (t[field as keyof MixFullTotals] as number) || 0;
   };
 
-  return (
-    <div className="fin-scroll overflow-x-auto">
-      <table className="fin-table w-full table-fixed">
-        <thead>
-          <tr>
-            <th style={{ width: "28%" }}>שדה</th>
-            <th style={{ width: "24%" }} data-num="true">
-              {activeMix.mix_name}
-            </th>
-            <th style={{ width: "24%" }} data-num="true">
-              {compareMix?.mix_name ?? "—"}
-            </th>
-            <th style={{ width: "24%" }} data-num="true">
-              הפרש
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {ROWS.map((row) => {
-            const isRatio = row.field === "costPerShekel";
-            const a = valueOf(active, row.field);
-            const b = valueOf(other, row.field);
-            const diff = a - b;
-            const fmt = isRatio ? ratio : nis;
-            // cheaper is better, so a negative difference is the win
-            const color = !other || diff === 0 ? "var(--ink-4)" : diff < 0 ? "var(--pos)" : "var(--neg)";
+  const deltas: DeltaRow[] = ROWS.map((r) => ({
+    label: r.label,
+    active: valueOf(active, r.field),
+    compare: valueOf(other, r.field),
+    ratio: r.field === "costPerShekel",
+  }));
 
-            return (
-              <tr key={row.field} className="fin-row">
-                <td className="text-[12.5px] font-bold" style={{ color: "var(--ink-2)" }}>
-                  {row.label}
-                </td>
-                <td>
-                  <span className="fin-calc font-bold" style={{ color: "var(--ink)" }}>
-                    {fmt(a)}
-                    {!isRatio && <span className="fin-cur">₪</span>}
-                  </span>
-                </td>
-                <td>
-                  <span className="fin-calc" data-muted={!other || undefined}>
-                    {other ? (
-                      <>
-                        {fmt(b)}
-                        {!isRatio && <span className="fin-cur">₪</span>}
-                      </>
+  // one-line verdict, on the metric that decides a mortgage: total cost
+  const totalDiff = valueOf(active, "totalPayment") - valueOf(other, "totalPayment");
+
+  return (
+    <div className="grid lg:grid-cols-2">
+      {/* ---------------------------------------------------------- numbers */}
+      <div className="fin-scroll overflow-x-auto">
+        <table className="fin-table w-full table-fixed">
+          <colgroup>
+            <col style={{ width: "31%" }} />
+            <col style={{ width: "23%" }} />
+            <col style={{ width: "23%" }} />
+            <col style={{ width: "23%" }} />
+          </colgroup>
+          <thead>
+            <tr>
+              <th>שדה</th>
+              <th className="truncate">{activeMix.mix_name}</th>
+              <th className="truncate">{compareMix?.mix_name ?? "—"}</th>
+              <th>הפרש</th>
+            </tr>
+          </thead>
+          <tbody>
+            {ROWS.map((row) => {
+              const isRatio = row.field === "costPerShekel";
+              const a = valueOf(active, row.field);
+              const b = valueOf(other, row.field);
+              // Round before judging. Two mixes with an identical principal
+              // still differ by a float epsilon, which rendered as a red "+₪0".
+              const diff = isRatio ? a - b : Math.round(a) - Math.round(b);
+              // cheaper is better, so a negative difference is the win
+              const color = !other || diff === 0 ? "var(--ink-4)" : diff < 0 ? "var(--pos)" : "var(--neg)";
+
+              return (
+                <tr key={row.field} className="fin-row">
+                  <td className="text-[12.5px] font-bold" style={{ color: "var(--ink-2)" }}>
+                    {row.label}
+                  </td>
+                  <td>
+                    {isRatio ? (
+                      <span className="fin-money fin-money-block font-bold">{ratio(a)}</span>
                     ) : (
-                      "—"
+                      <Money value={a} weight={700} />
                     )}
-                  </span>
-                </td>
-                <td>
-                  <span className="fin-calc font-bold" style={{ color }}>
-                    {other ? (
-                      <>
-                        {diff > 0 ? "+" : ""}
-                        {fmt(diff)}
-                        {!isRatio && <span className="fin-cur">₪</span>}
-                      </>
+                  </td>
+                  <td>
+                    {!other ? (
+                      <span className="fin-calc" data-muted="true">
+                        —
+                      </span>
+                    ) : isRatio ? (
+                      <span className="fin-money fin-money-block" style={{ color: "var(--ink-3)" }}>
+                        {ratio(b)}
+                      </span>
                     ) : (
-                      "—"
+                      <Money value={b} color="var(--ink-3)" />
                     )}
-                  </span>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-      {!other && (
-        <p className="px-3 py-2.5 text-[11.5px]" style={{ color: "var(--ink-4)" }}>
-          בחרו תמהיל להשוואה בסרגל העליון כדי לראות את ההפרשים.
-        </p>
-      )}
+                  </td>
+                  <td>
+                    {!other ? (
+                      <span className="fin-calc" data-muted="true">
+                        —
+                      </span>
+                    ) : isRatio ? (
+                      <span className="fin-money fin-money-block font-bold" style={{ color }}>
+                        {diff > 0 ? "+" : diff < 0 ? "−" : ""}
+                        {ratio(Math.abs(diff))}
+                      </span>
+                    ) : (
+                      <Money value={diff} sign weight={700} color={color} />
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* ----------------------------------------------------------- verdict */}
+      <div className="border-t lg:border-s lg:border-t-0" style={{ borderColor: "var(--line)" }}>
+        {other && compareMix ? (
+          <>
+            <div
+              className="flex flex-wrap items-baseline gap-x-2 gap-y-1 border-b px-3.5 py-2.5"
+              style={{ borderColor: "var(--line)" }}
+            >
+              <span className="fin-display text-[15px]">
+                {totalDiff < 0 ? "התמהיל הנוכחי זול יותר" : totalDiff > 0 ? "התמהיל הנוכחי יקר יותר" : "עלות זהה"}
+              </span>
+              {totalDiff !== 0 && (
+                <Money
+                  value={Math.abs(totalDiff)}
+                  block={false}
+                  weight={700}
+                  size={15}
+                  color={totalDiff < 0 ? "var(--pos)" : "var(--neg)"}
+                />
+              )}
+              <span className="ms-auto text-[10.5px]" style={{ color: "var(--ink-4)" }}>
+                לאורך כל חיי ההלוואה, מול {compareMix.mix_name}
+              </span>
+            </div>
+            <CompareChart rows={deltas} activeName={activeMix.mix_name} compareName={compareMix.mix_name} />
+          </>
+        ) : (
+          <div className="fin-empty h-full">
+            בחרו תמהיל להשוואה בסרגל העליון —
+            <br />
+            כאן יופיע ההפרש באחוזים, שורה מול שורה.
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -10,14 +10,12 @@
 // row keeps the two families scannable without breaking the table in half.
 //
 // Every field the old grid had is still here. The five rarely-touched ones
-// (עוגן, מרווח, תדירות, גרייס) sit behind a per-row expander so the default
-// view stays dense and readable.
+// (עוגן, מרווח, תדירות, גרייס) open in a sheet off the row's settings icon, so
+// reaching them never reflows the grid.
 
 import { Fragment, useMemo, useState } from "react";
-import { AnimatePresence, motion } from "motion/react";
 import {
   Bank,
-  CaretDown,
   HandCoins,
   Plus,
   Sliders,
@@ -26,24 +24,28 @@ import {
   Warning,
 } from "@phosphor-icons/react";
 import { schedules } from "@/app/data/amortization_schedules";
-import { graceTypes } from "@/app/data/graceTypes";
 import type { LoanPath } from "@/app/data/hooks/useLoanPaths";
 import { calculateLoan } from "@/app/private/crm/leads/simulators/components/calculate/loanCalculators";
 import Select from "./Select";
 import DateField from "./DateField";
+import Money from "./Money";
+import RowSettings from "./RowSettings";
 import {
   FAMILY,
-  PATH_LABEL,
   PATH_SHORT,
   TRACK_HEX,
+  rateHeat,
   type DebtGroup,
   type ImportedLoan,
 } from "../lib/credit";
 import { addMonths, monthsBetween, parseDate, startOfToday, toIso } from "../lib/dates";
 
-const nis = (n: number) => Math.round(n || 0).toLocaleString("he-IL", { maximumFractionDigits: 0 });
-
 const ORDER: DebtGroup[] = ["mortgage", "loan"];
+
+const FAM_ICON = {
+  mortgage: <Bank size={12} weight="fill" className="fin-fam-ico" />,
+  loan: <HandCoins size={12} weight="fill" className="fin-fam-ico" />,
+} as const;
 
 /** Fields whose change we mark with the corner tick. */
 const TRACKED = [
@@ -78,8 +80,8 @@ export default function Ledger({
   onChange: (loans: ImportedLoan[]) => void;
   onSchedule: (loan: ImportedLoan) => void;
 }) {
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [armed, setArmed] = useState<string | null>(null);
+  const [sheet, setSheet] = useState<{ id: string; rect: DOMRect } | null>(null);
   const today = startOfToday();
 
   const patch = (id: string, next: Partial<ImportedLoan>) =>
@@ -109,14 +111,6 @@ export default function Ledger({
       },
     ]);
 
-  const toggle = (id: string) =>
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-
   /* --- תאריך סיום and חודשים describe one fact, so they move together --- */
   const setTerm = (id: string, months: number) => {
     const m = Math.max(0, Math.round(months) || 0);
@@ -125,11 +119,7 @@ export default function Ledger({
   };
   const setEnd = (id: string, iso: string | null) => {
     const d = iso ? parseDate(iso) : null;
-    patch(id, {
-      loan_end_date: iso,
-      end_date: iso,
-      months: d ? monthsBetween(today, d) : 0,
-    });
+    patch(id, { loan_end_date: iso, end_date: iso, months: d ? monthsBetween(today, d) : 0 });
   };
 
   /* ------------------------------------------------------------- grouping */
@@ -171,12 +161,12 @@ export default function Ledger({
     return out;
   };
 
-  const addBtns = (
+  const addBtns = (size: "sm" | "md" = "sm") => (
     <div className="flex items-center gap-1.5">
       {ORDER.map((key) => (
         <button
           key={key}
-          className="fin-btn fin-btn-sm fin-btn-fam"
+          className={`fin-btn fin-btn-fam ${size === "sm" ? "fin-btn-sm" : ""}`}
           style={
             {
               "--fam": FAMILY[key].color,
@@ -193,14 +183,15 @@ export default function Ledger({
     </div>
   );
 
+  const sheetLoan = sheet ? loans.find((l) => l.id === sheet.id) : null;
+
   /* ------------------------------------------------------------------- ui */
   return (
     <section className="fin-card overflow-hidden">
       <header className="fin-head">
         <h2 className="fin-title">התחייבויות בתמהיל</h2>
         <span className="fin-count">{loans.length}</span>
-        <span className="fin-sub hidden sm:inline">משכנתאות והלוואות, טבלה אחת</span>
-        <div className="ms-auto">{addBtns}</div>
+        <div className="ms-auto">{addBtns()}</div>
       </header>
 
       {loans.length === 0 ? (
@@ -212,26 +203,26 @@ export default function Ledger({
             <Bank size={19} />
           </span>
           התמהיל ריק — גררו דוח אשראי למעלה, או הוסיפו שורה ידנית.
-          <div className="mt-1">{addBtns}</div>
+          <div className="mt-1">{addBtns("md")}</div>
         </div>
       ) : (
-        <div className="fin-scroll max-h-[62vh] overflow-auto">
+        <div className="fin-scroll max-h-[64vh] overflow-auto">
           <table className="fin-table">
             <colgroup>
-              {["10%", "14%", "15%", "12%", "7.5%", "7.5%", "13%", "14%", "7%"].map((w, i) => (
+              {["10%", "14%", "13%", "12%", "8%", "8%", "13%", "15%", "7%"].map((w, i) => (
                 <col key={i} style={{ width: w }} />
               ))}
             </colgroup>
             <thead>
               <tr>
                 <th>סוג</th>
-                <th data-num="true">סכום</th>
+                <th>סכום</th>
                 <th>מסלול</th>
                 <th>לוח סילוקין</th>
-                <th data-num="true">ריבית %</th>
-                <th data-num="true">חודשים</th>
+                <th>ריבית %</th>
+                <th>חודשים</th>
                 <th>תאריך סיום</th>
-                <th data-num="true">החזר חודשי</th>
+                <th>החזר חודשי</th>
                 <th />
               </tr>
             </thead>
@@ -253,26 +244,25 @@ export default function Ledger({
                       <td colSpan={9}>
                         <div className="fin-groupbar-in">
                           <span className="fin-groupbar-title">
-                            {g.key === "mortgage" ? <Bank size={13} weight="fill" /> : <HandCoins size={13} weight="fill" />}
+                            {FAM_ICON[g.key]}
                             {fam.plural}
                           </span>
                           <span className="fin-count">{g.rows.length}</span>
-                          <span className="fin-groupbar-sum ms-auto">
-                            {nis(g.amount)}
-                            <span className="fin-cur">₪</span>
-                          </span>
-                          <span className="fin-groupbar-sum" style={{ color: fam.color, minWidth: 96, textAlign: "end" }}>
-                            {nis(g.monthly)}
-                            <span className="fin-cur">₪/ח׳</span>
-                          </span>
-                          <span style={{ width: 74 }} />
+                          <Money value={g.amount} block={false} className="fin-groupbar-sum ms-auto" />
+                          <Money
+                            value={g.monthly}
+                            per="ח׳"
+                            block={false}
+                            className="fin-groupbar-sum"
+                            style={{ color: fam.color, minWidth: 104 }}
+                          />
+                          <span style={{ width: 68 }} />
                         </div>
                       </td>
                     </tr>
 
                     {g.rows.map((loan) => {
                       const res = calculateLoan(loan, annualInflation);
-                      const open = expanded.has(loan.id);
                       const dirty = dirtyOf(loan);
                       const amount = Number(loan.amount) || 0;
                       const months = Number(loan.months) || 0;
@@ -283,319 +273,244 @@ export default function Ledger({
                       const stale = !!end && end < today;
                       const flag = noTerm ? "err" : stale ? "warn" : undefined;
                       const share = grand.amount ? (amount / grand.amount) * 100 : 0;
+                      const heat = rateHeat(loan.rate, g.key);
 
                       return (
-                        <Fragment key={loan.id}>
-                          <tr className="fin-row" style={famVars} data-flag={flag}>
-                            {/* --- סוג: spine, expander, worded chip, share --- */}
-                            <td>
-                              <div className="flex items-center gap-1">
-                                <button
-                                  className="fin-act !h-6 !w-5"
-                                  onClick={() => toggle(loan.id)}
-                                  aria-label="שדות נוספים"
-                                  aria-expanded={open}
-                                  title="עוגן, מרווח, תדירות שינוי וגרייס"
-                                >
-                                  <motion.span animate={{ rotate: open ? 180 : 0 }} transition={{ duration: 0.15 }}>
-                                    <CaretDown size={12} weight="bold" />
-                                  </motion.span>
-                                </button>
-                                <div className="min-w-0 flex-1">
-                                  <button
-                                    className="fin-fam"
-                                    onClick={() =>
-                                      patch(loan.id, { group: g.key === "mortgage" ? "loan" : "mortgage" })
-                                    }
-                                    title={`שינוי ל${g.key === "mortgage" ? FAMILY.loan.label : FAMILY.mortgage.label}`}
-                                  >
-                                    {g.key === "mortgage" ? (
-                                      <Bank size={12} weight="fill" className="fin-fam-ico" />
-                                    ) : (
-                                      <HandCoins size={12} weight="fill" className="fin-fam-ico" />
-                                    )}
-                                    {fam.label}
-                                  </button>
-                                  <div className="fin-share mt-1" title={`${share.toFixed(1)}% מהתמהיל`}>
-                                    <span style={{ width: `${Math.min(100, share)}%` }} />
-                                  </div>
-                                </div>
-                              </div>
-                            </td>
+                        <tr key={loan.id} className="fin-row" style={famVars} data-flag={flag}>
+                          {/* --- סוג: spine + the family control --- */}
+                          <td>
+                            <Select
+                              variant="chip"
+                              value={g.key}
+                              onChange={(v) => patch(loan.id, { group: v as DebtGroup })}
+                              ariaLabel="סוג ההתחייבות"
+                              minWidth={148}
+                              options={ORDER.map((k) => ({
+                                value: k,
+                                label: FAMILY[k].label,
+                                icon: FAM_ICON[k],
+                                tone: FAMILY[k].color,
+                              }))}
+                            />
+                            <div className="fin-share mt-1" title={`${share.toFixed(1)}% מהתמהיל`}>
+                              <span style={{ width: `${Math.min(100, share)}%` }} />
+                            </div>
+                          </td>
 
-                            {/* --- סכום --- */}
-                            <td>
-                              <div className="fin-well" data-dirty={dirty.has("amount") || undefined}>
-                                <input
-                                  className="fin-cell text-end font-bold"
-                                  value={amount ? amount.toLocaleString("he-IL") : ""}
-                                  placeholder="0"
-                                  aria-label="סכום"
-                                  inputMode="numeric"
-                                  onFocus={(e) => e.currentTarget.select()}
-                                  onChange={(e) =>
-                                    patch(loan.id, { amount: Number(e.target.value.replace(/[^\d]/g, "")) || 0 })
-                                  }
-                                />
-                              </div>
+                          {/* --- סכום --- */}
+                          <td>
+                            <div className="fin-well" data-dirty={dirty.has("amount") || undefined}>
+                              <input
+                                className="fin-cell fin-num-in font-bold"
+                                value={amount ? amount.toLocaleString("he-IL") : ""}
+                                placeholder="0"
+                                aria-label="סכום"
+                                inputMode="numeric"
+                                onFocus={(e) => e.currentTarget.select()}
+                                onChange={(e) =>
+                                  patch(loan.id, { amount: Number(e.target.value.replace(/[^\d]/g, "")) || 0 })
+                                }
+                              />
                               {(loan.source_bank || loan.is_guarantor) && (
-                                <div
-                                  className="mt-0.5 flex items-center gap-1.5 truncate px-1.5 text-[10px] leading-tight"
-                                  style={{ color: "var(--ink-4)" }}
-                                  title={loan.source_bank}
-                                >
+                                <span className="fin-note truncate" style={{ maxWidth: "62%" }} title={loan.source_bank}>
                                   {loan.is_guarantor && (
                                     <span
-                                      className="fin-tag"
+                                      className="fin-tag me-1"
                                       style={{ background: FAMILY.loan.tint, color: FAMILY.loan.color }}
-                                      title="הלקוח ערב לחוב הזה, לא חייב בו"
                                     >
                                       ערב
                                     </span>
                                   )}
-                                  <span className="truncate">{loan.source_bank?.replace(/בע"?מ|בנק/g, "").trim()}</span>
-                                </div>
-                              )}
-                            </td>
-
-                            {/* --- מסלול --- */}
-                            <td>
-                              <div className="fin-well" data-dirty={dirty.has("path_id") || undefined}>
-                                <Select
-                                  value={loan.path_id}
-                                  onChange={(v) => patch(loan.id, { path_id: Number(v) })}
-                                  options={paths.map((p) => ({
-                                    value: p.id,
-                                    label: PATH_LABEL[p.id] ?? p.name,
-                                    dot: TRACK_HEX[p.id],
-                                  }))}
-                                  ariaLabel="מסלול"
-                                />
-                              </div>
-                            </td>
-
-                            {/* --- לוח סילוקין --- */}
-                            <td>
-                              <div className="fin-well" data-dirty={dirty.has("amortization_schedule_id") || undefined}>
-                                <Select
-                                  value={loan.amortization_schedule_id}
-                                  onChange={(v) => patch(loan.id, { amortization_schedule_id: Number(v) })}
-                                  options={schedules.map((s) => ({ value: s.id, label: s.schedule_name }))}
-                                  ariaLabel="לוח סילוקין"
-                                />
-                              </div>
-                            </td>
-
-                            {/* --- ריבית --- */}
-                            <td>
-                              <div className="fin-well" data-dirty={dirty.has("rate") || undefined}>
-                                <input
-                                  className="fin-cell text-center"
-                                  type="number"
-                                  step="0.01"
-                                  min={0}
-                                  aria-label="ריבית באחוזים"
-                                  value={loan.rate || ""}
-                                  placeholder="0"
-                                  onFocus={(e) => e.currentTarget.select()}
-                                  onChange={(e) => patch(loan.id, { rate: Number(e.target.value) || 0 })}
-                                />
-                              </div>
-                            </td>
-
-                            {/* --- חודשים (synced with the end date) --- */}
-                            <td>
-                              <div className="fin-well" data-dirty={dirty.has("months") || undefined}>
-                                <input
-                                  className="fin-cell text-center"
-                                  type="number"
-                                  min={0}
-                                  aria-label="מספר חודשים"
-                                  data-state={noTerm ? "err" : undefined}
-                                  value={months || ""}
-                                  placeholder="0"
-                                  onFocus={(e) => e.currentTarget.select()}
-                                  onChange={(e) => setTerm(loan.id, Number(e.target.value))}
-                                />
-                              </div>
-                              {months > 0 && (
-                                <div className="px-1 text-center text-[9.5px]" style={{ color: "var(--ink-4)" }}>
-                                  {(months / 12).toFixed(1)} שנים
-                                </div>
-                              )}
-                            </td>
-
-                            {/* --- תאריך סיום --- */}
-                            <td>
-                              <div data-dirty={dirty.has("loan_end_date") || undefined} className="fin-well">
-                                <DateField
-                                  value={loan.loan_end_date ?? loan.end_date}
-                                  onChange={(iso) => setEnd(loan.id, iso)}
-                                  state={stale ? "warn" : undefined}
-                                  hint={months > 0 ? `${months} חודשים מהיום` : "בחירת תאריך תקבע גם את מספר החודשים"}
-                                />
-                              </div>
-                            </td>
-
-                            {/* --- החזר חודשי (calculated: no well) --- */}
-                            <td>
-                              {noTerm ? (
-                                <span
-                                  className="flex items-center justify-end gap-1 px-1 text-[11px] font-bold"
-                                  style={{ color: "var(--neg)" }}
-                                  title="לשורה יש יתרה אבל אין תקופה — הזינו חודשים או תאריך סיום"
-                                >
-                                  <Warning size={12} weight="fill" />
-                                  חסרה תקופה
-                                </span>
-                              ) : (
-                                <span className="fin-calc font-bold" title="מחושב מהסכום, הריבית והתקופה">
-                                  {nis(res.monthlyPayment)}
-                                  <span className="fin-cur">₪</span>
+                                  {loan.source_bank?.replace(/בע"?מ|בנק/g, "").trim()}
                                 </span>
                               )}
-                              <div className="flex items-center justify-end gap-1.5 px-2 pt-0.5">
-                                {res.isIndexed && (
-                                  <span className="text-[9.5px]" style={{ color: "var(--ink-4)" }}>
-                                    צמוד מדד
-                                  </span>
-                                )}
+                            </div>
+                          </td>
+
+                          {/* --- מסלול --- */}
+                          <td>
+                            <div className="fin-well" data-dirty={dirty.has("path_id") || undefined}>
+                              <Select
+                                value={loan.path_id}
+                                onChange={(v) => patch(loan.id, { path_id: Number(v) })}
+                                options={paths.map((p) => ({
+                                  value: p.id,
+                                  label: PATH_SHORT[p.id] ?? p.name,
+                                  dot: TRACK_HEX[p.id],
+                                }))}
+                                ariaLabel="מסלול"
+                                minWidth={150}
+                              />
+                            </div>
+                          </td>
+
+                          {/* --- לוח סילוקין --- */}
+                          <td>
+                            <div className="fin-well" data-dirty={dirty.has("amortization_schedule_id") || undefined}>
+                              <Select
+                                value={loan.amortization_schedule_id}
+                                onChange={(v) => patch(loan.id, { amortization_schedule_id: Number(v) })}
+                                options={schedules.map((s) => ({ value: s.id, label: s.schedule_name }))}
+                                ariaLabel="לוח סילוקין"
+                              />
+                            </div>
+                          </td>
+
+                          {/* --- ריבית: warms as the rate climbs, per family --- */}
+                          <td>
+                            <div className="fin-well" data-dirty={dirty.has("rate") || undefined}>
+                              <input
+                                className="fin-cell fin-num-in"
+                                type="number"
+                                step="0.01"
+                                min={0}
+                                aria-label="ריבית באחוזים"
+                                data-heat={heat ?? undefined}
+                                title={
+                                  heat === "hot"
+                                    ? `ריבית גבוהה ל${FAMILY[g.key].label}`
+                                    : heat === "warm"
+                                      ? `ריבית גבוהה מהממוצע ל${FAMILY[g.key].label}`
+                                      : undefined
+                                }
+                                value={loan.rate || ""}
+                                placeholder="0"
+                                onFocus={(e) => e.currentTarget.select()}
+                                onChange={(e) => patch(loan.id, { rate: Number(e.target.value) || 0 })}
+                              />
+                            </div>
+                            {heat && <span className="fin-heat-mark" data-heat={heat} aria-hidden />}
+                          </td>
+
+                          {/* --- חודשים (synced with the end date) --- */}
+                          <td>
+                            <div className="fin-well" data-dirty={dirty.has("months") || undefined}>
+                              <input
+                                className="fin-cell fin-num-in"
+                                type="number"
+                                min={0}
+                                aria-label="מספר חודשים"
+                                data-state={noTerm ? "err" : undefined}
+                                value={months || ""}
+                                placeholder="0"
+                                onFocus={(e) => e.currentTarget.select()}
+                                onChange={(e) => setTerm(loan.id, Number(e.target.value))}
+                              />
+                              {months > 0 && <span className="fin-note">{(months / 12).toFixed(1)} שנ׳</span>}
+                            </div>
+                          </td>
+
+                          {/* --- תאריך סיום --- */}
+                          <td>
+                            <div className="fin-well" data-dirty={dirty.has("loan_end_date") || undefined}>
+                              <DateField
+                                value={loan.loan_end_date ?? loan.end_date}
+                                onChange={(iso) => setEnd(loan.id, iso)}
+                                state={stale ? "warn" : undefined}
+                                hint={months > 0 ? `${months} חודשים מהיום` : "בחירת תאריך תקבע גם את מספר החודשים"}
+                              />
+                            </div>
+                          </td>
+
+                          {/* --- החזר חודשי (calculated: no well) --- */}
+                          <td>
+                            {noTerm ? (
+                              <span
+                                className="flex items-center justify-end gap-1 px-1 text-[11.5px] font-bold"
+                                style={{ color: "var(--neg)" }}
+                                title="לשורה יש יתרה אבל אין תקופה — הזינו חודשים או תאריך סיום"
+                              >
+                                <Warning size={13} weight="fill" />
+                                חסרה תקופה
+                              </span>
+                            ) : (
+                              <Money
+                                value={res.monthlyPayment}
+                                per="ח׳"
+                                className="fin-pay"
+                                style={{ color: "var(--ink)" }}
+                              />
+                            )}
+                            {(res.isIndexed || stale) && (
+                              <div className="flex items-center justify-start gap-1.5 px-2 pt-0.5" dir="ltr">
                                 {stale && (
-                                  <span className="text-[9.5px] font-bold" style={{ color: "var(--warn)" }} title="תאריך הסיום שבדוח כבר עבר">
+                                  <span className="text-[9.5px] font-bold" style={{ color: "var(--warn)" }} dir="rtl">
                                     תאריך עבר
                                   </span>
                                 )}
+                                {res.isIndexed && (
+                                  <span className="text-[9.5px]" style={{ color: "var(--ink-4)" }} dir="rtl">
+                                    צמוד מדד
+                                  </span>
+                                )}
                               </div>
-                            </td>
-
-                            {/* --- actions --- */}
-                            <td>
-                              <div className="flex items-center justify-end gap-0.5 pe-0.5">
-                                <button
-                                  className="fin-act"
-                                  onClick={() => onSchedule(loan)}
-                                  title="לוח סילוקין של השורה"
-                                  aria-label="לוח סילוקין של השורה"
-                                >
-                                  <TableIcon size={14} />
-                                </button>
-                                <button
-                                  className="fin-act"
-                                  data-danger="true"
-                                  data-armed={armed === loan.id || undefined}
-                                  onClick={() => (armed === loan.id ? remove(loan.id) : setArmed(loan.id))}
-                                  onBlur={() => setArmed((a) => (a === loan.id ? null : a))}
-                                  title={armed === loan.id ? "לחצו שוב לאישור המחיקה" : "מחיקת השורה"}
-                                  aria-label={armed === loan.id ? "אישור מחיקה" : "מחיקת השורה"}
-                                >
-                                  <Trash size={14} weight={armed === loan.id ? "fill" : "regular"} />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-
-                          {/* --- secondary fields --- */}
-                          <AnimatePresence initial={false}>
-                            {open && (
-                              <motion.tr
-                                key={`${loan.id}-x`}
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                exit={{ opacity: 0 }}
-                                transition={{ duration: 0.14 }}
-                              >
-                                <td colSpan={9} className="fin-tray">
-                                  <div className="flex flex-wrap items-end gap-3.5 px-4 py-2.5">
-                                    <span
-                                      className="flex items-center gap-1.5 self-center text-[11px]"
-                                      style={{ color: "var(--ink-4)" }}
-                                    >
-                                      <Sliders size={13} />
-                                      שדות נוספים
-                                    </span>
-                                    {(
-                                      [
-                                        { label: "עוגן", key: "anchor", type: "text", w: 96 },
-                                        { label: "מרווח מהעוגן", key: "anchor_margin", type: "number", w: 96 },
-                                        { label: "תדירות שינוי", key: "change_frequency", type: "text", w: 96 },
-                                      ] as const
-                                    ).map((f) => (
-                                      <label key={f.key} className="flex flex-col gap-1">
-                                        <span className="fin-label">{f.label}</span>
-                                        <div className="fin-well" data-dirty={dirty.has(f.key) || undefined}>
-                                          <input
-                                            className="fin-cell text-center"
-                                            style={{ width: f.w }}
-                                            type={f.type}
-                                            value={(loan[f.key] as string | number) ?? ""}
-                                            onChange={(e) =>
-                                              patch(loan.id, {
-                                                [f.key]:
-                                                  f.type === "number"
-                                                    ? Number(e.target.value) || 0
-                                                    : e.target.value,
-                                              } as Partial<ImportedLoan>)
-                                            }
-                                          />
-                                        </div>
-                                      </label>
-                                    ))}
-                                    <label className="flex flex-col gap-1">
-                                      <span className="fin-label">גרייס</span>
-                                      <div className="fin-well" data-dirty={dirty.has("grace_type_id") || undefined}>
-                                        <Select
-                                          value={loan.grace_type_id ?? 1}
-                                          onChange={(v) => patch(loan.id, { grace_type_id: Number(v) })}
-                                          options={graceTypes.map((gt) => ({ value: gt.id, label: gt.name }))}
-                                          style={{ width: 128 }}
-                                          ariaLabel="גרייס"
-                                        />
-                                      </div>
-                                    </label>
-                                    <label className="flex flex-col gap-1">
-                                      <span className="fin-label">חודשי גרייס</span>
-                                      <div className="fin-well" data-dirty={dirty.has("grace_months") || undefined}>
-                                        <input
-                                          className="fin-cell text-center"
-                                          style={{ width: 96 }}
-                                          type="number"
-                                          min={0}
-                                          value={loan.grace_months ?? 0}
-                                          onFocus={(e) => e.currentTarget.select()}
-                                          onChange={(e) => patch(loan.id, { grace_months: Number(e.target.value) || 0 })}
-                                        />
-                                      </div>
-                                    </label>
-                                    {loan.source_track && (
-                                      <span className="ms-auto self-center text-[11px]" style={{ color: "var(--ink-4)" }}>
-                                        מהדוח: {loan.source_type} · {loan.source_track}
-                                      </span>
-                                    )}
-                                  </div>
-                                </td>
-                              </motion.tr>
                             )}
-                          </AnimatePresence>
-                        </Fragment>
+                          </td>
+
+                          {/* --- actions --- */}
+                          <td>
+                            <div className="flex items-center justify-end gap-0.5 pe-0.5">
+                              <button
+                                className="fin-act fin-tip"
+                                data-tip="שדות נוספים"
+                                aria-label="שדות נוספים"
+                                aria-expanded={sheet?.id === loan.id}
+                                onClick={(e) =>
+                                  setSheet(
+                                    sheet?.id === loan.id
+                                      ? null
+                                      : { id: loan.id, rect: e.currentTarget.getBoundingClientRect() }
+                                  )
+                                }
+                              >
+                                <Sliders size={14} />
+                              </button>
+                              <button
+                                className="fin-act fin-tip"
+                                data-tip="לוח סילוקין"
+                                onClick={() => onSchedule(loan)}
+                                aria-label="לוח סילוקין של השורה"
+                              >
+                                <TableIcon size={14} />
+                              </button>
+                              <button
+                                className="fin-act fin-tip"
+                                data-danger="true"
+                                data-armed={armed === loan.id || undefined}
+                                data-tip={armed === loan.id ? "לחצו שוב לאישור" : "מחיקה"}
+                                onClick={() => (armed === loan.id ? remove(loan.id) : setArmed(loan.id))}
+                                onBlur={() => setArmed((a) => (a === loan.id ? null : a))}
+                                aria-label={armed === loan.id ? "אישור מחיקה" : "מחיקת השורה"}
+                              >
+                                <Trash size={14} weight={armed === loan.id ? "fill" : "regular"} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
                       );
                     })}
                   </Fragment>
                 );
               })}
+
+              {/* add a row from the bottom, so a long list never sends you back up */}
+              <tr className="fin-addrow">
+                <td colSpan={9}>
+                  <div className="fin-addrow-in">
+                    {addBtns()}
+                    <span className="fin-addrow-hint">הוספת שורה ריקה לתמהיל</span>
+                  </div>
+                </td>
+              </tr>
             </tbody>
 
             <tfoot>
               <tr>
                 <td>
-                  <span className="ps-1 text-[11px] font-bold" style={{ color: "var(--ink-2)" }}>
-                    סה״כ
-                  </span>
+                  <span className="fin-total-label">סה״כ</span>
                 </td>
                 <td>
-                  <span className="fin-calc font-bold" style={{ fontSize: 13.5 }}>
-                    {nis(grand.amount)}
-                    <span className="fin-cur">₪</span>
-                  </span>
+                  <Money value={grand.amount} className="fin-total-fig" />
                 </td>
                 <td colSpan={5}>
                   <div className="flex flex-wrap items-center gap-1.5 px-1">
@@ -611,7 +526,7 @@ export default function Ledger({
                             color: FAMILY[g.key].color,
                           }}
                         >
-                          {g.key === "mortgage" ? <Bank size={11} weight="fill" /> : <HandCoins size={11} weight="fill" />}
+                          {FAM_ICON[g.key]}
                           {FAMILY[g.key].plural}
                           <span className="fin-fig" style={{ opacity: 0.75 }}>
                             {grand.amount ? Math.round((g.amount / grand.amount) * 100) : 0}%
@@ -621,10 +536,7 @@ export default function Ledger({
                   </div>
                 </td>
                 <td>
-                  <span className="fin-calc font-bold" style={{ fontSize: 13.5, color: "var(--ink)" }}>
-                    {nis(grand.monthly)}
-                    <span className="fin-cur">₪</span>
-                  </span>
+                  <Money value={grand.monthly} per="ח׳" className="fin-total-fig" hot />
                 </td>
                 <td />
               </tr>
@@ -632,9 +544,16 @@ export default function Ledger({
           </table>
         </div>
       )}
+
+      {sheet && sheetLoan && (
+        <RowSettings
+          loan={sheetLoan}
+          anchorRect={sheet.rect}
+          dirty={dirtyOf(sheetLoan)}
+          onPatch={(next) => patch(sheetLoan.id, next)}
+          onClose={() => setSheet(null)}
+        />
+      )}
     </section>
   );
 }
-
-/** Exported for the composition legend so a track name never drifts. */
-export const trackName = (id: number) => PATH_SHORT[id] ?? PATH_LABEL[id] ?? String(id);
