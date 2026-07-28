@@ -25,6 +25,7 @@ import {
   PencilSimple,
   Plus,
   Trash,
+  UserCircle,
   WarningCircle,
   X,
 } from "@phosphor-icons/react";
@@ -95,6 +96,7 @@ function nameFor(mix: Mix, summary: ImportSummary, first: boolean): string {
 export default function Simulator({
   lead,
   endpoint = "/api/aa100/mixes",
+  locked = false,
 }: {
   lead: Lead | null;
   /**
@@ -103,6 +105,16 @@ export default function Simulator({
    * from a signed cookie instead so there is no id left to tamper with.
    */
   endpoint?: string;
+  /**
+   * This board belongs to exactly one lead and cannot be pointed at another.
+   *
+   * The cookie scoping is only as good as the ways out of the page: the lead
+   * picker navigates to /aa100test/<id>, which is the open sandbox route and
+   * takes its id from the URL. Left in place on a Fireberry session it hands
+   * every visitor a menu of every client — undoing the entire reason the id
+   * was taken out of the URL.
+   */
+  locked?: boolean;
 }) {
   const [mixes, setMixes] = useState<Mix[] | null>(null);
   const [activeMixId, setActiveMixId] = useState<string | null>(null);
@@ -382,17 +394,27 @@ export default function Simulator({
         >
           <div className="flex items-center gap-3">
             <h1 className="fin-display text-[30px]">סימולטור תמהילים</h1>
-            <LeadPicker
-              lead={lead}
-              onPick={(l) => {
-                if (dirty && !window.confirm("יש שינויים שלא נשמרו. לעבור לליד אחר ולאבד אותם?")) return;
-                router.push(`/aa100test/${l.id}`);
-              }}
-              onClear={() => {
-                if (dirty && !window.confirm("יש שינויים שלא נשמרו. לצאת מהליד ולאבד אותם?")) return;
-                router.push("/aa100test");
-              }}
-            />
+            {locked ? (
+              // Same chip, no way out of it: the client is stated, not chosen.
+              <span className="fin-btn" data-static="" title="הליד שאליו משויך התמהיל">
+                <UserCircle size={15} weight="fill" style={{ color: "var(--primary)" }} />
+                <span className="max-w-[190px] truncate">
+                  {lead ? `${lead.name || "ללא שם"} · ${lead.id}` : "ללא ליד"}
+                </span>
+              </span>
+            ) : (
+              <LeadPicker
+                lead={lead}
+                onPick={(l) => {
+                  if (dirty && !window.confirm("יש שינויים שלא נשמרו. לעבור לליד אחר ולאבד אותם?")) return;
+                  router.push(`/aa100test/${l.id}`);
+                }}
+                onClear={() => {
+                  if (dirty && !window.confirm("יש שינויים שלא נשמרו. לצאת מהליד ולאבד אותם?")) return;
+                  router.push("/aa100test");
+                }}
+              />
+            )}
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
