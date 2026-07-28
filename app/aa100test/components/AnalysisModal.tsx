@@ -18,6 +18,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion } from "motion/react";
 import {
+  ArrowLeft,
   Bank,
   CalendarBlank,
   CaretDown,
@@ -58,6 +59,8 @@ function Section({
   note,
   children,
   fold,
+  forceOpen,
+  lit,
 }: {
   id: string;
   icon: React.ReactNode;
@@ -66,10 +69,15 @@ function Section({
   children: React.ReactNode;
   /** Reference material: present, but not competing with the findings. */
   fold?: string;
+  /** A finding pointed here, so a folded section has to give way. */
+  forceOpen?: boolean;
+  /** Lit for a moment after a finding sends the reader here. */
+  lit?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const shown = open || !!forceOpen;
   return (
-    <section id={id} className="fin-sec">
+    <section id={id} className="fin-sec" data-hl={lit || undefined}>
       <header className="fin-sec-head">
         <span className="fin-sec-ico">{icon}</span>
         <h3 className="fin-display text-[15px]">{title}</h3>
@@ -80,12 +88,12 @@ function Section({
         )}
         {fold && (
           <button className="fin-btn fin-btn-sm ms-auto" onClick={() => setOpen((o) => !o)}>
-            <CaretDown size={12} weight="bold" style={{ transform: open ? "rotate(180deg)" : undefined, transition: "transform .15s ease" }} />
-            {open ? "הסתרה" : fold}
+            <CaretDown size={12} weight="bold" style={{ transform: shown ? "rotate(180deg)" : undefined, transition: "transform .15s ease" }} />
+            {shown ? "הסתרה" : fold}
           </button>
         )}
       </header>
-      {(!fold || open) && children}
+      {(!fold || shown) && children}
     </section>
   );
 }
@@ -119,9 +127,18 @@ function Kpi({
   );
 }
 
-function FlagRow({ flag }: { flag: Flag }) {
+function FlagRow({ flag, onGo }: { flag: Flag; onGo?: (f: Flag) => void }) {
+  const go = flag.target ? () => onGo?.(flag) : undefined;
   return (
-    <li className="fin-flag" data-sev={flag.severity}>
+    <li
+      className="fin-flag"
+      data-sev={flag.severity}
+      data-go={go ? "" : undefined}
+      role={go ? "button" : undefined}
+      tabIndex={go ? 0 : undefined}
+      onClick={go}
+      onKeyDown={go ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } } : undefined}
+    >
       <span className="fin-flag-sev">{SEVERITY_LABEL[flag.severity]}</span>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-baseline gap-x-2">
@@ -135,6 +152,7 @@ function FlagRow({ flag }: { flag: Flag }) {
         <p className="mt-0.5 text-[12px] leading-[1.55]" style={{ color: "var(--ink-3)" }}>
           {flag.detail}
         </p>
+        {go && <span className="fin-flag-go">הצג במסמך<ArrowLeft size={11} weight="bold" /></span>}
         {flag.where?.length ? (
           <div className="mt-1 flex flex-wrap gap-1">
             {Array.from(new Set(flag.where)).slice(0, 6).map((w) => (
@@ -267,7 +285,7 @@ function hasData(lines: DebtLine[], c: Col): boolean {
   }
 }
 
-function DebtTable({ lines, cols: requested }: { lines: DebtLine[]; cols: Col[] }) {
+function DebtTable({ lines, cols: requested, hl }: { lines: DebtLine[]; cols: Col[]; hl?: Set<string> }) {
   // A column of nothing but em-dashes is furniture. Dropping it costs no
   // information and takes a visible bite out of how busy the table looks —
   // revolving facilities in particular rarely price a rate or a term.
@@ -288,7 +306,7 @@ function DebtTable({ lines, cols: requested }: { lines: DebtLine[]; cols: Col[] 
           {lines.map((l) => {
             const bad = l.overdue > 0 || !!l.arrearsRange;
             return (
-              <tr key={l.uid} data-bad={bad || undefined}>
+              <tr key={l.uid} data-bad={bad || undefined} data-hl={hl?.has(l.uid) || undefined}>
                 {cols.map((c) => {
                   switch (c) {
                     case "bank":
@@ -382,6 +400,42 @@ function DebtTable({ lines, cols: requested }: { lines: DebtLine[]; cols: Col[] 
   );
 }
 
+/**
+ * Ease a scroll container to an offset.
+ *
+ * `scrollTo({behavior:"smooth"})` is not dependable — it silently does nothing
+ * in some engines and embedded views, and a finding that appears to ignore the
+ * click is worse than one that never offered to move. Driving it by frame is a
+ * dozen lines and always runs, and the duration can scale with the distance so
+ * a short hop does not take as long as a long one.
+ */
+function easeScroll(el: HTMLElement, to: number) {
+  const from = el.scrollTop;
+  const dist = to - from;
+  if (Math.abs(dist) < 2) return;
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    el.scrollTop = to;
+    return;
+  }
+  const ms = Math.min(700, Math.max(260, Math.abs(dist) * 0.42));
+  const t0 = performance.now();
+  let framed = false;
+  const step = (now: number) => {
+    framed = true;
+    const p = Math.min(1, (now - t0) / ms);
+    // easeOutCubic: quick to leave, gentle to land
+    el.scrollTop = from + dist * (1 - Math.pow(1 - p, 3));
+    if (p < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+  // Frames do not flow in a backgrounded or non-compositing tab, and then the
+  // animation never starts at all — the click would look ignored. Arriving
+  // without the animation is a far better failure than not arriving.
+  window.setTimeout(() => {
+    if (!framed) el.scrollTop = to;
+  }, 140);
+}
+
 /* -------------------------------------------------------------------- main */
 
 const FAMILY_COLOR: Record<string, string> = {
@@ -403,6 +457,8 @@ export default function AnalysisModal({
 }) {
   const bodyRef = useRef<HTMLDivElement>(null);
   const [tab, setTab] = useState<string>("flags");
+  /** The section a finding sent us to, and the exact rows behind its claim. */
+  const [lit, setLit] = useState<{ section: string; uids: Set<string> } | null>(null);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -470,6 +526,38 @@ export default function AnalysisModal({
     el?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
+  /**
+   * Follow a finding to its evidence.
+   *
+   * The section is opened first if it was folded, because scrolling to a
+   * collapsed section lands on a heading and nothing else. The highlight is
+   * then cleared on a timer rather than left on: it is a pointer, and a pointer
+   * that never goes away just becomes another colour on the page.
+   */
+  const goToFlag = (f: Flag) => {
+    const t = f.target;
+    if (!t) return;
+    setTab(t.section);
+    setLit({ section: t.section, uids: new Set(t.uids ?? []) });
+    // Let React commit first, so a section that was folded has rendered its
+    // rows before we measure where it starts. A timer rather than a frame:
+    // frames can be withheld, timers are not.
+    window.setTimeout(() => {
+      const body = bodyRef.current;
+      const el = body?.querySelector<HTMLElement>(`#${t.section}`);
+      if (!body || !el) return;
+      const top =
+        el.getBoundingClientRect().top - body.getBoundingClientRect().top + body.scrollTop - 6;
+      easeScroll(body, Math.max(0, top));
+    }, 0);
+  };
+
+  useEffect(() => {
+    if (!lit) return;
+    const t = setTimeout(() => setLit(null), 2600);
+    return () => clearTimeout(t);
+  }, [lit]);
+
   return createPortal(
     <div
       dir="rtl"
@@ -519,12 +607,12 @@ export default function AnalysisModal({
           <Kpi
             label="סך ההתחייבויות"
             tone="primary"
-            value={<Money value={a.totals.balance} size={21} weight={800} style={{ textAlign: "start" }} />}
+            value={<Money value={a.totals.balance} size={24} weight={800} />}
             sub={`${own.length} התחייבויות פעילות`}
           />
           <Kpi
             label="החזר חודשי"
-            value={<Money value={a.totals.monthly} size={21} weight={800} style={{ textAlign: "start" }} />}
+            value={<Money value={a.totals.monthly} size={24} weight={800} />}
             sub={
               a.consumer.shareOfMonthly > 0
                 ? `${pct(a.consumer.shareOfMonthly)} מזה הלוואות צרכניות`
@@ -537,7 +625,7 @@ export default function AnalysisModal({
           <Kpi
             label="חיוב חודשי בכרטיסים"
             tone={a.cards.rolled > 0 ? "warn" : undefined}
-            value={<Money value={a.cards.monthlyCharge} size={21} weight={800} style={{ textAlign: "start" }} />}
+            value={<Money value={a.cards.monthlyCharge} size={24} weight={800} />}
             sub={
               a.cards.rolled > 0
                 ? `₪${fmt(a.cards.rolled)} לא נפרעו וגולגלו`
@@ -564,7 +652,7 @@ export default function AnalysisModal({
           <Kpi
             label="יתרות בפיגור"
             tone={a.totals.overdue > 0 ? "neg" : undefined}
-            value={<Money value={a.totals.overdue} size={21} weight={800} style={{ textAlign: "start" }} />}
+            value={<Money value={a.totals.overdue} size={24} weight={800} />}
             sub={
               a.behaviour.arrearsMonths
                 ? `${a.behaviour.arrearsMonths} חודשי פיגור בהיסטוריה`
@@ -587,7 +675,7 @@ export default function AnalysisModal({
           {/* ---------------------------------------------------- findings */}
           {a.flags.length > 0 && (
             <Section
-              id="flags"
+              id="flags" lit={lit?.section === "flags"}
               icon={<ShieldWarning size={15} weight="fill" />}
               title="ממצאים לתשומת לב היועץ"
               note={
@@ -604,7 +692,7 @@ export default function AnalysisModal({
             >
               <ul className="grid gap-1.5">
                 {a.flags.map((f) => (
-                  <FlagRow key={f.id} flag={f} />
+                  <FlagRow key={f.id} flag={f} onGo={goToFlag} />
                 ))}
               </ul>
             </Section>
@@ -612,7 +700,7 @@ export default function AnalysisModal({
 
           {/* ------------------------------------------------ debt picture */}
           <Section
-            id="picture"
+            id="picture" lit={lit?.section === "picture"}
             icon={<ChartPieSlice size={15} weight="fill" />}
             title="תמונת החוב"
             note={a.lines.some((l) => l.shared) ? "התחייבויות משותפות נספרו פעם אחת" : undefined}
@@ -667,7 +755,7 @@ export default function AnalysisModal({
           {/* --------------------------------------------------- mortgages */}
           {mortgages.length > 0 && (
             <Section
-              id="mortgage"
+              id="mortgage" lit={lit?.section === "mortgage"}
               icon={<Bank size={15} weight="fill" />}
               title="משכנתאות"
               note={
@@ -685,7 +773,7 @@ export default function AnalysisModal({
                   </div>
                 </div>
               )}
-              <DebtTable lines={mortgages} cols={["bank", "balance", "original", "rate", "monthly", "term", "end", "track", "status"]} />
+              <DebtTable hl={lit?.uids} lines={mortgages} cols={["bank", "balance", "original", "rate", "monthly", "term", "end", "track", "status"]} />
               {a.mortgage.collateralValue > 0 && (
                 <p className="mt-2 text-[11.5px]" style={{ color: "var(--ink-4)" }}>
                   שווי בטוחות מדווח ₪{fmt(a.mortgage.collateralValue)} מול יתרה של ₪{fmt(a.mortgage.balance)}.
@@ -697,7 +785,7 @@ export default function AnalysisModal({
           {/* ---------------------------------------------------- consumer */}
           {consumer.length > 0 && (
             <Section
-              id="consumer"
+              id="consumer" lit={lit?.section === "consumer"}
               icon={<Pulse size={15} weight="bold" />}
               title="הלוואות צרכניות"
               note={
@@ -707,14 +795,14 @@ export default function AnalysisModal({
                 </>
               }
             >
-              <DebtTable lines={consumer} cols={["bank", "type", "balance", "original", "rate", "monthly", "term", "end", "status"]} />
+              <DebtTable hl={lit?.uids} lines={consumer} cols={["bank", "type", "balance", "original", "rate", "monthly", "term", "end", "status"]} />
             </Section>
           )}
 
           {/* --------------------------------------------------- revolving */}
           {revolving.length > 0 && (
             <Section
-              id="revolving"
+              id="revolving" lit={lit?.section === "revolving"}
               icon={<Certificate size={15} weight="fill" />}
               title='מסגרות אשראי וחשבונות עו"ש'
               note={
@@ -745,26 +833,26 @@ export default function AnalysisModal({
                   </div>
                 </div>
               )}
-              <DebtTable lines={revolving} cols={["bank", "type", "balance", "limit", "use", "charge", "paid", "rate"]} />
+              <DebtTable hl={lit?.uids} lines={revolving} cols={["bank", "type", "balance", "limit", "use", "charge", "paid", "rate"]} />
             </Section>
           )}
 
           {/* ------------------------------------------------------- other */}
           {otherDebts.length > 0 && (
-            <Section id="other" icon={<Warning size={15} weight="fill" />} title="התחייבויות אחרות">
-              <DebtTable lines={otherDebts} cols={["bank", "type", "balance", "monthly", "status"]} />
+            <Section id="other" lit={lit?.section === "other"} icon={<Warning size={15} weight="fill" />} title="התחייבויות אחרות">
+              <DebtTable hl={lit?.uids} lines={otherDebts} cols={["bank", "type", "balance", "monthly", "status"]} />
             </Section>
           )}
 
           {/* -------------------------------------------------- guarantees */}
           {guarantees.length > 0 && (
             <Section
-              id="guarantees"
+              id="guarantees" lit={lit?.section === "guarantees"}
               icon={<Certificate size={15} weight="bold" />}
               title="ערבויות"
               note="אינן החזר של הלקוח, אך נספרות כחשיפה בבדיקת בנק"
             >
-              <DebtTable lines={guarantees} cols={["bank", "type", "balance", "monthly", "end", "status"]} />
+              <DebtTable hl={lit?.uids} lines={guarantees} cols={["bank", "type", "balance", "monthly", "end", "status"]} />
             </Section>
           )}
 
@@ -772,7 +860,7 @@ export default function AnalysisModal({
           {(a.behaviour.arrears.length > 0 ||
             a.behaviour.checksPresented > 0 ||
             a.behaviour.debitsPresented > 0) && (
-            <Section id="behaviour" icon={<CalendarBlank size={15} weight="fill" />} title="התנהגות תשלומים">
+            <Section id="behaviour" lit={lit?.section === "behaviour"} icon={<CalendarBlank size={15} weight="fill" />} title="התנהגות תשלומים">
               <div className="mb-3 flex flex-wrap gap-x-6 gap-y-2">
                 {[
                   { l: "שיקים שהוצגו", v: a.behaviour.checksPresented, bad: false },
@@ -807,7 +895,7 @@ export default function AnalysisModal({
           {/* --------------------------------------------------- inquiries */}
           {(a.inquiries.total > 0 || a.inquiries.pending.length > 0) && (
             <Section
-              id="inquiries"
+              id="inquiries" lit={lit?.section === "inquiries"}
               icon={<MagnifyingGlass size={15} weight="bold" />}
               title="פניות ובקשות אשראי"
               note={`${a.inquiries.last3} ב-3 החודשים האחרונים · ${a.inquiries.last12} בשנה`}
@@ -858,7 +946,7 @@ export default function AnalysisModal({
           {(a.legal.execution.length > 0 ||
             a.legal.insolvency.length > 0 ||
             a.legal.nonPayment.length > 0) && (
-            <Section id="legal" icon={<Gavel size={15} weight="fill" />} title="הליכים ואי עמידה בפירעון">
+            <Section id="legal" lit={lit?.section === "legal"} icon={<Gavel size={15} weight="fill" />} title="הליכים ואי עמידה בפירעון">
               {a.legal.nonPayment.length > 0 && (
                 <div className="mb-3 overflow-x-auto">
                   <Label>נתונים המעידים על אי עמידה בפירעון</Label>
@@ -953,7 +1041,8 @@ export default function AnalysisModal({
           {/* ----------------------------------------------------- sources */}
           {a.sources.length > 0 && (
             <Section
-              id="sources"
+              id="sources" lit={lit?.section === "sources"}
+              forceOpen={lit?.section === "sources"}
               icon={<Bank size={15} weight="bold" />}
               title="תמצית הדוח לפי מקור"
               // Reference. It restates the tables above lender by lender, so it
@@ -1017,7 +1106,7 @@ export default function AnalysisModal({
 
           {/* -------------------------------------------------- collateral */}
           {collateral.length > 0 && (
-            <Section id="collateral" icon={<Bank size={15} weight="bold" />} title="בטוחות">
+            <Section id="collateral" lit={lit?.section === "collateral"} icon={<Bank size={15} weight="bold" />} title="בטוחות">
               <div className="overflow-x-auto">
                 <table className="fin-table fin-mini">
                   <thead>
@@ -1045,7 +1134,8 @@ export default function AnalysisModal({
 
           {/* ------------------------------------------------- report notes */}
           <Section
-            id="meta"
+            id="meta" lit={lit?.section === "meta"}
+            forceOpen={lit?.section === "meta"}
             icon={<IdentificationCard size={15} weight="bold" />}
             title="פרטי הדוח"
             fold="הצגה"

@@ -74,6 +74,14 @@ export interface Flag {
   /** Which debts triggered it, for the analyst to go look. */
   where?: string[];
   amount?: number;
+  /**
+   * Where the evidence for this finding actually is.
+   *
+   * A finding that states a number without showing you the rows behind it asks
+   * to be taken on trust. `section` is where to go; `uids` are the exact debts
+   * that produced it, so the claim can be pointed at rather than described.
+   */
+  target?: { section: string; uids?: string[] };
 }
 
 /** One liability, with everything the report says about it. */
@@ -666,6 +674,16 @@ function inquiries(reports: CreditReport[], now: Date): Inquiries {
  * Each flag names its own evidence — the bank, the amount, the count — because
  * "high utilization" without the number is not a finding, it is a mood.
  */
+/** Which section a given debt is rendered in, so a finding can point at it. */
+function sectionOf(l?: DebtLine): string {
+  if (!l) return "picture";
+  if (l.role === "guarantor") return "guarantees";
+  if (l.category === "mortgage") return "mortgage";
+  if (l.category === "loan") return "consumer";
+  if (l.category === "card" || l.category === "overdraft") return "revolving";
+  return "other";
+}
+
 function buildFlags(a: Omit<Analysis, "flags">): Flag[] {
   const flags: Flag[] = [];
   const own = a.lines.filter((l) => l.role === "debtor");
@@ -675,6 +693,7 @@ function buildFlags(a: Omit<Analysis, "flags">): Flag[] {
   if (a.legal.insolvency.length) {
     push({
       id: "insolvency",
+      target: { section: "legal" },
       severity: "critical",
       title: "הליך חדלות פירעון",
       detail: `נמצאו ${a.legal.insolvency.length} הליכי חדלות פירעון או שיקום כלכלי. יש לברר סטטוס והכרעות לפני כל המשך טיפול.`,
@@ -684,6 +703,7 @@ function buildFlags(a: Omit<Analysis, "flags">): Flag[] {
   if (a.legal.executionOpen.length) {
     push({
       id: "execution",
+      target: { section: "legal" },
       severity: "critical",
       title: "תיקים פתוחים בהוצאה לפועל",
       detail: `${a.legal.executionOpen.length} תיקים פתוחים. חוב פתוח בהוצאה לפועל נחשב חוב לכל דבר וחוסם כמעט כל מסלול.`,
@@ -694,6 +714,7 @@ function buildFlags(a: Omit<Analysis, "flags">): Flag[] {
   if (closedExec > 0) {
     push({
       id: "execution-closed",
+      target: { section: "legal" },
       severity: "medium",
       title: "תיקי הוצאה לפועל שנסגרו",
       detail: `${closedExec} תיקים נסגרו ואינם חוב פתוח, אך נותרים בדוח ונקראים כהיסטוריה על ידי החתם.`,
@@ -707,6 +728,7 @@ function buildFlags(a: Omit<Analysis, "flags">): Flag[] {
     const toBureau = a.legal.nonPayment.filter((n) => n.allowsBureauTransfer).length;
     push({
       id: "nonpayment",
+      target: { section: "legal" },
       severity: toBureau ? "critical" : "high",
       title: "נתונים המעידים על אי עמידה בפירעון",
       detail: toBureau
@@ -719,6 +741,7 @@ function buildFlags(a: Omit<Analysis, "flags">): Flag[] {
   if (openRequests.length) {
     push({
       id: "admin",
+      target: { section: "meta" },
       severity: "info",
       title: "פניות פתוחות מול מערכת נתוני אשראי",
       detail: `${openRequests.length} פניות שטרם הסתיימו (${openRequests
@@ -732,6 +755,7 @@ function buildFlags(a: Omit<Analysis, "flags">): Flag[] {
   if (inArrears.length) {
     push({
       id: "arrears-now",
+      target: { section: sectionOf(inArrears[0]), uids: inArrears.map((l) => l.uid) },
       severity: "high",
       title: "פיגורים פעילים",
       detail: `${inArrears.length} התחייבויות בפיגור${
@@ -744,6 +768,7 @@ function buildFlags(a: Omit<Analysis, "flags">): Flag[] {
   if (a.behaviour.arrearsMonths > 0) {
     push({
       id: "arrears-history",
+      target: { section: "behaviour" },
       severity: a.behaviour.worstBucket >= 4 ? "high" : "medium",
       title: "היסטוריית פיגורים",
       detail: `${a.behaviour.arrearsMonths} חודשים עם פיגור בהיסטוריה${
@@ -758,6 +783,7 @@ function buildFlags(a: Omit<Analysis, "flags">): Flag[] {
   if (enforced.length) {
     push({
       id: "remark-enforced",
+      target: { section: sectionOf(enforced[0]), uids: enforced.map((l) => l.uid) },
       severity: "high",
       title: "עסקאות בטיפול ההוצאה לפועל",
       detail: `${enforced.length} עסקאות מסומנות כמטופלות בהוצאה לפועל.`,
@@ -768,6 +794,7 @@ function buildFlags(a: Omit<Analysis, "flags">): Flag[] {
   if (noPayment.length) {
     push({
       id: "remark-nopay",
+      target: { section: sectionOf(noPayment[0]), uids: noPayment.map((l) => l.uid) },
       severity: "high",
       title: "עסקאות בפיגור ללא תשלום כלל",
       detail: `${noPayment.length} עסקאות שלא התקבל בהן תשלום.`,
@@ -779,6 +806,7 @@ function buildFlags(a: Omit<Analysis, "flags">): Flag[] {
   if (a.behaviour.checksReturned > 0) {
     push({
       id: "checks",
+      target: { section: "behaviour" },
       severity: a.behaviour.checksReturned >= 3 ? "high" : "medium",
       title: 'שיקים שחזרו (אכ"מ)',
       detail: `${a.behaviour.checksReturned} שיקים חזרו מתוך ${a.behaviour.checksPresented || "—"} שהוצגו.`,
@@ -787,6 +815,7 @@ function buildFlags(a: Omit<Analysis, "flags">): Flag[] {
   if (a.behaviour.debitsDishonored > 0) {
     push({
       id: "debits",
+      target: { section: "behaviour" },
       severity: a.behaviour.debitsDishonored >= 3 ? "high" : "medium",
       title: "הוראות קבע שלא כובדו",
       detail: `${a.behaviour.debitsDishonored} הוראות לחיוב חשבון לא כובדו מתוך ${a.behaviour.debitsPresented || "—"}.`,
@@ -798,6 +827,7 @@ function buildFlags(a: Omit<Analysis, "flags">): Flag[] {
   if (blocked.length) {
     push({
       id: "client-status",
+      target: { section: "meta" },
       severity: "high",
       title: `סטטוס לקוח: ${blocked[0].systemStatus}`,
       detail: "סטטוס שאינו רגיל במערכת נתוני האשראי — יש לברר את משמעותו מול הלקוח.",
@@ -809,6 +839,10 @@ function buildFlags(a: Omit<Analysis, "flags">): Flag[] {
   if (a.revolving.utilization !== null && a.revolving.utilization >= 80) {
     push({
       id: "revolving",
+      target: {
+        section: "revolving",
+        uids: a.lines.filter((l) => (l.utilization ?? 0) >= 80).map((l) => l.uid),
+      },
       severity: a.revolving.utilization >= 95 ? "high" : "medium",
       title: "ניצול מסגרות גבוה",
       detail: `${a.revolving.utilization}% מהמסגרות מנוצלות. ניצול מתמשך מעל 80% נקרא כמצוקת נזילות.`,
@@ -825,6 +859,7 @@ function buildFlags(a: Omit<Analysis, "flags">): Flag[] {
   ) {
     push({
       id: "revolving-peak",
+      target: { section: "revolving" },
       severity: "medium",
       title: "שיא ניצול גבוה מהיתרה המוצגת",
       detail: `שיא הניצול בחודש הדיווח היה ${Math.round(a.revolving.peak).toLocaleString("en-US")} ₪ מול יתרה מוצגת של ${Math.round(a.revolving.used).toLocaleString("en-US")} ₪ — המסגרת נוצלה כמעט במלואה במהלך החודש.`,
@@ -837,6 +872,12 @@ function buildFlags(a: Omit<Analysis, "flags">): Flag[] {
     const share = a.totals.monthly > 0 ? a.cards.monthlyCharge / a.totals.monthly : 0;
     push({
       id: "card-charge",
+      target: {
+        section: "revolving",
+        uids: a.lines
+          .filter((l) => l.role === "debtor" && (l.category === "card" || l.category === "overdraft") && l.monthly > 0)
+          .map((l) => l.uid),
+      },
       severity: share >= 0.3 ? "medium" : "info",
       title: "חיוב חודשי בכרטיסי אשראי ומסגרות",
       detail: `${Math.round(a.cards.monthlyCharge).toLocaleString("en-US")} ₪ בחודש על פני ${a.cards.count} מסגרות${
@@ -848,6 +889,10 @@ function buildFlags(a: Omit<Analysis, "flags">): Flag[] {
   if (a.cards.rolled > 0) {
     push({
       id: "card-rolled",
+      target: {
+        section: "revolving",
+        uids: a.lines.filter((l) => l.monthly - l.paidActually > 1 && l.paidActually > 0).map((l) => l.uid),
+      },
       severity: "high",
       title: "חיוב שלא נפרע במלואו",
       detail: `${Math.round(a.cards.rolled).toLocaleString("en-US")} ₪ מהחיוב החודשי לא שולמו בפועל וגולגלו קדימה. גלגול אשראי צרכני הוא האשראי היקר ביותר שיש.`,
@@ -861,6 +906,7 @@ function buildFlags(a: Omit<Analysis, "flags">): Flag[] {
     const worst = Math.max(...expensive.map((l) => l.rate ?? 0));
     push({
       id: "expensive",
+      target: { section: "consumer", uids: expensive.map((l) => l.uid) },
       severity: worst >= 13 ? "high" : "medium",
       title: "הלוואות בריבית גבוהה",
       detail: `${expensive.length} הלוואות בריבית ${worst.toFixed(2)}% ומטה-מעלה — מועמדות ראשונות למיחזור לתוך המשכנתא.`,
@@ -874,6 +920,7 @@ function buildFlags(a: Omit<Analysis, "flags">): Flag[] {
   if (balloons.length) {
     push({
       id: "balloon",
+      target: { section: sectionOf(balloons[0]), uids: balloons.map((l) => l.uid) },
       severity: "medium",
       title: "הלוואות בלון",
       detail: `${balloons.length} התחייבויות שהקרן בהן נפרעת בסוף התקופה. ההחזר החודשי הנוכחי אינו משקף את החבות.`,
@@ -887,6 +934,7 @@ function buildFlags(a: Omit<Analysis, "flags">): Flag[] {
     if (a.mortgage.variableShare >= 0.66) {
       push({
         id: "variable",
+      target: { section: "mortgage" },
         severity: "medium",
         title: "חשיפה גבוהה לריבית משתנה",
         detail: `${Math.round(a.mortgage.variableShare * 100)}% מהמשכנתא במסלולים משתנים. כל עליית ריבית מתגלגלת כמעט במלואה להחזר.`,
@@ -896,6 +944,7 @@ function buildFlags(a: Omit<Analysis, "flags">): Flag[] {
     if (a.mortgage.linkedShare >= 0.5) {
       push({
         id: "linked",
+      target: { section: "mortgage" },
         severity: "medium",
         title: "חשיפה גבוהה למדד",
         detail: `${Math.round(a.mortgage.linkedShare * 100)}% מהמשכנתא צמוד למדד — הקרן עצמה גדלה עם האינפלציה.`,
@@ -905,6 +954,7 @@ function buildFlags(a: Omit<Analysis, "flags">): Flag[] {
     if (a.mortgage.ltv !== null && a.mortgage.ltv >= 0.75) {
       push({
         id: "ltv",
+      target: { section: "mortgage" },
         severity: a.mortgage.ltv >= 0.9 ? "high" : "medium",
         title: `יחס מימון ${Math.round(a.mortgage.ltv * 100)}%`,
         detail: "יחס מימון גבוה מצמצם מאוד את מרחב המיחזור ואת הנכונות של בנקים להגדיל.",
@@ -916,6 +966,7 @@ function buildFlags(a: Omit<Analysis, "flags">): Flag[] {
   if (a.consumer.shareOfMonthly >= 0.4 && a.consumer.monthly > 0) {
     push({
       id: "consumer-weight",
+      target: { section: "consumer" },
       severity: "medium",
       title: "משקל גבוה להלוואות צרכניות",
       detail: `${Math.round(a.consumer.shareOfMonthly * 100)}% מההחזר החודשי הולך להלוואות צרכניות ולא למשכנתא — הפוטנציאל הגדול ביותר לשיפור תזרים.`,
@@ -940,6 +991,7 @@ function buildFlags(a: Omit<Analysis, "flags">): Flag[] {
     const mortgageAsk = byType.get("משכנתה")?.max ?? 0;
     push({
       id: "pending",
+      target: { section: "inquiries" },
       severity: mortgageAsk > 0 ? "high" : "medium",
       title: mortgageAsk > 0 ? "בקשות משכנתה פתוחות אצל מלווים אחרים" : "בקשות אשראי פתוחות",
       detail: `${parts.join(" · ")}. ${
@@ -956,6 +1008,7 @@ function buildFlags(a: Omit<Analysis, "flags">): Flag[] {
   if (a.reconcile.balanceGap > 500 || a.reconcile.limitGap > 500) {
     push({
       id: "reconcile",
+      target: { section: "sources" },
       severity: "medium",
       title: "פער בין התמצית לפירוט",
       detail: `תמצית הדוח מציגה ${
@@ -968,6 +1021,7 @@ function buildFlags(a: Omit<Analysis, "flags">): Flag[] {
   if (a.inquiries.last3 >= 3) {
     push({
       id: "shopping",
+      target: { section: "inquiries" },
       severity: "medium",
       title: "ריבוי פניות בזמן קצר",
       detail: `${a.inquiries.last3} פניות לקבלת מידע ב-3 החודשים האחרונים (${a.inquiries.last12} בשנה). דפוס שנקרא כחיפוש אשראי.`,
@@ -978,6 +1032,10 @@ function buildFlags(a: Omit<Analysis, "flags">): Flag[] {
   if (a.totals.guaranteedCount > 0) {
     push({
       id: "guarantor",
+      target: {
+        section: "guarantees",
+        uids: a.lines.filter((l) => l.role === "guarantor").map((l) => l.uid),
+      },
       severity: "info",
       title: "ערבויות",
       detail: `הלקוח ערב ל-${a.totals.guaranteedCount} התחייבויות. אינן החזר שלו, אך נחשבות חשיפה בבדיקת בנק.`,
@@ -990,6 +1048,7 @@ function buildFlags(a: Omit<Analysis, "flags">): Flag[] {
   if (shared.length) {
     push({
       id: "shared",
+      target: { section: "picture", uids: shared.map((l) => l.uid) },
       severity: "info",
       title: "התחייבויות משותפות",
       detail: `${shared.length} התחייבויות הופיעו ביותר מדוח אחד ונספרו פעם אחת בלבד.`,
