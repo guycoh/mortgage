@@ -26,6 +26,13 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ fbId: strin
   const deny = (reason: string) =>
     NextResponse.redirect(new URL(`/simulator/denied?r=${reason}`, req.url));
 
+  // If the placeholder in the Fireberry button is wrong, what arrives here is
+  // the literal token — "{{accountid}}" — rather than a GUID. That is a
+  // configuration mistake, not an access one, and saying so turns a baffling
+  // refusal into an instruction.
+  const looksLikeGuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(fbId);
+  if (!looksLikeGuid) return deny("notoken");
+
   const check = verifyLink(fbId, sp.get("n"), sp.get("exp"), sp.get("sig"));
   if (!check.ok) return deny(check.reason === "expired" ? "expired" : "invalid");
 
