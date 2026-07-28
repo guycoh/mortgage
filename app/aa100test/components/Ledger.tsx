@@ -187,7 +187,12 @@ export default function Ledger({
 
   /* ------------------------------------------------------------------- ui */
   return (
-    <section className="fin-card overflow-hidden">
+    // No clipping on this card on purpose: `overflow: hidden` would make it the
+    // containing block for the table's sticky header and totals bar, and a box
+    // that never scrolls pins them in place — they would slide away with the
+    // page instead of holding. Visible overflow hands them the page as their
+    // scroller, which is the point now that the list is not boxed.
+    <section className="fin-card">
       <header className="fin-head">
         <h2 className="fin-title">התחייבויות בתמהיל</h2>
         <span className="fin-count">{loans.length}</span>
@@ -206,7 +211,12 @@ export default function Ledger({
           <div className="mt-1">{addBtns("md")}</div>
         </div>
       ) : (
-        <div className="fin-scroll overflow-auto" style={{ maxHeight: "calc(100dvh - 200px)" }}>
+        // The board is as tall as the debts are many. A report with forty
+        // liabilities used to become a small scrolling window inside a
+        // full-height page — two scrollbars fighting, and no way to see the
+        // list whole. The page is the only scroller now; the header and the
+        // totals bar stay put on their own.
+        <div>
           <table className="fin-table">
             <colgroup>
               {["10%", "14%", "13%", "12%", "8%", "8%", "13%", "15%", "7%"].map((w, i) => (

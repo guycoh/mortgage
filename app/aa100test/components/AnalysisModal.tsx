@@ -143,7 +143,7 @@ function ShareBar({
   if (!shown.length) return null;
   return (
     <div>
-      <div className="fin-share" role="img" aria-label="התפלגות">
+      <div className="fin-split" role="img" aria-label="התפלגות">
         {shown.map((p) => (
           <span
             key={p.label}
