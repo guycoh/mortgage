@@ -19,9 +19,27 @@ import { lookupAccount } from "../../lib/fireberry";
 
 export const dynamic = "force-dynamic";
 
+const GUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+
 export async function GET(req: NextRequest, ctx: { params: Promise<{ fbId: string }> }) {
-  const { fbId } = await ctx.params;
+  const { fbId: raw } = await ctx.params;
   const sp = req.nextUrl.searchParams;
+
+  // Take the GUID from ANYWHERE in the segment rather than demanding the whole
+  // segment be one.
+  //
+  // Fireberry's HTML widget strips <script>, so the record id can only arrive
+  // through a placeholder — and its syntax is not documented anywhere we can
+  // reach: the REST API exposes objects and fields but no views or layouts, and
+  // the widget markup is not stored on the record. Testing candidates one at a
+  // time is a slow loop for whoever is holding the CRM.
+  //
+  // So the button may list several candidate placeholders in one path. Whichever
+  // one Fireberry actually substitutes becomes a GUID; the rest stay literal
+  // text and are simply ignored here. One paste, and it either works or reports
+  // that none of them substituted.
+  const hit = raw.match(GUID);
+  const fbId = hit ? hit[0] : raw;
 
   const deny = (reason: string) =>
     NextResponse.redirect(new URL(`/simulator/denied?r=${reason}`, req.url));
@@ -30,14 +48,13 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ fbId: strin
   // the literal token — "{{accountid}}" — rather than a GUID. That is a
   // configuration mistake, not an access one, and saying so turns a baffling
   // refusal into an instruction.
-  const looksLikeGuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(fbId);
-  if (!looksLikeGuid) {
+  if (!hit) {
     // Echo back what actually arrived. Trying placeholder syntaxes is otherwise
     // a guessing game against a page that only ever says "no"; seeing the raw
     // value tells you immediately whether Fireberry substituted anything.
     // Reflected into JSX, which escapes it, and only ever reached by a value
     // that is definitionally not a real account id.
-    const got = fbId.slice(0, 60);
+    const got = raw.slice(0, 80);
     return NextResponse.redirect(
       new URL(`/simulator/denied?r=notoken&got=${encodeURIComponent(got)}`, req.url)
     );
