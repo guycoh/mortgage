@@ -92,7 +92,18 @@ function nameFor(mix: Mix, summary: ImportSummary, first: boolean): string {
   return mix.mix_name.includes(summary.clientName) ? mix.mix_name : `${mix.mix_name} + ${summary.clientName}`;
 }
 
-export default function Simulator({ lead }: { lead: Lead | null }) {
+export default function Simulator({
+  lead,
+  endpoint = "/api/aa100/mixes",
+}: {
+  lead: Lead | null;
+  /**
+   * Where the board is read and written. /aa100test names the lead in the
+   * request; the Fireberry route uses /api/simulator/mixes, which takes it
+   * from a signed cookie instead so there is no id left to tamper with.
+   */
+  endpoint?: string;
+}) {
   const [mixes, setMixes] = useState<Mix[] | null>(null);
   const [activeMixId, setActiveMixId] = useState<string | null>(null);
   const [compareMixId, setCompareMixId] = useState<string | null>(null);
@@ -151,7 +162,7 @@ export default function Simulator({ lead }: { lead: Lead | null }) {
     }
     let cancelled = false;
     setMixes(null);
-    fetch(`/api/aa100/mixes?lead=${lead.id}`)
+    fetch(endpoint.includes("simulator") ? endpoint : `${endpoint}?lead=${lead.id}`)
       .then((r) => r.json())
       .then((d) => {
         if (cancelled) return;
@@ -175,7 +186,7 @@ export default function Simulator({ lead }: { lead: Lead | null }) {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lead?.id, adopt]);
+  }, [lead?.id, adopt, endpoint]);
 
   useEffect(() => setCompareMixId(null), [activeMixId]);
 
@@ -261,7 +272,7 @@ export default function Simulator({ lead }: { lead: Lead | null }) {
     if (!mixes || !lead) return;
     setSaving(true);
     try {
-      const res = await fetch("/api/aa100/mixes", {
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ lead: lead.id, mixes }),
