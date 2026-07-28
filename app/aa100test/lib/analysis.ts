@@ -700,16 +700,18 @@ function buildFlags(a: Omit<Analysis, "flags">): Flag[] {
     });
   }
   if (a.legal.nonPayment.length) {
-    const blocking = a.legal.nonPayment.filter((n) => n.prevents).length;
+    // The column that decides how much this hurts is "מאפשר העברת מידע ללשכה
+    // בחיווי אשראי": it says the event may be passed to the bureau and shown in
+    // the credit rating a lender actually pulls. An item that stays inside the
+    // report is a conversation; one that reaches the bureau is priced.
+    const toBureau = a.legal.nonPayment.filter((n) => n.allowsBureauTransfer).length;
     push({
       id: "nonpayment",
-      // "מונע או מבטל" is the whole question. An indicator that neither
-      // prevents nor cancels is on the record; one that does is a wall.
-      severity: blocking ? "critical" : "high",
+      severity: toBureau ? "critical" : "high",
       title: "נתונים המעידים על אי עמידה בפירעון",
-      detail: blocking
-        ? `${a.legal.nonPayment.length} רשומות, מתוכן ${blocking} מונעות או מבטלות. זהו הפריט הראשון שבנק יבחן.`
-        : `${a.legal.nonPayment.length} רשומות שאינן מונעות או מבטלות, אך מופיעות בדוח ויידרש הסבר.`,
+      detail: toBureau
+        ? `${a.legal.nonPayment.length} רשומות, מתוכן ${toBureau} ניתנות להעברה ללשכה ומופיעות בחיווי האשראי שהבנק מושך. זהו הפריט הראשון שייבחן.`
+        : `${a.legal.nonPayment.length} רשומות שאינן מועברות ללשכה, אך מופיעות בדוח ויידרש עליהן הסבר.`,
       where: a.legal.nonPayment.map((n) => n.source).filter(Boolean),
     });
   }
@@ -1005,7 +1007,31 @@ function buildFlags(a: Omit<Analysis, "flags">): Flag[] {
 /**
  * Build the whole analysis from one or more reports of the same household.
  */
-export function analyseReports(reports: CreditReport[], fileNames: string[] = []): Analysis {
+export function analyseReports(rawReports: CreditReport[], rawNames: string[] = []): Analysis {
+  // The same PDF dropped twice.
+  //
+  // Line-level merging deliberately refuses to fold two rows from one report
+  // together — two facilities at one bank can genuinely look identical — so a
+  // duplicate report would otherwise double every figure on this screen
+  // silently. A report is identified by whose it is and when it was pulled;
+  // the same person pulled on two different dates is two real snapshots, and
+  // the later one is kept.
+  const seenReport = new Map<string, number>();
+  const reports: CreditReport[] = [];
+  const fileNames: string[] = [];
+  rawReports.forEach((r, i) => {
+    const key = `${r.client?.idNumber ?? ""}|${r.meta?.reportDate ?? ""}|${r.transactions.length}`;
+    const at = seenReport.get(key);
+    if (at !== undefined) {
+      reports[at] = r;
+      fileNames[at] = rawNames[i] ?? fileNames[at] ?? "";
+      return;
+    }
+    seenReport.set(key, reports.length);
+    reports.push(r);
+    fileNames.push(rawNames[i] ?? "");
+  });
+
   // Recency is measured from the report, not from today. A דוח ריכוז נתונים is
   // a snapshot: read a year later, "פניות ב-3 החודשים האחרונים" counted against
   // the wall clock is always zero, which reads as "no credit-seeking" when what

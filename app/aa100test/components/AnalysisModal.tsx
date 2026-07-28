@@ -20,6 +20,7 @@ import { motion } from "motion/react";
 import {
   Bank,
   CalendarBlank,
+  CaretDown,
   Certificate,
   ChartPieSlice,
   Gavel,
@@ -56,25 +57,35 @@ function Section({
   title,
   note,
   children,
+  fold,
 }: {
   id: string;
   icon: React.ReactNode;
   title: string;
   note?: React.ReactNode;
   children: React.ReactNode;
+  /** Reference material: present, but not competing with the findings. */
+  fold?: string;
 }) {
+  const [open, setOpen] = useState(false);
   return (
     <section id={id} className="fin-sec">
       <header className="fin-sec-head">
         <span className="fin-sec-ico">{icon}</span>
         <h3 className="fin-display text-[15px]">{title}</h3>
         {note && (
-          <span className="ms-auto text-[11.5px]" style={{ color: "var(--ink-4)" }}>
+          <span className="text-[11.5px]" style={{ color: "var(--ink-4)" }}>
             {note}
           </span>
         )}
+        {fold && (
+          <button className="fin-btn fin-btn-sm ms-auto" onClick={() => setOpen((o) => !o)}>
+            <CaretDown size={12} weight="bold" style={{ transform: open ? "rotate(180deg)" : undefined, transition: "transform .15s ease" }} />
+            {open ? "הסתרה" : fold}
+          </button>
+        )}
       </header>
-      {children}
+      {(!fold || open) && children}
     </section>
   );
 }
@@ -214,7 +225,7 @@ function ArrearsGrid({ rows }: { rows: { year: string; months: (number | null)[]
 }
 
 /* A debt table whose columns suit the family being shown. */
-type Col = "bank" | "type" | "balance" | "original" | "rate" | "monthly" | "paid" | "term" | "end" | "track" | "limit" | "use" | "status";
+type Col = "bank" | "type" | "balance" | "original" | "rate" | "monthly" | "charge" | "paid" | "term" | "end" | "track" | "limit" | "use" | "status";
 
 const COL_HEAD: Record<Col, string> = {
   bank: "מקור",
@@ -222,7 +233,10 @@ const COL_HEAD: Record<Col, string> = {
   balance: "יתרה",
   original: "סכום מקורי",
   rate: "ריבית",
-  monthly: "חיוב חודשי",
+  // Same field, two different things. On an amortising debt it is a repayment;
+  // on a card it is what the lender charged that month.
+  monthly: "החזר חודשי",
+  charge: "חיוב חודשי",
   paid: "שולם בפועל",
   term: "חודשים",
   end: "סיום",
@@ -232,7 +246,32 @@ const COL_HEAD: Record<Col, string> = {
   status: "סטטוס",
 };
 
-function DebtTable({ lines, cols }: { lines: DebtLine[]; cols: Col[] }) {
+/** Does any row have something to say in this column? */
+function hasData(lines: DebtLine[], c: Col): boolean {
+  const some = (f: (l: DebtLine) => unknown) => lines.some((l) => { const v = f(l); return v !== null && v !== undefined && v !== "" && v !== 0; });
+  switch (c) {
+    case "bank": return true;
+    case "type": return some((l) => l.type);
+    case "balance": return some((l) => l.balance);
+    case "original": return some((l) => l.original);
+    case "rate": return some((l) => l.rate);
+    case "monthly":
+    case "charge": return some((l) => l.monthly);
+    case "paid": return some((l) => l.paidActually);
+    case "term": return some((l) => l.months);
+    case "end": return some((l) => l.endDate);
+    case "track": return some((l) => l.track);
+    case "limit": return some((l) => l.limit);
+    case "use": return some((l) => l.utilization);
+    case "status": return some((l) => l.status);
+  }
+}
+
+function DebtTable({ lines, cols: requested }: { lines: DebtLine[]; cols: Col[] }) {
+  // A column of nothing but em-dashes is furniture. Dropping it costs no
+  // information and takes a visible bite out of how busy the table looks —
+  // revolving facilities in particular rarely price a rate or a term.
+  const cols = requested.filter((c) => hasData(lines, c));
   return (
     <div className="overflow-x-auto">
       <table className="fin-table fin-mini">
@@ -285,6 +324,7 @@ function DebtTable({ lines, cols }: { lines: DebtLine[]; cols: Col[] }) {
                         </td>
                       );
                     case "monthly":
+                    case "charge":
                       return <td key={c}>{l.monthly ? <Money value={l.monthly} block={false} /> : "—"}</td>;
                     case "paid":
                       // Paying less than the charge is the whole point of the
@@ -705,7 +745,7 @@ export default function AnalysisModal({
                   </div>
                 </div>
               )}
-              <DebtTable lines={revolving} cols={["bank", "type", "balance", "limit", "use", "monthly", "paid", "rate"]} />
+              <DebtTable lines={revolving} cols={["bank", "type", "balance", "limit", "use", "charge", "paid", "rate"]} />
             </Section>
           )}
 
@@ -916,6 +956,14 @@ export default function AnalysisModal({
               id="sources"
               icon={<Bank size={15} weight="bold" />}
               title="תמצית הדוח לפי מקור"
+              // Reference. It restates the tables above lender by lender, so it
+              // stays folded unless it disagrees with them — which is exactly
+              // when an advisor needs to look at it.
+              fold={
+                a.reconcile.balanceGap > 500 || a.reconcile.limitGap > 500
+                  ? undefined
+                  : `${a.sources.length} שורות`
+              }
               note={
                 a.reconcile.balanceGap > 500 || a.reconcile.limitGap > 500 ? (
                   <span style={{ color: "var(--neg)" }}>
@@ -996,7 +1044,12 @@ export default function AnalysisModal({
           )}
 
           {/* ------------------------------------------------- report notes */}
-          <Section id="meta" icon={<IdentificationCard size={15} weight="bold" />} title="פרטי הדוח">
+          <Section
+            id="meta"
+            icon={<IdentificationCard size={15} weight="bold" />}
+            title="פרטי הדוח"
+            fold="הצגה"
+          >
             <div className="overflow-x-auto">
               <table className="fin-table fin-mini">
                 <thead>

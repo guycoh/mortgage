@@ -1136,7 +1136,11 @@ tr:hover .fin-act { color: var(--ink-3); }
 }
 
 /* --- compact table: auto widths, non-sticky heads, exceptions tinted --- */
-.fin-mini { table-layout: auto; }
+/* Sized to its content, not stretched to the sheet. A full-width table with
+   eight short numeric columns scatters them across a metre of white and stops
+   being a table you can read across — the row is the unit here, so the columns
+   sit together and the leftover space stays leftover. */
+.fin-mini { table-layout: auto; width: auto; max-width: 100%; }
 .fin-mini th { position: static; z-index: auto; padding: 6px 8px; font-size: 11px; }
 .fin-mini td { padding: 5px 8px; font-size: 12px; text-align: start; white-space: nowrap; }
 .fin-mini tbody tr:hover { background: var(--card-2); }
