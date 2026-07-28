@@ -31,7 +31,17 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ fbId: strin
   // configuration mistake, not an access one, and saying so turns a baffling
   // refusal into an instruction.
   const looksLikeGuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(fbId);
-  if (!looksLikeGuid) return deny("notoken");
+  if (!looksLikeGuid) {
+    // Echo back what actually arrived. Trying placeholder syntaxes is otherwise
+    // a guessing game against a page that only ever says "no"; seeing the raw
+    // value tells you immediately whether Fireberry substituted anything.
+    // Reflected into JSX, which escapes it, and only ever reached by a value
+    // that is definitionally not a real account id.
+    const got = fbId.slice(0, 60);
+    return NextResponse.redirect(
+      new URL(`/simulator/denied?r=notoken&got=${encodeURIComponent(got)}`, req.url)
+    );
+  }
 
   const check = verifyLink(fbId, sp.get("n"), sp.get("exp"), sp.get("sig"));
   if (!check.ok) return deny(check.reason === "expired" ? "expired" : "invalid");
