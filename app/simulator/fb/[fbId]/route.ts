@@ -15,7 +15,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { FB_COOKIE, signCookie, verifyLink } from "../../lib/fblink";
 import { leadForFireberry } from "../../lib/lead";
-import { accountName } from "../../lib/fireberry";
+import { lookupAccount } from "../../lib/fireberry";
 
 export const dynamic = "force-dynamic";
 
@@ -29,10 +29,19 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ fbId: strin
   const check = verifyLink(fbId, sp.get("n"), sp.get("exp"), sp.get("sig"));
   if (!check.ok) return deny(check.reason === "expired" ? "expired" : "invalid");
 
-  // The name is optional in the link — a button that can only supply the record
-  // id signs an empty one, and we read שם לקוח from Fireberry instead. Failing
-  // to get it is not a reason to refuse entry.
-  const name = check.name || (await accountName(check.fbId)) || "";
+  // Ask Fireberry who this is. On an unsigned link the answer is also the
+  // gate: the GUID is the only credential such a link carries, so we open the
+  // board only for an id Fireberry recognises. A made-up GUID gets nothing and,
+  // just as importantly, creates no leads row.
+  //
+  // "We could not ask" is not "no such account". A signed link is trusted on
+  // its signature; an unsigned one is refused, because letting an outage turn
+  // into an open door is exactly the failure worth avoiding.
+  const found = await lookupAccount(check.fbId);
+  if (found.known === false) return deny("invalid");
+  if (found.known === "unknown" && !check.signed) return deny("unavailable");
+
+  const name = check.name || (found.known === true ? found.name : null) || "";
 
   let lead;
   try {

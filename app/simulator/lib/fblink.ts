@@ -36,12 +36,27 @@ function equal(a: string, b: string): boolean {
 }
 
 export type LinkCheck =
-  | { ok: true; fbId: string; name: string }
+  | { ok: true; fbId: string; name: string; signed: boolean }
   | { ok: false; reason: "no-secret" | "missing" | "expired" | "bad-signature" };
 
 /**
- * Verify a link built by the Fireberry button.
- * `exp` is a unix timestamp in seconds.
+ * Verify a link from the Fireberry button.
+ *
+ * An UNSIGNED link is accepted, and that is a deliberate reading of what the id
+ * actually is. The button lives in a Fireberry HTML widget among plain <a href>
+ * links; static HTML cannot compute an HMAC. But it does not need to: the id in
+ * the path is a Fireberry account GUID — 122 bits of randomness. It is not a
+ * sequential lead number that anyone can increment, it is itself the unguessable
+ * part. The route pairs this with an existence check against Fireberry, so a
+ * made-up GUID gets nothing and creates nothing.
+ *
+ * What this model does not defend against is a link LEAKING — a shared
+ * screenshot, a pasted URL. Hence Referrer-Policy: no-referrer on these routes,
+ * and a board URL that carries no id at all once you are through the door.
+ *
+ * A SIGNED link is still held to the signature strictly, expiry included, so if
+ * the widget ever does run scripts the stronger button works with no change
+ * here.
  */
 export function verifyLink(
   fbId: string,
@@ -49,10 +64,15 @@ export function verifyLink(
   exp: string | null,
   sig: string | null
 ): LinkCheck {
+  if (!fbId) return { ok: false, reason: "missing" };
+
+  // No signature offered: the plain-anchor case. The GUID carries the entropy.
+  if (!sig) return { ok: true, fbId, name: name ?? "", signed: false };
+
   const secret = process.env.FB_LINK_SECRET;
-  // Fail closed. A missing secret in production must not mean "let everyone in".
+  // A signature was offered but we cannot check it — refuse rather than shrug.
   if (!secret) return { ok: false, reason: "no-secret" };
-  if (!fbId || !exp || !sig) return { ok: false, reason: "missing" };
+  if (!exp) return { ok: false, reason: "missing" };
 
   const expNum = Number(exp);
   if (!Number.isFinite(expNum)) return { ok: false, reason: "missing" };
@@ -61,7 +81,7 @@ export function verifyLink(
   const expected = hmac(payload(fbId, name ?? "", expNum), secret);
   if (!equal(expected, sig)) return { ok: false, reason: "bad-signature" };
 
-  return { ok: true, fbId, name: name ?? "" };
+  return { ok: true, fbId, name: name ?? "", signed: true };
 }
 
 /** Build a link — used by the test helper and by anything server-side. */
