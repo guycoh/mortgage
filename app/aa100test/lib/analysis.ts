@@ -90,6 +90,9 @@ export interface DebtLine {
   /** Annual nominal %, utilization-weighted across tracks. null when unpriced. */
   rate: number | null;
   monthly: number;
+  /** 201-048 — what actually left the account. Below `monthly` on a card means
+   *  the charge is being rolled rather than cleared. */
+  paidActually: number;
   months: number | null;
   startDate: string;
   endDate: string;
@@ -246,6 +249,24 @@ export interface Analysis {
     shareOfMonthly: number;
   };
   revolving: { limit: number; used: number; utilization: number | null; peak: number };
+  /**
+   * What the cards and the current account actually take out of the household
+   * every month.
+   *
+   * This is the number an advisor is asked for first and the report states
+   * plainly — yet it never reaches the mix, because a revolving facility has no
+   * term to amortise and is dropped on import. Left out, the monthly outgoings
+   * look smaller than they are.
+   */
+  cards: {
+    /** 201-046 across cards and current accounts — the charge. */
+    monthlyCharge: number;
+    /** 201-048 — what was actually paid against it. */
+    paidActually: number;
+    /** Charge minus payment: what rolled into next month. */
+    rolled: number;
+    count: number;
+  };
   behaviour: Behaviour;
   inquiries: Inquiries;
   legal: Legal;
@@ -352,6 +373,7 @@ function toLine(
     limit,
     rate: rate !== null && Number.isFinite(rate) ? rate : null,
     monthly: loan?.displayMonthly ?? num(f["201-046"]),
+    paidActually: num(f["201-048"]),
     months: loan?.months ? Number(loan.months) : null,
     startDate: f["201-016"] ?? "",
     endDate: f["201-018"] ?? "",
@@ -808,6 +830,29 @@ function buildFlags(a: Omit<Analysis, "flags">): Flag[] {
     });
   }
 
+  /* ---- what the plastic costs every month */
+  if (a.cards.monthlyCharge > 0) {
+    const share = a.totals.monthly > 0 ? a.cards.monthlyCharge / a.totals.monthly : 0;
+    push({
+      id: "card-charge",
+      severity: share >= 0.3 ? "medium" : "info",
+      title: "חיוב חודשי בכרטיסי אשראי ומסגרות",
+      detail: `${Math.round(a.cards.monthlyCharge).toLocaleString("en-US")} ₪ בחודש על פני ${a.cards.count} מסגרות${
+        share > 0 ? ` — ${Math.round(share * 100)}% מסך ההחזר החודשי` : ""
+      }. חיוב שאינו מופיע בתמהיל, אך יוצא מהחשבון בכל חודש.`,
+      amount: a.cards.monthlyCharge,
+    });
+  }
+  if (a.cards.rolled > 0) {
+    push({
+      id: "card-rolled",
+      severity: "high",
+      title: "חיוב שלא נפרע במלואו",
+      detail: `${Math.round(a.cards.rolled).toLocaleString("en-US")} ₪ מהחיוב החודשי לא שולמו בפועל וגולגלו קדימה. גלגול אשראי צרכני הוא האשראי היקר ביותר שיש.`,
+      amount: a.cards.rolled,
+    });
+  }
+
   /* ---- price of the consumer debt */
   const expensive = own.filter((l) => l.category === "loan" && (l.rate ?? 0) >= 10);
   if (expensive.length) {
@@ -1053,6 +1098,15 @@ export function analyseReports(reports: CreditReport[], fileNames: string[] = []
       used: revolvingUsed,
       utilization: revolvingLimit > 0 ? Math.round((revolvingUsed / revolvingLimit) * 1000) / 10 : null,
       peak: revolvingRows.reduce((s, l) => s + l.peak, 0),
+    },
+    cards: {
+      monthlyCharge: revolvingRows.reduce((s, l) => s + l.monthly, 0),
+      paidActually: revolvingRows.reduce((s, l) => s + l.paidActually, 0),
+      rolled: Math.max(
+        0,
+        revolvingRows.reduce((s, l) => s + Math.max(0, l.monthly - l.paidActually), 0)
+      ),
+      count: revolvingRows.filter((l) => l.monthly > 0).length,
     },
     behaviour: behaviour(reports, lines),
     inquiries: inquiries(reports, asOf),
