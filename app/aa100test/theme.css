@@ -1091,13 +1091,13 @@ tr:hover .fin-act { color: var(--ink-3); }
 .fin-flag[data-sev="info"] .fin-flag-sev, .fin-flag-sev[data-sev="info"] { background: var(--card-3); color: var(--ink-3); }
 
 /* --- proportions, as one bar --- */
-.fin-share {
+.fin-split {
   display: flex; height: 10px;
   border-radius: 99px; overflow: hidden;
   background: var(--card-3);
 }
-.fin-share > span { display: block; height: 100%; }
-.fin-share > span + span { box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.85); }
+.fin-split > span { display: block; height: 100%; }
+.fin-split > span + span { box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.85); }
 
 /* --- arrears history: month columns, deeper red the older the arrears --- */
 .fin-heat { border-collapse: separate; border-spacing: 2px; font-family: var(--num); }
@@ -1148,3 +1148,14 @@ tr:hover .fin-act { color: var(--ink-3); }
   .fin-sec { break-inside: avoid; }
   .fin-flag { break-inside: avoid; }
 }
+
+/* The unbounded ledger.
+   With the card no longer clipping (so the sticky header and totals bar can
+   hold against the page), the totals row's own corners have to match the card
+   the table now sits flush inside — otherwise a square edge shows through the
+   card's radius. */
+.fin-table tfoot tr:last-child td:first-child { border-end-start-radius: var(--r); }
+.fin-table tfoot tr:last-child td:last-child { border-end-end-radius: var(--r); }
+/* Analysis tables live inside their own scrolling sheet and keep square ends. */
+.fin-mini tfoot tr:last-child td:first-child,
+.fin-mini tfoot tr:last-child td:last-child { border-radius: 0; }
