@@ -1032,41 +1032,59 @@ tr:hover .fin-act { color: var(--ink-3); }
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   border-bottom: 1px solid var(--line);
+  background: linear-gradient(180deg, #fff, var(--card-2));
 }
-@media (max-width: 940px) { .fin-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-.fin-kpi { padding: 9px 14px; }
+@media (max-width: 1040px) { .fin-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.fin-kpi { position: relative; padding: 11px 15px 12px; }
 .fin-kpi + .fin-kpi { border-inline-start: 1px solid var(--line); }
-.fin-kpi[data-tone="neg"] { background: var(--neg-tint); }
-.fin-kpi[data-tone="warn"] { background: var(--warn-tint); }
+/* Tone rides on a hairline above the tile, so an exception is marked without
+   the band turning into a warning panel. */
+.fin-kpi-rule { position: absolute; inset-block-start: 0; inset-inline: 0; height: 2px; background: transparent; }
+.fin-kpi[data-tone="primary"] .fin-kpi-rule { background: var(--primary); }
+.fin-kpi[data-tone="neg"] .fin-kpi-rule { background: var(--neg); }
+.fin-kpi[data-tone="warn"] .fin-kpi-rule { background: #c2700c; }
+.fin-kpi-val { margin-top: 3px; min-height: 26px; }
+.fin-kpi-num { font-size: 21px; font-weight: 800; letter-spacing: -0.02em; }
+/* Reserved even when empty, so five tiles keep one baseline. */
+.fin-kpi-sub { margin-top: 2px; min-height: 14px; font-size: 11px; color: var(--ink-4); }
 
 .fin-navbar {
+  position: sticky;
+  top: 0;
+  z-index: 6;
   display: flex; flex-wrap: wrap; gap: 6px;
-  padding: 8px 14px;
+  padding: 8px 15px;
   border-bottom: 1px solid var(--line);
-  background: var(--card-2);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(6px);
 }
 
-.fin-analysis { padding: 0 14px 20px; }
-.fin-sec { padding: 15px 0; border-bottom: 1px solid var(--line); scroll-margin-top: 6px; }
+.fin-analysis { padding: 0 15px 22px; }
+.fin-sec { padding: 17px 0; border-bottom: 1px solid var(--line); scroll-margin-top: 46px; }
 .fin-sec:last-child { border-bottom: 0; }
-.fin-sec-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.fin-sec-head { display: flex; align-items: center; gap: 8px; margin-bottom: 11px; }
 .fin-sec-ico {
   display: grid; place-items: center; flex: none;
-  width: 24px; height: 24px;
+  width: 23px; height: 23px;
   border-radius: var(--r-sm);
   background: var(--card-3);
-  color: var(--ink-2);
+  color: var(--ink-3);
 }
+
+/* a short row of stated figures — same rhythm as the KPI band, section scale */
+.fin-facts { display: flex; flex-wrap: wrap; gap: 26px; }
 
 /* --- findings: a rule of colour on the leading edge, nothing else shouts --- */
 .fin-flag {
   position: relative;
   display: flex; gap: 10px;
-  padding: 9px 12px 9px 11px;
-  border: 1px solid var(--line-2);
+  padding: 9px 13px 9px 12px;
+  border: 1px solid var(--line);
   border-radius: var(--r-sm);
   background: #fff;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
 }
+.fin-flag:hover { border-color: var(--line-2); box-shadow: 0 1px 0 var(--line-2); }
 .fin-flag::before {
   content: ""; position: absolute; inset-block: -1px; inset-inline-start: -1px;
   width: 3px;
@@ -1080,10 +1098,11 @@ tr:hover .fin-act { color: var(--ink-3); }
 
 .fin-flag-sev {
   align-self: flex-start; flex: none;
+  min-width: 58px;
   padding: 2px 7px;
   border-radius: 99px;
-  font-size: 10.5px; font-weight: 800; letter-spacing: 0.01em;
-  white-space: nowrap;
+  font-size: 10px; font-weight: 800; letter-spacing: 0.02em;
+  text-align: center; white-space: nowrap;
 }
 .fin-flag[data-sev="critical"] .fin-flag-sev, .fin-flag-sev[data-sev="critical"] { background: var(--neg-tint); color: var(--neg); }
 .fin-flag[data-sev="high"] .fin-flag-sev, .fin-flag-sev[data-sev="high"] { background: var(--warn-tint); color: #9a5407; }

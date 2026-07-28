@@ -79,6 +79,14 @@ function Section({
   );
 }
 
+/**
+ * One headline figure.
+ *
+ * Same shape every time — label, number, one line of context — so the band
+ * reads as a row of comparable facts rather than five different cards. Tone is
+ * carried by a hairline above the tile, not by a coloured panel: the exception
+ * is marked without the whole band turning into a warning.
+ */
 function Kpi({
   label,
   value,
@@ -88,17 +96,14 @@ function Kpi({
   label: string;
   value: React.ReactNode;
   sub?: React.ReactNode;
-  tone?: "neg" | "warn";
+  tone?: "neg" | "warn" | "primary";
 }) {
   return (
     <div className="fin-kpi" data-tone={tone}>
+      <div className="fin-kpi-rule" aria-hidden />
       <Label>{label}</Label>
-      <div className="mt-1">{value}</div>
-      {sub && (
-        <div className="mt-0.5 text-[11px]" style={{ color: "var(--ink-4)" }}>
-          {sub}
-        </div>
-      )}
+      <div className="fin-kpi-val">{value}</div>
+      <div className="fin-kpi-sub">{sub ?? " "}</div>
     </div>
   );
 }
@@ -209,7 +214,7 @@ function ArrearsGrid({ rows }: { rows: { year: string; months: (number | null)[]
 }
 
 /* A debt table whose columns suit the family being shown. */
-type Col = "bank" | "type" | "balance" | "original" | "rate" | "monthly" | "term" | "end" | "track" | "limit" | "use" | "status";
+type Col = "bank" | "type" | "balance" | "original" | "rate" | "monthly" | "paid" | "term" | "end" | "track" | "limit" | "use" | "status";
 
 const COL_HEAD: Record<Col, string> = {
   bank: "מקור",
@@ -217,7 +222,8 @@ const COL_HEAD: Record<Col, string> = {
   balance: "יתרה",
   original: "סכום מקורי",
   rate: "ריבית",
-  monthly: "החזר",
+  monthly: "חיוב חודשי",
+  paid: "שולם בפועל",
   term: "חודשים",
   end: "סיום",
   track: "מסלול",
@@ -280,6 +286,22 @@ function DebtTable({ lines, cols }: { lines: DebtLine[]; cols: Col[] }) {
                       );
                     case "monthly":
                       return <td key={c}>{l.monthly ? <Money value={l.monthly} block={false} /> : "—"}</td>;
+                    case "paid":
+                      // Paying less than the charge is the whole point of the
+                      // column, so it is the only state that gets colour.
+                      return (
+                        <td key={c}>
+                          {l.paidActually ? (
+                            <Money
+                              value={l.paidActually}
+                              block={false}
+                              color={l.monthly - l.paidActually > 1 ? "var(--neg)" : undefined}
+                            />
+                          ) : (
+                            "—"
+                          )}
+                        </td>
+                      );
                     case "term":
                       return <td key={c} className="fin-fig">{l.months ?? "—"}</td>;
                     case "end":
@@ -456,38 +478,58 @@ export default function AnalysisModal({
         <div className="fin-kpis">
           <Kpi
             label="סך ההתחייבויות"
-            value={<Money value={a.totals.balance} size={20} weight={800} style={{ textAlign: "start" }} />}
+            tone="primary"
+            value={<Money value={a.totals.balance} size={21} weight={800} style={{ textAlign: "start" }} />}
             sub={`${own.length} התחייבויות פעילות`}
           />
           <Kpi
             label="החזר חודשי"
-            value={<Money value={a.totals.monthly} size={20} weight={800} style={{ textAlign: "start" }} />}
-            sub={a.consumer.shareOfMonthly > 0 ? `${pct(a.consumer.shareOfMonthly)} צרכני` : undefined}
+            value={<Money value={a.totals.monthly} size={21} weight={800} style={{ textAlign: "start" }} />}
+            sub={
+              a.consumer.shareOfMonthly > 0
+                ? `${pct(a.consumer.shareOfMonthly)} מזה הלוואות צרכניות`
+                : "משכנתאות, הלוואות ומסגרות"
+            }
+          />
+          {/* The number an advisor asks for first, and the one the mix cannot
+              show: a revolving facility has no term, so it never reaches the
+              ledger even though it leaves the account every month. */}
+          <Kpi
+            label="חיוב חודשי בכרטיסים"
+            tone={a.cards.rolled > 0 ? "warn" : undefined}
+            value={<Money value={a.cards.monthlyCharge} size={21} weight={800} style={{ textAlign: "start" }} />}
+            sub={
+              a.cards.rolled > 0
+                ? `₪${fmt(a.cards.rolled)} לא נפרעו וגולגלו`
+                : a.cards.count
+                  ? `על פני ${a.cards.count} מסגרות · נפרע במלואו`
+                  : "אין חיוב מדווח"
+            }
           />
           <Kpi
             label="ריבית ממוצעת משוקללת"
             value={
-              <span className="fin-fig text-[20px] font-extrabold">
+              <span className="fin-fig fin-kpi-num">
                 {a.totals.rate === null ? "—" : `${a.totals.rate.toFixed(2)}%`}
               </span>
             }
-            sub={a.mortgage.rate !== null ? `משכנתא ${a.mortgage.rate.toFixed(2)}%` : undefined}
+            sub={
+              a.mortgage.rate !== null
+                ? `משכנתא ${a.mortgage.rate.toFixed(2)}%${a.consumer.rate !== null ? ` · צרכני ${a.consumer.rate.toFixed(2)}%` : ""}`
+                : a.consumer.rate !== null
+                  ? `צרכני ${a.consumer.rate.toFixed(2)}%`
+                  : undefined
+            }
           />
           <Kpi
             label="יתרות בפיגור"
             tone={a.totals.overdue > 0 ? "neg" : undefined}
-            value={<Money value={a.totals.overdue} size={20} weight={800} style={{ textAlign: "start" }} />}
-            sub={a.behaviour.arrearsMonths ? `${a.behaviour.arrearsMonths} חודשי פיגור בהיסטוריה` : "אין פיגור פעיל"}
-          />
-          <Kpi
-            label="ניצול מסגרות"
-            tone={(a.revolving.utilization ?? 0) >= 80 ? "warn" : undefined}
-            value={
-              <span className="fin-fig text-[20px] font-extrabold">
-                {a.revolving.utilization === null ? "—" : `${a.revolving.utilization}%`}
-              </span>
+            value={<Money value={a.totals.overdue} size={21} weight={800} style={{ textAlign: "start" }} />}
+            sub={
+              a.behaviour.arrearsMonths
+                ? `${a.behaviour.arrearsMonths} חודשי פיגור בהיסטוריה`
+                : "אין פיגור פעיל"
             }
-            sub={a.revolving.limit ? `₪${fmt(a.revolving.used)} מתוך ₪${fmt(a.revolving.limit)}` : undefined}
           />
         </div>
 
@@ -635,9 +677,35 @@ export default function AnalysisModal({
               id="revolving"
               icon={<Certificate size={15} weight="fill" />}
               title='מסגרות אשראי וחשבונות עו"ש'
-              note={a.revolving.peak > 0 ? `שיא ניצול בחודש הדיווח ₪${fmt(a.revolving.peak)}` : undefined}
+              note={
+                a.revolving.utilization !== null
+                  ? `ניצול ${a.revolving.utilization}%${a.revolving.peak > 0 ? ` · שיא בחודש הדיווח ₪${fmt(a.revolving.peak)}` : ""}`
+                  : undefined
+              }
             >
-              <DebtTable lines={revolving} cols={["bank", "type", "balance", "limit", "use", "rate", "status"]} />
+              {a.cards.monthlyCharge > 0 && (
+                <div className="fin-facts mb-3">
+                  <div>
+                    <Label>חיוב חודשי</Label>
+                    <Money value={a.cards.monthlyCharge} size={17} weight={800} style={{ textAlign: "start" }} />
+                  </div>
+                  <div>
+                    <Label>שולם בפועל</Label>
+                    <Money value={a.cards.paidActually} size={17} weight={800} style={{ textAlign: "start" }} />
+                  </div>
+                  <div>
+                    <Label>גולגל לחודש הבא</Label>
+                    <Money
+                      value={a.cards.rolled}
+                      size={17}
+                      weight={800}
+                      color={a.cards.rolled > 0 ? "var(--neg)" : undefined}
+                      style={{ textAlign: "start" }}
+                    />
+                  </div>
+                </div>
+              )}
+              <DebtTable lines={revolving} cols={["bank", "type", "balance", "limit", "use", "monthly", "paid", "rate"]} />
             </Section>
           )}
 
