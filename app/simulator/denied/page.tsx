@@ -22,6 +22,12 @@ const TEXT: Record<string, { head: string; body: string }> = {
     head: "משהו השתבש",
     body: "לא הצלחנו לפתוח את התמהיל. נסו שוב, ואם זה חוזר — פנו למנהל המערכת.",
   },
+  notoken: {
+    head: "הכפתור לא העביר מזהה לקוח",
+    body:
+      "נראה שהקישור בכרטיס ב-Fireberry לא מחליף את מזהה הלקוח בערך האמיתי. " +
+      "יש לערוך את הכפתור כך שה-href יסתיים במזהה הרשומה (accountid) ולא בשם השדה עצמו.",
+  },
   unavailable: {
     head: "לא הצלחנו לאמת את הלקוח",
     body: "אין כרגע תקשורת עם Fireberry, ולכן לא ניתן לפתוח את התמהיל. נסו שוב בעוד רגע.",
@@ -38,6 +44,7 @@ export default async function DeniedPage({
   const sp = await searchParams;
   const key = (Array.isArray(sp.r) ? sp.r[0] : sp.r) ?? "invalid";
   const t = TEXT[key] ?? TEXT.invalid;
+  const got = (Array.isArray(sp.got) ? sp.got[0] : sp.got) ?? "";
 
   return (
     <div className="fin-root grid min-h-dvh place-items-center px-6" dir="rtl">
@@ -52,6 +59,23 @@ export default async function DeniedPage({
         <p className="mt-2 text-[13px] leading-relaxed" style={{ color: "var(--ink-3)" }}>
           {t.body}
         </p>
+        {key === "notoken" && got && (
+          <div className="mt-4 text-start">
+            <div className="fin-label mb-1">מה שהתקבל בפועל מהכפתור</div>
+            <code
+              dir="ltr"
+              className="block truncate rounded border px-2.5 py-2 text-[12px]"
+              style={{
+                borderColor: "var(--line-2)",
+                background: "var(--card-2)",
+                fontFamily: "var(--num)",
+                color: "var(--neg)",
+              }}
+            >
+              {got}
+            </code>
+          </div>
+        )}
       </div>
     </div>
   );
