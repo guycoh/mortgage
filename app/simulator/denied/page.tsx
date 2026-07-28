@@ -22,6 +22,10 @@ const TEXT: Record<string, { head: string; body: string }> = {
     head: "משהו השתבש",
     body: "לא הצלחנו לפתוח את התמהיל. נסו שוב, ואם זה חוזר — פנו למנהל המערכת.",
   },
+  unavailable: {
+    head: "לא הצלחנו לאמת את הלקוח",
+    body: "אין כרגע תקשורת עם Fireberry, ולכן לא ניתן לפתוח את התמהיל. נסו שוב בעוד רגע.",
+  },
 };
 
 export const metadata = { title: "אין גישה · סימולטור תמהילים" };
