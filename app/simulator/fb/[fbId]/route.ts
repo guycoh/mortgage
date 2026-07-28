@@ -15,6 +15,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { FB_COOKIE, signCookie, verifyLink } from "../../lib/fblink";
 import { leadForFireberry } from "../../lib/lead";
+import { accountName } from "../../lib/fireberry";
 
 export const dynamic = "force-dynamic";
 
@@ -28,9 +29,14 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ fbId: strin
   const check = verifyLink(fbId, sp.get("n"), sp.get("exp"), sp.get("sig"));
   if (!check.ok) return deny(check.reason === "expired" ? "expired" : "invalid");
 
+  // The name is optional in the link — a button that can only supply the record
+  // id signs an empty one, and we read שם לקוח from Fireberry instead. Failing
+  // to get it is not a reason to refuse entry.
+  const name = check.name || (await accountName(check.fbId)) || "";
+
   let lead;
   try {
-    lead = await leadForFireberry(check.fbId, check.name);
+    lead = await leadForFireberry(check.fbId, name);
   } catch {
     return deny("server");
   }
