@@ -73,7 +73,11 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ fbId: strin
   // into an open door is exactly the failure worth avoiding.
   const found = await lookupAccount(check.fbId);
   if (found.known === false) return deny("invalid");
-  if (found.known === "unknown" && !check.signed) return deny("unavailable");
+  if (found.known === "unknown" && !check.signed) {
+    // A missing token is a deployment that was never rebuilt, not an outage.
+    // Naming it is safe: it says nothing about this client, only about us.
+    return deny(found.why === "no-token" ? "noenv" : "unavailable");
+  }
 
   const name = check.name || (found.known === true ? found.name : null) || "";
 
@@ -85,8 +89,11 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ fbId: strin
   }
   if (!lead) return deny("server");
 
+  // signCookie fails for one reason only: no FB_LINK_SECRET. That is a
+  // deployment that was never configured, not a fault the client can retry
+  // their way out of, so it says so rather than hiding behind "משהו השתבש".
   const cookie = signCookie(lead.id);
-  if (!cookie) return deny("server");
+  if (!cookie) return deny("nosecret");
 
   const res = NextResponse.redirect(new URL("/simulator/board", req.url));
   res.cookies.set(FB_COOKIE, cookie, {

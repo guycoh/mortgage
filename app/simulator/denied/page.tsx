@@ -32,6 +32,19 @@ const TEXT: Record<string, { head: string; body: string }> = {
     head: "לא הצלחנו לאמת את הלקוח",
     body: "אין כרגע תקשורת עם Fireberry, ולכן לא ניתן לפתוח את התמהיל. נסו שוב בעוד רגע.",
   },
+  nosecret: {
+    head: "החתימה של הקישור לא מוגדרת",
+    body:
+      "המשתנה FB_LINK_SECRET חסר בגרסה שרצה כרגע — בלעדיו אי אפשר לחתום על " +
+      "הכניסה לתמהיל. יש להגדיר אותו ב-Vercel (Production) ולבצע Redeploy. " +
+      "הכפתור והחיבור ל-Fireberry תקינים.",
+  },
+  noenv: {
+    head: "החיבור ל-Fireberry לא מוגדר",
+    body:
+      "המשתנה FIREBERRY_TOKEN חסר בגרסה שרצה כרגע. אם הוא כבר הוגדר ב-Vercel — " +
+      "יש לבצע Redeploy, כי משתני סביבה נכנסים לתוקף רק בבנייה חדשה. הכפתור עצמו תקין.",
+  },
 };
 
 export const metadata = { title: "אין גישה · סימולטור תמהילים" };

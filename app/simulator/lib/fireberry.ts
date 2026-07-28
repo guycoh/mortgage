@@ -16,8 +16,13 @@ export type Lookup =
   | { known: true; name: string | null }
   /** Fireberry answered and there is no such account. */
   | { known: false }
-  /** We could not ask — no token, a timeout, an outage. */
-  | { known: "unknown" };
+  /**
+   * We could not ask. `why` separates the two cases that look identical from
+   * the outside and are fixed in completely different places: a missing
+   * FIREBERRY_TOKEN is ours to configure, an outage is Fireberry's to end.
+   * Collapsing them into one message costs an afternoon of guessing.
+   */
+  | { known: "unknown"; why: "no-token" | "unreachable" };
 
 /**
  * Look an account up by GUID.
@@ -32,7 +37,10 @@ export type Lookup =
  */
 export async function lookupAccount(fbId: string): Promise<Lookup> {
   const token = process.env.FIREBERRY_TOKEN;
-  if (!token) return { known: "unknown" };
+  // Note for whoever hits this on Vercel: an env var only reaches builds made
+  // AFTER it was saved. Adding it is not enough — the deployment has to be
+  // rebuilt before process.env can see it.
+  if (!token) return { known: "unknown", why: "no-token" };
 
   try {
     const res = await fetch(`${BASE}/api/record/${ACCOUNT}/${encodeURIComponent(fbId)}`, {
@@ -45,8 +53,8 @@ export async function lookupAccount(fbId: string): Promise<Lookup> {
     // not 404 — so a rejected id means "no such account", while an auth or
     // server failure has to stay "could not ask".
     if (res.status === 400 || res.status === 404) return { known: false };
-    if (res.status === 401 || res.status === 403) return { known: "unknown" };
-    if (!res.ok) return { known: "unknown" };
+    if (res.status === 401 || res.status === 403) return { known: "unknown", why: "unreachable" };
+    if (!res.ok) return { known: "unknown", why: "unreachable" };
 
     const body = (await res.json()) as {
       success?: boolean;
@@ -59,6 +67,6 @@ export async function lookupAccount(fbId: string): Promise<Lookup> {
     return { known: true, name: typeof name === "string" && name.trim() ? name.trim() : null };
   } catch {
     // A timeout or an expired token must not stop someone opening their board.
-    return { known: "unknown" };
+    return { known: "unknown", why: "unreachable" };
   }
 }

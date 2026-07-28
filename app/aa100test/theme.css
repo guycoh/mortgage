@@ -349,6 +349,12 @@
 .fin-btn:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 0 0 var(--line-2); }
 .fin-btn:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: 0 2px 0 var(--line); }
 
+/* Reads as a label, not a control: same chip, nothing to press. Used where the
+   lead is stated rather than chosen — a Fireberry session owns exactly one. */
+.fin-btn[data-static] { cursor: default; background: var(--card-2); box-shadow: none; }
+.fin-btn[data-static]:hover { border-color: var(--line-2); box-shadow: none; color: var(--ink-2); }
+.fin-btn[data-static]:active { transform: none; }
+
 .fin-btn-primary {
   background: linear-gradient(180deg, #4c40dc, var(--primary));
   border-color: var(--primary-deep);

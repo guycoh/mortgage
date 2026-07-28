@@ -33,5 +33,8 @@ export default async function BoardPage() {
   const lead = data?.[0];
   if (!lead) redirect("/simulator/denied?r=invalid");
 
-  return <Simulator lead={lead} endpoint="/api/simulator/mixes" />;
+  // locked: this session was granted one lead. The picker would navigate to
+  // /aa100test/<id>, which is unauthenticated and takes its id from the URL —
+  // a door out of the very scoping the cookie exists to enforce.
+  return <Simulator lead={lead} endpoint="/api/simulator/mixes" locked />;
 }
