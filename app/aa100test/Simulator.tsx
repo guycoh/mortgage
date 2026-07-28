@@ -30,12 +30,14 @@ import {
   X,
   FilePdf,
   Stethoscope,
+  UserFocus,
 } from "@phosphor-icons/react";
 import type { LoanPath } from "@/app/data/hooks/useLoanPaths";
 import { paths as STATIC_PATHS } from "@/app/data/paths";
 import { calculateLoan } from "@/app/private/crm/leads/simulators/components/calculate/loanCalculators";
 import Bay from "./components/Bay";
 import AnalysisModal from "./components/AnalysisModal";
+import ClientSummaryModal from "./components/ClientSummaryModal";
 import ReportViewerModal from "./components/ReportViewerModal";
 import { analyseReports } from "./lib/analysis";
 import { useRouter } from "next/navigation";
@@ -137,6 +139,7 @@ export default function Simulator({
   const [reports, setReports] = useState<ImportSummary[]>([]);
   const [showDoc, setShowDoc] = useState(false);
   const [showAnalysis, setShowAnalysis] = useState(false);
+  const [showClient, setShowClient] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [saving, setSaving] = useState(false);
   const router = useRouter();
@@ -636,6 +639,14 @@ export default function Simulator({
             <>
               <button
                 className="fin-btn fin-btn-sm ms-auto"
+                onClick={() => setShowClient(true)}
+                title="עמוד אחד להראות ללקוח — מה יש לו, כמה זה עולה בחודש, ומה לשים לב אליו"
+              >
+                <UserFocus size={14} weight="bold" style={{ color: "var(--pos)" }} />
+                סיכום ללקוח
+              </button>
+              <button
+                className="fin-btn fin-btn-sm"
                 onClick={() => setShowAnalysis(true)}
                 title="ניתוח מלא של חיווי האשראי — פיגורים, הליכים, חשיפות וסיכונים"
               >
@@ -762,6 +773,16 @@ export default function Simulator({
 
       {/* Derived on open rather than on import: the analysis is a read of the
           reports, and recomputing it costs nothing next to parsing the PDF. */}
+      {showClient && reports.length > 0 && (
+        <ClientSummaryModal
+          analysis={analyseReports(
+            reports.map((r) => r.report),
+            reports.map((r) => r.fileName)
+          )}
+          onClose={() => setShowClient(false)}
+        />
+      )}
+
       {showAnalysis && reports.length > 0 && (
         <AnalysisModal
           analysis={analyseReports(
