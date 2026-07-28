@@ -1081,8 +1081,8 @@ tr:hover .fin-act { color: var(--ink-3); }
 /* --- findings: a rule of colour on the leading edge, nothing else shouts --- */
 .fin-flag {
   position: relative;
-  display: flex; gap: 10px;
-  padding: 9px 13px 9px 12px;
+  display: flex; gap: 9px;
+  padding: 7px 12px 8px;
   border: 1px solid var(--line);
   border-radius: var(--r-sm);
   background: #fff;
@@ -1103,6 +1103,7 @@ tr:hover .fin-act { color: var(--ink-3); }
 .fin-flag-sev {
   align-self: flex-start; flex: none;
   min-width: 58px;
+  margin-top: 1px;
   padding: 2px 7px;
   border-radius: 99px;
   font-size: 10px; font-weight: 800; letter-spacing: 0.02em;
@@ -1229,10 +1230,12 @@ tr:hover .fin-act { color: var(--ink-3); }
 }
 .fin-cs-colspacer { width: 30px; flex: none; }
 
-/* Fixed width and a shared right edge, so every figure lines up down the page
-   instead of drifting with the width of its own digits. */
-.fin-cs-amt { flex: none; width: 104px; text-align: end; }
-.fin-cs-cols .fin-cs-amt { text-align: end; }
+/* Fixed width and a shared edge, so every figure lines up down the page instead
+   of drifting with the width of its own digits.
+   `start`, not `end`: Money is direction:ltr and text-align:right, which lands
+   on the RTL column's start edge. A header set to `end` sat against the far
+   side and read as belonging to the wrong column. */
+.fin-cs-amt { flex: none; width: 104px; text-align: start; }
 
 .fin-cs-more { padding: 8px 2px; font-size: 12.5px; color: var(--ink-3); }
 
@@ -1284,12 +1287,19 @@ tr:hover .fin-act { color: var(--ink-3); }
   border-color: var(--primary);
   box-shadow: 0 0 0 3px var(--primary-tint);
 }
+/* Taken out of flow entirely. Held in the layout at opacity 0 it reserved a
+   line on every card — the height of the affordance was being paid whether or
+   not anyone was hovering, on all ten of them. The empty side of the card is
+   where it belongs anyway: the text is right-aligned, so nothing is there. */
 .fin-flag-go {
+  position: absolute;
+  inset-inline-end: 12px;
+  bottom: 7px;
   display: inline-flex; align-items: center; gap: 3px;
-  margin-top: 5px;
   font-size: 11px; font-weight: 800; color: var(--primary);
   opacity: 0; transform: translateX(4px);
   transition: opacity 0.16s ease, transform 0.16s ease;
+  pointer-events: none;
 }
 .fin-flag[data-go]:hover .fin-flag-go,
 .fin-flag[data-go]:focus-visible .fin-flag-go { opacity: 1; transform: translateX(0); }
