@@ -1182,3 +1182,68 @@ tr:hover .fin-act { color: var(--ink-3); }
 /* Analysis tables live inside their own scrolling sheet and keep square ends. */
 .fin-mini tfoot tr:last-child td:first-child,
 .fin-mini tfoot tr:last-child td:last-child { border-radius: 0; }
+
+/* ==================================================== סיכום ללקוח */
+/* A different reader from the analysis: someone seeing their own finances laid
+   out for the first time, across a desk. Bigger type, fewer figures, and the
+   only colour is the one that means "look at this". */
+
+.fin-cs { padding: 4px 16px 14px; }
+
+.fin-cs-group { padding: 12px 0 4px; }
+.fin-cs-group + .fin-cs-group { border-top: 1px solid var(--line); }
+.fin-cs-title {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 4px;
+  font-family: var(--display, var(--ui));
+  font-size: 14px; font-weight: 800; letter-spacing: -0.01em;
+  color: var(--ink-2);
+}
+.fin-cs-title::before {
+  content: ""; width: 9px; height: 9px; border-radius: 3px;
+  background: var(--fam); flex: none;
+}
+
+.fin-cs-row {
+  display: flex; align-items: center; gap: 11px;
+  padding: 9px 2px;
+  border-bottom: 1px solid var(--line);
+}
+.fin-cs-row:last-child { border-bottom: 0; }
+.fin-cs-bank { font-size: 15px; font-weight: 700; color: var(--ink); letter-spacing: -0.01em; }
+.fin-cs-meta { margin-top: 1px; font-size: 12px; color: var(--ink-4); }
+.fin-cs-warn { color: var(--neg); font-weight: 700; }
+
+.fin-cs-amt { flex: none; min-width: 96px; text-align: start; }
+.fin-cs-cap { display: block; margin-top: 1px; font-size: 10.5px; color: var(--ink-4); }
+
+.fin-cs-more { padding: 8px 2px; font-size: 12.5px; color: var(--ink-3); }
+
+/* The worries. Last, so they land after the facts rather than instead of them. */
+.fin-cs-worry {
+  margin-top: 12px;
+  padding: 11px 13px;
+  border: 1px solid var(--neg-line);
+  border-radius: var(--r);
+  background: var(--neg-tint);
+}
+.fin-cs-worry-head {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 13.5px; font-weight: 800; color: var(--neg);
+}
+.fin-cs-worry ul { margin-top: 6px; display: grid; gap: 4px; }
+.fin-cs-worry li {
+  position: relative; padding-inline-start: 14px;
+  font-size: 13px; line-height: 1.5; color: #7d1229;
+}
+.fin-cs-worry li::before {
+  content: ""; position: absolute; inset-inline-start: 3px; top: 8px;
+  width: 5px; height: 5px; border-radius: 99px; background: var(--neg);
+}
+
+.fin-cs-foot {
+  display: flex; align-items: flex-end; justify-content: space-between; gap: 16px;
+  padding: 12px 16px;
+  border-top: 2px solid var(--ink);
+  background: linear-gradient(180deg, #fff, var(--card-3));
+}
