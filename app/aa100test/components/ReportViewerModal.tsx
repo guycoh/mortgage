@@ -1,0 +1,139 @@
+"use client";
+
+// The original document, on screen.
+//
+// The ledger is a reading of the report; sometimes you need the report. Rather
+// than send the advisor back to their downloads folder, the dropped PDF is kept
+// in memory for the session and rendered here by the browser's own viewer —
+// which brings page navigation, zoom, search and text selection for free.
+//
+// Nothing is uploaded. The object URL points at the File the user dropped, and
+// it is revoked when the modal closes.
+
+import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
+import { motion } from "motion/react";
+import { DownloadSimple, IdentificationCard, X } from "@phosphor-icons/react";
+import type { ImportSummary } from "../lib/credit";
+
+export default function ReportViewerModal({
+  reports,
+  onClose,
+}: {
+  reports: ImportSummary[];
+  onClose: () => void;
+}) {
+  const [active, setActive] = useState(0);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = "";
+    };
+  }, [onClose]);
+
+  // One URL per file, revoked together on unmount. Building them during render
+  // would leak an object URL on every unrelated re-render.
+  const urls = useMemo(
+    () => reports.map((r) => (r.file ? URL.createObjectURL(r.file) : "")),
+    [reports]
+  );
+  useEffect(() => () => urls.forEach((u) => u && URL.revokeObjectURL(u)), [urls]);
+
+  const current = reports[active];
+  const url = urls[active];
+
+  return createPortal(
+    <div
+      dir="rtl"
+      className="fin-vars fixed inset-0 z-[120] grid place-items-center p-4 backdrop-blur-[2px]"
+      style={{ background: "rgba(14,21,36,.55)" }}
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ opacity: 0, y: 10, scale: 0.99 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+        className="fin-card flex h-[92vh] w-full max-w-6xl flex-col overflow-hidden"
+        style={{ boxShadow: "var(--shadow-lift)" }}
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label="חיווי אשראי"
+      >
+        <header className="fin-head">
+          <h2 className="fin-title">חיווי אשראי</h2>
+
+          {reports.length > 1 ? (
+            <div className="flex flex-wrap items-center gap-1.5">
+              {reports.map((r, i) => (
+                <button
+                  key={`${r.clientId}-${i}`}
+                  className="fin-tab"
+                  data-on={i === active || undefined}
+                  onClick={() => setActive(i)}
+                >
+                  <IdentificationCard size={13} />
+                  {r.clientName || `דוח ${i + 1}`}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <span className="fin-chip" style={{ color: "var(--ink-3)" }}>
+              <span className="truncate" style={{ maxWidth: 260 }} title={current?.fileName}>
+                {current?.fileName || "—"}
+              </span>
+            </span>
+          )}
+
+          {current?.reportDate && (
+            <span className="text-[11.5px]" style={{ color: "var(--ink-4)" }}>
+              דוח מ־{current.reportDate}
+            </span>
+          )}
+
+          <div className="ms-auto flex items-center gap-1.5">
+            {url && (
+              <a
+                className="fin-btn fin-btn-sm"
+                href={url}
+                download={current?.fileName || "credit-report.pdf"}
+              >
+                <DownloadSimple size={13} weight="bold" />
+                הורדה
+              </a>
+            )}
+            <button className="fin-act" onClick={onClose} aria-label="סגירה">
+              <X size={15} weight="bold" />
+            </button>
+          </div>
+        </header>
+
+        <div className="min-h-0 flex-1" style={{ background: "var(--bg-2)" }}>
+          {url ? (
+            <iframe
+              key={url}
+              src={`${url}#view=FitH`}
+              title={current?.fileName || "חיווי אשראי"}
+              className="h-full w-full"
+              style={{ border: 0, display: "block" }}
+            />
+          ) : (
+            <div className="grid h-full place-items-center px-6 text-center">
+              <div>
+                <div className="fin-display text-[16px]">הקובץ אינו זמין לצפייה</div>
+                <p className="mt-1.5 text-[12.5px]" style={{ color: "var(--ink-3)" }}>
+                  הדוח נטען בהפעלה קודמת של הדף. גררו אותו שוב כדי לצפות במסמך המקורי.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      </motion.div>
+    </div>,
+    document.body
+  );
+}

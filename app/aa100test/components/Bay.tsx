@@ -69,7 +69,9 @@ export default function Bay({
           );
           return;
         }
-        onImport(summary);
+        // Keep the file itself: the analyst reads the original alongside the
+        // analysis, and re-picking it just to look at it is friction.
+        onImport({ ...summary, file: pdf });
       } catch (e) {
         setError((e as Error)?.message || "לא הצלחנו לקרוא את הדוח.");
       } finally {

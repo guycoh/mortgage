@@ -1022,3 +1022,129 @@ tr:hover .fin-act { color: var(--ink-3); }
   box-shadow: var(--shadow-lift);
   font-size: 12.5px; font-weight: 700;
 }
+
+/* ==================================================== חיווי אשראי — ניתוח */
+/* The analysis modal. Colour is spent only on severity and on family identity;
+   every table stays black on white so the exceptions are the only things that
+   catch the eye. */
+
+.fin-kpis {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  border-bottom: 1px solid var(--line);
+}
+@media (max-width: 940px) { .fin-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.fin-kpi { padding: 9px 14px; }
+.fin-kpi + .fin-kpi { border-inline-start: 1px solid var(--line); }
+.fin-kpi[data-tone="neg"] { background: var(--neg-tint); }
+.fin-kpi[data-tone="warn"] { background: var(--warn-tint); }
+
+.fin-navbar {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--line);
+  background: var(--card-2);
+}
+
+.fin-analysis { padding: 0 14px 20px; }
+.fin-sec { padding: 15px 0; border-bottom: 1px solid var(--line); scroll-margin-top: 6px; }
+.fin-sec:last-child { border-bottom: 0; }
+.fin-sec-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.fin-sec-ico {
+  display: grid; place-items: center; flex: none;
+  width: 24px; height: 24px;
+  border-radius: var(--r-sm);
+  background: var(--card-3);
+  color: var(--ink-2);
+}
+
+/* --- findings: a rule of colour on the leading edge, nothing else shouts --- */
+.fin-flag {
+  position: relative;
+  display: flex; gap: 10px;
+  padding: 9px 12px 9px 11px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  background: #fff;
+}
+.fin-flag::before {
+  content: ""; position: absolute; inset-block: -1px; inset-inline-start: -1px;
+  width: 3px;
+  border-start-start-radius: var(--r-sm); border-end-start-radius: var(--r-sm);
+}
+.fin-flag[data-sev="critical"]::before { background: var(--neg); }
+.fin-flag[data-sev="high"]::before { background: #c2700c; }
+.fin-flag[data-sev="medium"]::before { background: var(--warn-line); }
+.fin-flag[data-sev="info"]::before { background: var(--line-2); }
+.fin-flag[data-sev="critical"] { border-color: var(--neg-line); background: #fffafb; }
+
+.fin-flag-sev {
+  align-self: flex-start; flex: none;
+  padding: 2px 7px;
+  border-radius: 99px;
+  font-size: 10.5px; font-weight: 800; letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+.fin-flag[data-sev="critical"] .fin-flag-sev, .fin-flag-sev[data-sev="critical"] { background: var(--neg-tint); color: var(--neg); }
+.fin-flag[data-sev="high"] .fin-flag-sev, .fin-flag-sev[data-sev="high"] { background: var(--warn-tint); color: #9a5407; }
+.fin-flag[data-sev="medium"] .fin-flag-sev, .fin-flag-sev[data-sev="medium"] { background: var(--card-3); color: var(--warn); }
+.fin-flag[data-sev="info"] .fin-flag-sev, .fin-flag-sev[data-sev="info"] { background: var(--card-3); color: var(--ink-3); }
+
+/* --- proportions, as one bar --- */
+.fin-share {
+  display: flex; height: 10px;
+  border-radius: 99px; overflow: hidden;
+  background: var(--card-3);
+}
+.fin-share > span { display: block; height: 100%; }
+.fin-share > span + span { box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.85); }
+
+/* --- arrears history: month columns, deeper red the older the arrears --- */
+.fin-heat { border-collapse: separate; border-spacing: 2px; font-family: var(--num); }
+.fin-heat th {
+  position: static; z-index: auto;
+  padding: 0 2px;
+  border: 0; background: transparent;
+  font-size: 10px; font-weight: 700; color: var(--ink-4);
+  text-align: center; white-space: nowrap;
+}
+.fin-heat td {
+  width: 28px; height: 20px;
+  padding: 0;
+  border: 0; border-radius: 3px;
+  background: var(--card-3);
+  text-align: center; font-size: 10.5px; font-weight: 800; color: #6b3a12;
+}
+
+/* --- compact table: auto widths, non-sticky heads, exceptions tinted --- */
+.fin-mini { table-layout: auto; }
+.fin-mini th { position: static; z-index: auto; padding: 6px 8px; font-size: 11px; }
+.fin-mini td { padding: 5px 8px; font-size: 12px; text-align: start; white-space: nowrap; }
+.fin-mini tbody tr:hover { background: var(--card-2); }
+.fin-mini tbody tr[data-bad] { background: var(--neg-tint); }
+.fin-mini tbody tr[data-bad]:hover { background: #fbdfe6; }
+.fin-mini tfoot td {
+  position: static;
+  padding: 8px; font-size: 12.5px;
+  border-top: 2px solid var(--ink);
+  background: var(--card-3);
+}
+
+/* --- on paper, the analysis is the page --- */
+@media print {
+  body > *:not(.fin-printable) { display: none !important; }
+  .fin-printable {
+    position: static !important; inset: auto !important;
+    display: block !important; padding: 0 !important;
+    background: #fff !important; backdrop-filter: none !important;
+  }
+  .fin-printable .fin-card {
+    max-width: none !important; width: auto !important;
+    height: auto !important; max-height: none !important;
+    border: 0 !important; box-shadow: none !important;
+  }
+  .fin-analysis { height: auto !important; overflow: visible !important; }
+  .fin-navbar, .fin-noprint { display: none !important; }
+  .fin-sec { break-inside: avoid; }
+  .fin-flag { break-inside: avoid; }
+}

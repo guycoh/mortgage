@@ -156,6 +156,17 @@ export interface ImportSummary {
   clientId: string;
   reportDate: string;
   fileName: string;
+  /**
+   * The whole parsed report, kept rather than discarded after the rows are
+   * built. The mix needs four numbers per debt; the analysis needs arrears
+   * history, remarks, proceedings and inquiries — none of which survive the
+   * conversion to Loan rows.
+   *
+   * Client-side only. Only `mixes` is ever sent to the API.
+   */
+  report: CreditReport;
+  /** The dropped PDF itself, so it can be read on screen without re-uploading. */
+  file?: File;
   /** Debts present in the report but not carried over (cards, overdrafts…). */
   skipped: { label: string; count: number; balance: number }[];
   /** How many imported rows are guaranteed rather than owed. */
@@ -213,6 +224,7 @@ export function importReportToLoans(
     clientId: report.client?.idNumber ?? "",
     reportDate: report.meta?.reportDate ?? "",
     fileName,
+    report,
     skipped: Array.from(skippedMap.entries()).map(([label, v]) => ({ label, ...v })),
     guaranteed: loans.filter((l) => l.is_guarantor).length,
     totalBalance: loans.reduce((s, l) => s + l.amount, 0),
