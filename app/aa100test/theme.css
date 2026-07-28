@@ -1035,7 +1035,11 @@ tr:hover .fin-act { color: var(--ink-3); }
   background: linear-gradient(180deg, #fff, var(--card-2));
 }
 @media (max-width: 1040px) { .fin-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-.fin-kpi { position: relative; padding: 11px 15px 12px; }
+/* Label, figure and note all hug the same edge. Money is direction:ltr, so its
+   own text-align:right lands on the RTL tile's start edge — the same side the
+   Hebrew label starts from. Anything else zig-zags down the band. */
+.fin-kpi { position: relative; padding: 12px 16px 13px; text-align: start; }
+.fin-kpi .fin-label { font-size: 12px; letter-spacing: 0.01em; color: var(--ink-3); }
 .fin-kpi + .fin-kpi { border-inline-start: 1px solid var(--line); }
 /* Tone rides on a hairline above the tile, so an exception is marked without
    the band turning into a warning panel. */
@@ -1043,10 +1047,10 @@ tr:hover .fin-act { color: var(--ink-3); }
 .fin-kpi[data-tone="primary"] .fin-kpi-rule { background: var(--primary); }
 .fin-kpi[data-tone="neg"] .fin-kpi-rule { background: var(--neg); }
 .fin-kpi[data-tone="warn"] .fin-kpi-rule { background: #c2700c; }
-.fin-kpi-val { margin-top: 3px; min-height: 26px; }
-.fin-kpi-num { font-size: 21px; font-weight: 800; letter-spacing: -0.02em; }
+.fin-kpi-val { margin-top: 4px; min-height: 30px; }
+.fin-kpi-num { font-size: 24px; font-weight: 800; letter-spacing: -0.02em; }
 /* Reserved even when empty, so five tiles keep one baseline. */
-.fin-kpi-sub { margin-top: 2px; min-height: 14px; font-size: 11px; color: var(--ink-4); }
+.fin-kpi-sub { margin-top: 3px; min-height: 16px; font-size: 12px; color: var(--ink-4); }
 
 .fin-navbar {
   position: sticky;
@@ -1211,11 +1215,24 @@ tr:hover .fin-act { color: var(--ink-3); }
 }
 .fin-cs-row:last-child { border-bottom: 0; }
 .fin-cs-bank { font-size: 15px; font-weight: 700; color: var(--ink); letter-spacing: -0.01em; }
-.fin-cs-meta { margin-top: 1px; font-size: 12px; color: var(--ink-4); }
+/* Was --ink-4. The line carries rates and terms now, which are facts, not
+   footnotes — it has to be read, not skimmed past. */
+.fin-cs-meta { margin-top: 2px; font-size: 12.5px; color: var(--ink-3); }
 .fin-cs-warn { color: var(--neg); font-weight: 700; }
 
-.fin-cs-amt { flex: none; min-width: 96px; text-align: start; }
-.fin-cs-cap { display: block; margin-top: 1px; font-size: 10.5px; color: var(--ink-4); }
+/* One header per group, sitting over its column. */
+.fin-cs-cols {
+  display: flex; align-items: center; gap: 11px;
+  padding: 0 2px 4px;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.01em;
+  color: var(--ink-3);
+}
+.fin-cs-colspacer { width: 30px; flex: none; }
+
+/* Fixed width and a shared right edge, so every figure lines up down the page
+   instead of drifting with the width of its own digits. */
+.fin-cs-amt { flex: none; width: 104px; text-align: end; }
+.fin-cs-cols .fin-cs-amt { text-align: end; }
 
 .fin-cs-more { padding: 8px 2px; font-size: 12.5px; color: var(--ink-3); }
 
@@ -1246,4 +1263,58 @@ tr:hover .fin-act { color: var(--ink-3); }
   padding: 12px 16px;
   border-top: 2px solid var(--ink);
   background: linear-gradient(180deg, #fff, var(--card-3));
+}
+
+/* Footer captions read as labels, not fine print. */
+.fin-cs-foot-cap { font-size: 11.5px; font-weight: 700; color: var(--ink-3); margin-bottom: 2px; }
+
+/* ---------------------------------- a finding points at its own evidence */
+/* A finding that states a number without showing the rows behind it asks to be
+   taken on trust. These are clickable, and the affordance only appears on
+   approach so the list stays a list rather than a wall of buttons. */
+.fin-flag[data-go] { cursor: pointer; }
+.fin-flag[data-go]:hover {
+  border-color: var(--edge);
+  box-shadow: 0 2px 10px -4px rgba(14, 21, 36, 0.22);
+  transform: translateY(-1px);
+}
+.fin-flag[data-go]:active { transform: translateY(0); }
+.fin-flag[data-go]:focus-visible {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-tint);
+}
+.fin-flag-go {
+  display: inline-flex; align-items: center; gap: 3px;
+  margin-top: 5px;
+  font-size: 11px; font-weight: 800; color: var(--primary);
+  opacity: 0; transform: translateX(4px);
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+.fin-flag[data-go]:hover .fin-flag-go,
+.fin-flag[data-go]:focus-visible .fin-flag-go { opacity: 1; transform: translateX(0); }
+
+/* The landing. Bright for a moment, then gone — a pointer that never fades
+   just becomes another colour on the page. */
+@keyframes fin-lit-sec {
+  0%   { background: var(--primary-tint); }
+  70%  { background: var(--primary-tint); }
+  100% { background: transparent; }
+}
+@keyframes fin-lit-row {
+  0%   { background: #fde9b0; }
+  70%  { background: #fdf3d6; }
+  100% { background: transparent; }
+}
+.fin-sec[data-hl] {
+  animation: fin-lit-sec 2.6s ease-out;
+  border-radius: var(--r-sm);
+}
+.fin-mini tbody tr[data-hl] {
+  animation: fin-lit-row 2.6s ease-out;
+  box-shadow: inset 0 0 0 9999px transparent;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fin-sec[data-hl], .fin-mini tbody tr[data-hl] { animation-duration: 0.01ms; }
+  .fin-flag[data-go]:hover { transform: none; }
 }
