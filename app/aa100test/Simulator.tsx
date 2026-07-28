@@ -28,11 +28,16 @@ import {
   UserCircle,
   WarningCircle,
   X,
+  FilePdf,
+  Stethoscope,
 } from "@phosphor-icons/react";
 import type { LoanPath } from "@/app/data/hooks/useLoanPaths";
 import { paths as STATIC_PATHS } from "@/app/data/paths";
 import { calculateLoan } from "@/app/private/crm/leads/simulators/components/calculate/loanCalculators";
 import Bay from "./components/Bay";
+import AnalysisModal from "./components/AnalysisModal";
+import ReportViewerModal from "./components/ReportViewerModal";
+import { analyseReports } from "./lib/analysis";
 import { useRouter } from "next/navigation";
 import LeadPicker, { type Lead } from "./components/LeadPicker";
 import Ledger from "./components/Ledger";
@@ -130,6 +135,8 @@ export default function Simulator({
   const [saved, setSaved] = useState("");
   /** Reports folded into the active mix, oldest first. */
   const [reports, setReports] = useState<ImportSummary[]>([]);
+  const [showDoc, setShowDoc] = useState(false);
+  const [showAnalysis, setShowAnalysis] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [saving, setSaving] = useState(false);
   const router = useRouter();
@@ -623,8 +630,32 @@ export default function Simulator({
             תמהיל
           </button>
 
+          {/* The report's own findings, and the report itself. Both only exist
+              once something has been dropped, so they appear with the data. */}
+          {reports.length > 0 && (
+            <>
+              <button
+                className="fin-btn fin-btn-sm ms-auto"
+                onClick={() => setShowAnalysis(true)}
+                title="ניתוח מלא של חיווי האשראי — פיגורים, הליכים, חשיפות וסיכונים"
+              >
+                <Stethoscope size={14} weight="bold" style={{ color: "var(--primary)" }} />
+                ניתוח חיווי
+              </button>
+              <button
+                className="fin-btn fin-btn-sm"
+                onClick={() => setShowDoc(true)}
+                disabled={!reports.some((r) => r.file)}
+                title={reports.some((r) => r.file) ? "צפייה במסמך המקורי" : "המסמך אינו זמין בהפעלה הזו"}
+              >
+                <FilePdf size={14} weight="fill" style={{ color: "var(--neg)" }} />
+                צפייה בחיווי
+              </button>
+            </>
+          )}
+
           <button
-            className="fin-btn fin-btn-excel ms-auto"
+            className={`fin-btn fin-btn-excel${reports.length ? "" : " ms-auto"}`}
             onClick={exportExcel}
             disabled={!loans.length || exporting}
             aria-busy={exporting}
@@ -722,6 +753,22 @@ export default function Simulator({
           }
           annualInflation={annualInflation}
           onClose={() => setSchedFor(null)}
+        />
+      )}
+
+      {showDoc && reports.length > 0 && (
+        <ReportViewerModal reports={reports} onClose={() => setShowDoc(false)} />
+      )}
+
+      {/* Derived on open rather than on import: the analysis is a read of the
+          reports, and recomputing it costs nothing next to parsing the PDF. */}
+      {showAnalysis && reports.length > 0 && (
+        <AnalysisModal
+          analysis={analyseReports(
+            reports.map((r) => r.report),
+            reports.map((r) => r.fileName)
+          )}
+          onClose={() => setShowAnalysis(false)}
         />
       )}
     </div>
