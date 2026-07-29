@@ -328,10 +328,18 @@ export function parseJerusalem(pages: RawPage[], dataPages: number[]): BankState
       );
     } else if (Math.abs(gap) > 1) {
       warnings.push(
-        `היתרה לסילוק בתיק גבוהה ב-${Math.round(gap).toLocaleString("en-US")} ₪ מסכום החלקים — עמלה תפעולית ברמת התיק, שאינה משויכת לחלק.`
+        `היתרה לסילוק בתיק כוללת עמלה תפעולית של ${Math.round(gap).toLocaleString("en-US")} ₪ ברמת התיק, שאינה משויכת לחלק.`
       );
     }
   }
+
+  // This lender names the fee only in its explanatory pages ("תשלום חד פעמי שלא
+  // יעלה על ₪ 60 … בגין העלות התפעולית"), never as a field. The residual between
+  // its printed file payoff and the sum of the parts IS that fee, and the cap
+  // stated in the document is what makes the identification safe rather than a
+  // guess: anything larger is a missed page and is reported as one.
+  const residual = printedPayoff ? Math.round((printedPayoff - sumPayoff) * 100) / 100 : 0;
+  const operationalFee = residual > 0 && residual <= 200 ? residual : null;
 
   const loan: BankLoan = {
     loanNumber,
@@ -343,6 +351,7 @@ export function parseJerusalem(pages: RawPage[], dataPages: number[]): BankState
       monthly: headerFigure(pages[0].items, "ההחזר החודשי"),
       breakFee: null,
       forecastRate: null,
+      operationalFee,
     },
   };
 
@@ -359,7 +368,7 @@ export function parseJerusalem(pages: RawPage[], dataPages: number[]): BankState
       balance: tranches.reduce((s, t) => s + (t.balance ?? 0), 0),
       payoff: sumPayoff,
       monthly: tranches.reduce((s, t) => s + (t.monthly ?? 0), 0),
-      breakFee: tranches.reduce((s, t) => s + (t.breakFee ?? 0), 0),
+      breakFee: tranches.reduce((s, t) => s + (t.breakFee ?? 0), 0) + (operationalFee ?? 0),
     },
     warnings,
   };

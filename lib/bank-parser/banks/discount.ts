@@ -232,6 +232,8 @@ export function parseDiscount(
         monthly: tranche.monthly,
         breakFee: tranche.breakFee,
         forecastRate: tranche.forecastRate,
+        // This template itemises it per loan, so there is nothing to reconcile.
+        operationalFee: num(g("עמלה תיפעולית")),
       },
     });
   }

@@ -208,6 +208,7 @@ export function parseLeumi(pages: RawPage[], dataPages: number[]): BankStatement
   const tranches: BankTranche[] = [];
   let printedTotalBalance: number | null = null;
   let printedTotalMonthly: number | null = null;
+  let operationalFee: number | null = null;
 
   for (const { grid } of grids) {
     const width = grid.numbers.length;
@@ -253,6 +254,10 @@ export function parseLeumi(pages: RawPage[], dataPages: number[]): BankStatement
         printedTotalBalance;
       const monthlyKey = Array.from(grid.totalsColumn.cells.keys()).find((k) => has(k, "החזר"));
       printedTotalMonthly = num(grid.totalsColumn.cells.get(monthlyKey ?? "") ?? "") ?? printedTotalMonthly;
+      // The one figure the per-משנה columns never carry: it is charged once on
+      // the loan, and it is exactly what makes the columns sum short.
+      const feeKey = Array.from(grid.totalsColumn.cells.keys()).find((k) => has(k, "עמלה תפעולית"));
+      operationalFee = num(grid.totalsColumn.cells.get(feeKey ?? "") ?? "") ?? operationalFee;
     }
 
     for (let c = 0; c < width; c++) {
@@ -326,8 +331,11 @@ export function parseLeumi(pages: RawPage[], dataPages: number[]): BankStatement
   // The lender prints its own total; a gap means a column was misread.
   if (printedTotalBalance !== null && Math.abs(printedTotalBalance - tranches.reduce((s, t) => s + (t.payoff ?? 0), 0)) > 5) {
     const gap = Math.round(printedTotalBalance - tranches.reduce((s2, t) => s2 + (t.payoff ?? 0), 0));
+    const explained = operationalFee !== null && Math.abs(gap - operationalFee) < 1;
     warnings.push(
-      `סך היתרה לסילוק המודפס (${Math.round(printedTotalBalance).toLocaleString("en-US")} ₪) גבוה ב-${gap.toLocaleString("en-US")} ₪ מסכום המשנים — ככל הנראה עמלה תפעולית ברמת ההלוואה, שאינה משויכת למשנה.`
+      explained
+        ? `היתרה לסילוק כוללת עמלה תפעולית של ${gap.toLocaleString("en-US")} ₪ ברמת ההלוואה, שאינה משויכת למשנה.`
+        : `סך היתרה לסילוק המודפס (${Math.round(printedTotalBalance).toLocaleString("en-US")} ₪) גבוה ב-${gap.toLocaleString("en-US")} ₪ מסכום המשנים — יש לוודא.`
     );
   }
 
@@ -341,6 +349,7 @@ export function parseLeumi(pages: RawPage[], dataPages: number[]): BankStatement
       monthly: printedTotalMonthly,
       breakFee: null,
       forecastRate: null,
+      operationalFee,
     },
   };
 
@@ -357,7 +366,7 @@ export function parseLeumi(pages: RawPage[], dataPages: number[]): BankStatement
       balance,
       payoff: tranches.reduce((s, t) => s + (t.payoff ?? 0), 0),
       monthly: tranches.reduce((s, t) => s + (t.monthly ?? 0), 0),
-      breakFee: tranches.reduce((s, t) => s + (t.breakFee ?? 0), 0),
+      breakFee: tranches.reduce((s, t) => s + (t.breakFee ?? 0), 0) + (operationalFee ?? 0),
     },
     warnings,
   };
