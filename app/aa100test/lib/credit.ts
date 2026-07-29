@@ -9,6 +9,7 @@
 
 import { paths as STATIC_PATHS } from "@/app/data/paths";
 import type { CreditReport } from "@/lib/credit-parser/types";
+import type { BankStatement } from "@/lib/bank-parser/types";
 import { extractLoans, type ExtractedLoan } from "@/lib/credit-parser/loan-mapping";
 import type { Loan } from "@/app/private/crm/leads/simulators/components/LoanTable";
 
@@ -157,14 +158,24 @@ export interface ImportSummary {
   reportDate: string;
   fileName: string;
   /**
+   * Which document produced this. A user drops one or the other, never both:
+   * a חיווי אשראי covers every liability shallowly, a bank statement covers one
+   * mortgage in full. Both fill the same board.
+   */
+  kind?: "credit" | "bank";
+  /**
    * The whole parsed report, kept rather than discarded after the rows are
    * built. The mix needs four numbers per debt; the analysis needs arrears
    * history, remarks, proceedings and inquiries — none of which survive the
    * conversion to Loan rows.
    *
+   * Absent when the source was a bank statement.
+   *
    * Client-side only. Only `mixes` is ever sent to the API.
    */
-  report: CreditReport;
+  report?: CreditReport;
+  /** The parsed mortgage statement, when that is what was dropped. */
+  bank?: BankStatement;
   /** The dropped PDF itself, so it can be read on screen without re-uploading. */
   file?: File;
   /** Debts present in the report but not carried over (cards, overdrafts…). */
@@ -225,6 +236,7 @@ export function importReportToLoans(
     reportDate: report.meta?.reportDate ?? "",
     fileName,
     report,
+    kind: "credit",
     skipped: Array.from(skippedMap.entries()).map(([label, v]) => ({ label, ...v })),
     guaranteed: loans.filter((l) => l.is_guarantor).length,
     totalBalance: loans.reduce((s, l) => s + l.amount, 0),
