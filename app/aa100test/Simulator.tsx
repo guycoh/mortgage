@@ -137,6 +137,10 @@ export default function Simulator({
   const [saved, setSaved] = useState("");
   /** Reports folded into the active mix, oldest first. */
   const [reports, setReports] = useState<ImportSummary[]>([]);
+  // The two analyses read a חיווי אשראי. A bank statement fills the same board
+  // but carries none of that material — no arrears history, no proceedings, no
+  // inquiries — so those buttons belong only to the reports that can answer them.
+  const creditReports = reports.filter((r) => r.report).map((r) => r.report!);
   const [showDoc, setShowDoc] = useState(false);
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [showClient, setShowClient] = useState(false);
@@ -637,6 +641,8 @@ export default function Simulator({
               once something has been dropped, so they appear with the data. */}
           {reports.length > 0 && (
             <>
+              {creditReports.length > 0 && (
+                <>
               <button
                 className="fin-btn fin-btn-sm ms-auto"
                 onClick={() => setShowClient(true)}
@@ -653,8 +659,10 @@ export default function Simulator({
                 <Stethoscope size={14} weight="bold" style={{ color: "var(--primary)" }} />
                 ניתוח חיווי
               </button>
+                </>
+              )}
               <button
-                className="fin-btn fin-btn-sm"
+                className={`fin-btn fin-btn-sm${creditReports.length ? "" : " ms-auto"}`}
                 onClick={() => setShowDoc(true)}
                 disabled={!reports.some((r) => r.file)}
                 title={reports.some((r) => r.file) ? "צפייה במסמך המקורי" : "המסמך אינו זמין בהפעלה הזו"}
@@ -773,22 +781,16 @@ export default function Simulator({
 
       {/* Derived on open rather than on import: the analysis is a read of the
           reports, and recomputing it costs nothing next to parsing the PDF. */}
-      {showClient && reports.length > 0 && (
+      {showClient && creditReports.length > 0 && (
         <ClientSummaryModal
-          analysis={analyseReports(
-            reports.map((r) => r.report),
-            reports.map((r) => r.fileName)
-          )}
+          analysis={analyseReports(creditReports, reports.map((r) => r.fileName))}
           onClose={() => setShowClient(false)}
         />
       )}
 
-      {showAnalysis && reports.length > 0 && (
+      {showAnalysis && creditReports.length > 0 && (
         <AnalysisModal
-          analysis={analyseReports(
-            reports.map((r) => r.report),
-            reports.map((r) => r.fileName)
-          )}
+          analysis={analyseReports(creditReports, reports.map((r) => r.fileName))}
           onClose={() => setShowAnalysis(false)}
         />
       )}

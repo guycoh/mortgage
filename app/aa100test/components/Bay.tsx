@@ -23,7 +23,9 @@ import {
   WarningCircle,
   X,
 } from "@phosphor-icons/react";
-import { parsePdfFile } from "@/lib/credit-parser/extract.client";
+import { extractPages, parsePdfFile } from "@/lib/credit-parser/extract.client";
+import { detectBank, parseBankStatement } from "@/lib/bank-parser";
+import { bankStatementToLoans } from "@/lib/bank-parser/to-loans";
 import { importReportToLoans, type ImportSummary } from "../lib/credit";
 
 export default function Bay({
@@ -51,29 +53,38 @@ export default function Bay({
         (f) => /\.pdf$/i.test(f.name) || f.type === "application/pdf"
       );
       if (!pdf) {
-        setError("צריך קובץ PDF של דוח ריכוז נתונים.");
+        setError("צריך קובץ PDF — חיווי אשראי או תדפיס משכנתא מהבנק.");
         return;
       }
       setBusy(true);
       setError("");
       try {
-        const report = await parsePdfFile(pdf);
-        const summary = importReportToLoans(report, mixId, pdf.name);
+        // Decode once, then decide what it is. A חיווי אשראי and a bank's own
+        // mortgage statement are alternatives — whichever arrives fills the same
+        // board — so the bank templates are tried first when they match, because
+        // the credit-report parser would reject them with a misleading message.
+        const pages = await extractPages(pdf);
+        const summary = detectBank(pages)
+          ? bankStatementToLoans(parseBankStatement(pages), mixId, pdf.name)
+          : importReportToLoans(await parsePdfFile(pdf), mixId, pdf.name);
+
         if (!summary.loans.length) {
           setError(
             summary.skipped.length
               ? `בדוח נמצאו רק ${summary.skipped
                   .map((s) => `${s.label} (${s.count})`)
                   .join(" ו-")} — אלה אינם ניתנים לשילוב בתמהיל.`
-              : "לא נמצאו בדוח התחייבויות פעילות עם יתרה."
+              : summary.kind === "bank"
+                ? "לא נמצאו בתדפיס הלוואות פעילות עם יתרה."
+                : "לא נמצאו בדוח התחייבויות פעילות עם יתרה."
           );
           return;
         }
-        // Keep the file itself: the analyst reads the original alongside the
+        // Keep the file itself: the advisor reads the original alongside the
         // analysis, and re-picking it just to look at it is friction.
         onImport({ ...summary, file: pdf });
       } catch (e) {
-        setError((e as Error)?.message || "לא הצלחנו לקרוא את הדוח.");
+        setError((e as Error)?.message || "לא הצלחנו לקרוא את המסמך.");
       } finally {
         setBusy(false);
         depth.current = 0;
@@ -186,7 +197,7 @@ export default function Bay({
       ? "לא הצלחנו לקרוא את הדוח"
       : drag
         ? "שחררו כאן"
-        : "גררו לכאן חיווי אשראי";
+        : "גררו לכאן חיווי אשראי או תדפיס משכנתא";
 
   return (
     <div
