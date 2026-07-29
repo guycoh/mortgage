@@ -82,12 +82,14 @@ function readTrack(
 
   // "לא צמוד" has to be tested before the "צמוד" it contains.
   const src = `${n}${l}`;
-  const linkage: Linkage = /לאצמוד/.test(src)
-    ? "unlinked"
-    : /צמודמדד|צמודהלמדד|צמוד/.test(src)
-      ? "linked"
-      : /דולר|אירו|מט"ח/.test(src)
-        ? "fx"
+  // Currency first: "צמוד אירו" contains צמוד and would otherwise be filed as
+  // index-linked, which is a different risk and a different track entirely.
+  const linkage: Linkage = /דולר|אירו|מט"ח|יורו/.test(src)
+    ? "fx"
+    : /לאצמוד/.test(src)
+      ? "unlinked"
+      : /צמודמדד|צמודהלמדד|צמוד/.test(src)
+        ? "linked"
         : "unknown";
 
   // "כל 2 שנים" / "כל 5 שנים" — the reset interval, stated in years.
@@ -118,24 +120,26 @@ function beside(items: RawItem[], phrase: string, dy = 6): string {
   const label = items.find((i) => has(i.str, phrase));
   if (!label) return "";
 
-  const pick = (lo: number, hi: number, leftOnly: boolean) => {
+  // Some cells are a single run holding both: "סכום החיוב החודשי בגין חלק זה:
+  // 637.81". Nothing sits beside them, so looking outward reaches into the next
+  // row and returns its value instead — this field was coming back as the
+  // average interest rate.
+  // The separator that follows a label is not a value: "יתרת הקרן:" leaves a
+  // bare colon behind, which is truthy and short-circuited every other field.
+  const inline = clean(afterPhrase(label.str, phrase)).replace(/^[:\s]+/, "");
+  if (/[\d֐-׿]/.test(inline)) return inline;
+
+  // Candidates start LEFT of the label's left edge, not left of its right edge.
+  // The track description is wider than its own label and overhangs it, so a
+  // right-edge test rejected the value and forced a looser rule that then let
+  // the part-number box's stray digits in.
+  const pick = (lo: number, hi: number) => {
     const near = items.filter(
-      (i) =>
-        i !== label &&
-        (!leftOnly || i.x + i.w <= label.x + 2) &&
-        label.y - i.y >= lo &&
-        label.y - i.y <= hi
+      (i) => i !== label && i.x < label.x - 1 && label.y - i.y >= lo && label.y - i.y <= hi
     );
     if (!near.length) return "";
-    // Take only the row closest to the label, not everything in the window.
-    // Two fields can sit four points apart here — "סכום החיוב החודשי" and
-    // "שיעור ריבית ממוצעת" — and a window wide enough to catch a value offset
-    // from its own label also reaches the next field's value. Reading both gave
-    // the monthly payment as 3.48, which is the average rate.
-    // The unit sits on the label's own baseline while the figure is a few points
-    // below it, so anchoring on the nearest item of any kind picks "ש"ח" and
-    // then discards the number. Units carry no content and cannot anchor.
-    const isUnit = (t: string) => /^\s*(ש"ח|ש״ח|%|נקודות)\s*$/.test(t);
+    // "ש"ח" and "%" sit on the label's own baseline while the figure is a few
+    // points below, so a unit must never anchor the row.
     const anchors = near.filter((i) => !isUnit(i.str));
     if (!anchors.length) return "";
     const anchorY = anchors.reduce(
@@ -151,15 +155,49 @@ function beside(items: RawItem[], phrase: string, dy = 6): string {
     );
   };
 
-  // Beside it first: the common case, a couple of points off the same baseline.
-  const same = pick(-dy, dy, true);
-  if (same) return same;
+  // Beside it first, then one row below — the track description sits about
+  // sixteen points down from its label.
+  return pick(-dy, dy) || pick(dy, 20);
+}
 
-  // Some cells put the value on the line BELOW the label instead — the track
-  // description sits about sixteen points down, wider than its own label. Rows
-  // are roughly fourteen apart, so this reaches exactly one line further and no
-  // constraint on x, because the value is wider than the label above it.
-  return pick(dy, 20, false);
+/**
+ * Same lookup, but the label must BE the phrase rather than merely contain it.
+ *
+ * This template names the same field two ways depending on the rate type — a
+ * fixed tranche says "שיעור הריבית בחלק זה:", a variable one just
+ * "שיעור הריבית:" — and a loose match on the shorter form would hit
+ * "שיעור הריבית לצרכי השוואה" or "שיעור הריבית המתואמת" first and read the
+ * wrong number.
+ */
+function besideExact(items: RawItem[], phrase: string, dy = 6): string {
+  const want = norm(phrase).replace(/:$/, "");
+  const label = items.find((i) => {
+    const n = norm(i.str).replace(/[:*]+$/, "");
+    return n === want;
+  });
+  if (!label) return "";
+  return beside([label, ...items.filter((i) => i !== label)], i0(label.str), dy);
+}
+
+/** The phrase a run spells, for feeding back into `beside`. */
+const i0 = (s2: string) => s2;
+
+const isUnit = (t: string) => /^\s*(ש"ח|ש״ח|%|נקודות)\s*$/.test(t);
+
+/** Whatever a run says after the label it starts with. */
+function afterPhrase(text: string, phrase: string): string {
+  const n = norm(text);
+  const p = norm(phrase);
+  const at = n.indexOf(p);
+  if (at < 0) return "";
+  // Walk the original string, counting only the characters norm() keeps, so the
+  // cut lands in the right place despite the spaces it removed.
+  let kept = 0;
+  for (let i = 0; i < text.length; i++) {
+    if (norm(text[i])) kept += 1;
+    if (kept === at + p.length) return text.slice(i + 1);
+  }
+  return "";
 }
 
 /**
@@ -250,8 +288,12 @@ export function parseJerusalem(pages: RawPage[], dataPages: number[]): BankState
       payoff,
       originalAmount: num(G("סכום חלק זה בעת הביצוע")),
       monthly: num(G("סכום החיוב החודשי בגין חלק זה")) ?? num(G("החיוב החודשי בגין חלק זה")),
-      rate: pct(G("שיעור הריבית בחלק זה")),
-      effectiveRate: pct(G("שיעור הריבית המתואמת")),
+      rate:
+        pct(besideExact(right.items, "שיעור הריבית בחלק זה:")) ??
+        pct(besideExact(right.items, "שיעור הריבית:")),
+      effectiveRate:
+        pct(besideExact(right.items, "שיעור הריבית המתואמת:")) ??
+        pct(besideExact(right.items, "המתואמת:")),
       forecastRate: pct(G("הריבית הכוללת החזויה")),
       comparisonRate: pct(G("שיעור הריבית לצרכי השוואה")),
       anchor: clean(trackName.replace(/^.*?על בסיס\s*/, "")) || "",
@@ -275,10 +317,20 @@ export function parseJerusalem(pages: RawPage[], dataPages: number[]): BankState
   // was missed rather than that the arithmetic is wrong.
   const printedPayoff = headerFigure(pages[0].items, "היתרה לסילוק בתיק");
   const sumPayoff = tranches.reduce((s, t) => s + (t.payoff ?? 0), 0);
-  if (printedPayoff && Math.abs(printedPayoff - sumPayoff) > 5) {
-    warnings.push(
-      `היתרה לסילוק בתיק המודפסת (${Math.round(printedPayoff).toLocaleString("en-US")} ₪) שונה מסכום החלקים (${Math.round(sumPayoff).toLocaleString("en-US")} ₪) — ייתכן שחלק מהעמודים לא נקראו.`
-    );
+  // A small gap is the file-level operational fee, which this lender adds to the
+  // whole-file position without attributing it to any one חלק. A large one means
+  // a חלק page really was missed, and those are different problems.
+  if (printedPayoff) {
+    const gap = printedPayoff - sumPayoff;
+    if (Math.abs(gap) > Math.max(200, printedPayoff * 0.005)) {
+      warnings.push(
+        `היתרה לסילוק בתיק המודפסת (${Math.round(printedPayoff).toLocaleString("en-US")} ₪) שונה מסכום החלקים ב-${Math.round(gap).toLocaleString("en-US")} ₪ — ייתכן שלא כל עמודי החלקים נקראו.`
+      );
+    } else if (Math.abs(gap) > 1) {
+      warnings.push(
+        `היתרה לסילוק בתיק גבוהה ב-${Math.round(gap).toLocaleString("en-US")} ₪ מסכום החלקים — עמלה תפעולית ברמת התיק, שאינה משויכת לחלק.`
+      );
+    }
   }
 
   const loan: BankLoan = {
