@@ -40,6 +40,9 @@ import AnalysisModal from "./components/AnalysisModal";
 import ClientSummaryModal from "./components/ClientSummaryModal";
 import ReportViewerModal from "./components/ReportViewerModal";
 import { analyseReports } from "./lib/analysis";
+import StatementAnalysisModal from "./components/StatementAnalysisModal";
+import StatementSummaryModal from "./components/StatementSummaryModal";
+import { analyseStatement } from "@/lib/bank-parser/analysis";
 import { useRouter } from "next/navigation";
 import LeadPicker, { type Lead } from "./components/LeadPicker";
 import Ledger from "./components/Ledger";
@@ -141,6 +144,10 @@ export default function Simulator({
   // but carries none of that material — no arrears history, no proceedings, no
   // inquiries — so those buttons belong only to the reports that can answer them.
   const creditReports = reports.filter((r) => r.report).map((r) => r.report!);
+  // A statement analysis reads one bank's mortgage; a credit report reads a whole
+  // household. Only one of the two is ever loaded, so the buttons follow the
+  // document rather than being shown and then explaining themselves away.
+  const statement = reports.find((r) => r.bank)?.bank ?? null;
   const [showDoc, setShowDoc] = useState(false);
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [showClient, setShowClient] = useState(false);
@@ -641,6 +648,26 @@ export default function Simulator({
               once something has been dropped, so they appear with the data. */}
           {reports.length > 0 && (
             <>
+              {statement && (
+                <>
+                  <button
+                    className="fin-btn fin-btn-sm ms-auto"
+                    onClick={() => setShowClient(true)}
+                    title="עמוד אחד להראות ללקוח — מה יש לו, כמה זה עולה בחודש, ומה יעלה לסלק"
+                  >
+                    <UserFocus size={14} weight="bold" style={{ color: "var(--pos)" }} />
+                    סיכום ללקוח
+                  </button>
+                  <button
+                    className="fin-btn fin-btn-sm"
+                    onClick={() => setShowAnalysis(true)}
+                    title="ניתוח המשכנתא — תמהיל, עמלות יציאה, שינויי ריבית וכדאיות מיחזור"
+                  >
+                    <Stethoscope size={14} weight="bold" style={{ color: "var(--primary)" }} />
+                    ניתוח משכנתא
+                  </button>
+                </>
+              )}
               {creditReports.length > 0 && (
                 <>
               <button
@@ -662,7 +689,7 @@ export default function Simulator({
                 </>
               )}
               <button
-                className={`fin-btn fin-btn-sm${creditReports.length ? "" : " ms-auto"}`}
+                className={`fin-btn fin-btn-sm${creditReports.length || statement ? "" : " ms-auto"}`}
                 onClick={() => setShowDoc(true)}
                 disabled={!reports.some((r) => r.file)}
                 title={reports.some((r) => r.file) ? "צפייה במסמך המקורי" : "המסמך אינו זמין בהפעלה הזו"}
@@ -781,6 +808,20 @@ export default function Simulator({
 
       {/* Derived on open rather than on import: the analysis is a read of the
           reports, and recomputing it costs nothing next to parsing the PDF. */}
+      {showClient && statement && (
+        <StatementSummaryModal
+          analysis={analyseStatement(statement)}
+          onClose={() => setShowClient(false)}
+        />
+      )}
+
+      {showAnalysis && statement && (
+        <StatementAnalysisModal
+          analysis={analyseStatement(statement)}
+          onClose={() => setShowAnalysis(false)}
+        />
+      )}
+
       {showClient && creditReports.length > 0 && (
         <ClientSummaryModal
           analysis={analyseReports(creditReports, reports.map((r) => r.fileName))}
