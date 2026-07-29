@@ -133,6 +133,15 @@ export interface BankLoan {
     monthly: number | null;
     breakFee: number | null;
     forecastRate: number | null;
+    /**
+     * עמלה תפעולית — a flat charge for performing the early repayment, levied
+     * once on the loan and never attributed to a tranche.
+     *
+     * Worth its own field because it is the entire reason a tranche-by-tranche
+     * sum falls short of the lender's printed payoff. Left uncaptured it looks
+     * like a parsing error; captured, the arithmetic closes.
+     */
+    operationalFee: number | null;
   };
 }
 

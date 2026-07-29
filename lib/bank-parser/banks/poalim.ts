@@ -389,6 +389,8 @@ export function parsePoalim(pages: RawPage[], dataPages: number[]): BankStatemen
         monthly: tot.monthly,
         breakFee: tot.breakFee,
         forecastRate: null,
+        // Folded into the loan's printed עמלת פירעון מוקדם; not stated separately.
+        operationalFee: null,
       },
     });
   }
