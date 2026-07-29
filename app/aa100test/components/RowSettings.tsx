@@ -1,9 +1,16 @@
 "use client";
 
-// The five fields nobody touches on a normal day — עוגן, מרווח מהעוגן, תדירות
-// שינוי, גרייס and חודשי גרייס. They used to live in an expander tray that
-// pushed every row below it down the page. Now they open in a small sheet
-// anchored to the row's own settings icon, so the grid never reflows.
+// The four fields nobody touches on a normal day — ריבית העוגן, מרווח מהעוגן,
+// גרייס and חודשי גרייס. They used to live in an expander tray that pushed every
+// row below it down the page. Now they open in a small sheet anchored to the row's
+// own settings icon, so the grid never reflows.
+//
+// תדירות שינוי was the fifth, and the anchor's NAME the sixth. Both moved to the
+// grid once the two document types started filling them on import — a field that
+// arrives with data in it is not a field you go hunting for, and one value
+// editable in two places is one value too many. What is left here is the anchor's
+// numeric side: its own rate, which only Discount's statement prints, and the
+// margin over it, which the grid shows but does not edit.
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -14,7 +21,7 @@ import Select from "./Select";
 import { FAMILY, PATH_LABEL, type ImportedLoan } from "../lib/credit";
 
 const W = 348;
-const H = 250;
+const H = 208;
 
 export default function RowSettings({
   loan,
@@ -69,7 +76,7 @@ export default function RowSettings({
 
   const field = (
     label: string,
-    key: "anchor" | "anchor_margin" | "change_frequency" | "grace_months",
+    key: "anchor" | "anchor_margin" | "grace_months",
     type: "text" | "number",
     placeholder?: string
   ) => (
@@ -127,9 +134,8 @@ export default function RowSettings({
           </header>
 
           <div className="fin-sheet-body">
-            {field("עוגן", "anchor", "number", "0")}
-            {field("מרווח מהעוגן", "anchor_margin", "number", "0")}
-            {field("תדירות שינוי", "change_frequency", "text", "—")}
+            {field("ריבית העוגן %", "anchor", "number", "0")}
+            {field("מרווח מהעוגן %", "anchor_margin", "number", "0")}
             <label className="flex flex-col gap-1">
               <span className="fin-label">גרייס</span>
               <div className="fin-well" data-dirty={dirty.has("grace_type_id") || undefined}>
@@ -149,6 +155,7 @@ export default function RowSettings({
             {loan.source_track ? (
               <>
                 מהדוח: {loan.source_type} · {loan.source_track}
+                {loan.source_anchor ? ` · ${loan.source_anchor}` : ""}
                 {loan.source_bank ? ` · ${loan.source_bank.replace(/בע"?מ|בנק/g, "").trim()}` : ""}
               </>
             ) : (

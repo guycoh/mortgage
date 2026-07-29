@@ -27,6 +27,14 @@ export type ImportedLoan = Loan & {
   source_bank?: string;
   source_type?: string;
   source_track?: string;
+  /**
+   * עוגן, as the document names it — "ריבית פריים", "עוגן בנק ישראל אג\"ח".
+   *
+   * A name, not a rate: the `anchor` column is numeric and holds the anchor's own
+   * level, which only Discount's template prints. The two are different facts
+   * about the same thing and both are worth keeping.
+   */
+  source_anchor?: string;
 };
 
 /* ------------------------------------------------------------------ paths */
@@ -138,9 +146,13 @@ function toLoanRow(src: ExtractedLoan, mixId: string, group: DebtGroup): Importe
     amortization_schedule_id: 1, // שפיצר — what a bank mortgage almost always is
     grace_type_id: 1, // ללא
     grace_months: 0,
-    // anchor is a numeric column (the anchor rate). The prime track is
-    // already carried by path_id, so there is nothing to put here.
+    // The numeric column is the anchor's own RATE, and the credit report never
+    // prints it — only the anchor's name (201-034) and the margin over it
+    // (201-035), both of which do have somewhere to go.
     anchor: null,
+    anchor_margin: src.anchorMargin,
+    change_frequency: src.changeFrequency,
+    source_anchor: src.anchorName,
     group,
     is_guarantor: guarantor,
     source_bank: src.source,

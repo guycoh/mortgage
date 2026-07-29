@@ -22,5 +22,13 @@ alter table public.loans
 -- Existing rows predate the simulator and are all mortgages by convention.
 update public.loans set debt_group = 'mortgage' where debt_group is null;
 
+-- The anchor's NAME, added with the עוגן column on the board. The existing
+-- `anchor` column is numeric and holds the anchor's own rate, which only the
+-- Discount statement prints; every document that names an anchor without pricing
+-- it needs somewhere to put the words. loadBoard degrades this one column on its
+-- own, so the board still works before this line is run.
+alter table public.loans
+  add column if not exists source_anchor text;
+
 -- Loading a lead's board reads loans by mix; this is the index that read wants.
 create index if not exists loans_mix_id_idx on public.loans (mix_id);

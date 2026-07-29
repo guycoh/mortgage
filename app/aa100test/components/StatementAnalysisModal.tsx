@@ -40,6 +40,7 @@ import {
   type StatementAnalysis,
 } from "@/lib/bank-parser/analysis";
 import type { BankTranche } from "@/lib/bank-parser/types";
+import { FREQ_PRIME, freqLabel } from "@/lib/rate-frequency";
 
 const pct = (n: number) => `${Math.round(n * 100)}%`;
 const rate = (n: number | null) => (n === null ? "—" : `${n.toFixed(2)}%`);
@@ -625,7 +626,7 @@ export default function StatementAnalysisModal({
                         <td><Money value={t.balance ?? 0} block={false} /></td>
                         <td className="fin-fig">{rate(t.rate)}</td>
                         <td className="fin-fig">{t.nextReset || "—"}</td>
-                        <td className="fin-fig">{t.resetMonths ? `כל ${t.resetMonths} חודשים` : "—"}</td>
+                        <td>{freqLabel(t.resetMonths) || (t.rateKind === "prime" ? FREQ_PRIME : "—")}</td>
                       </tr>
                     ))}
                   </tbody>

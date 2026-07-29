@@ -92,11 +92,15 @@ function readTrack(
         ? "linked"
         : "unknown";
 
-  // "כל 2 שנים" / "כל 5 שנים" — the reset interval, stated in years.
-  const years = name.match(/כל\s*(\d+)\s*שנ/);
-  const months = name.match(/כל\s*(\d+)\s*חוד/);
+  // "כל 2 שנים" / "כל 5 שנים" — the reset interval, stated in years. Half-years
+  // are real ("כל 2.5 שנים"), so the number is not assumed to be whole.
+  const years = name.match(/כל\s*(\d+(?:\.\d+)?)\s*שנ/);
+  // "כל 3 חודשים", and the abbreviated form this template uses on its foreign-
+  // currency tranches — "עדכ':3 חודשים". Same fact, written as an update note
+  // rather than as a period, and missed entirely when only כל is looked for.
+  const months = name.match(/(?:כל|עדכ(?:ון)?['׳’]?\s*:?)\s*(\d+)\s*חוד/);
   const resetMonths = years
-    ? Number(years[1]) * 12
+    ? Math.round(Number(years[1]) * 12)
     : months
       ? Number(months[1])
       : kind === "prime"
@@ -296,7 +300,10 @@ export function parseJerusalem(pages: RawPage[], dataPages: number[]): BankState
         pct(besideExact(right.items, "המתואמת:")),
       forecastRate: pct(G("הריבית הכוללת החזויה")),
       comparisonRate: pct(G("שיעור הריבית לצרכי השוואה")),
-      anchor: clean(trackName.replace(/^.*?על בסיס\s*/, "")) || "",
+      // Only what follows "על בסיס" is an anchor. Where the sentence has no such
+      // clause it is describing the track and nothing else — returning the whole
+      // sentence put "לא צמוד, ריבית פריים, שפיצר" in the עוגן column.
+      anchor: clean((trackName.match(/על בסיס\s*(.+)$/) ?? ["", ""])[1]),
       margin: null,
       resetMonths,
       nextReset: "",

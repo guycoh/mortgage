@@ -12,6 +12,7 @@
 
 import { PATH_IDS, type ImportedLoan, type ImportSummary } from "@/app/aa100test/lib/credit";
 import type { Loan } from "@/app/private/crm/leads/simulators/components/LoanTable";
+import { FREQ_FIXED, FREQ_PRIME, FREQ_UNSTATED, freqLabel } from "@/lib/rate-frequency";
 import { monthsBetween, toDate } from "./text";
 import type { BankStatement, BankTranche } from "./types";
 
@@ -60,6 +61,50 @@ function termOf(t: BankTranche, statementDate: string): number {
   return to ? monthsBetween(from, to) : 0;
 }
 
+/**
+ * תדירות שינוי for one tranche.
+ *
+ * The printed interval wins wherever there is one. Prime is named rather than
+ * given a number even when the lender prints "1": Hapoalim's own column says one
+ * month, but the rate does not actually change monthly — it changes when the Bank
+ * of Israel changes, which is the thing an advisor needs to hear.
+ */
+function frequencyOf(t: BankTranche): string {
+  if (t.rateKind === "prime") return FREQ_PRIME;
+  if (t.resetMonths && t.resetMonths > 0) return freqLabel(t.resetMonths);
+  // A fixed rate has no reset by definition, so a blank column is a fact here
+  // rather than a gap. On a variable tranche the same blank is a gap, and says so.
+  if (t.rateKind === "fixed") return FREQ_FIXED;
+  return t.rateKind === "variable" ? FREQ_UNSTATED : "";
+}
+
+/**
+ * The anchor, as words.
+ *
+ * Every lender writes it differently, and two of them write it into the same cell
+ * as the margin — Leumi "עוגן+0.95%", Hapoalim "P + 0.15%". The margin is already
+ * its own number on the tranche, so it comes out here rather than being shown
+ * twice, and what is left is the lender's own name for the anchor.
+ */
+function anchorNameOf(t: BankTranche): string {
+  // Prime is prime at all four banks, however they abbreviate it — "P", "פריי",
+  // "ר.פריים". Naming it once beats carrying four spellings onto the board.
+  if (t.rateKind === "prime") return "ריבית פריים";
+
+  const s = t.anchor
+    .replace(/[+\-−]\s*\d+(?:\.\d+)?\s*%?/g, " ") // the margin sharing the cell
+    .replace(/[|*]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/^ר\.?\s*(?=עוגן)/, ""); // Discount abbreviates "ריבית עוגן" to "ר.עוגן"
+
+  if (!s || /^[-–—.]+$/.test(s)) return "";
+  // Hapoalim names its bond anchor with a single letter. Left bare it is a
+  // riddle; saying it IS the anchor keeps the lender's own code and the meaning.
+  if (/^[A-Za-z]{1,2}$/.test(s)) return `עוגן ${s.toUpperCase()}`;
+  return s;
+}
+
 function toRow(t: BankTranche, mixId: string, st: BankStatement): ImportedLoan {
   const end = iso(t.endDate);
   return {
@@ -74,11 +119,13 @@ function toRow(t: BankTranche, mixId: string, st: BankStatement): ImportedLoan {
     amortization_schedule_id: amortizationId(t.amortization),
     grace_type_id: 1,
     grace_months: 0,
-    // The anchor rate itself is a number in this column; the statement gives a
-    // description ("ר.עוגן בנק ישראל"), which belongs on the label, not here.
-    anchor: null,
+    // This column is the anchor's own RATE, which only the Discount template
+    // prints. Its name is words and lives in source_anchor.
+    anchor: t.anchorRate ?? null,
     anchor_margin: t.margin ?? null,
     anchor_interval: t.resetMonths ?? null,
+    change_frequency: frequencyOf(t),
+    source_anchor: anchorNameOf(t),
     group: "mortgage",
     is_guarantor: false,
     source_bank: st.bankLabel,
