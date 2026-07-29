@@ -203,7 +203,7 @@ function readGrid(page: RawPage): Grid | null {
 
 /** Look a field up in a grid, tolerating the lender's line wrapping. */
 function field(grid: Grid, label: string): string[] {
-  for (const [k, v] of grid.rows) if (has(k, label)) return v;
+  for (const [k, v] of Array.from(grid.rows)) if (has(k, label)) return v;
   return grid.loanNumbers.map(() => "");
 }
 
