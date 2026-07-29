@@ -7,6 +7,7 @@
 import type { RawPage } from "@/lib/credit-parser/types";
 import { detectBank, type Detection } from "./detect";
 import { parseDiscount } from "./banks/discount";
+import { parsePoalim } from "./banks/poalim";
 import { BANK_LABEL, type BankStatement } from "./types";
 
 /** True when this looks like a bank mortgage statement at all. */
@@ -33,6 +34,8 @@ export function parseBankStatement(pages: RawPage[]): BankStatement {
     case "discount":
     case "mercantile":
       return withMeta(parseDiscount(pages, det.bank, det.dataPages), det);
+    case "poalim":
+      return withMeta(parsePoalim(pages, det.dataPages), det);
     default:
       throw new Error(
         `זוהה מסמך של ${BANK_LABEL[det.bank]}, אך הקריאה עבור התבנית הזו עדיין לא נתמכת.`

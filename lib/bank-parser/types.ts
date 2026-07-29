@@ -68,6 +68,18 @@ export interface BankTranche {
   originalAmount: number | null;
   /** Monthly repayment for this tranche. */
   monthly: number | null;
+  /**
+   * True when the balance was not printed per tranche and had to be split out
+   * of a loan-level figure.
+   *
+   * Hapoalim states balances per loan and terms per מרכיב, and never the two
+   * together. The split is done by amortising each tranche from its own
+   * original amount, rate and term and then scaling the result so the parts add
+   * back to the lender's printed loan balance — arithmetic anchored to a printed
+   * total, not a guess. It is still marked, because an advisor quoting a single
+   * tranche should know the number was derived.
+   */
+  balanceApportioned?: boolean;
 
   /* ---- price */
   /** Nominal annual %, e.g. 5.9. */
