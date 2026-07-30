@@ -1,0 +1,1871 @@
+/* ============================================================================
+   /aa101test — mortgage mix simulator. "The instrument."
+
+   An Apple-designed Israeli fintech tool: precision hairlines, machined
+   controls, weight-driven typography, and two identity colours that look like
+   they came off a letterpress rather than out of a framework.
+
+   Seven rules, and nothing on this page breaks them:
+
+   1. ONE FAMILY   Inter carries the Latin and every figure, Assistant carries
+                   the Hebrew. Their proportions are close enough that a mixed
+                   line reads as one typeface. Weight does the hierarchy —
+                   600 for values and titles, 400/500 for everything else.
+   2. TWO RADII    10px for anything you operate (input, button, select),
+                   16px for anything that holds them (card, panel, rail).
+                   Chips under 26px take 8px, because 10 on a 24px chip is a
+                   pill; nothing else has a corner.
+   3. HAIRLINES    Structure is drawn, not floated: 1px borders, and any
+                   border you can operate is at least #C9CBD2. Shadows are
+                   two-layer and barely there — a 0.5px contact line plus a
+                   wide, low ambient. Nothing reads as a drop shadow.
+   4. LOUD COLOUR, QUIET MATERIAL
+                   The materials whisper, so colour has to carry the meaning.
+                   #5B54D6 is both the primary action colour and משכנתא's
+                   identity, because the mortgage is what this page is about;
+                   הלוואה answers it in #E07B39. Both are loud enough to name
+                   a row across a desk. Neither is ever the only signal —
+                   every chip carries an icon and the word, which is what
+                   keeps them apart under deuteranopia.
+                   Fills use the anchor; TYPE uses the darkened `text` step,
+                   because a strong orange is 2.97:1 on white and unreadable.
+   5. NOTHING STICKS, NOTHING IS GLASS
+                   The page is one static document from the title to the
+                   comparison. No sticky header, no pinned totals bar — and
+                   therefore no surface that ever slides over its own content,
+                   which is the only thing that would justify a blur. The one
+                   gradient on the page is the intake bay's surface.
+   6. IDENTITY ≠ STATUS  Violet and orange mean "which debt is this". Green
+                   means success, red means destructive. They never trade jobs.
+   7. DEAD STILL UNTIL TOUCHED
+                   Nothing loops, floats, breathes or shimmers. Every movement
+                   here is a reply to something a person did, and it lands
+                   within 400ms. Hover lives in CSS (140ms), press and presence
+                   live in Motion springs (lib/transitions.ts); the two never
+                   animate the same property on the same element.
+
+   Everything is scoped under .ink-root and prefixed ink- so it cannot collide
+   with the live simulator's stylesheet.
+   ========================================================================== */
+
+/* Tokens live on both the page root and .ink-vars, which portalled surfaces
+   (popovers, modals) carry so they resolve the same variables without also
+   inheriting the page's full-viewport canvas. */
+.ink-root,
+.ink-vars {
+  /* ONE STACK for display, UI and figures. Inter has no Hebrew, so Hebrew
+     glyphs fall through to Assistant by design — a neutral Hebrew grotesque
+     whose x-height and stroke sit close enough to Inter's that a mixed
+     "משכנתא 1,240,000" reads as one voice. Nothing else is loaded. */
+  --ui: "Inter Variable", "Assistant", -apple-system, system-ui, sans-serif;
+  --display: var(--ui);
+  --num: var(--ui);
+
+  /* canvas — Apple neutral: near-white with the faintest cool cast. Not warm
+     paper, not cool dashboard grey. */
+  --bg: #f7f7f9;
+  --bg-2: #eeeef1;
+  --card: #ffffff;
+  --card-2: #fafafc;
+  --card-3: #f1f1f4;
+
+  /* INK — every step here clears 4.5:1 on white at the size it is used. */
+  --ink: #1c1c1e;
+  --ink-2: #3a3d45; /* column headers, secondary labels — 10.4:1 */
+  --ink-3: #5c6068; /* captions and notes — 6.4:1 */
+  --ink-4: #7c8089; /* the quietest text that is still text — 4.5:1 */
+  --ink-placeholder: #9a9da6; /* not text: an empty field's shape hint */
+
+  /* Hairlines. --line is structure you read past; --line-2 is the border of
+     something you can operate and never goes lighter than #C9CBD2. */
+  --line: #e8e9ec;
+  --line-2: #c9cbd2;
+  --edge: #a3a7b0;
+
+  /* THE IDENTITY — a confident violet-blue. Loud enough to name a row from
+     across the desk, dark enough to stay ink rather than neon. Primary action
+     and משכנתא are the same colour on purpose: the mortgage is this page's
+     subject, so the thing you press and the thing you are pricing are one hue. */
+  --primary: #5b54d6;
+  --primary-deep: #4f46c8;
+  --primary-press: #443cb0;
+  /* Tints are the anchor over white — 12% for anything that must say
+     "mortgage" at a glance, 20% for hover and focus rings, 30% for borders. */
+  --primary-tint: #ebeafa;
+  --primary-tint-2: #deddf7;
+  --primary-line: #ceccf3;
+  /* the quietest possible wash, for a whole-row background */
+  --primary-wash: #f5f4fd;
+
+  /* debt families */
+  --mortgage: var(--primary);
+  --mortgage-deep: var(--primary-deep);
+  --mortgage-tint: var(--primary-tint);
+  --mortgage-tint-2: var(--primary-tint-2);
+  --mortgage-line: var(--primary-line);
+
+  --loan: #e07b39;
+  --loan-deep: #c25f22;
+  --loan-tint: #fbefe7;
+  --loan-tint-2: #f9e5d7;
+  --loan-line: #f5d5c0;
+
+  /* THE FIVE TRACKS — five distinct hues, deliberately not a ramp.
+     A track is a category, not a magnitude, and five steps of one violet ask
+     the eye to rank them by lightness at 8px, which is the comparison it is
+     worst at. These live in a different register from the two family colours
+     and never compete with them: a family is a chip with a word, a track is a
+     dot with a word, and they never stand as alternatives to each other. */
+  --t1: #2563eb; /* פריים */
+  --t2: #0d8b9b; /* קבועה לא צמודה */
+  --t3: #14905a; /* קבועה צמודה */
+  --t4: #ad7804; /* משתנה לא צמודה */
+  --t5: #c62370; /* משתנה צמודה */
+
+  /* status — the only colours on the page that are not violet, orange or grey */
+  --pos: #147a45;
+  --pos-tint: #e9f5ee;
+  --pos-line: #bfdfcd;
+  /* "warn" is the loan orange, deepened to clear 4.5:1 as text. Amber would be
+     a fifth hue AND would read as הלוואה; folding the two together keeps the
+     palette closed and costs nothing — a stale date and a consumer loan are
+     never adjacent claims. */
+  --warn: #a8511a;
+  --warn-tint: #fbefe7;
+  --warn-line: #f5d5c0;
+  --neg: #b42318;
+  --neg-tint: #fdf1f0;
+  --neg-line: #f2cdc9;
+
+  /* TWO RADII. Controls are machined; panels hold them. */
+  --r: 16px;
+  --r-sm: 10px;
+
+  /* Two layers, both faint: a 0.5px contact line so the edge is legible, and a
+     wide low-opacity ambient so the card sits rather than floats. */
+  --shadow: 0 0.5px 1px rgba(0, 0, 0, 0.055), 0 6px 20px -12px rgba(0, 0, 0, 0.16);
+  --shadow-hover: 0 0.5px 1px rgba(0, 0, 0, 0.07), 0 4px 10px -4px rgba(0, 0, 0, 0.08),
+    0 14px 34px -16px rgba(0, 0, 0, 0.22);
+  --shadow-lift: 0 0.5px 1px rgba(0, 0, 0, 0.09), 0 2px 6px -2px rgba(0, 0, 0, 0.06),
+    0 20px 48px -16px rgba(0, 0, 0, 0.28);
+
+  /* MOTION.
+     One curve for hover-scale things (--ease-out, entering on the leading
+     edge so the surface answers within a frame) and one duration. Springs for
+     press, presence and layout live in lib/transitions.ts and are applied by
+     Motion, not by CSS — the two systems never animate the same property on
+     the same element.
+
+     Exits get an 80ms delay so a pointer skimming across a row does not set
+     the whole sheet flickering. */
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --t: 140ms;
+  --t-exit-delay: 80ms;
+
+  color: var(--ink);
+  font-family: var(--ui);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "cv05" 1; /* Inter's single-storey ell — cleaner at 11px */
+}
+
+/* Flat and opaque. The dot grid that used to live here was decoration, and
+   decoration is the first thing an instrument gives up. */
+.ink-root {
+  min-height: 100dvh;
+  background: var(--bg);
+}
+
+/* ------------------------------------------------------------ typography */
+
+.ink-fig {
+  font-family: var(--num);
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: "tnum" 1, "lnum" 1;
+  letter-spacing: -0.01em;
+  font-weight: 500;
+}
+.ink-display {
+  font-family: var(--display);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.05;
+}
+.ink-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.005em;
+  color: var(--ink-3);
+}
+/* MONEY — ₪ leads, digits align on the units place. See Money.tsx for why the
+   bidi isolate is mandatory rather than cosmetic. */
+.ink-money {
+  direction: ltr;
+  unicode-bidi: isolate;
+  text-align: right;
+  font-family: var(--num);
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: "tnum" 1, "lnum" 1;
+  letter-spacing: -0.015em;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.ink-money-block { display: block; }
+/* the mark is quieter than the amount it introduces, and never crowds it */
+.ink-cur { margin-inline-end: 0.2em; font-size: 0.76em; font-weight: 500; opacity: 0.6; }
+.ink-per { margin-inline-start: 0.1em; font-size: 0.72em; font-weight: 500; opacity: 0.5; }
+
+/* A FIGURE THAT JUST CHANGED. One quiet beat of the ink at 10%, then gone.
+   Long enough to catch the eye moving down the column, short enough that a
+   fast typist never sees the page strobe. */
+@keyframes ink-pulse {
+  0% { background-color: var(--fam-tint-2, var(--primary-tint-2)); }
+  100% { background-color: transparent; }
+}
+.ink-money[data-pulse] {
+  border-radius: 6px;
+  animation: ink-pulse 600ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* ------------------------------------------------------------------ card */
+
+.ink-card {
+  background: var(--card);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r);
+  box-shadow: var(--shadow);
+}
+.ink-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  border-start-start-radius: calc(var(--r) - 1px);
+  border-start-end-radius: calc(var(--r) - 1px);
+}
+.ink-title {
+  font-family: var(--display);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.018em;
+}
+.ink-sub { font-size: 12px; color: var(--ink-3); }
+.ink-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 8px;
+  border: 0;
+  background: var(--card-3);
+  color: var(--ink-3);
+  font-family: var(--num);
+  font-variant-numeric: tabular-nums;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+/* ============================================== the console: toolbar + rail */
+/* The top of the page is ONE object in two materials — a light toolbar sitting
+   directly on a dark KPI slab, sharing a 16px outline and a single shadow. The
+   title row floats above it, and none of it is sticky: this is a document, and
+   a document's masthead scrolls with it.
+
+   The dark half is a widget in dark mode on a light page; the light half is the
+   controls that drive it. Reading down: who this is → what you can change →
+   what it costs. */
+
+.ink-console {
+  border-radius: var(--r);
+  border: 1px solid var(--line-2);
+  background: #fff;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+/* --- the toolbar, in three functional groups --- */
+.ink-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 24px;
+  padding: 12px 16px;
+}
+/* A hairline between groups, never before the first one. Groups already sit
+   24px apart; the rule is for the eye that needs the seam stated. */
+.ink-tool-group { display: flex; align-items: center; gap: 8px; }
+.ink-tool-group + .ink-tool-group { padding-inline-start: 24px; border-inline-start: 1px solid var(--line); }
+.ink-tool-group[data-end="true"] { margin-inline-start: auto; }
+
+/* ONE COMPOSED FIELD — label, number and unit inside a single border, so
+   "אינפלציה שנתית 2 %" reads as one parameter rather than a caption that
+   happens to sit beside a box. */
+.ink-param {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 11px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  background: #fff;
+  transition: border-color var(--t) var(--ease), box-shadow 120ms var(--ease);
+}
+.ink-param:hover { border-color: var(--edge); }
+.ink-param:focus-within { border-color: var(--focus); box-shadow: 0 0 0 2px var(--focus-ring-strong); }
+.ink-param-label { font-size: 12.5px; font-weight: 500; color: var(--ink-2); white-space: nowrap; }
+.ink-param-in {
+  width: 44px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  outline: none;
+  text-align: center;
+  font-family: var(--num);
+  font-variant-numeric: tabular-nums lining-nums;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.ink-param-unit { font-size: 12.5px; font-weight: 500; color: var(--ink-4); }
+.ink-param-sep { width: 1px; align-self: stretch; margin-block: 8px; background: var(--line); }
+
+/* THE LEAD PICKER — an entity, not a dropdown.
+   Avatar, name in semibold, chevron. What it names is a person, so it is
+   built like a person: the initial in a filled disc, the name at reading
+   weight, and the id demoted to a monospaced footnote beside it. */
+.ink-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  height: 40px;
+  padding: 0 12px 0 9px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink);
+  font-family: var(--ui);
+  cursor: pointer;
+  transition: background var(--t) var(--ease) var(--t-exit-delay),
+    border-color var(--t) var(--ease) var(--t-exit-delay),
+    box-shadow var(--t) var(--ease) var(--t-exit-delay),
+    translate var(--t) var(--ease) var(--t-exit-delay);
+}
+.ink-picker:hover { border-color: var(--edge); background: var(--card-2); translate: 0 -1px; box-shadow: var(--shadow); transition-delay: 0ms; }
+.ink-picker:focus-visible { outline: none; border-color: var(--primary); box-shadow: 0 0 0 2px var(--focus-ring-strong); }
+.ink-picker[data-static] { cursor: default; }
+.ink-picker[data-static]:hover { border-color: var(--line-2); background: #fff; translate: 0; box-shadow: none; }
+.ink-picker[data-open="true"] { border-color: var(--primary); box-shadow: 0 0 0 2px var(--focus-ring-strong); }
+.ink-avatar {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border-radius: 999px;
+  background: var(--primary);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+}
+.ink-picker[data-empty="true"] .ink-avatar { background: var(--card-3); color: var(--ink-4); }
+.ink-picker-name {
+  max-width: 210px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.ink-picker[data-empty="true"] .ink-picker-name { color: var(--ink-3); font-weight: 500; }
+.ink-picker-id {
+  font-family: var(--num);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-4);
+}
+.ink-picker-caret { color: var(--ink-4); flex: none; transition: transform 200ms var(--ease); }
+.ink-picker[data-open="true"] .ink-picker-caret { transform: rotate(180deg); color: var(--primary); }
+
+/* AUTOSAVE STATUS — information, not an action. No fill, no border, no chevron;
+   it states where the board stands and gets out of the way. */
+.ink-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 36px;
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  font-family: var(--ui);
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+.ink-status[data-tone="ok"] { color: var(--pos); }
+.ink-status[data-tone="busy"] { color: var(--ink-3); }
+.ink-status[data-tone="dirty"] { color: var(--ink-2); }
+/* A dot, because "unsaved" is a state and states get a dot. */
+.ink-status-dot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 999px;
+  background: var(--primary);
+}
+/* The one case where the status is also the way out of it. Text only — it is
+   still not a button, it is a sentence you can press. */
+.ink-status-act {
+  border: 0;
+  background: none;
+  padding: 2px 2px;
+  border-radius: 6px;
+  font: inherit;
+  color: var(--primary);
+  font-weight: 600;
+  cursor: pointer;
+  transition: color var(--t) var(--ease);
+}
+.ink-status-act:hover { color: var(--primary-deep); text-decoration: underline; text-underline-offset: 3px; }
+.ink-status-act:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring-strong); }
+
+/* --- the KPI slab --- */
+.ink-rail {
+  background: #1c1c1e;
+  box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.16);
+}
+/* NO DIVIDERS. Four cells that share one anatomy — label above, figure below —
+   are already four cells; a rule between them just adds furniture. Space does
+   the separating. */
+.ink-rail-cells {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) minmax(0, 1fr) minmax(268px, 1.15fr);
+  gap: 4px 32px;
+  padding: 18px 20px 20px;
+}
+.ink-rail-cell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 70px;
+  min-width: 0;
+}
+.ink-rail-label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.005em;
+  color: rgba(255, 255, 255, 0.72);
+  white-space: nowrap;
+}
+.ink-rail-value {
+  font-family: var(--num);
+  font-variant-numeric: tabular-nums lining-nums;
+  font-size: 23px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: #fff;
+  white-space: nowrap;
+  direction: ltr;
+  unicode-bidi: isolate;
+  text-align: start;
+}
+/* THE HERO. החזר חודשי is the number an advisor is actually solving for, so it
+   is a full step larger than its three satellites and the only one lit. */
+.ink-rail-cell[data-hero="true"] .ink-rail-value { font-size: 34px; letter-spacing: -0.04em; }
+.ink-rail-cell[data-hero="true"] .ink-rail-label { color: #fff; font-weight: 700; }
+/* EMPTY. Not ₪0 — a stated zero is a claim, and nothing has been claimed yet. */
+.ink-rail-value[data-empty="true"] { color: rgba(255, 255, 255, 0.34); font-weight: 400; letter-spacing: 0.02em; }
+.ink-rail-hint { font-size: 12px; color: rgba(255, 255, 255, 0.72); }
+/* A REAL SEGMENTED BAR. Segments are separated by a hairline of the slab
+   itself, so a 4%-wide track still reads as its own block instead of dissolving
+   into its neighbour. Widths animate; nothing else about it moves. */
+.ink-rail-strip {
+  display: flex;
+  height: 10px;
+  border-radius: 5px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.1);
+}
+.ink-rail-strip span {
+  display: block;
+  height: 100%;
+  transition: width 0.4s var(--ease), filter var(--t) var(--ease);
+}
+.ink-rail-strip span + span { box-shadow: inset 1px 0 0 rgba(28, 28, 30, 0.7); }
+/* legend on hover: everything else steps back so the one you are on stands out */
+.ink-rail-strip:hover span { filter: brightness(0.62); }
+.ink-rail-strip span:hover { filter: brightness(1.18); }
+.ink-rail-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 12px; color: rgba(255, 255, 255, 0.72); }
+.ink-rail-legend b {
+  font-family: var(--num); font-variant-numeric: tabular-nums;
+  font-weight: 600; color: #fff; margin-inline-start: 5px;
+  letter-spacing: -0.01em;
+}
+
+/* --------------------------------------------------------------- controls */
+
+/* Every control on the page shares one ring colour, and inside a debt row that
+   colour is the row's own family — so focus tells you where you are as well as
+   what you are editing. --focus falls back to the identity violet everywhere
+   else. --focus-ring-strong is the 2px bloom; it is deliberately dark enough
+   to be seen on a white field from a metre away. */
+.ink-root,
+.ink-vars {
+  --focus: var(--primary);
+  --focus-ring: var(--primary-tint-2);
+  --focus-ring-strong: rgba(91, 84, 214, 0.45);
+}
+
+.ink-input {
+  height: 36px;
+  padding: 0 11px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  background: #fff;
+  color: var(--ink);
+  font-family: var(--ui);
+  font-size: 13px;
+  font-weight: 500;
+  outline: none;
+  transition: border-color var(--t) var(--ease), box-shadow 120ms var(--ease), background var(--t) var(--ease);
+}
+.ink-input:hover { border-color: var(--edge); }
+.ink-input:focus,
+.ink-input:focus-visible {
+  border-color: var(--focus);
+  box-shadow: 0 0 0 2px var(--focus-ring-strong);
+}
+
+/* AN EDITABLE FIELD in the grid. Flat and opaque with a hairline — the inset
+   "well" shading is gone, because a machined control is defined by its edge,
+   not by a bevel. What still separates editable from calculated: this has a
+   border and a placeholder, the calculated figure has neither. */
+.ink-cell {
+  width: 100%;
+  height: 36px;
+  padding: 0 9px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  background: #fff;
+  font-family: var(--num);
+  font-variant-numeric: tabular-nums lining-nums;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  outline: none;
+  transition: border-color var(--t) var(--ease), box-shadow 120ms var(--ease), background var(--t) var(--ease);
+}
+/* PLACEHOLDER vs VALUE — the difference has to be visible without reading.
+   An empty field shows a muted 0.00 at 40%, regular weight; a typed value is
+   full ink at 600. The old placeholders repeated the column header inside the
+   box ("עוגן", "מרווח"), which said nothing the <th> had not already said. */
+.ink-cell::placeholder {
+  font-family: var(--num);
+  font-variant-numeric: tabular-nums;
+  font-weight: 400;
+  color: var(--ink-placeholder);
+  opacity: 1;
+  letter-spacing: -0.01em;
+}
+.ink-cell:hover:not(:disabled) { border-color: var(--edge); }
+.ink-cell:focus,
+.ink-cell:focus-visible {
+  border-color: var(--focus);
+  box-shadow: 0 0 0 2px var(--focus-ring-strong);
+}
+/* text-bearing fields (selects, the date field) speak UI, not figures */
+/* פריים, שפיצר, a picked date — these are values, not captions, and they are
+   set at the same weight as the figures beside them. */
+.ink-cell[data-text="true"] { font-family: var(--ui); font-weight: 600; letter-spacing: -0.005em; }
+
+/* TWO FIELDS, ONE CONTROL — the עוגן cell.
+   An anchor is a name and a margin over it, and both are typed on a manual row.
+   Showing the margin as a read-only grey note meant a hand-added row could state
+   an anchor it could not price. They are joined rather than given a column each,
+   because they are one fact and the grid stays one cell per column. The shared
+   border is a negative margin, so the seam is 1px rather than 2. */
+.ink-pair { display: flex; align-items: stretch; }
+.ink-pair > .ink-cell { position: relative; border-radius: 0; }
+.ink-pair > .ink-cell:first-child {
+  flex: 1;
+  min-width: 0;
+  border-start-start-radius: var(--r-sm);
+  border-end-start-radius: var(--r-sm);
+}
+.ink-pair > .ink-cell:last-child {
+  flex: 0 0 56px;
+  margin-inline-start: -1px;
+  padding-inline: 6px;
+  border-start-end-radius: var(--r-sm);
+  border-end-end-radius: var(--r-sm);
+}
+/* the focused half owns the seam, so its ring is never sliced by its neighbour */
+.ink-pair > .ink-cell:focus { z-index: 1; }
+
+/* CHANGED — the classic spreadsheet corner tick, in the ink. */
+.ink-well { position: relative; }
+.ink-well[data-dirty="true"]::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  inset-inline-end: 3px;
+  width: 0;
+  height: 0;
+  border-top: 5px solid var(--primary);
+  border-inline-start: 5px solid transparent;
+  pointer-events: none;
+}
+
+/* WARNING / ERROR fields */
+.ink-cell[data-state="warn"] { border-color: var(--warn-line); background: var(--warn-tint); color: var(--warn); }
+.ink-cell[data-state="warn"]:focus { border-color: var(--warn); box-shadow: 0 0 0 2px rgba(168, 81, 26, 0.4); }
+.ink-cell[data-state="err"] { border-color: var(--neg-line); background: var(--neg-tint); color: var(--neg); }
+.ink-cell[data-state="err"]:focus { border-color: var(--neg); box-shadow: 0 0 0 2px rgba(180, 35, 24, 0.4); }
+
+/* CALCULATED — flat on the paper, no field. */
+.ink-calc {
+  display: block;
+  padding: 0 8px;
+  font-size: 13px;
+  color: var(--ink-2);
+  cursor: default;
+}
+.ink-calc[data-muted="true"] { color: var(--ink-4); font-weight: 400; }
+/* The one calculated figure people actually read: the monthly payment. 9px on
+   top of the td's 5px is the column's 14px inset — see --col-inset. */
+.ink-pay { padding: 0 9px; font-size: 16px; font-weight: 600; color: var(--ink); line-height: 1.15; }
+
+/* The החזר חודשי cell has no well, but it needs a well's box: 32px tall and
+   position:relative, so its "צמוד מדד" / "תאריך עבר" note can hang off the bottom
+   like every other column's note instead of taking a line of its own. In flow the
+   note added its own height, and because the cell is vertically centred it shoved
+   the figure upward — so a row carrying the note sat 3px taller and its ₪ figure
+   3px higher than its neighbours, all the way down the column. */
+.ink-paycell { position: relative; display: flex; align-items: center; height: 36px; }
+.ink-paycell > .ink-pay { flex: 1; min-width: 0; }
+/* Two words at 9px need the room; 5px from the edge is where the other notes sit. */
+.ink-note-pay { left: 5px; display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+.ink-note-stale { color: var(--warn); font-weight: 700; }
+
+/* HIGH RATE — the figure itself carries it, and nothing else.
+   No fill, no border, no motion: the column reads normally at a glance, and a
+   rate that is out of line for its family shows up the moment you look at it.
+   Thresholds are per family (see rateHeat) because 6.5% is expensive for a
+   mortgage and cheap for a credit-card loan. */
+.ink-cell[data-heat="warm"] { color: #9a6410; }
+.ink-cell[data-heat="hot"] { color: #ac4a13; font-weight: 700; }
+
+/* The same two steps on a read-only figure in an analysis table. These had no
+   rule at all: four `data-heat` attributes were being set on `<td class="ink-fig">`
+   and rendering nothing, because the only heat rules in the sheet were scoped to
+   .ink-cell — the Ledger's <input>. Every high rate in the advisor's tables was
+   silently plain text. */
+.ink-fig[data-heat="warm"] { color: #9a6410; font-weight: 700; }
+.ink-fig[data-heat="hot"] { color: #ac4a13; font-weight: 800; }
+
+/* native spinners fight the grid */
+.ink-cell[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+.ink-cell[type="number"]::-webkit-outer-spin-button,
+.ink-cell[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+/* THREE LEVELS OF BUTTON, and no fourth.
+     SECONDARY (.ink-btn)          white, 1px hairline — the default
+     PRIMARY   (.ink-btn-primary)  solid ink-violet, one per view
+     TERTIARY  (.ink-btn-ghost)    text only, background on hover
+   Every one of them is the same height, radius and weight. The "hard 2px
+   bottom edge" that used to make these look like arcade keys is gone: a
+   machined control presses by compressing, not by falling off a ledge. */
+/* TACTILITY, without the arcade key.
+   The version before this had a hard 2px slab under every button and dropped
+   2px on :active — physical, but it made a toolbar look like a keyboard. This
+   keeps what made that read as pressable and drops what made it loud: a 1px
+   inner highlight along the top edge, a barely-there fall of shadow below, and
+   a whisper of a top-to-bottom gradient so the face catches light. The edge is
+   1px, not 2, and it darkens rather than protrudes.
+   Hover raises 1px and deepens the shadow. Press is NOT here: it is a spring,
+   and springs belong to Motion (see lib/transitions.ts) — two systems animating
+   transform on one element is how you get a button that sticks down. */
+.ink-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  background: linear-gradient(180deg, #ffffff, #f4f4f7);
+  box-shadow: inset 0 1px 0 #fff, 0 1px 1.5px rgba(0, 0, 0, 0.05), 0 1px 0 rgba(0, 0, 0, 0.03);
+  color: var(--ink-2);
+  font-family: var(--ui);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  cursor: pointer;
+  transition: background var(--t) var(--ease) var(--t-exit-delay),
+    border-color var(--t) var(--ease) var(--t-exit-delay),
+    box-shadow var(--t) var(--ease) var(--t-exit-delay),
+    translate var(--t) var(--ease) var(--t-exit-delay),
+    color var(--t) var(--ease) var(--t-exit-delay);
+  white-space: nowrap;
+  user-select: none;
+}
+.ink-btn:hover:not(:disabled) {
+  border-color: var(--edge);
+  background: linear-gradient(180deg, #ffffff, #eeeef2);
+  color: var(--ink);
+  translate: 0 -1px;
+  box-shadow: inset 0 1px 0 #fff, 0 2px 4px -1px rgba(0, 0, 0, 0.1), 0 1px 0 rgba(0, 0, 0, 0.05);
+  transition-delay: 0ms;
+}
+.ink-btn:focus-visible { outline: none; border-color: var(--primary); box-shadow: 0 0 0 2px var(--focus-ring-strong); }
+.ink-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Reads as a label, not a control: same chip, nothing to press. Used where the
+   lead is stated rather than chosen — a Fireberry session owns exactly one. */
+.ink-btn[data-static] { cursor: default; background: var(--card-3); border-color: transparent; box-shadow: none; }
+.ink-btn[data-static]:hover { background: var(--card-3); border-color: transparent; color: var(--ink-2); }
+.ink-btn[data-static]:active { transform: none; }
+
+/* The one solid fill on the page. Hover deepens the ink; it never gradients. */
+.ink-btn-primary {
+  background: var(--primary);
+  border-color: var(--primary-deep);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.26), 0 1px 2px rgba(68, 60, 176, 0.32);
+  color: #fff;
+  font-weight: 600;
+}
+.ink-btn-primary:hover:not(:disabled) {
+  background: var(--primary-deep);
+  border-color: var(--primary-press);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 3px 8px -2px rgba(68, 60, 176, 0.42);
+  color: #fff;
+}
+.ink-btn-primary:active:not(:disabled) { background: var(--primary-press); border-color: var(--primary-press); translate: 0; box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2); }
+.ink-btn-primary:disabled { background: var(--primary); border-color: var(--primary); }
+
+.ink-btn-sm { height: 30px; padding: 0 11px; font-size: 12.5px; gap: 5px; }
+
+.ink-btn-ghost { background: transparent; border-color: transparent; box-shadow: none; color: var(--ink-2); }
+.ink-btn-ghost:hover:not(:disabled) { background: var(--card-3); border-color: transparent; box-shadow: none; color: var(--ink); }
+.ink-btn-ghost:hover:not(:disabled) { translate: 0; box-shadow: none; }
+
+/* THE ENTITY-ADD BUTTONS. Secondary in shape — same height, radius, weight —
+   but carrying their family's tint, text and border, so "+ משכנתא" is
+   recognisable as a mortgage action before the word is read. */
+.ink-btn-fam {
+  background: linear-gradient(180deg, #fff, var(--fam-tint));
+  border-color: var(--fam-line);
+  box-shadow: inset 0 1px 0 #fff, 0 1px 1.5px rgba(0, 0, 0, 0.05);
+  color: var(--fam-text, var(--fam));
+}
+.ink-btn-fam:hover:not(:disabled) {
+  background: linear-gradient(180deg, var(--fam-tint), var(--fam-tint-2, var(--fam-tint)));
+  border-color: var(--fam);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 2px 4px -1px rgba(0, 0, 0, 0.09);
+  color: var(--fam-text, var(--fam));
+}
+.ink-btn-fam:focus-visible { border-color: var(--fam); box-shadow: 0 0 0 2px var(--fam-ring, var(--focus-ring-strong)); }
+
+/* A row action. Hidden until the row is approached (see .ink-row), and it
+   always names itself in Hebrew through .ink-tip — nothing here is an icon
+   an advisor has to guess at. */
+.ink-act {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--ink-3);
+  cursor: pointer;
+}
+.ink-act:hover { border-color: var(--line-2); background: #fff; color: var(--ink); }
+.ink-act:focus-visible { outline: none; border-color: var(--primary); color: var(--ink); box-shadow: 0 0 0 2px var(--focus-ring-strong); }
+.ink-act[data-danger="true"]:hover { border-color: var(--neg-line); background: var(--neg-tint); color: var(--neg); }
+.ink-act[data-armed="true"] { border-color: var(--neg); background: var(--neg); color: #fff; opacity: 1 !important; }
+
+/* The Excel export — the one green thing on the page, because green means
+   "this leaves here intact" and nothing else on the sheet does. Secondary
+   shape; only the ink is different. The label never changes while exporting:
+   swapping it for "מייצא…" resized the button mid-click and it jumped. */
+.ink-btn-excel {
+  background: linear-gradient(180deg, #fff, var(--pos-tint));
+  border-color: var(--pos-line);
+  box-shadow: inset 0 1px 0 #fff, 0 1px 1.5px rgba(0, 0, 0, 0.05);
+  color: #16603c;
+}
+.ink-btn-excel:hover:not(:disabled) {
+  background: linear-gradient(180deg, var(--pos-tint), #ddeee5);
+  border-color: var(--pos);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 2px 4px -1px rgba(0, 0, 0, 0.09);
+  color: #0f4a2e;
+}
+.ink-btn-excel:focus-visible { border-color: var(--pos); box-shadow: 0 0 0 2px rgba(20, 122, 69, 0.45); }
+.ink-btn-excel .ink-excel-ico { color: var(--pos); }
+
+/* ------------------------------------------------------------------- tabs */
+
+.ink-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 36px;
+  padding: 0 13px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  background: linear-gradient(180deg, #ffffff, #f4f4f7);
+  box-shadow: inset 0 1px 0 #fff, 0 1px 1.5px rgba(0, 0, 0, 0.05);
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  color: var(--ink-2);
+  cursor: pointer;
+  transition: background var(--t) var(--ease) var(--t-exit-delay),
+    border-color var(--t) var(--ease) var(--t-exit-delay),
+    color var(--t) var(--ease) var(--t-exit-delay),
+    translate var(--t) var(--ease) var(--t-exit-delay),
+    box-shadow var(--t) var(--ease) var(--t-exit-delay);
+  white-space: nowrap;
+}
+.ink-tab:hover { color: var(--ink); border-color: var(--edge); background: linear-gradient(180deg, #fff, #eeeef2); translate: 0 -1px; box-shadow: inset 0 1px 0 #fff, 0 2px 4px -1px rgba(0, 0, 0, 0.1); transition-delay: 0ms; }
+/* The active mix is the ink, filled. Nothing else on the tab strip is. */
+.ink-tab[data-on="true"] {
+  background: var(--primary);
+  border-color: var(--primary-deep);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.26), 0 1px 2px rgba(68, 60, 176, 0.32);
+  color: #fff;
+}
+.ink-tab[data-on="true"]:hover { background: var(--primary-deep); border-color: var(--primary-press); }
+.ink-tab[data-on="true"] .ink-tab-x { color: rgba(255, 255, 255, 0.62); }
+.ink-tab-x { color: var(--ink-4); border-radius: 8px; padding: 1px; margin-inline-start: -2px; transition: background var(--t) ease, color var(--t) ease; }
+.ink-tab-x:hover { color: inherit; background: rgba(127, 127, 127, 0.18); }
+
+/* ------------------------------------------------------- the ledger table */
+
+/* Fixed layout: the column widths are a design decision, not a side effect of
+   whatever happens to be typed in a cell. */
+.ink-table { width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0; }
+/* ONE INSET FOR THE WHOLE COLUMN.
+   Every header reads the same way: Hebrew, start-aligned. Numeric cells are
+   LTR-isolated but text-aligned right, which in an RTL table is the same edge —
+   so a column's header and its figures sit on one line, always.
+
+   "The same edge" only holds if they are inset by the same amount, and they were
+   not: a header sat 8px in, a row's figure 13px (td padding + ink-pay), a group
+   subtotal wherever its hand-tuned flex width landed, and the grand total 6px.
+   Four offsets down one column, which is exactly what a ledger must never do.
+   14px is the number every editable cell already produced — td padding 5 + the
+   well's 1px border + its 8px inner padding — so the naked figures and the
+   headers are brought to it rather than the other way round. Change it in one
+   place and the column stays true. */
+.ink-table { --col-inset: 14px; }
+/* NOTHING ON THIS PAGE STICKS.
+   The header and the totals bar used to pin themselves to the viewport. They
+   don't any more — the page is one static document from the title to the
+   comparison, and a surface that slides over its own content is the only
+   thing that would need a translucent material. There is no glass here at all
+   now, which is the point. */
+.ink-table th {
+  padding: 11px 8px;
+  padding-inline-start: var(--col-inset);
+  text-align: start;
+  /* A column header is the one label an advisor reads on every pass down the
+     sheet. 700 at 13px in near-ink: it names the column from a metre away and
+     stops the header row reading as a caption. */
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.005em;
+  color: #2f323a;
+  background: #fff;
+  border-bottom: 1px solid var(--line-2);
+  white-space: nowrap;
+}
+.ink-table td { padding: 4px 5px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.ink-table tbody tr { transition: background var(--t) var(--ease) var(--t-exit-delay); }
+.ink-table tbody tr:hover { transition-delay: 0ms; }
+
+/* THE TOTALS BAR — the one line that has to be unmissable. Ruled by a solid
+   ink hairline rather than a slab, and its figures a full step larger. */
+.ink-table tfoot td {
+  padding: 13px 6px;
+  border-top: 1.5px solid var(--ink);
+  border-bottom: 0;
+  background: #fff;
+}
+.ink-total-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding-inline-start: 4px;
+  font-family: var(--display);
+  font-size: 13.5px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+}
+/* tfoot pads 6px, so 8px more lands the digits on the column's 14px inset */
+.ink-total-fig { padding-inline: 8px; font-size: 17px; font-weight: 600; color: var(--ink); letter-spacing: -0.025em; }
+.ink-total-fig[data-hot="true"] { color: var(--primary); }
+
+/* THE ACCENT — family identity drawn on the row's start edge, which in this
+   RTL sheet is its right edge. 4px at rest, 6px on approach.
+   Drawn as a positioned bar rather than a border so the growth is a scaleX
+   from the start edge — a transform, which the compositor can do in a frame,
+   instead of a width the layout engine has to reflow the whole table for. */
+.ink-row > td:first-child { position: relative; padding-inline-start: 9px; }
+.ink-row > td:first-child::after {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: 4px;
+  background: var(--fam, var(--line-2));
+  transform-origin: right center; /* the start edge, in RTL */
+  transition: transform var(--t) var(--ease) var(--t-exit-delay);
+}
+.ink-row:hover > td:first-child::after,
+.ink-row:focus-within > td:first-child::after { transform: scaleX(1.5); transition-delay: 0ms; }
+.ink-row:hover > td { background: var(--card-2); }
+/* SELECTED — the row you are actually editing, washed in its own family, and
+   its fields ringed in that family too (--focus, set below). A 12% tint under
+   a whole row of white fields is a slab; the wash is that colour at a third
+   of the strength, which reads as "this row" without shouting it. */
+.ink-row:focus-within > td { background: var(--fam-wash, var(--primary-wash)); }
+.ink-row {
+  --focus: var(--fam, var(--primary));
+  --focus-ring: var(--fam-tint-2, var(--primary-tint-2));
+  --focus-ring-strong: var(--fam-ring, rgba(91, 84, 214, 0.45));
+}
+/* A flagged row keeps its family spine — identity must never be overwritten by
+   a transient state. The flag reads on the well and in the החזר cell instead,
+   with a matching notch on the spine so the row is findable when scrolling. */
+/* A flagged row keeps its family accent — identity is never overwritten by a
+   transient state — and gets a dashed notch drawn over it so the row is
+   findable while scrolling. */
+.ink-row[data-flag] > td:first-child::before {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  inset-block: 5px;
+  inset-inline-start: 0;
+  width: 4px;
+  background: repeating-linear-gradient(180deg, var(--flag) 0 3px, transparent 3px 6px);
+}
+.ink-row[data-flag="err"] { --flag: var(--neg); }
+.ink-row[data-flag="warn"] { --flag: var(--warn); }
+
+/* ROW ACTIONS ON APPROACH. Three glyphs on every one of forty rows is a wall;
+   revealed on hover they are a wall that isn't there until you reach for it.
+   They arrive 30ms apart, from the outside edge in, which reads as one gesture
+   rather than three things blinking on. Keyboard users are not hover users, so
+   focus-within reveals them too, and an armed delete stays put regardless. */
+.ink-row .ink-act {
+  opacity: 0;
+  transform: translateX(-6px);
+  transition: opacity var(--t) var(--ease) var(--t-exit-delay),
+    transform var(--t) var(--ease) var(--t-exit-delay),
+    background var(--t) var(--ease), border-color var(--t) var(--ease), color var(--t) var(--ease);
+}
+.ink-row:hover .ink-act,
+.ink-row:focus-within .ink-act { opacity: 1; transform: none; }
+.ink-row:hover .ink-act:nth-child(1),
+.ink-row:focus-within .ink-act:nth-child(1) { transition-delay: 0ms; }
+.ink-row:hover .ink-act:nth-child(2),
+.ink-row:focus-within .ink-act:nth-child(2) { transition-delay: 30ms; }
+.ink-row:hover .ink-act:nth-child(3),
+.ink-row:focus-within .ink-act:nth-child(3) { transition-delay: 60ms; }
+.ink-act:focus-visible { opacity: 1 !important; transform: none !important; }
+
+/* the family chip: word + swatch, never colour alone */
+.ink-fam {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 9px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: var(--fam-tint, #fff);
+  color: var(--fam-text, var(--fam, var(--ink-2)));
+  font-family: var(--ui);
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--t) ease, border-color var(--t) ease;
+}
+.ink-fam:hover { border-color: var(--fam-line); }
+.ink-fam:focus-visible { outline: none; border-color: var(--fam); box-shadow: 0 0 0 2px var(--fam-ring, var(--focus-ring-strong)); }
+.ink-fam-ico { flex: none; opacity: 0.9; }
+
+/* Share-of-mix meter under the chip. Held at 45% so it stays a measurement
+   and does not compete with the row's 4px identity accent — two saturated
+   marks of the same colour on one row and neither one means anything. */
+.ink-share { height: 2px; border-radius: 1px; background: var(--line); overflow: hidden; opacity: 0.3; transition: opacity var(--t) var(--ease); }
+.ink-row:hover .ink-share, .ink-row:focus-within .ink-share { opacity: 0.9; }
+.ink-share span { display: block; height: 100%; background: var(--fam); border-radius: 1px; transition: width 0.45s var(--ease); }
+
+/* The in-table group divider — one continuous table, still scannable.
+   Tinted at 4% of the family so the band belongs to the rows beneath it
+   without becoming a second header. Its cells are the table's own cells, so a
+   family subtotal lands in the same column as the rows it totals. */
+.ink-groupbar > td {
+  padding: 7px 5px;
+  border-bottom: 1px solid var(--line-2);
+  background: color-mix(in srgb, var(--fam) 4%, #fff);
+}
+.ink-groupbar > td:first-child { border-inline-start: 4px solid var(--fam); }
+.ink-groupbar-in { display: flex; align-items: center; gap: 8px; padding-inline-start: 9px; }
+.ink-groupbar-title {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--display); font-size: 13px; font-weight: 700;
+  letter-spacing: -0.015em; color: var(--fam-text, var(--fam)); white-space: nowrap;
+}
+.ink-groupbar-sum {
+  padding-inline: 9px;
+  font-family: var(--num); font-variant-numeric: tabular-nums;
+  font-size: 15px; font-weight: 600; color: var(--ink);
+  letter-spacing: -0.025em;
+}
+
+/* ------------------------------------------------------- composition bar */
+/* Segments are lit from the top and separated by a hairline of the page, so a
+   4%-wide track still reads as its own block rather than a colour smear. */
+.ink-bar {
+  display: flex;
+  height: 46px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  overflow: hidden;
+}
+.ink-bar-seg {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-width: 3px;
+  transition: filter var(--t) ease;
+}
+.ink-bar-seg + .ink-bar-seg { box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.6); }
+.ink-bar-seg:hover { filter: brightness(1.07); }
+.ink-bar-pct {
+  font-family: var(--num);
+  font-variant-numeric: tabular-nums;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #fff;
+}
+/* A pale step of the ink ramp cannot carry white text. Segments below the
+   midpoint state their share in the ink instead. */
+.ink-bar-pct[data-dark="true"] { color: var(--primary-deep); }
+
+/* ------------------------------------------------------------------ chips */
+
+.ink-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 9px;
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+  background: #fff;
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.ink-dot { width: 8px; height: 8px; border-radius: 2.5px; flex: none; }
+.ink-tag {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 1px 6px; border-radius: 6px;
+  font-size: 9.5px; font-weight: 700; letter-spacing: 0.01em; line-height: 1.6;
+}
+
+/* --------------------------------------------------------------- dropzone */
+/* THE INTAKE BAY — the hero of this page.
+   Dropping a חיווי אשראי fills the entire mix in one gesture; nothing else
+   here is worth as much per click, so it is sized and lit accordingly. It is
+   also the one surface on the page allowed a gradient and a dashed edge,
+   because "put a document here" is the one thing that has to read as an
+   opening rather than as a panel. */
+
+/* DEAD STILL UNTIL TOUCHED. At rest this is a static panel with a static
+   dashed edge — no beam, no breathing, nothing. The dashes only start marching
+   when a file is actually over it, and they stop the moment it lands. */
+.ink-bay {
+  position: relative;
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  /* Dashed at rest, because that is what a place-a-file-here reads as
+     everywhere. Static, though — the dashes only march once a file is actually
+     over the zone, and the marching set is an SVG drawn on top of this one. */
+  border: 2px dashed var(--primary-line);
+  border-radius: var(--r);
+  /* the page's single gradient: the identity violet at 4%, falling to white */
+  background: linear-gradient(180deg, #f3f2fd 0%, #fbfbfe 55%, #ffffff 100%);
+  text-align: start;
+  cursor: pointer;
+  transition: border-color var(--t) var(--ease), box-shadow var(--t) var(--ease),
+    background var(--t) var(--ease);
+}
+.ink-bay:hover { border-color: var(--primary); box-shadow: var(--shadow-hover); }
+.ink-bay:focus-visible { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--focus-ring-strong); }
+.ink-bay[data-drag="true"] {
+  border-color: transparent;
+  background: linear-gradient(180deg, #e9e7fb 0%, #f6f5fe 60%, #ffffff 100%);
+  box-shadow: var(--shadow-lift);
+}
+.ink-bay[data-state="err"] { border-color: var(--neg); background: linear-gradient(180deg, #fdf1f0, #fff); }
+
+/* THE MARCHING ANTS.
+   An SVG rect stroked with a dash array, drawn on top of the panel's own
+   border, animating only stroke-dashoffset — one compositor-friendly property
+   and one that a plain CSS dashed border cannot animate at all. Present only
+   while a file is over the bay. */
+/* The rect is the full box and its stroke is 4px wide, so the outer half is
+   clipped by the bay's own overflow and exactly 2px shows — a dashed line
+   sitting precisely where the resting border was, corners and all. */
+.ink-ants { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.ink-ants rect {
+  fill: none;
+  stroke: var(--primary);
+  stroke-width: 4;
+  stroke-dasharray: 9 7;
+  animation: ink-march 620ms linear infinite;
+}
+@keyframes ink-march {
+  to { stroke-dashoffset: -16; }
+}
+
+/* The scan pass, while the PDF is being decoded. This one is a progress
+   indicator — it exists because the user dropped a file and work is happening,
+   and it ends when the work does. */
+.ink-beam { position: absolute; inset: 0; pointer-events: none; overflow: hidden; border-radius: inherit; }
+.ink-beam::after {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  width: 38%;
+  background: linear-gradient(90deg, transparent, rgba(91, 84, 214, 0.13), transparent);
+  animation: ink-sweep 1.5s ease-in-out infinite;
+}
+@keyframes ink-sweep {
+  0% { transform: translateX(-120%); }
+  100% { transform: translateX(350%); }
+}
+
+
+/* ------- the mark: a document being lifted and read, drawn in the palette --- */
+/* Two sheets and a scan line. Geometric, flat, no perspective tricks — the
+   copper sheet behind is the הלוואה the report will yield, the violet-ruled
+   sheet in front is the משכנתא. The whole thing is the page's two identity
+   colours saying what comes out of the bay before a word is read. */
+.ink-mark {
+  position: relative;
+  width: 76px;
+  height: 76px;
+  flex: none;
+  transition: translate var(--t) var(--ease) var(--t-exit-delay);
+}
+.ink-bay:hover .ink-mark,
+.ink-bay[data-drag="true"] .ink-mark { translate: 0 -3px; transition-delay: 0ms; }
+.ink-mark svg { display: block; width: 100%; height: 100%; overflow: visible; }
+/* the sheet lifts off the stack on approach */
+.ink-mark .m-front { transition: transform var(--t) var(--ease) var(--t-exit-delay); transform-origin: 52px 56px; }
+.ink-bay:hover .ink-mark .m-front,
+.ink-bay[data-drag="true"] .ink-mark .m-front { transform: translate(-3px, -6px) rotate(-2.5deg); transition-delay: 0ms; }
+/* the scan line runs only while the bay is live */
+.ink-mark .m-scan { opacity: 0; transition: opacity 200ms ease; }
+.ink-bay[data-drag="true"] .ink-mark .m-scan,
+.ink-bay[data-busy="true"] .ink-mark .m-scan { opacity: 1; animation: ink-scan 1.5s var(--ease) infinite; }
+@keyframes ink-scan {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(30px); }
+}
+.ink-bay[data-state="err"] .ink-mark { filter: grayscale(0.7); }
+
+/* the formats footnote, on the bay's own bottom rule */
+.ink-bay-foot {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 5px;
+  font-size: 11.5px;
+  color: var(--ink-4);
+}
+.ink-bay-foot span { display: inline-flex; align-items: center; gap: 5px; }
+.ink-bay-foot i { width: 3px; height: 3px; border-radius: 99px; background: var(--ink-4); display: inline-block; }
+
+/* numbered how-it-works rail inside the bay */
+.ink-steps { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; }
+.ink-step {
+  display: inline-flex; align-items: center; gap: 7px;
+  height: 26px; padding: 0 11px 0 8px;
+  border: 1px solid var(--line); border-radius: 999px;
+  background: rgba(255, 255, 255, 0.8);
+  font-size: 11.5px; font-weight: 500; color: var(--ink-2); white-space: nowrap;
+}
+.ink-step b {
+  display: grid; place-items: center;
+  width: 17px; height: 17px; border-radius: 999px;
+  background: var(--primary); border: 0;
+  font-family: var(--num); font-size: 10px; font-weight: 600; color: #fff;
+}
+.ink-step-sep { width: 14px; height: 1px; background: var(--line-2); flex: none; }
+
+/* imported-result strip */
+.ink-recv { display: flex; align-items: stretch; flex-wrap: wrap; }
+.ink-recv-cell { display: flex; flex-direction: column; gap: 3px; justify-content: center; padding: 9px 14px; }
+.ink-recv-cell + .ink-recv-cell { border-inline-start: 1px solid var(--line); }
+
+/* ------------------------------------------------------------------ misc */
+
+.ink-scroll { scrollbar-width: thin; scrollbar-color: var(--line-2) transparent; }
+.ink-scroll::-webkit-scrollbar { width: 10px; height: 10px; }
+.ink-scroll::-webkit-scrollbar-track { background: transparent; }
+.ink-scroll::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: 999px; border: 3px solid #fff; }
+
+.ink-empty {
+  display: grid; place-items: center; gap: 12px;
+  padding: 40px 16px; text-align: center;
+  font-size: 13px; color: var(--ink-3);
+}
+
+/* A loading placeholder holds the shape and says nothing else. The shimmer
+   that used to run here was an idle loop on a page that has none. */
+.ink-skel { border-radius: var(--r-sm); background: var(--card-3); }
+
+@media (prefers-reduced-motion: reduce) {
+  .ink-bay, .ink-mark, .ink-mark .m-front, .ink-share span, .ink-rail-strip span,
+  .ink-btn, .ink-tab, .ink-act, .ink-row > td:first-child::after { transition: none; }
+  .ink-beam::after, .ink-mark .m-scan, .ink-ants rect, .ink-money[data-pulse] { animation: none; }
+  .ink-btn:hover:not(:disabled), .ink-tab:hover, .ink-flag[data-go]:hover { translate: none; transform: none; }
+}
+
+/* --------------------------------------------------- custom select popover */
+
+.ink-sel-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--ui);
+  font-weight: 600;
+  text-align: start;
+  cursor: pointer;
+}
+.ink-sel-btn[data-empty="true"] { color: var(--ink-4); }
+.ink-sel-caret { margin-inline-start: auto; flex: none; color: var(--ink-4); transition: transform 200ms var(--ease), color var(--t) ease; }
+.ink-sel-btn:hover .ink-sel-caret { color: var(--ink-2); }
+.ink-sel-btn[data-open="true"] .ink-sel-caret { transform: rotate(180deg); color: var(--focus); }
+.ink-sel-btn[data-open="true"] {
+  border-color: var(--focus);
+  box-shadow: 0 0 0 2px var(--focus-ring-strong);
+}
+
+/* A SELECT INSIDE THE GRID IS BORDERLESS AND SHRINKS TO ITS VALUE.
+   Ten bordered boxes across a row turn the sheet into a form; the chevron is
+   already an unambiguous "this opens", so the border and the fill are held
+   back until you approach. What the row looks like at rest is its values —
+   which is what an advisor is scanning for.
+
+   Width is fit-content because a full-width borderless select strands its
+   chevron 80px from the word it belongs to, and the two stop reading as one
+   control. Hugging the value also puts every chevron in the column at a
+   different x, which is the honest signal: these are values of different
+   lengths, not a column of empty boxes. */
+.ink-table .ink-cell.ink-sel-btn {
+  width: fit-content;
+  max-width: 100%;
+  border-color: transparent;
+  background: transparent;
+}
+.ink-table .ink-cell.ink-sel-btn:hover:not(:disabled) {
+  border-color: var(--line-2);
+  background: #fff;
+}
+.ink-table .ink-cell.ink-sel-btn[data-open="true"],
+.ink-table .ink-cell.ink-sel-btn:focus-visible {
+  border-color: var(--focus);
+  background: #fff;
+}
+
+.ink-pop {
+  position: fixed;
+  z-index: 90;
+  overflow: auto;
+  background: #fff;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  box-shadow: var(--shadow-lift);
+  padding: 5px;
+}
+.ink-sel-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  font-family: var(--ui);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-2);
+  text-align: start;
+  cursor: pointer;
+}
+.ink-sel-item[data-hi="true"] { background: var(--primary-tint); color: var(--ink); }
+.ink-sel-item[data-on="true"] { color: var(--ink); font-weight: 700; }
+/* an option that carries its own colour (the debt families) keeps it in the list */
+.ink-sel-item[style*="--tone"] { color: var(--tone); }
+.ink-sel-item[style*="--tone"][data-hi="true"] { background: color-mix(in srgb, var(--tone) 8%, #fff); }
+.ink-sel-check { margin-inline-start: auto; flex: none; color: var(--primary); }
+.ink-sel-note { margin-inline-start: auto; font-family: var(--num); font-size: 11px; color: var(--ink-4); }
+
+/* ---------------------------------------------------- date picker popover */
+
+.ink-cal { width: 268px; padding: 11px; }
+.ink-cal-head { display: flex; align-items: center; gap: 5px; margin-bottom: 9px; }
+.ink-cal-nav {
+  display: grid; place-items: center;
+  width: 28px; height: 28px; flex: none;
+  border: 1px solid var(--line-2); border-radius: 8px;
+  background: #fff; color: var(--ink-3); cursor: pointer;
+  transition: background var(--t) ease, border-color var(--t) ease, color var(--t) ease, transform 110ms var(--ease);
+}
+.ink-cal-nav:hover { border-color: var(--edge); color: var(--ink); background: var(--card-2); }
+.ink-cal-nav:focus-visible { outline: none; border-color: var(--primary); box-shadow: 0 0 0 2px var(--focus-ring-strong); }
+.ink-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; }
+.ink-cal-dow { display: grid; place-items: center; height: 22px; font-size: 10.5px; font-weight: 500; color: var(--ink-4); }
+.ink-cal-day {
+  display: grid; place-items: center;
+  height: 36px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  font-family: var(--num);
+  font-variant-numeric: tabular-nums;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ink-2);
+  cursor: pointer;
+  transition: background var(--t) ease, color var(--t) ease, border-color var(--t) ease;
+}
+.ink-cal-day:hover { background: var(--card-3); }
+.ink-cal-day:focus-visible { outline: none; border-color: var(--primary); box-shadow: 0 0 0 2px var(--focus-ring-strong); }
+.ink-cal-day[data-out="true"] { color: var(--ink-4); font-weight: 400; }
+.ink-cal-day[data-today="true"] { border-color: var(--line-2); }
+.ink-cal-day[data-on="true"] { background: var(--primary); border-color: var(--primary); color: #fff; font-weight: 600; }
+.ink-cal-foot { display: flex; align-items: center; gap: 6px; margin-top: 9px; padding-top: 9px; border-top: 1px solid var(--line); }
+.ink-cal-hint { margin-inline-start: auto; font-family: var(--ui); font-size: 11px; color: var(--ink-4); }
+
+/* ------------------------------------------------------------- annotations */
+
+/* Numeric wells read LTR and flush right so a column's units digits line up. */
+.ink-num-in { direction: ltr; unicode-bidi: isolate; text-align: right; }
+
+/* A derived note pinned in the well's bottom-left corner. Absolute, so it can
+   never change the row's height — which is what made the months cell jump.
+   (Named ink-note, not ink-sub: ink-sub is the card-header subtitle, and giving
+   both the same name once flung every subtitle into the page margin.) */
+.ink-note {
+  position: absolute;
+  bottom: 0;
+  left: 6px;
+  font-family: var(--num);
+  font-variant-numeric: tabular-nums;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--ink-3);
+  pointer-events: none;
+}
+/* A note that is arithmetic rather than words — "−1.08% + 3.05%".
+   Without the isolate the bidi algorithm walks it: inside an RTL cell the signs
+   and the two percentages get reordered, and "6.00% −0.40%" renders as
+   "0.40%− 6.00%" — a different, wrong sum. Same reason Money isolates; see the
+   note above .ink-money. Notes that ARE words (a bank name, "צמוד מדד") must stay
+   RTL, which is why this is a modifier and not baked into .ink-note. */
+.ink-note-num { direction: ltr; unicode-bidi: isolate; text-align: left; }
+/* The anchor's level belongs under the anchor's NAME, not under the margin field
+   at the cell's other end — parked there it read as an annotation of the margin,
+   so a row whose margin was blank appeared to have a margin of 2.80%. Pinned to
+   the cell's start edge on the column's own 14px inset. */
+.ink-note-anchor { left: auto; right: 9px; text-align: right; }
+
+/* ---------------------------------------------------------------- tooltips */
+/* Opens to the row's inside, never past the scroll container, so it cannot be
+   clipped by the table's overflow. Delayed, so hovering across a row is quiet. */
+.ink-tip { position: relative; }
+.ink-tip::after {
+  content: attr(data-tip);
+  position: absolute;
+  left: calc(100% + 7px);
+  top: 50%;
+  padding: 5px 9px;
+  border-radius: 8px;
+  background: var(--ink);
+  color: #fff;
+  font-family: var(--ui);
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-50%) translateX(4px) scale(0.97);
+  transition: opacity 0.13s ease 0.28s, transform 0.2s var(--ease) 0.28s;
+  z-index: 60;
+}
+.ink-tip:hover::after,
+.ink-tip:focus-visible::after { opacity: 1; transform: translateY(-50%) translateX(0) scale(1); }
+.ink-tip[data-tip-side="start"]::after { left: auto; right: calc(100% + 7px); transform: translateY(-50%) translateX(-4px) scale(0.97); }
+.ink-tip[data-tip-side="start"]:hover::after { transform: translateY(-50%) translateX(0) scale(1); }
+
+/* -------------------------------------------------------- the family select */
+/* A TINTED CHIP, not a box. The row already says which family it is with its
+   4px edge accent; this states it in a word and an icon and opens to the
+   other one. No border at rest — a bordered version read as an empty
+   dropdown, which is the one thing this cell is not. */
+.ink-fam-sel {
+  width: fit-content;
+  min-width: 0;
+  height: 26px;
+  /* 9px start, so the chip's word sits on the column's 14px inset like every
+     other cell's content */
+  padding: 0 9px 0 6px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: var(--fam-tint, #fff);
+  color: var(--fam-text, var(--fam, var(--ink-2)));
+  font-family: var(--ui);
+  font-size: 11.5px;
+  font-weight: 600;
+  gap: 5px;
+}
+.ink-fam-sel:hover:not(:disabled) { border-color: var(--fam-line); background: var(--fam-tint-2, var(--fam-tint)); }
+.ink-fam-sel[data-open="true"] { border-color: var(--fam); box-shadow: 0 0 0 2px var(--fam-ring, var(--focus-ring-strong)); background: var(--fam-tint); }
+.ink-fam-sel .ink-sel-caret { color: currentColor; opacity: 0.5; margin-inline-start: 2px; }
+
+/* ------------------------------------------------------------- the add row */
+
+.ink-addrow > td { padding: 0; border-bottom: 1px solid var(--line); background: var(--card-2); }
+.ink-addrow-in {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-inline-start: 4px dashed var(--line-2);
+}
+.ink-addrow-hint { font-size: 11.5px; color: var(--ink-3); }
+
+/* ------------------------------------------------- the row-settings popover */
+
+.ink-sheet { width: 352px; padding: 0; overflow: hidden; border-radius: var(--r); }
+.ink-sheet-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--line);
+  background: var(--card-2);
+}
+.ink-sheet-body { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 14px; }
+.ink-sheet-foot {
+  padding: 9px 14px;
+  border-top: 1px solid var(--line);
+  background: var(--card-2);
+  font-size: 11px;
+  color: var(--ink-3);
+}
+
+/* the expander tray under a row */
+.ink-tray { background: var(--card-2); box-shadow: inset 0 3px 5px -4px rgba(0, 0, 0, 0.1); }
+
+/* toast */
+.ink-toast {
+  display: flex; align-items: center; gap: 9px;
+  padding: 11px 15px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-2);
+  background: #fff;
+  box-shadow: var(--shadow-lift);
+  font-size: 13px; font-weight: 600;
+}
+
+/* ==================================================== חיווי אשראי — ניתוח */
+/* The analysis modal. Colour is spent only on severity and on family identity;
+   every table stays black on white so the exceptions are the only things that
+   catch the eye. */
+
+.ink-kpis {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  border-bottom: 1px solid var(--line);
+  background: #fff;
+}
+@media (max-width: 1040px) { .ink-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+/* Label, figure and note all hug the same edge. Money is direction:ltr, so its
+   own text-align:right lands on the RTL tile's start edge — the same side the
+   Hebrew label starts from. Anything else zig-zags down the band. */
+.ink-kpi { position: relative; padding: 12px 16px 13px; text-align: start; }
+.ink-kpi .ink-label { font-size: 12px; letter-spacing: 0.01em; color: var(--ink-3); }
+.ink-kpi + .ink-kpi { border-inline-start: 1px solid var(--line); }
+/* Tone rides on a hairline above the tile, so an exception is marked without
+   the band turning into a warning panel. */
+.ink-kpi-rule { position: absolute; inset-block-start: 0; inset-inline: 0; height: 2px; background: transparent; }
+.ink-kpi[data-tone="primary"] .ink-kpi-rule { background: var(--primary); }
+.ink-kpi[data-tone="neg"] .ink-kpi-rule { background: var(--neg); }
+.ink-kpi[data-tone="warn"] .ink-kpi-rule { background: var(--warn); }
+.ink-kpi-val { margin-top: 5px; min-height: 30px; }
+.ink-kpi-num { font-size: 25px; font-weight: 600; letter-spacing: -0.03em; }
+/* Reserved even when empty, so five tiles keep one baseline. */
+.ink-kpi-sub { margin-top: 3px; min-height: 16px; font-size: 12px; color: var(--ink-3); }
+
+.ink-navbar {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  display: flex; flex-wrap: wrap; gap: 6px;
+  padding: 9px 16px;
+  border-bottom: 1px solid var(--line);
+  background: #fff;
+}
+
+.ink-analysis { padding: 0 16px 24px; }
+.ink-sec { padding: 18px 0; border-bottom: 1px solid var(--line); scroll-margin-top: 48px; }
+.ink-sec:last-child { border-bottom: 0; }
+.ink-sec-head { display: flex; align-items: center; gap: 9px; margin-bottom: 12px; }
+.ink-sec-ico {
+  display: grid; place-items: center; flex: none;
+  width: 24px; height: 24px;
+  border-radius: 8px;
+  background: var(--card-3);
+  color: var(--ink-3);
+}
+
+/* a short row of stated figures — same rhythm as the KPI band, section scale */
+.ink-facts { display: flex; flex-wrap: wrap; gap: 26px; }
+
+/* --- findings: a rule of colour on the leading edge, nothing else shouts --- */
+.ink-flag {
+  position: relative;
+  display: flex; gap: 10px;
+  padding: 9px 13px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: #fff;
+  transition: border-color var(--t) ease, box-shadow var(--t) ease;
+}
+.ink-flag:hover { border-color: var(--line-2); }
+.ink-flag::before {
+  content: ""; position: absolute; inset-block: -1px; inset-inline-start: -1px;
+  width: 3px;
+  border-start-start-radius: var(--r-sm); border-end-start-radius: var(--r-sm);
+}
+.ink-flag[data-sev="critical"]::before { background: var(--neg); }
+.ink-flag[data-sev="high"]::before { background: var(--warn); }
+.ink-flag[data-sev="medium"]::before { background: var(--warn-line); }
+.ink-flag[data-sev="info"]::before { background: var(--line-2); }
+.ink-flag[data-sev="critical"] { border-color: var(--neg-line); background: #fffbfb; }
+
+.ink-flag-sev {
+  align-self: flex-start; flex: none;
+  min-width: 58px;
+  margin-top: 1px;
+  padding: 3px 8px;
+  border-radius: 99px;
+  font-size: 10.5px; font-weight: 600; letter-spacing: 0.01em;
+  text-align: center; white-space: nowrap;
+}
+.ink-flag[data-sev="critical"] .ink-flag-sev, .ink-flag-sev[data-sev="critical"] { background: var(--neg-tint); color: var(--neg); }
+.ink-flag[data-sev="high"] .ink-flag-sev, .ink-flag-sev[data-sev="high"] { background: var(--warn-tint); color: var(--warn-deep, #8d5527); }
+.ink-flag[data-sev="medium"] .ink-flag-sev, .ink-flag-sev[data-sev="medium"] { background: var(--card-3); color: var(--warn); }
+.ink-flag[data-sev="info"] .ink-flag-sev, .ink-flag-sev[data-sev="info"] { background: var(--card-3); color: var(--ink-3); }
+
+/* --- proportions, as one bar --- */
+.ink-split {
+  display: flex; height: 10px;
+  border-radius: 99px; overflow: hidden;
+  background: var(--card-3);
+}
+.ink-split > span { display: block; height: 100%; }
+.ink-split > span + span { box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.85); }
+
+/* --- arrears history: month columns, deeper red the older the arrears --- */
+.ink-heat { border-collapse: separate; border-spacing: 2px; font-family: var(--num); }
+.ink-heat th {
+  position: static; z-index: auto;
+  padding: 0 2px;
+  border: 0; background: transparent;
+  font-size: 10.5px; font-weight: 500; color: var(--ink-4);
+  text-align: center; white-space: nowrap;
+}
+.ink-heat td {
+  width: 28px; height: 20px;
+  padding: 0;
+  border: 0; border-radius: 8px;
+  background: var(--card-3);
+  text-align: center; font-size: 10.5px; font-weight: 600; color: #6d4022;
+}
+/* The 180+ bucket is the only cell dark enough to need reversing out. */
+.ink-heat td[style*="#b42318"] { color: #fff; }
+
+/* --- compact table: auto widths, non-sticky heads, exceptions tinted --- */
+/* Sized to its content, not stretched to the sheet. A full-width table with
+   eight short numeric columns scatters them across a metre of white and stops
+   being a table you can read across — the row is the unit here, so the columns
+   sit together and the leftover space stays leftover. */
+.ink-mini { table-layout: auto; width: auto; max-width: 100%; }
+/* Analysis tables do not scroll under their own header, so they get no blur —
+   the systemMaterial exception is for sticky surfaces only. */
+.ink-mini th {
+  position: static; z-index: auto; padding: 7px 8px; font-size: 11.5px;
+  background: var(--card-2);
+}
+.ink-mini td { padding: 5px 8px; font-size: 12px; text-align: start; white-space: nowrap; }
+.ink-mini tbody tr:hover { background: var(--card-2); }
+.ink-mini tbody tr[data-bad] { background: var(--neg-tint); }
+.ink-mini tbody tr[data-bad]:hover { background: #fbdfe6; }
+.ink-mini tfoot td {
+  position: static;
+  padding: 9px 8px; font-size: 12.5px;
+  border-top: 1.5px solid var(--ink);
+  background: var(--card-3);
+}
+
+/* --- on paper, the analysis is the page --- */
+@media print {
+  body > *:not(.ink-printable) { display: none !important; }
+  .ink-printable {
+    position: static !important; inset: auto !important;
+    display: block !important; padding: 0 !important;
+    background: #fff !important;
+  }
+  .ink-printable .ink-card {
+    max-width: none !important; width: auto !important;
+    height: auto !important; max-height: none !important;
+    border: 0 !important; box-shadow: none !important;
+  }
+  .ink-analysis { height: auto !important; overflow: visible !important; }
+  .ink-navbar, .ink-noprint { display: none !important; }
+  .ink-sec { break-inside: avoid; }
+  .ink-flag { break-inside: avoid; }
+}
+
+/* The unbounded ledger.
+   With the card no longer clipping (so the sticky header and totals bar can
+   hold against the page), the totals row's own corners have to match the card
+   the table now sits flush inside — otherwise a square edge shows through the
+   card's radius. */
+.ink-table tfoot tr:last-child td:first-child { border-end-start-radius: var(--r); }
+.ink-table tfoot tr:last-child td:last-child { border-end-end-radius: var(--r); }
+/* Analysis tables live inside their own scrolling sheet and keep square ends. */
+.ink-mini tfoot tr:last-child td:first-child,
+.ink-mini tfoot tr:last-child td:last-child { border-radius: 0; }
+
+/* ==================================================== סיכום ללקוח */
+/* A different reader from the analysis: someone seeing their own finances laid
+   out for the first time, across a desk. Bigger type, fewer figures, and the
+   only colour is the one that means "look at this". */
+
+.ink-cs { padding: 4px 16px 14px; }
+
+.ink-cs-group { padding: 12px 0 4px; }
+.ink-cs-group + .ink-cs-group { border-top: 1px solid var(--line); }
+.ink-cs-title {
+  display: flex; align-items: center; gap: 9px;
+  margin-bottom: 4px;
+  font-family: var(--display, var(--ui));
+  font-size: 15px; font-weight: 600; letter-spacing: -0.015em;
+  color: var(--ink);
+}
+.ink-cs-title::before {
+  content: ""; width: 9px; height: 9px; border-radius: 3px;
+  background: var(--fam); flex: none;
+}
+
+.ink-cs-row {
+  display: flex; align-items: center; gap: 11px;
+  padding: 9px 2px;
+  border-bottom: 1px solid var(--line);
+}
+.ink-cs-row:last-child { border-bottom: 0; }
+.ink-cs-bank { font-size: 15px; font-weight: 600; color: var(--ink); letter-spacing: -0.015em; }
+/* Was --ink-4. The line carries rates and terms now, which are facts, not
+   footnotes — it has to be read, not skimmed past. */
+.ink-cs-meta { margin-top: 2px; font-size: 12.5px; color: var(--ink-3); }
+.ink-cs-warn { color: var(--neg); font-weight: 700; }
+/* One step below red: high but not alarming. A card drawn to 80% of its limit is
+   worth noticing; the same card at 100% is the thing to act on, and they must not
+   look the same. */
+.ink-cs-warm { color: var(--warn); font-weight: 700; }
+
+/* A CARD ROW carries more facts than a lender row — limit, utilisation, peak, two
+   rates, arrears — so its meta line wraps instead of truncating. Separated by a
+   middot drawn in CSS rather than typed between the spans, because a conditional
+   separator in JSX is how you end up with a leading " · " on the row that happens
+   to have nothing before it. */
+.ink-cs-meta-wrap { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 4px; row-gap: 1px; }
+.ink-cs-bit + .ink-cs-bit::before { content: "·"; margin-inline-end: 4px; color: var(--ink-4); }
+/* What kind of facility it is, beside the lender's name — a client holds several
+   cards at one issuer and "מסגרת אשראי מתחדשת" vs "חשבון עובר ושב" is the
+   difference between a card and an overdraft. */
+.ink-cs-kind {
+  margin-inline-start: 7px;
+  font-family: var(--ui);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-4);
+  letter-spacing: -0.005em;
+}
+/* The part of the charge that was not actually paid. Sits under the figure it
+   qualifies, and only ever appears when the document printed both numbers. */
+.ink-cs-rolled { margin-top: 1px; font-size: 10.5px; font-weight: 700; color: var(--neg); }
+/* An absent field. Not ₪0 — a stated zero is a claim and this is silence. */
+.ink-cs-none { font-family: var(--ui); font-size: 11.5px; font-weight: 600; color: var(--ink-4); }
+
+/* A section subtotal, so the footer is arrived at rather than asserted. */
+.ink-cs-sub {
+  display: flex; align-items: center; gap: 11px;
+  margin-top: 2px; padding: 7px 2px 0;
+  border-top: 1px solid var(--line-2);
+  font-family: var(--ui); font-size: 12px; font-weight: 700; color: var(--ink-2);
+}
+
+/* A row whose facility is in arrears or under enforcement. Tinted, not shouted:
+   the row's own figures already carry red where it matters. */
+.ink-cs-row[data-alarm] { background: var(--neg-tint); }
+
+/* One header per group, sitting over its column. */
+.ink-cs-cols {
+  display: flex; align-items: center; gap: 11px;
+  padding: 0 2px 4px;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.01em;
+  color: var(--ink-3);
+}
+.ink-cs-colspacer { width: 30px; flex: none; }
+
+/* Fixed width and a shared edge, so every figure lines up down the page instead
+   of drifting with the width of its own digits.
+   `start`, not `end`: Money is direction:ltr and text-align:right, which lands
+   on the RTL column's start edge. A header set to `end` sat against the far
+   side and read as belonging to the wrong column. */
+.ink-cs-amt { flex: none; width: 104px; text-align: start; }
+
+.ink-cs-more { padding: 8px 2px; font-size: 12.5px; color: var(--ink-3); }
+
+/* The worries. Last, so they land after the facts rather than instead of them. */
+.ink-cs-worry {
+  margin-top: 12px;
+  padding: 11px 13px;
+  border: 1px solid var(--neg-line);
+  border-radius: var(--r);
+  background: var(--neg-tint);
+}
+.ink-cs-worry-head {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 13.5px; font-weight: 800; color: var(--neg);
+}
+.ink-cs-worry ul { margin-top: 6px; display: grid; gap: 4px; }
+.ink-cs-worry li {
+  position: relative; padding-inline-start: 14px;
+  font-size: 13px; line-height: 1.5; color: #7d1229;
+}
+.ink-cs-worry li::before {
+  content: ""; position: absolute; inset-inline-start: 3px; top: 8px;
+  width: 5px; height: 5px; border-radius: 99px; background: var(--neg);
+}
+
+.ink-cs-foot {
+  display: flex; align-items: flex-end; justify-content: space-between; gap: 16px;
+  padding: 14px 16px;
+  border-top: 1.5px solid var(--ink);
+  background: var(--card-2);
+}
+
+/* Footer captions read as labels, not fine print. */
+.ink-cs-foot-cap { font-size: 11.5px; font-weight: 500; color: var(--ink-3); margin-bottom: 2px; }
+
+/* ---------------------------------- a finding points at its own evidence */
+/* A finding that states a number without showing the rows behind it asks to be
+   taken on trust. These are clickable, and the affordance only appears on
+   approach so the list stays a list rather than a wall of buttons. */
+.ink-flag[data-go] { cursor: pointer; }
+.ink-flag[data-go]:hover {
+  border-color: var(--line-2);
+  box-shadow: var(--shadow);
+  transform: translateY(-1px);
+}
+.ink-flag[data-go]:active { transform: translateY(0); }
+.ink-flag[data-go]:focus-visible {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-tint);
+}
+/* Taken out of flow entirely. Held in the layout at opacity 0 it reserved a
+   line on every card — the height of the affordance was being paid whether or
+   not anyone was hovering, on all ten of them. The empty side of the card is
+   where it belongs anyway: the text is right-aligned, so nothing is there. */
+.ink-flag-go {
+  position: absolute;
+  inset-inline-end: 12px;
+  bottom: 8px;
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 11.5px; font-weight: 600; color: var(--primary);
+  opacity: 0; transform: translateX(4px);
+  transition: opacity 0.16s ease, transform 0.16s var(--ease);
+  pointer-events: none;
+}
+.ink-flag[data-go]:hover .ink-flag-go,
+.ink-flag[data-go]:focus-visible .ink-flag-go { opacity: 1; transform: translateX(0); }
+
+/* The landing. Bright for a moment, then gone — a pointer that never fades
+   just becomes another colour on the page. */
+@keyframes ink-lit-sec {
+  0%   { background: var(--primary-tint); }
+  70%  { background: var(--primary-tint); }
+  100% { background: transparent; }
+}
+@keyframes ink-lit-row {
+  0%   { background: var(--loan-tint-2); }
+  70%  { background: var(--loan-tint); }
+  100% { background: transparent; }
+}
+.ink-sec[data-hl] {
+  animation: ink-lit-sec 2.6s ease-out;
+  border-radius: var(--r-sm);
+}
+.ink-mini tbody tr[data-hl] {
+  animation: ink-lit-row 2.6s ease-out;
+  box-shadow: inset 0 0 0 9999px transparent;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ink-sec[data-hl], .ink-mini tbody tr[data-hl] { animation-duration: 0.01ms; }
+  .ink-flag[data-go]:hover { transform: none; }
+}
+
+/* A HEADER OVER A PAIRED CELL.
+   The עוגן column holds two fields, so one start-aligned label left "מרווח %"
+   floating over the gap between them. This splits the header on the same
+   1fr / 56px grid `.ink-pair` uses, so each word sits over the box it names. */
+.ink-th-pair { display: flex; align-items: baseline; gap: 0; }
+.ink-th-pair > :first-child { flex: 1; min-width: 0; }
+.ink-th-pair-b { flex: 0 0 56px; }
