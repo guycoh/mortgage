@@ -1,9 +1,16 @@
 "use client";
 
-// The five fields nobody touches on a normal day — עוגן, מרווח מהעוגן, תדירות
-// שינוי, גרייס and חודשי גרייס. They used to live in an expander tray that
-// pushed every row below it down the page. Now they open in a small sheet
-// anchored to the row's own settings icon, so the grid never reflows.
+// גרייס and חודשי גרייס — the two fields nobody touches on a normal day. They
+// used to live in an expander tray that pushed every row below it down the page.
+// Now they open in a small sheet anchored to the row's own settings icon, so the
+// grid never reflows.
+//
+// עוגן, מרווח and תדירות שינוי used to be here too. All three moved to the grid
+// once both document types started filling them on import: a field that arrives
+// with data in it is not a field you go hunting for, and one value editable in two
+// places is one value too many. The anchor's NAME never made it onto the grid —
+// it is words, and the עוגן column is numeric — so it stays as provenance in the
+// footer below.
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -14,7 +21,7 @@ import Select from "./Select";
 import { FAMILY, PATH_LABEL, type ImportedLoan } from "../lib/credit";
 
 const W = 348;
-const H = 250;
+const H = 152;
 
 export default function RowSettings({
   loan,
@@ -67,28 +74,18 @@ export default function RowSettings({
     };
   }, [onClose]);
 
-  const field = (
-    label: string,
-    key: "anchor" | "anchor_margin" | "change_frequency" | "grace_months",
-    type: "text" | "number",
-    placeholder?: string
-  ) => (
+  const field = (label: string, key: "grace_months", placeholder?: string) => (
     <label className="flex flex-col gap-1">
       <span className="fin-label">{label}</span>
       <div className="fin-well" data-dirty={dirty.has(key) || undefined}>
         <input
-          className={`fin-cell ${type === "number" ? "fin-num-in" : ""}`}
-          data-text={type === "text" ? "true" : undefined}
-          type={type}
-          min={type === "number" ? 0 : undefined}
+          className="fin-cell fin-num-in"
+          type="number"
+          min={0}
           placeholder={placeholder}
-          value={(loan[key] as string | number) ?? ""}
+          value={loan[key] ?? ""}
           onFocus={(e) => e.currentTarget.select()}
-          onChange={(e) =>
-            onPatch({
-              [key]: type === "number" ? Number(e.target.value) || 0 : e.target.value,
-            } as Partial<ImportedLoan>)
-          }
+          onChange={(e) => onPatch({ [key]: Number(e.target.value) || 0 } as Partial<ImportedLoan>)}
         />
       </div>
     </label>
@@ -127,9 +124,6 @@ export default function RowSettings({
           </header>
 
           <div className="fin-sheet-body">
-            {field("עוגן", "anchor", "number", "0")}
-            {field("מרווח מהעוגן", "anchor_margin", "number", "0")}
-            {field("תדירות שינוי", "change_frequency", "text", "—")}
             <label className="flex flex-col gap-1">
               <span className="fin-label">גרייס</span>
               <div className="fin-well" data-dirty={dirty.has("grace_type_id") || undefined}>
@@ -142,13 +136,14 @@ export default function RowSettings({
                 />
               </div>
             </label>
-            {field("חודשי גרייס", "grace_months", "number", "0")}
+            {field("חודשי גרייס", "grace_months", "0")}
           </div>
 
           <footer className="fin-sheet-foot">
             {loan.source_track ? (
               <>
                 מהדוח: {loan.source_type} · {loan.source_track}
+                {loan.source_anchor ? ` · ${loan.source_anchor}` : ""}
                 {loan.source_bank ? ` · ${loan.source_bank.replace(/בע"?מ|בנק/g, "").trim()}` : ""}
               </>
             ) : (

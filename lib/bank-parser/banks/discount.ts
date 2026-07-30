@@ -205,6 +205,10 @@ export function parseDiscount(
       forecastRate: pct(g("שיעור ריבית כוללת חזויה")),
       comparisonRate: pct(g("שיעור ריבית לצרכי השוואה")),
       anchor: g("בסיס לקביעת ריבית"),
+      // The current level of the anchor, not the rate the borrower pays. This is
+      // the only template that prints it, and it is what makes the row's rate
+      // legible: 4.09% = an anchor of 2.89% plus a margin of 1.20%.
+      anchorRate: pct(g("ריבית בסיס)עוגן(עדכנית")) ?? pct(g("ריבית בסיס)עוגן(מקורית")),
       margin: pct(g("שיעור תוספת/הפחתה")),
       resetMonths: num(g("תדירות שינוי ריבית")),
       nextReset: date(g("תאריך שינוי קרוב")),

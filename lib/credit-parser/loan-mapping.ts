@@ -11,6 +11,7 @@
 // Interest comes from the per-track nominal rates (Transaction.interestTracks),
 // utilization-weighted so the rate reflects the money actually drawn.
 
+import { FREQ_FIXED, FREQ_PRIME, FREQ_UNSTATED } from "../rate-frequency";
 import type { CreditReport, Transaction, InterestTrack } from "./types";
 
 /** BDI page-2 grouping: the four liability families + a catch-all. */
@@ -34,6 +35,12 @@ export interface ExtractedLoan {
   category: LiabilityCategory;
   /** Human mortgage-track label derived from the interest tracks (e.g. "פריים"). */
   trackLabel: string;
+  /** תדירות שינוי — derived, because this report has no field for it. */
+  changeFrequency: string;
+  /** עוגן (201-034) of the dominant track, e.g. "ריבית פריים" ("" when blank). */
+  anchorName: string;
+  /** מרווח (201-035) over that anchor, in points; null when not printed. */
+  anchorMargin: number | null;
   balance: number; // numeric outstanding balance
   balanceStr: string; // "89,223" (grouped, for the input field)
   interest: string; // annual nominal %, e.g. "8.42" ("" when unknown)
@@ -187,17 +194,62 @@ function trackName(tr: InterestTrack): string {
 }
 
 /**
+ * The track that describes the debt: the one carrying the most drawn money.
+ *
+ * A revolving facility quotes five rates and uses one. Utilization is what says
+ * which, and when nothing is drawn the first quoted track is all there is.
+ */
+function dominantTrack(tracks: InterestTrack[]): InterestTrack | null {
+  if (!tracks.length) return null;
+  return [...tracks].sort((a, b) => parseNum(b.utilization) - parseNum(a.utilization))[0];
+}
+
+/**
  * Mortgage track/type label: the dominant (highest-utilization) track's name,
  * with a "+N" suffix when the loan is split across several tracks.
  */
 export function trackLabel(tracks: InterestTrack[]): string {
-  if (!tracks.length) return "";
-  const top = [...tracks].sort(
-    (a, b) => parseNum(b.utilization) - parseNum(a.utilization)
-  )[0];
+  const top = dominantTrack(tracks);
+  if (!top) return "";
   const name = trackName(top);
   if (!name) return "";
   return tracks.length > 1 ? `${name} +${tracks.length - 1}` : name;
+}
+
+/**
+ * תדירות שינוי, as far as this report can honestly go.
+ *
+ * The דוח ריכוז נתונים has no reset-interval field — see lib/rate-frequency.ts.
+ * Two of its answers are still definite: a fixed or interest-free rate never
+ * resets, and a prime-anchored one resets with the Bank of Israel. Everything
+ * else is a variable rate whose period the report simply does not carry, and it
+ * says exactly that instead of picking a plausible five years.
+ */
+/**
+ * עוגן and מרווח of the track the debt is actually drawn on (201-034 / 201-035).
+ *
+ * The report prints these per interest track, so a facility quoting five rates
+ * has five anchors. The one that matters is the one carrying the money — the same
+ * track trackLabel and changeFrequency describe, so all three agree.
+ */
+export function anchorOf(tracks: InterestTrack[]): { name: string; margin: number | null } {
+  const top = dominantTrack(tracks);
+  if (!top) return { name: "", margin: null };
+  const margin = parseFloat(top.margin);
+  return {
+    name: top.anchor.trim(),
+    margin: Number.isFinite(margin) ? margin : null,
+  };
+}
+
+export function changeFrequency(tracks: InterestTrack[]): string {
+  const top = dominantTrack(tracks);
+  if (!top) return "";
+  // Prime first: a prime track is variable, so testing the type first would file
+  // it as an unknown interval and lose the one thing that is certain about it.
+  if (top.anchor.includes("פריים")) return FREQ_PRIME;
+  if (isInterestFree(top) || top.type.includes("קבוע")) return FREQ_FIXED;
+  return top.type.includes("משתנה") ? FREQ_UNSTATED : "";
 }
 
 /** True when the track is flagged interest-free (ללא ריבית / הריבית = אפס). */
@@ -244,6 +296,7 @@ function deriveLoan(t: Transaction, asOf: Date): ExtractedLoan {
   const balance = parseNum(t.fields["201-049"]);
   const knownPayment = parseNum(t.fields["201-046"]);
   const mortgage = isMortgageTxn(t);
+  const anchor = anchorOf(t.interestTracks);
 
   // 1) Remaining months from the planned end date (independent of interest).
   let months: number | null = null;
@@ -281,6 +334,9 @@ function deriveLoan(t: Transaction, asOf: Date): ExtractedLoan {
     isLoanOrMortgage: isLoanOrMortgage(t),
     category: liabilityCategory(t),
     trackLabel: trackLabel(t.interestTracks),
+    changeFrequency: changeFrequency(t.interestTracks),
+    anchorName: anchor.name,
+    anchorMargin: anchor.margin,
     balance,
     balanceStr: groupThousands(balance),
     interest,

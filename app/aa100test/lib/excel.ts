@@ -77,6 +77,9 @@ const COLS: Col[] = [
   { header: "לוח סילוקין", width: 12.5 },
   { header: "יתרה (₪)", width: 14, fmt: "money", total: true },
   { header: "ריבית", width: 9.5, fmt: "pct" },
+  { header: "עוגן", width: 9.5, fmt: "pct" },
+  { header: "מרווח", width: 9, fmt: "pct" },
+  { header: "תדירות שינוי", width: 14 },
   { header: "חודשים", width: 9.5, fmt: "int" },
   { header: "תאריך סיום", width: 13, fmt: "date" },
   { header: "החזר חודשי (₪)", width: 15, fmt: "money", total: true },
@@ -109,18 +112,36 @@ function toDate(v?: string | null): Date | null {
 /** Blank instead of a bare 0, so an empty cell reads as "no value". */
 const num = (n: number) => (Math.round(n) !== 0 ? Math.round(n) : null);
 
+/** A percentage column's value: Excel wants the fraction, absent stays absent. */
+const pctOrNull = (v: number | string | null | undefined) => {
+  if (v === null || v === undefined || v === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n / 100 : null;
+};
+
 const scheduleName = (id: number) => schedules.find((s) => s.id === id)?.schedule_name ?? "";
 
 type Priced = { l: ImportedLoan; res: ReturnType<typeof calculateLoan> };
 
+/** Which column is which, by name, so inserting one cannot silently move a sum. */
+const CI = {
+  family: 0,
+  amount: COLS.findIndex((c) => c.header.startsWith("יתרה")),
+  rate: COLS.findIndex((c) => c.header === "ריבית"),
+  anchor: COLS.findIndex((c) => c.header === "עוגן"),
+  frequency: COLS.findIndex((c) => c.header === "תדירות שינוי"),
+  monthly: COLS.findIndex((c) => c.header.startsWith("החזר")),
+  interest: COLS.findIndex((c) => c.header.startsWith('סה"כ ריבית')),
+} as const;
+
 /** The cached result for a SUM over one of the totalled columns. */
 function columnTotal(rows: Priced[], colIndex: number): number {
   const pick = (x: Priced) =>
-    colIndex === 4
+    colIndex === CI.amount
       ? Number(x.l.amount) || 0
-      : colIndex === 8
+      : colIndex === CI.monthly
         ? x.res.monthlyPayment
-        : colIndex === 9
+        : colIndex === CI.interest
           ? x.res.totalInterest
           : x.res.totalPaid;
   return Math.round(rows.reduce((s, x) => s + pick(x), 0));
@@ -354,6 +375,11 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
         scheduleName(l.amortization_schedule_id),
         num(Number(l.amount) || 0),
         (Number(l.rate) || 0) / 100,
+        // Both anchor fields are percentages; blank stays blank, because 0% and
+        // "not anchored" are different facts about a row.
+        pctOrNull(l.anchor),
+        pctOrNull(l.anchor_margin),
+        l.change_frequency || null,
         Number(l.months) || null,
         toDate(l.loan_end_date ?? l.end_date),
         num(res.monthlyPayment),
@@ -369,10 +395,12 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
           name: FONT,
           size: 10,
           color: { argb: ci === 0 ? accent : C.ink2 },
-          bold: ci === 0 || ci === 4 || ci === 8,
+          bold: ci === CI.family || ci === CI.amount || ci === CI.monthly,
         };
         cell.alignment = {
-          horizontal: ci <= 3 || ci === SPAN - 1 ? "right" : "center",
+          // words right, figures centred — תדירות שינוי is the one worded column
+          // among the numbers
+          horizontal: ci <= 3 || ci === CI.frequency || ci === SPAN - 1 ? "right" : "center",
           vertical: "middle",
         };
         const fmt = COLS[ci].fmt;
@@ -388,7 +416,8 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
       // a high rate is the one thing the sheet flags, same rule as the screen
       const rate = Number(l.rate) || 0;
       const hot = g === "loan" ? rate >= 10 : rate >= 6.5;
-      if (hot) ws.getCell(r, 6).font = { name: FONT, size: 10, bold: true, color: { argb: C.amber } };
+      if (hot)
+        ws.getCell(r, CI.rate + 1).font = { name: FONT, size: 10, bold: true, color: { argb: C.amber } };
       r += 1;
     });
 

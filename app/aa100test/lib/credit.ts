@@ -27,6 +27,14 @@ export type ImportedLoan = Loan & {
   source_bank?: string;
   source_type?: string;
   source_track?: string;
+  /**
+   * עוגן, as the document names it — "ריבית פריים", "עוגן בנק ישראל אג\"ח".
+   *
+   * A name, not a rate: the `anchor` column is numeric and holds the anchor's own
+   * level, which only Discount's template prints. The two are different facts
+   * about the same thing and both are worth keeping.
+   */
+  source_anchor?: string;
 };
 
 /* ------------------------------------------------------------------ paths */
@@ -113,6 +121,16 @@ export const isIndexedPath = (pathId: number) =>
 
 /* ------------------------------------------------------------- conversion */
 
+/**
+ * The anchor's own rate: what is left of the quoted rate once the margin over the
+ * anchor is taken out. Null without a margin — an unanchored fixed rate is not an
+ * anchor, and returning the rate itself would present it as one.
+ */
+function anchorRate(rate: number, margin: number | null): number | null {
+  if (margin === null || !Number.isFinite(rate) || !Number.isFinite(margin)) return null;
+  return Math.round((rate - margin) * 100) / 100;
+}
+
 /** dd/mm/yyyy → yyyy-mm-dd, the shape both the picker and the API expect. */
 function toIso(dmy: string | undefined): string | null {
   const m = (dmy ?? "").match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
@@ -138,9 +156,14 @@ function toLoanRow(src: ExtractedLoan, mixId: string, group: DebtGroup): Importe
     amortization_schedule_id: 1, // שפיצר — what a bank mortgage almost always is
     grace_type_id: 1, // ללא
     grace_months: 0,
-    // anchor is a numeric column (the anchor rate). The prime track is
-    // already carried by path_id, so there is nothing to put here.
-    anchor: null,
+    // The numeric column is the anchor's own RATE. The report does not print it,
+    // but it prints both sides of it: the nominal rate (201-036) and the margin
+    // over the anchor (201-035). A prime facility quoted at 17.60% with a margin
+    // of 11.60% is anchored at 6.00% — the prime rate, exactly.
+    anchor: anchorRate(Number(src.interest), src.anchorMargin),
+    anchor_margin: src.anchorMargin,
+    change_frequency: src.changeFrequency,
+    source_anchor: src.anchorName,
     group,
     is_guarantor: guarantor,
     source_bank: src.source,

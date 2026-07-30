@@ -92,6 +92,14 @@ export interface BankTranche {
   comparisonRate: number | null;
   /** Anchor description, e.g. "עוגן בנק ישראל", "פריים". */
   anchor: string;
+  /**
+   * The anchor's own current rate, where the lender prints it.
+   *
+   * Only the Discount/Mercantile template does — "ריבית בסיס)עוגן(עדכנית". The
+   * others give the anchor a name and a margin and leave its level to the market,
+   * so this is optional rather than a field three parsers would have to fake.
+   */
+  anchorRate?: number | null;
   /** Margin over the anchor, in points, e.g. 3.25. */
   margin: number | null;
   /** Months between rate resets. */

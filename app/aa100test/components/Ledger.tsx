@@ -9,9 +9,14 @@
 // הלוואה), an icon and a faint tint — never colour on its own. A slim divider
 // row keeps the two families scannable without breaking the table in half.
 //
-// Every field the old grid had is still here. The five rarely-touched ones
-// (עוגן, מרווח, תדירות, גרייס) open in a sheet off the row's settings icon, so
-// reaching them never reflows the grid.
+// Every field the old grid had is still here. The four rarely-touched ones
+// (עוגן, מרווח, גרייס, חודשי גרייס) open in a sheet off the row's settings icon,
+// so reaching them never reflows the grid.
+//
+// תדירות שינוי is on the grid rather than in that sheet: both document types now
+// fill it on import, and how often a rate resets belongs next to the rate it
+// resets — it is the difference between a 3% tranche that stays 3% and one that
+// reprices next spring.
 
 import { Fragment, useMemo, useState } from "react";
 import {
@@ -39,6 +44,7 @@ import {
   type ImportedLoan,
 } from "../lib/credit";
 import { addMonths, monthsBetween, parseDate, startOfToday, toIso } from "../lib/dates";
+import { FREQ_FIXED, FREQ_UNSTATED, freqMonths, freqOptionsFor } from "@/lib/rate-frequency";
 
 const ORDER: DebtGroup[] = ["mortgage", "loan"];
 
@@ -60,6 +66,7 @@ const TRACKED = [
   "anchor",
   "anchor_margin",
   "change_frequency",
+  "source_anchor",
 ] as const;
 
 type Baseline = Record<string, ImportedLoan>;
@@ -121,6 +128,79 @@ export default function Ledger({
     const d = iso ? parseDate(iso) : null;
     patch(id, { loan_end_date: iso, end_date: iso, months: d ? monthsBetween(today, d) : 0 });
   };
+
+  /* --- תדירות שינוי is words, anchor_interval is the same fact as a number --- */
+  // Two columns describing one thing, so they are written together — a board
+  // where the label says five years and the interval still says twelve months is
+  // worse than one where only the label is filled in.
+  //
+  // But three of the answers carry no interval, and only one of them means the
+  // interval is gone: "ללא שינוי" says there is no reset at all. "עם הפריים" and
+  // "לא צוין" say the period is not a fixed number of months — while the lender
+  // may still have printed one, and throwing that away to record an answer that
+  // agrees with it would be a net loss of data.
+  const setFreq = (id: string, label: string) => {
+    const months = freqMonths(label);
+    patch(id, {
+      change_frequency: label,
+      ...(months !== null || label === FREQ_FIXED ? { anchor_interval: months } : {}),
+    } as Partial<ImportedLoan>);
+  };
+
+  /* --- עוגן: the name is the value, its margin is the note underneath --- */
+  const signed = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${Math.abs(n).toFixed(2)}%`;
+
+  /**
+   * One of the two rate fields in the עוגן cell.
+   *
+   * Empty means absent, not zero: a fixed-rate row has no anchor and no margin,
+   * and writing 0 into either would claim it is anchored at nothing. So the value
+   * clears to null rather than to 0 — which also keeps the numeric columns
+   * nullable in the database, the way they are declared.
+   */
+  const numField = (
+    loan: ImportedLoan,
+    key: "anchor" | "anchor_margin",
+    label: string,
+    placeholder: string
+  ) => (
+    <input
+      className="fin-cell fin-num-in"
+      type="number"
+      step="0.01"
+      aria-label={label}
+      title={label}
+      placeholder={placeholder}
+      value={loan[key] ?? ""}
+      onFocus={(e) => e.currentTarget.select()}
+      onChange={(e) =>
+        patch(loan.id, {
+          [key]: e.target.value === "" ? null : Number(e.target.value),
+        } as Partial<ImportedLoan>)
+      }
+    />
+  );
+
+  /** The sum spelled out, for the cell's tooltip: anchor + margin = the rate. */
+  const anchorTip = (loan: ImportedLoan) => {
+    if (loan.anchor === null && loan.anchor_margin === null)
+      return "המסמך לא ציין עוגן לשורה הזו";
+    const parts = [loan.source_anchor || "עוגן"];
+    if (loan.anchor !== null && Number.isFinite(Number(loan.anchor)))
+      parts.push(`${Number(loan.anchor).toFixed(2)}%`);
+    if (loan.anchor_margin !== null && Number.isFinite(Number(loan.anchor_margin)))
+      parts.push(`מרווח ${signed(Number(loan.anchor_margin))}`);
+    parts.push(`סה"כ ${(Number(loan.rate) || 0).toFixed(2)}%`);
+    return parts.join(" · ");
+  };
+
+  /** Why the cell says what it says — the report's own wording, where there was one. */
+  const freqTip = (loan: ImportedLoan) =>
+    loan.change_frequency === FREQ_UNSTATED
+      ? "הדוח מציין ריבית משתנה אך לא כל כמה זמן היא מתעדכנת"
+      : loan.source_track
+        ? `מהדוח: ${loan.source_track}`
+        : undefined;
 
   /* ------------------------------------------------------------- grouping */
   // Rows with no family (hand-added before an import) sit with the mortgages,
@@ -219,9 +299,11 @@ export default function Ledger({
         <div>
           <table className="fin-table">
             <colgroup>
-              {["10%", "14%", "13%", "12%", "8%", "8%", "13%", "15%", "7%"].map((w, i) => (
-                <col key={i} style={{ width: w }} />
-              ))}
+              {["10.5%", "11.5%", "9%", "8%", "6%", "13%", "10%", "6%", "9.5%", "10%", "6.5%"].map(
+                (w, i) => (
+                  <col key={i} style={{ width: w }} />
+                )
+              )}
             </colgroup>
             <thead>
               <tr>
@@ -230,8 +312,14 @@ export default function Ledger({
                 <th>מסלול</th>
                 <th>לוח סילוקין</th>
                 <th>ריבית %</th>
+                {/* one header for the paired field, so both halves are named and
+                    the margin's unit is stated once instead of per row */}
+                <th>עוגן / מרווח %</th>
+                <th>תדירות שינוי</th>
                 <th>חודשים</th>
                 <th>תאריך סיום</th>
+                {/* the unit lives in the header, so it is stated once instead of
+                    once per row — and the figures below keep a clean right edge */}
                 <th>החזר חודשי</th>
                 <th />
               </tr>
@@ -249,26 +337,30 @@ export default function Ledger({
 
                 return (
                   <Fragment key={g.key}>
-                    {/* group divider — still one table, just legible */}
+                    {/* Group divider — still one table, just legible. Its two
+                        subtotals sit in the real סכום and החזר חודשי cells rather
+                        than floating in a spanned row: hand-tuned widths could
+                        never land on the same pixel as the rows beneath them,
+                        and a ledger whose three levels of total each hang at a
+                        different offset is unreadable at a glance. */}
                     <tr className="fin-groupbar" style={famVars}>
-                      <td colSpan={9}>
+                      <td>
                         <div className="fin-groupbar-in">
                           <span className="fin-groupbar-title">
                             {FAM_ICON[g.key]}
                             {fam.plural}
                           </span>
                           <span className="fin-count">{g.rows.length}</span>
-                          <Money value={g.amount} block={false} className="fin-groupbar-sum ms-auto" />
-                          <Money
-                            value={g.monthly}
-                            per="ח׳"
-                            block={false}
-                            className="fin-groupbar-sum"
-                            style={{ color: fam.color, minWidth: 124 }}
-                          />
-                          <span style={{ width: 68 }} />
                         </div>
                       </td>
+                      <td>
+                        <Money value={g.amount} className="fin-groupbar-sum" />
+                      </td>
+                      <td colSpan={7} />
+                      <td>
+                        <Money value={g.monthly} className="fin-groupbar-sum" style={{ color: fam.color }} />
+                      </td>
+                      <td />
                     </tr>
 
                     {g.rows.map((loan) => {
@@ -400,6 +492,48 @@ export default function Ledger({
                             </div>
                           </td>
 
+                          {/* --- עוגן / מרווח: two rates, both numeric ---
+                              The pair IS the ריבית cell before this one, taken
+                              apart: anchor + margin = the rate. Both typed, so a
+                              hand-added row can price an anchor as fully as an
+                              imported one. The lender's own name for the anchor is
+                              words, so it stays off the grid and rides on the
+                              cell's tooltip and the row's settings sheet. */}
+                          <td>
+                            <div
+                              className="fin-well"
+                              data-dirty={dirty.has("anchor") || dirty.has("anchor_margin") || undefined}
+                              title={anchorTip(loan)}
+                            >
+                              <div className="fin-pair">
+                                {numField(loan, "anchor", "ריבית העוגן באחוזים", "עוגן")}
+                                {numField(loan, "anchor_margin", "מרווח מהעוגן באחוזים", "מרווח")}
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* --- תדירות שינוי ---
+                              Read from the document on import: the bank statement
+                              prints it, the credit report does not and says "לא
+                              צוין" instead of guessing. Editable, because an
+                              advisor on the phone to the bank will know. */}
+                          <td>
+                            <div
+                              className="fin-well"
+                              data-dirty={dirty.has("change_frequency") || undefined}
+                              title={freqTip(loan)}
+                            >
+                              <Select
+                                value={loan.change_frequency ?? ""}
+                                onChange={(v) => setFreq(loan.id, String(v))}
+                                options={freqOptionsFor(loan.change_frequency)}
+                                ariaLabel="תדירות שינוי הריבית"
+                                placeholder="—"
+                                minWidth={214}
+                              />
+                            </div>
+                          </td>
+
                           {/* --- חודשים (synced with the end date) --- */}
                           <td>
                             <div className="fin-well" data-dirty={dirty.has("months") || undefined}>
@@ -430,39 +564,29 @@ export default function Ledger({
                             </div>
                           </td>
 
-                          {/* --- החזר חודשי (calculated: no well) --- */}
+                          {/* --- החזר חודשי (calculated: no well, but a well's box
+                              so the note underneath cannot move the figure) --- */}
                           <td>
-                            {noTerm ? (
-                              <span
-                                className="flex items-center justify-end gap-1 px-1 text-[11.5px] font-bold"
-                                style={{ color: "var(--neg)" }}
-                                title="לשורה יש יתרה אבל אין תקופה — הזינו חודשים או תאריך סיום"
-                              >
-                                <Warning size={13} weight="fill" />
-                                חסרה תקופה
-                              </span>
-                            ) : (
-                              <Money
-                                value={res.monthlyPayment}
-                                per="ח׳"
-                                className="fin-pay"
-                                style={{ color: "var(--ink)" }}
-                              />
-                            )}
-                            {(res.isIndexed || stale) && (
-                              <div className="flex items-center justify-start gap-1.5 px-2 pt-0.5" dir="ltr">
-                                {stale && (
-                                  <span className="text-[9.5px] font-bold" style={{ color: "var(--warn)" }} dir="rtl">
-                                    תאריך עבר
-                                  </span>
-                                )}
-                                {res.isIndexed && (
-                                  <span className="text-[9.5px]" style={{ color: "var(--ink-4)" }} dir="rtl">
-                                    צמוד מדד
-                                  </span>
-                                )}
-                              </div>
-                            )}
+                            <div className="fin-paycell">
+                              {noTerm ? (
+                                <span
+                                  className="flex flex-1 items-center justify-end gap-1 px-1 text-[11.5px] font-bold"
+                                  style={{ color: "var(--neg)" }}
+                                  title="לשורה יש יתרה אבל אין תקופה — הזינו חודשים או תאריך סיום"
+                                >
+                                  <Warning size={13} weight="fill" />
+                                  חסרה תקופה
+                                </span>
+                              ) : (
+                                <Money value={res.monthlyPayment} className="fin-pay" style={{ color: "var(--ink)" }} />
+                              )}
+                              {(res.isIndexed || stale) && (
+                                <span className="fin-note fin-note-pay">
+                                  {stale && <span className="fin-note-stale">תאריך עבר</span>}
+                                  {res.isIndexed && <span>צמוד מדד</span>}
+                                </span>
+                              )}
+                            </div>
                           </td>
 
                           {/* --- actions --- */}
@@ -513,7 +637,7 @@ export default function Ledger({
 
               {/* add a row from the bottom, so a long list never sends you back up */}
               <tr className="fin-addrow">
-                <td colSpan={9}>
+                <td colSpan={11}>
                   <div className="fin-addrow-in">
                     {addBtns()}
                     <span className="fin-addrow-hint">הוספת שורה ריקה לתמהיל</span>
@@ -530,7 +654,7 @@ export default function Ledger({
                 <td>
                   <Money value={grand.amount} className="fin-total-fig" />
                 </td>
-                <td colSpan={5}>
+                <td colSpan={7}>
                   <div className="flex flex-wrap items-center gap-1.5 px-1">
                     {groups
                       .filter((g) => g.rows.length)
@@ -554,7 +678,7 @@ export default function Ledger({
                   </div>
                 </td>
                 <td>
-                  <Money value={grand.monthly} per="ח׳" className="fin-total-fig" hot />
+                  <Money value={grand.monthly} className="fin-total-fig" hot />
                 </td>
                 <td />
               </tr>

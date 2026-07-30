@@ -50,8 +50,18 @@ const EXTRA = [
   "source_track",
 ] as const;
 
+/**
+ * Added later than the rest, so it gets its own flag.
+ *
+ * Folding it into EXTRA would mean a deployment missing this one column silently
+ * stops persisting the other six as well — bank names and guarantor marks would
+ * vanish on reload to add an anchor. One column missing should cost one column.
+ */
+const ANCHOR = ["source_anchor"] as const;
+
 /** Flips to false the first time Postgres says the columns aren't there. */
 let hasExtra = true;
+let hasAnchor = true;
 
 export type Row = Record<string, unknown>;
 export type BoardMix = { id: string; mix_name: string; is_base?: boolean; loans?: Row[] };
@@ -88,8 +98,13 @@ function toDbRow(loan: Row, mixId: string): Row {
     out.source_type = loan.source_type ?? null;
     out.source_track = loan.source_track ?? null;
   }
+  if (hasAnchor) out.source_anchor = loan.source_anchor ?? null;
   return out;
 }
+
+/** The column list this deployment is known to have. */
+const selectCols = () =>
+  [...CORE, ...(hasExtra ? EXTRA : []), ...(hasAnchor ? ANCHOR : [])].join(",");
 
 function fromDbRow(row: Row): Row {
   const out: Row = { ...row };
@@ -115,12 +130,14 @@ export async function loadBoard(lead: number) {
   if (!mixes?.length) return { mixes: [], hasExtra };
 
   const ids = mixes.map((m) => m.id);
-  const cols = hasExtra ? [...CORE, ...EXTRA].join(",") : CORE.join(",");
-  let loansRes = await supabase.from("loans").select(cols).in("mix_id", ids);
+  let loansRes = await supabase.from("loans").select(selectCols()).in("mix_id", ids);
 
-  if (loansRes.error && isMissingColumn(loansRes.error)) {
-    hasExtra = false;
-    loansRes = await supabase.from("loans").select(CORE.join(",")).in("mix_id", ids);
+  // Retire the newest column set first, then the older one, so a deployment that
+  // is one migration behind loses only what that migration added.
+  for (const retire of [() => (hasAnchor = false), () => (hasExtra = false)]) {
+    if (!loansRes.error || !isMissingColumn(loansRes.error)) break;
+    retire();
+    loansRes = await supabase.from("loans").select(selectCols()).in("mix_id", ids);
   }
   if (loansRes.error) throw loansRes.error;
 
@@ -139,6 +156,7 @@ export async function loadBoard(lead: number) {
       loans: byMix.get(m.id) ?? [],
     })),
     hasExtra,
+    hasAnchor,
   };
 }
 
@@ -176,13 +194,13 @@ export async function saveBoard(lead: number, mixes: BoardMix[]) {
     const rows = (mix.loans ?? []).map((l) => ({ ...toDbRow(l, mix.id), id: l.id as string }));
 
     if (rows.length) {
+      const build = () =>
+        (mix.loans ?? []).map((l) => ({ ...toDbRow(l, mix.id), id: l.id as string }));
       let res = await supabase.from("loans").upsert(rows, { onConflict: "id" });
-      if (res.error && isMissingColumn(res.error)) {
-        hasExtra = false;
-        res = await supabase.from("loans").upsert(
-          (mix.loans ?? []).map((l) => ({ ...toDbRow(l, mix.id), id: l.id as string })),
-          { onConflict: "id" }
-        );
+      for (const retire of [() => (hasAnchor = false), () => (hasExtra = false)]) {
+        if (!res.error || !isMissingColumn(res.error)) break;
+        retire();
+        res = await supabase.from("loans").upsert(build(), { onConflict: "id" });
       }
       if (res.error) throw res.error;
     }
@@ -201,5 +219,5 @@ export async function saveBoard(lead: number, mixes: BoardMix[]) {
     }
   }
 
-  return { success: true, hasExtra };
+  return { success: true, hasExtra, hasAnchor };
 }

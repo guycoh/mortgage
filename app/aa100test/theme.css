@@ -278,6 +278,30 @@
 /* text-bearing wells (selects, the date field) speak UI, not figures */
 .fin-cell[data-text="true"] { font-family: var(--ui); font-weight: 600; letter-spacing: -0.005em; }
 
+/* TWO FIELDS, ONE CONTROL — the עוגן cell.
+   An anchor is a name and a margin over it, and both are typed on a manual row.
+   Showing the margin as a read-only grey note meant a hand-added row could state
+   an anchor it could not price. They are joined rather than given a column each,
+   because they are one fact and the grid stays one cell per column. The shared
+   border is a negative margin, so the seam is 1px rather than 2. */
+.fin-pair { display: flex; align-items: stretch; }
+.fin-pair > .fin-cell { position: relative; border-radius: 0; }
+.fin-pair > .fin-cell:first-child {
+  flex: 1;
+  min-width: 0;
+  border-start-start-radius: var(--r-sm);
+  border-end-start-radius: var(--r-sm);
+}
+.fin-pair > .fin-cell:last-child {
+  flex: 0 0 56px;
+  margin-inline-start: -1px;
+  padding-inline: 6px;
+  border-start-end-radius: var(--r-sm);
+  border-end-end-radius: var(--r-sm);
+}
+/* the focused half owns the seam, so its ring is never sliced by its neighbour */
+.fin-pair > .fin-cell:focus { z-index: 1; }
+
 /* CHANGED — the classic spreadsheet corner tick. */
 .fin-well { position: relative; }
 .fin-well[data-dirty="true"]::after {
@@ -307,8 +331,21 @@
   cursor: default;
 }
 .fin-calc[data-muted="true"] { color: var(--ink-4); font-weight: 500; }
-/* the one calculated figure people actually read: the monthly payment */
-.fin-pay { padding: 0 8px; font-size: 16px; font-weight: 700; color: var(--ink); line-height: 1.15; }
+/* The one calculated figure people actually read: the monthly payment. 9px on
+   top of the td's 5px is the column's 14px inset — see --col-inset. */
+.fin-pay { padding: 0 9px; font-size: 16px; font-weight: 700; color: var(--ink); line-height: 1.15; }
+
+/* The החזר חודשי cell has no well, but it needs a well's box: 32px tall and
+   position:relative, so its "צמוד מדד" / "תאריך עבר" note can hang off the bottom
+   like every other column's note instead of taking a line of its own. In flow the
+   note added its own height, and because the cell is vertically centred it shoved
+   the figure upward — so a row carrying the note sat 3px taller and its ₪ figure
+   3px higher than its neighbours, all the way down the column. */
+.fin-paycell { position: relative; display: flex; align-items: center; height: 32px; }
+.fin-paycell > .fin-pay { flex: 1; min-width: 0; }
+/* Two words at 9px need the room; 5px from the edge is where the other notes sit. */
+.fin-note-pay { left: 5px; display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+.fin-note-stale { color: var(--warn); font-weight: 700; }
 
 /* HIGH RATE — the figure itself carries it, and nothing else.
    No fill, no border, no motion: the column reads normally at a glance, and a
@@ -469,14 +506,26 @@ tr:hover .fin-act { color: var(--ink-3); }
 /* Fixed layout: the column widths are a design decision, not a side effect of
    whatever happens to be typed in a cell. */
 .fin-table { width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0; }
-/* Every header reads the same way: Hebrew, start-aligned. Numeric cells are
+/* ONE INSET FOR THE WHOLE COLUMN.
+   Every header reads the same way: Hebrew, start-aligned. Numeric cells are
    LTR-isolated but text-aligned right, which in an RTL table is the same edge —
-   so a column's header and its figures sit on one line, always. */
+   so a column's header and its figures sit on one line, always.
+
+   "The same edge" only holds if they are inset by the same amount, and they were
+   not: a header sat 8px in, a row's figure 13px (td padding + fin-pay), a group
+   subtotal wherever its hand-tuned flex width landed, and the grand total 6px.
+   Four offsets down one column, which is exactly what a ledger must never do.
+   14px is the number every editable cell already produced — td padding 5 + the
+   well's 1px border + its 8px inner padding — so the naked figures and the
+   headers are brought to it rather than the other way round. Change it in one
+   place and the column stays true. */
+.fin-table { --col-inset: 14px; }
 .fin-table th {
   position: sticky;
   top: 0;
   z-index: 3;
   padding: 8px 8px;
+  padding-inline-start: var(--col-inset);
   text-align: start;
   font-size: 12px;
   font-weight: 700;
@@ -513,7 +562,8 @@ tr:hover .fin-act { color: var(--ink-3); }
   letter-spacing: -0.01em;
   color: var(--ink);
 }
-.fin-total-fig { font-size: 16px; font-weight: 700; color: var(--ink); }
+/* tfoot pads 6px, so 8px more lands the digits on the column's 14px inset */
+.fin-total-fig { padding-inline: 8px; font-size: 16px; font-weight: 700; color: var(--ink); }
 .fin-total-fig[data-hot="true"] { color: var(--primary); }
 
 /* THE SPINE — family identity drawn on the row's start edge. */
@@ -563,21 +613,19 @@ tr:hover .fin-act { color: var(--ink-3); }
 .fin-share { height: 2px; border-radius: 1px; background: var(--line); overflow: hidden; }
 .fin-share span { display: block; height: 100%; background: var(--fam); border-radius: 1px; transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
 
-/* the in-table group divider — one continuous table, still scannable */
-.fin-groupbar > td { padding: 0; border-bottom: 1px solid var(--line-2); background: var(--card-3); }
-.fin-groupbar-in {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 10px 7px 7px;
-  border-inline-start: 3px solid var(--fam);
-}
+/* The in-table group divider — one continuous table, still scannable.
+   Its cells are the table's own cells now, so a family subtotal lands in the
+   same column as the rows it totals. */
+.fin-groupbar > td { padding: 5px; border-bottom: 1px solid var(--line-2); background: var(--card-3); }
+.fin-groupbar > td:first-child { border-inline-start: 3px solid var(--fam); }
+.fin-groupbar-in { display: flex; align-items: center; gap: 7px; }
 .fin-groupbar-title {
   display: inline-flex; align-items: center; gap: 6px;
   font-family: var(--display); font-size: 12px; font-weight: 700;
-  letter-spacing: -0.01em; color: var(--fam);
+  letter-spacing: -0.01em; color: var(--fam); white-space: nowrap;
 }
 .fin-groupbar-sum {
+  padding-inline: 9px;
   font-family: var(--num); font-variant-numeric: tabular-nums;
   font-size: 15px; font-weight: 700; color: var(--ink);
   letter-spacing: -0.02em;
@@ -930,6 +978,18 @@ tr:hover .fin-act { color: var(--ink-3); }
   color: var(--ink-4);
   pointer-events: none;
 }
+/* A note that is arithmetic rather than words — "−1.08% + 3.05%".
+   Without the isolate the bidi algorithm walks it: inside an RTL cell the signs
+   and the two percentages get reordered, and "6.00% −0.40%" renders as
+   "0.40%− 6.00%" — a different, wrong sum. Same reason Money isolates; see the
+   note above .fin-money. Notes that ARE words (a bank name, "צמוד מדד") must stay
+   RTL, which is why this is a modifier and not baked into .fin-note. */
+.fin-note-num { direction: ltr; unicode-bidi: isolate; text-align: left; }
+/* The anchor's level belongs under the anchor's NAME, not under the margin field
+   at the cell's other end — parked there it read as an annotation of the margin,
+   so a row whose margin was blank appeared to have a margin of 2.80%. Pinned to
+   the cell's start edge on the column's own 14px inset. */
+.fin-note-anchor { left: auto; right: 9px; text-align: right; }
 
 /* ---------------------------------------------------------------- tooltips */
 /* Opens to the row's inside, never past the scroll container, so it cannot be
@@ -965,7 +1025,9 @@ tr:hover .fin-act { color: var(--ink-3); }
 .fin-fam-sel {
   width: 100%;
   height: 26px;
-  padding: 0 7px 0 5px;
+  /* 8px start, so the chip's word sits on the column's 14px inset like every
+     other cell's content */
+  padding: 0 8px 0 5px;
   border: 1px solid var(--fam-line, var(--line-2));
   border-radius: 5px;
   background: var(--fam-tint, #fff);
