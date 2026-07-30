@@ -33,6 +33,7 @@ import {
   Warning,
   X,
 } from "@phosphor-icons/react";
+import { rateHeat, utilisationHeat } from "@/lib/verdicts";
 import Money, { fmt } from "./Money";
 import {
   CATEGORY_LABEL,
@@ -337,7 +338,7 @@ function DebtTable({ lines, cols: requested, hl }: { lines: DebtLine[]; cols: Co
                       return <td key={c}>{l.original ? <Money value={l.original} block={false} /> : "—"}</td>;
                     case "rate":
                       return (
-                        <td key={c} className="fin-fig" data-heat={l.rate !== null && l.rate >= 10 ? "hot" : l.rate !== null && l.rate >= 8 ? "warm" : undefined}>
+                        <td key={c} className="fin-fig" data-heat={rateHeat(l.rate, l.category === "mortgage" ? "mortgage" : "loan") ?? undefined}>
                           {l.rate === null ? "—" : `${l.rate.toFixed(2)}%`}
                         </td>
                       );
@@ -379,7 +380,7 @@ function DebtTable({ lines, cols: requested, hl }: { lines: DebtLine[]; cols: Co
                       return <td key={c}>{l.limit ? <Money value={l.limit} block={false} /> : "—"}</td>;
                     case "use":
                       return (
-                        <td key={c} className="fin-fig" data-heat={l.utilization !== null && l.utilization >= 90 ? "hot" : l.utilization !== null && l.utilization >= 75 ? "warm" : undefined}>
+                        <td key={c} className="fin-fig" data-heat={utilisationHeat(l.utilization === null ? null : l.utilization / 100) ?? undefined}>
                           {l.utilization === null ? "—" : `${l.utilization}%`}
                         </td>
                       );

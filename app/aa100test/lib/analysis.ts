@@ -32,6 +32,27 @@ import {
   type ExtractedLoan,
   type LiabilityCategory,
 } from "@/lib/credit-parser/loan-mapping";
+import {
+  APPLICATIONS_IN_WINDOW_TRIGGER,
+  ARREARS_BUCKET_HIGH,
+  CONSUMER_MONTHLY_SHARE_TRIGGER,
+  DEAR_RATE_CONSUMER,
+  DEAR_RATE_CONSUMER_HIGH,
+  DISHONOURED_COUNT_HIGH,
+  LINKED_SHARE_TRIGGER,
+  LTV_HIGH,
+  LTV_TRIGGER,
+  UTILISATION_PEAK_EXCESS,
+  UTILISATION_PEAK_RATIO,
+  isDearRate,
+  linkedIsHigh,
+  noteOf,
+  show,
+  silent,
+  utilisationHeat,
+  variableSeverity,
+  type ClientDisposition,
+} from "@/lib/verdicts";
 
 /* --------------------------------------------------------------- vocabulary */
 
@@ -71,6 +92,15 @@ export interface Flag {
   title: string;
   /** One sentence saying what it means for the file. */
   detail: string;
+  /**
+   * Whether the client hears this, and in what words. NOT optional.
+   *
+   * The client page used to keep its own hand-written list of worries, and five of
+   * the nine critical/high findings had quietly never made it in. Requiring a
+   * disposition here means a new finding cannot be added without deciding, in the
+   * same diff, whether the client is told — and writing down why when they are not.
+   */
+  client: ClientDisposition;
   /** Which debts triggered it, for the analyst to go look. */
   where?: string[];
   amount?: number;
@@ -119,8 +149,17 @@ export interface DebtLine {
   collateral: Collateral[];
   remarks: string[];
   grids: MonthlyGrid[];
-  /** Drawn ÷ limit, for revolving facilities only. */
+  /** Drawn ÷ limit as a PERCENTAGE (0-100), for facilities that state a limit. */
   utilization: number | null;
+  /** What the drawn balance costs — utilisation-weighted over the tracks the
+   *  report marks as used. null when the report does not say where the money is. */
+  rateOnDrawn: number | null;
+  /** The dearest rate quoted on the facility, drawn or not. */
+  rateMaxQuoted: number | null;
+  /** The drawn money sits entirely on a ללא ריבית track. */
+  interestFree: boolean;
+  /** Which money fields the document actually printed — see toLine. */
+  reported: { limit: boolean; monthly: boolean; paid: boolean; peak: boolean };
   /** Highest the facility was drawn during the reporting month (201-072).
    *  A limit that looks calm on the statement date can still be run to the
    *  ceiling mid-month, which is the number a lender actually reacts to. */
@@ -256,7 +295,19 @@ export interface Analysis {
     /** Consumer repayment as a share of all monthly repayment. */
     shareOfMonthly: number;
   };
-  revolving: { limit: number; used: number; utilization: number | null; peak: number };
+  revolving: {
+    /** Sum of the ceilings that were actually printed. */
+    limit: number;
+    /** Balance drawn against those ceilings — the utilisation numerator. */
+    used: number;
+    /** used ÷ limit, as a percentage. Never above 100 by construction. */
+    utilization: number | null;
+    /** Balance on facilities with no approved limit on record. Debt, not draw-down. */
+    unlimitedBalance: number;
+    peak: number;
+    /** Every open revolving balance, whether or not a limit was printed. */
+    totalBalance: number;
+  };
   /**
    * What the cards and the current account actually take out of the household
    * every month.
@@ -282,7 +333,71 @@ export interface Analysis {
   sources: SourceTotal[];
   reconcile: Reconciliation;
   flags: Flag[];
+  /** Exactly what the client page renders — see buildClientView. */
+  clientView: ClientView;
   warnings: string[];
+}
+
+/* ------------------------------------------------------- what a client sees */
+
+/** One line on the client page. A lender's whole holding, or one facility. */
+export interface ClientRow {
+  /** Every uid folded into this row, so a worry can be tied to what is on screen. */
+  uids: string[];
+  bank: string;
+  family: "mortgage" | "loan" | "card";
+  /** 201-002 as printed — only meaningful on the card family. */
+  type: string;
+  parts: number;
+  balance: number;
+  monthly: number;
+  months: number | null;
+  late: boolean;
+  overdue: number;
+  arrearsRange: string;
+  /** What the drawn money costs, where the report says. */
+  rate: number | null;
+  /** The dearest rate quoted, drawn or not. */
+  rateMaxQuoted: number | null;
+  interestFree: boolean;
+  minRate: number | null;
+  maxRate: number | null;
+  limit: number;
+  /** Percentage, 0-100. */
+  utilization: number | null;
+  peak: number;
+  /** Charged but not paid — only when the report printed both figures. */
+  rolled: number;
+  reported: { limit: boolean; monthly: boolean; paid: boolean; peak: boolean };
+  remarks: string[];
+}
+
+export interface ClientSection {
+  key: "mortgage" | "loan" | "card";
+  title: string;
+  accent: string;
+  rows: ClientRow[];
+}
+
+/**
+ * The client page, decided in the engine rather than in the component.
+ *
+ * The component used to select its own rows and recompute its own worries with its
+ * own thresholds. That is how it came to announce ₪372,873 of arrears above rows
+ * accounting for ₪33,825, and to print a ₪799,555 footer over ₪451,962 of visible
+ * balances — two populations, no arithmetic tying them together.
+ *
+ * Here there is one population. `shownBalance` is summed over the same `sections`
+ * array the component maps, so the two cannot drift; `unshownBalance` is the proof
+ * and must be zero.
+ */
+export interface ClientView {
+  sections: ClientSection[];
+  worries: { say: string; severity: Severity }[];
+  footer: { balance: number; monthly: number };
+  shownBalance: number;
+  /** footer.balance − shownBalance. Zero, or the page says so out loud. */
+  unshownBalance: number;
 }
 
 /* ------------------------------------------------------------------ helpers */
@@ -356,6 +471,56 @@ function lineKey(l: DebtLine): string {
 
 /* -------------------------------------------------------------- debt lines */
 
+/**
+ * A facility's price, read straight off its interest tracks.
+ *
+ * Two numbers, because one cannot honestly answer the question. The report quotes
+ * up to five rates per revolving facility and marks which of them the drawn money
+ * actually sits on (201-038). `onDrawn` is what the balance costs; `maxQuoted` is
+ * what the rest of the limit would cost if it were used. Collapsing them loses the
+ * distinction in both directions:
+ *
+ *   - כאל's ₪3,192 card quotes 17.00% and 17.90% with neither marked drawn.
+ *     Reporting 17.90% as the price of the balance is a guess presented as a fact.
+ *   - Discount's ₪1,029 facility sits on an interest-free track while quoting
+ *     17.23% on the rest. Reporting 0% tells a client their card is free.
+ *
+ * Computed here rather than taken from extractLoans, which drops any transaction
+ * with no balance — that is why a ₪15,000 מזרחי limit quoting five rates used to
+ * arrive with no rate at all.
+ */
+function trackPricing(tracks: InterestTrack[]): {
+  onDrawn: number | null;
+  maxQuoted: number | null;
+  interestFree: boolean;
+} {
+  const nominal = (tr: InterestTrack) => {
+    const n = parseFloat(tr.nominal);
+    return Number.isFinite(n) ? n : null;
+  };
+  const free = (tr: InterestTrack) => tr.type.includes("ללא") || tr.type.includes("אפס");
+
+  let w = 0;
+  let wsum = 0;
+  for (const tr of tracks) {
+    const used = num(tr.utilization);
+    if (used <= 0) continue;
+    const n = free(tr) ? 0 : nominal(tr);
+    if (n === null) continue;
+    wsum += used * n;
+    w += used;
+  }
+
+  const quoted = tracks.filter((tr) => !free(tr)).map(nominal).filter((n): n is number => n !== null && n > 0);
+  const drawnFree = tracks.some((tr) => free(tr) && num(tr.utilization) > 0);
+
+  return {
+    onDrawn: w > 0 ? Math.round((wsum / w) * 100) / 100 : null,
+    maxQuoted: quoted.length ? Math.max(...quoted) : null,
+    interestFree: drawnFree && w > 0 && wsum === 0,
+  };
+}
+
 function toLine(
   t: Transaction,
   loan: ExtractedLoan | undefined,
@@ -368,6 +533,7 @@ function toLine(
   const rate = rateStr === "" ? null : Number(rateStr);
   const paymentType = f["201-047"] ?? "";
   const frequency = f["201-044"] ?? "";
+  const pricing = trackPricing(t.interestTracks);
 
   return {
     uid: t.uid,
@@ -401,6 +567,19 @@ function toLine(
     grids: t.grids,
     utilization: limit > 0 ? Math.round((balance / limit) * 1000) / 10 : null,
     peak: num(f["201-072"]),
+    rateOnDrawn: pricing.onDrawn,
+    rateMaxQuoted: pricing.maxQuoted,
+    interestFree: pricing.interestFree,
+    // A printed "0" is a claim; an absent field is a gap. num() collapses both to
+    // zero, so which one it was is recorded before that happens — it is the
+    // difference between "approved limit ₪0" and "no limit on record", and the
+    // second must never enter a utilisation denominator.
+    reported: {
+      limit: f["201-020"] !== undefined,
+      monthly: f["201-046"] !== undefined,
+      paid: f["201-048"] !== undefined,
+      peak: f["201-072"] !== undefined,
+    },
     shared: false,
     reportedBy: [reporter],
   };
@@ -684,7 +863,132 @@ function sectionOf(l?: DebtLine): string {
   return "other";
 }
 
-function buildFlags(a: Omit<Analysis, "flags">): Flag[] {
+/* ------------------------------------------------- the client page, decided here */
+
+const EMPTY_ROW = (bank: string, family: ClientRow["family"], type: string): ClientRow => ({
+  uids: [],
+  bank,
+  family,
+  type,
+  parts: 0,
+  balance: 0,
+  monthly: 0,
+  months: null,
+  late: false,
+  overdue: 0,
+  arrearsRange: "",
+  rate: null,
+  rateMaxQuoted: null,
+  interestFree: false,
+  minRate: null,
+  maxRate: null,
+  limit: 0,
+  utilization: null,
+  peak: 0,
+  rolled: 0,
+  reported: { limit: false, monthly: false, paid: false, peak: false },
+  remarks: [],
+});
+
+/** Fold one liability into a row. */
+function absorb(row: ClientRow, l: DebtLine): ClientRow {
+  row.uids.push(l.uid);
+  row.parts += 1;
+  row.balance += l.balance;
+  row.monthly += l.monthly;
+  row.limit += l.limit;
+  row.peak += l.peak;
+  row.overdue += l.overdue;
+  if (l.months && (row.months === null || l.months > row.months)) row.months = l.months;
+  if (l.overdue > 0 || l.arrearsRange) row.late = true;
+  if (l.arrearsRange && l.arrearsRange > row.arrearsRange) row.arrearsRange = l.arrearsRange;
+  if (l.rateOnDrawn !== null) row.rate = Math.max(row.rate ?? -Infinity, l.rateOnDrawn);
+  if (l.rateMaxQuoted !== null) row.rateMaxQuoted = Math.max(row.rateMaxQuoted ?? -Infinity, l.rateMaxQuoted);
+  if (l.interestFree) row.interestFree = true;
+  if (l.rate !== null) {
+    row.minRate = row.minRate === null ? l.rate : Math.min(row.minRate, l.rate);
+    row.maxRate = row.maxRate === null ? l.rate : Math.max(row.maxRate, l.rate);
+  }
+  // Only a printed 201-048 can evidence a rolled charge; an absent one is silence,
+  // not non-payment.
+  if (l.reported.paid && l.paidActually > 0 && l.monthly - l.paidActually > 1)
+    row.rolled += l.monthly - l.paidActually;
+  for (const k of ["limit", "monthly", "paid", "peak"] as const)
+    if (l.reported[k]) row.reported[k] = true;
+  for (const r of l.remarks) if (!row.remarks.includes(r)) row.remarks.push(r);
+  return row;
+}
+
+/**
+ * Build the client page from the analysis.
+ *
+ * Mortgages and consumer loans fold to one row per lender — a מסלול is an artefact
+ * of how the bank booked the loan, and a household with a fourteen-tranche mortgage
+ * has three mortgages at three banks. Revolving facilities do NOT fold: מזרחי holds
+ * two separate ₪15,000 lines and a client needs to see both, and the point of the
+ * section is what each card costs.
+ */
+function buildClientView(a: Omit<Analysis, "flags" | "clientView">, flags: Flag[]): ClientView {
+  const own = a.lines.filter((l) => l.role === "debtor");
+
+  const byLender = (lines: DebtLine[], family: "mortgage" | "loan"): ClientRow[] => {
+    const by = new Map<string, ClientRow>();
+    for (const l of lines) {
+      const k = l.bank.replace(/\s+/g, "");
+      by.set(k, absorb(by.get(k) ?? EMPTY_ROW(l.bank, family, l.type), l));
+    }
+    return Array.from(by.values()).sort((x, y) => y.balance - x.balance || y.monthly - x.monthly);
+  };
+
+  // One row per facility. No monthly gate: a card that has stopped being serviced
+  // is the most important row on the page, and gating on monthly > 0 hid every
+  // revolving facility on a real report — ₪347,593 of it.
+  const cardRows = own
+    .filter((l) => l.category === "card" || l.category === "overdraft")
+    .map((l) => {
+      const row = absorb(EMPTY_ROW(l.bank, "card", l.type), l);
+      row.utilization = l.utilization;
+      return row;
+    })
+    .sort((x, y) => y.monthly - x.monthly || y.balance - x.balance);
+
+  const sections: ClientSection[] = [
+    { key: "mortgage" as const, title: "משכנתאות", accent: "#6b53d8", rows: byLender(own.filter((l) => l.category === "mortgage"), "mortgage") },
+    { key: "loan" as const, title: "הלוואות", accent: "#c4681a", rows: byLender(own.filter((l) => l.category === "loan"), "loan") },
+    { key: "card" as const, title: "כרטיסי אשראי ומסגרות", accent: "#0d8b9b", rows: cardRows },
+  ].filter((s) => s.rows.length > 0);
+
+  // Anything the categoriser did not place. Without this a new transaction type
+  // would silently vanish from the page while still counting in the footer.
+  const placed = new Set(sections.flatMap((s) => s.rows.flatMap((r) => r.uids)));
+  const orphans = own.filter((l) => !placed.has(l.uid));
+  if (orphans.length) {
+    sections.push({
+      key: "loan",
+      title: "התחייבויות נוספות",
+      accent: "#64748b",
+      rows: byLender(orphans, "loan"),
+    });
+  }
+
+  const shownBalance = sections.reduce((s, sec) => s + sec.rows.reduce((t, r) => t + r.balance, 0), 0);
+
+  // Ordered by severity, and each sentence's rows are on the page by construction.
+  const worries = flags
+    .map((f) => ({ note: noteOf(f.client), severity: f.severity }))
+    .filter((x): x is { note: { say: string; uids?: string[] }; severity: Severity } => x.note !== null)
+    .map((x) => ({ say: x.note.say, severity: x.severity }));
+
+  return {
+    sections,
+    worries,
+    footer: { balance: a.totals.balance, monthly: a.totals.monthly },
+    shownBalance,
+    unshownBalance: Math.round(a.totals.balance - shownBalance),
+  };
+}
+
+function buildFlags(a: Omit<Analysis, "flags" | "clientView">): Flag[] {
   const flags: Flag[] = [];
   const own = a.lines.filter((l) => l.role === "debtor");
   const push = (f: Flag) => flags.push(f);
@@ -697,6 +1001,7 @@ function buildFlags(a: Omit<Analysis, "flags">): Flag[] {
       severity: "critical",
       title: "הליך חדלות פירעון",
       detail: `נמצאו ${a.legal.insolvency.length} הליכי חדלות פירעון או שיקום כלכלי. יש לברר סטטוס והכרעות לפני כל המשך טיפול.`,
+      client: show("קיים הליך חדלות פירעון — זה הפריט הראשון שכל בנק יבדוק"),
       amount: a.legal.insolvency.reduce((s, c) => s + num(c["151-009"] || c["151-007"]), 0),
     });
   }
@@ -707,6 +1012,11 @@ function buildFlags(a: Omit<Analysis, "flags">): Flag[] {
       severity: "critical",
       title: "תיקים פתוחים בהוצאה לפועל",
       detail: `${a.legal.executionOpen.length} תיקים פתוחים. חוב פתוח בהוצאה לפועל נחשב חוב לכל דבר וחוסם כמעט כל מסלול.`,
+      client: show(
+        a.legal.executionOpen.length === 1
+          ? "קיים תיק פתוח בהוצאה לפועל — חוב לכל דבר, שחוסם כמעט כל מסלול"
+          : `קיימים ${a.legal.executionOpen.length} תיקים פתוחים בהוצאה לפועל — חוב לכל דבר, שחוסם כמעט כל מסלול`
+      ),
       amount: a.legal.executionDebt,
     });
   }
@@ -718,6 +1028,10 @@ function buildFlags(a: Omit<Analysis, "flags">): Flag[] {
       severity: "medium",
       title: "תיקי הוצאה לפועל שנסגרו",
       detail: `${closedExec} תיקים נסגרו ואינם חוב פתוח, אך נותרים בדוח ונקראים כהיסטוריה על ידי החתם.`,
+      // Closed and paid. Telling a client about a file they already settled invites
+      // alarm about something they cannot act on; the advisor still needs to see it
+      // because an underwriter will read the history.
+      client: silent("תיק שנסגר ואינו חוב פתוח — רלוונטי לחתם, לא ללקוח"),
     });
   }
   if (a.legal.nonPayment.length) {
@@ -734,6 +1048,11 @@ function buildFlags(a: Omit<Analysis, "flags">): Flag[] {
       detail: toBureau
         ? `${a.legal.nonPayment.length} רשומות, מתוכן ${toBureau} ניתנות להעברה ללשכה ומופיעות בחיווי האשראי שהבנק מושך. זהו הפריט הראשון שייבחן.`
         : `${a.legal.nonPayment.length} רשומות שאינן מועברות ללשכה, אך מופיעות בדוח ויידרש עליהן הסבר.`,
+      client: show(
+        toBureau
+          ? "קיים רישום על אי עמידה בתשלומים שמופיע בדירוג האשראי שהבנק מושך"
+          : "קיים רישום על אי עמידה בתשלומים בדוח, שיידרש עליו הסבר"
+      ),
       where: a.legal.nonPayment.map((n) => n.source).filter(Boolean),
     });
   }
@@ -747,6 +1066,7 @@ function buildFlags(a: Omit<Analysis, "flags">): Flag[] {
       detail: `${openRequests.length} פניות שטרם הסתיימו (${openRequests
         .map((x) => x.type)
         .join(", ")}). אם מדובר בתיקון מידע, ייתכן שהתמונה תשתנה.`,
+      client: silent("פנייה מנהלית מול מערכת נתוני אשראי — לא מצב פיננסי של הלקוח"),
     });
   }
 
@@ -761,6 +1081,7 @@ function buildFlags(a: Omit<Analysis, "flags">): Flag[] {
       detail: `${inArrears.length} התחייבויות בפיגור${
         inArrears.some((l) => l.arrearsRange) ? ` (הטווח החמור: ${inArrears.map((l) => l.arrearsRange).filter(Boolean).sort().reverse()[0]})` : ""
       }.`,
+      client: show("יש פיגור בתשלומים", inArrears.map((l) => l.uid)),
       amount: inArrears.reduce((s, l) => s + l.overdue, 0),
       where: Array.from(new Set(inArrears.map((l) => l.bank))),
     });
@@ -774,6 +1095,11 @@ function buildFlags(a: Omit<Analysis, "flags">): Flag[] {
       detail: `${a.behaviour.arrearsMonths} חודשים עם פיגור בהיסטוריה${
         a.behaviour.worstBucket >= 4 ? `, כולל פיגור של 120 יום ומעלה` : ""
       }. בנקים בוחנים את הדפוס, לא רק את המצב הנוכחי.`,
+      client: show(
+        a.behaviour.arrearsMonths === 1
+          ? "בעבר היה חודש אחד עם פיגור בתשלומים — הבנק מסתכל על הדפוס, לא רק על היום"
+          : `בעבר היו ${a.behaviour.arrearsMonths} חודשים עם פיגור בתשלומים — הבנק מסתכל על הדפוס, לא רק על היום`
+      ),
     });
   }
 
@@ -787,6 +1113,7 @@ function buildFlags(a: Omit<Analysis, "flags">): Flag[] {
       severity: "high",
       title: "עסקאות בטיפול ההוצאה לפועל",
       detail: `${enforced.length} עסקאות מסומנות כמטופלות בהוצאה לפועל.`,
+      client: show("חלק מההתחייבויות מטופלות בהוצאה לפועל", enforced.map((l) => l.uid)),
       where: Array.from(new Set(enforced.map((l) => l.bank))),
     });
   }
@@ -798,6 +1125,7 @@ function buildFlags(a: Omit<Analysis, "flags">): Flag[] {
       severity: "high",
       title: "עסקאות בפיגור ללא תשלום כלל",
       detail: `${noPayment.length} עסקאות שלא התקבל בהן תשלום.`,
+      client: show("יש התחייבויות שלא שולם בהן דבר", noPayment.map((l) => l.uid)),
       where: Array.from(new Set(noPayment.map((l) => l.bank))),
     });
   }
@@ -810,6 +1138,11 @@ function buildFlags(a: Omit<Analysis, "flags">): Flag[] {
       severity: a.behaviour.checksReturned >= 3 ? "high" : "medium",
       title: 'שיקים שחזרו (אכ"מ)',
       detail: `${a.behaviour.checksReturned} שיקים חזרו מתוך ${a.behaviour.checksPresented || "—"} שהוצגו.`,
+      client: show(
+        a.behaviour.checksReturned === 1
+          ? "שיק אחד חזר — פוגע בדירוג ומורגש בכל בקשה חדשה"
+          : `${a.behaviour.checksReturned} שיקים חזרו — פוגע בדירוג ומורגש בכל בקשה חדשה`
+      ),
     });
   }
   if (a.behaviour.debitsDishonored > 0) {
@@ -819,6 +1152,11 @@ function buildFlags(a: Omit<Analysis, "flags">): Flag[] {
       severity: a.behaviour.debitsDishonored >= 3 ? "high" : "medium",
       title: "הוראות קבע שלא כובדו",
       detail: `${a.behaviour.debitsDishonored} הוראות לחיוב חשבון לא כובדו מתוך ${a.behaviour.debitsPresented || "—"}.`,
+      client: show(
+        a.behaviour.debitsDishonored === 1
+          ? "הוראת קבע אחת לא כובדה — סימן לתזרים לחוץ בחשבון"
+          : `${a.behaviour.debitsDishonored} הוראות קבע לא כובדו — סימן לתזרים לחוץ בחשבון`
+      ),
     });
   }
 
@@ -831,22 +1169,58 @@ function buildFlags(a: Omit<Analysis, "flags">): Flag[] {
       severity: "high",
       title: `סטטוס לקוח: ${blocked[0].systemStatus}`,
       detail: "סטטוס שאינו רגיל במערכת נתוני האשראי — יש לברר את משמעותו מול הלקוח.",
+      // Deliberately not shown: the status is about the client's record inside the
+      // credit-data system, and its meaning has to be established with them before
+      // it can be stated to them.
+      client: silent("סטטוס הרשומה במערכת נתוני אשראי — לברור מול הלקוח לפני שנאמר לו"),
       where: blocked.map((c) => c.name),
     });
   }
 
   /* ---- revolving credit */
-  if (a.revolving.utilization !== null && a.revolving.utilization >= 80) {
+  const utilFraction = a.revolving.utilization === null ? null : a.revolving.utilization / 100;
+  const utilHeat = utilisationHeat(utilFraction);
+  if (utilHeat) {
+    const stretched = a.lines.filter(
+      (l) => utilisationHeat(l.utilization === null ? null : l.utilization / 100) !== null
+    );
     push({
       id: "revolving",
-      target: {
-        section: "revolving",
-        uids: a.lines.filter((l) => (l.utilization ?? 0) >= 80).map((l) => l.uid),
-      },
-      severity: a.revolving.utilization >= 95 ? "high" : "medium",
+      target: { section: "revolving", uids: stretched.map((l) => l.uid) },
+      severity: utilHeat === "hot" ? "high" : "medium",
       title: "ניצול מסגרות גבוה",
-      detail: `${a.revolving.utilization}% מהמסגרות מנוצלות. ניצול מתמשך מעל 80% נקרא כמצוקת נזילות.`,
+      detail: `${a.revolving.utilization}% מהמסגרות המאושרות מנוצלות. ניצול מתמשך בשיעור כזה נקרא כמצוקת נזילות.`,
       amount: a.revolving.used,
+      client: show(
+        `המסגרות מנוצלות ב-${Math.round(a.revolving.utilization ?? 0)}% — כמעט ללא אוויר לנשימה בחשבון`,
+        stretched.map((l) => l.uid)
+      ),
+    });
+  }
+
+  // Balance with no approved ceiling behind it. Not a utilisation problem — there
+  // is nothing to divide by — but the largest single debt on a real report was
+  // exactly this, and dividing by the other facilities' limits is what produced
+  // "ניצול 10,889.5%".
+  if (a.revolving.unlimitedBalance > 0) {
+    const noCeiling = a.lines.filter(
+      (l) =>
+        (l.category === "card" || l.category === "overdraft") &&
+        l.role === "debtor" &&
+        l.balance > 0 &&
+        !(l.reported.limit && l.limit > 0)
+    );
+    push({
+      id: "revolving-unlimited",
+      target: { section: "revolving", uids: noCeiling.map((l) => l.uid) },
+      severity: "high",
+      title: "יתרה ללא מסגרת מאושרת בדוח",
+      detail: `${Math.round(a.revolving.unlimitedBalance).toLocaleString("en-US")} ₪ נמצאים בחשבונות שהדוח אינו מציין להם מסגרת מאושרת. אין מול מה למדוד את הניצול, והיתרה עצמה היא חוב לכל דבר.`,
+      amount: a.revolving.unlimitedBalance,
+      client: show(
+        `${Math.round(a.revolving.unlimitedBalance).toLocaleString("en-US")} ₪ ביתרת חובה בחשבון, בלי מסגרת מאושרת בדוח`,
+        noCeiling.map((l) => l.uid)
+      ),
     });
   }
 
@@ -854,8 +1228,8 @@ function buildFlags(a: Omit<Analysis, "flags">): Flag[] {
   // the ceiling mid-month. The peak is the number a lender reacts to.
   if (
     a.revolving.limit > 0 &&
-    a.revolving.peak > a.revolving.used * 1.15 &&
-    a.revolving.peak / a.revolving.limit >= 0.9
+    a.revolving.peak > a.revolving.used * UTILISATION_PEAK_EXCESS &&
+    a.revolving.peak / a.revolving.limit >= UTILISATION_PEAK_RATIO
   ) {
     push({
       id: "revolving-peak",
@@ -863,6 +1237,9 @@ function buildFlags(a: Omit<Analysis, "flags">): Flag[] {
       severity: "medium",
       title: "שיא ניצול גבוה מהיתרה המוצגת",
       detail: `שיא הניצול בחודש הדיווח היה ${Math.round(a.revolving.peak).toLocaleString("en-US")} ₪ מול יתרה מוצגת של ${Math.round(a.revolving.used).toLocaleString("en-US")} ₪ — המסגרת נוצלה כמעט במלואה במהלך החודש.`,
+      client: show(
+        `במהלך החודש המסגרת נוצלה עד ${Math.round(a.revolving.peak).toLocaleString("en-US")} ₪ — גם אם ביום הדוח היא נראית פנויה`
+      ),
       amount: a.revolving.peak,
     });
   }
@@ -883,6 +1260,12 @@ function buildFlags(a: Omit<Analysis, "flags">): Flag[] {
       detail: `${Math.round(a.cards.monthlyCharge).toLocaleString("en-US")} ₪ בחודש על פני ${a.cards.count} מסגרות${
         share > 0 ? ` — ${Math.round(share * 100)}% מסך ההחזר החודשי` : ""
       }. חיוב שאינו מופיע בתמהיל, אך יוצא מהחשבון בכל חודש.`,
+      client: show(
+        `${Math.round(a.cards.monthlyCharge).toLocaleString("en-US")} ₪ בחודש יוצאים על כרטיסי אשראי ומסגרות`,
+        a.lines
+          .filter((l) => l.role === "debtor" && (l.category === "card" || l.category === "overdraft"))
+          .map((l) => l.uid)
+      ),
       amount: a.cards.monthlyCharge,
     });
   }
@@ -896,20 +1279,35 @@ function buildFlags(a: Omit<Analysis, "flags">): Flag[] {
       severity: "high",
       title: "חיוב שלא נפרע במלואו",
       detail: `${Math.round(a.cards.rolled).toLocaleString("en-US")} ₪ מהחיוב החודשי לא שולמו בפועל וגולגלו קדימה. גלגול אשראי צרכני הוא האשראי היקר ביותר שיש.`,
+      client: show(
+        `${Math.round(a.cards.rolled).toLocaleString("en-US")} ₪ מהחיוב בכרטיס לא נפרעו והתגלגלו לחודש הבא — זה האשראי היקר ביותר שיש`,
+        a.lines.filter((l) => l.monthly - l.paidActually > 1 && l.paidActually > 0).map((l) => l.uid)
+      ),
       amount: a.cards.rolled,
     });
   }
 
   /* ---- price of the consumer debt */
-  const expensive = own.filter((l) => l.category === "loan" && (l.rate ?? 0) >= 10);
+  const expensive = own.filter((l) => l.category === "loan" && (l.rate ?? 0) >= DEAR_RATE_CONSUMER);
   if (expensive.length) {
     const worst = Math.max(...expensive.map((l) => l.rate ?? 0));
+    const cheapest = Math.min(...expensive.map((l) => l.rate ?? 0));
     push({
       id: "expensive",
       target: { section: "consumer", uids: expensive.map((l) => l.uid) },
-      severity: worst >= 13 ? "high" : "medium",
+      severity: worst >= DEAR_RATE_CONSUMER_HIGH ? "high" : "medium",
       title: "הלוואות בריבית גבוהה",
-      detail: `${expensive.length} הלוואות בריבית ${worst.toFixed(2)}% ומטה-מעלה — מועמדות ראשונות למיחזור לתוך המשכנתא.`,
+      // The range of the set actually counted. "N loans at X% and above" where X
+      // was the MAXIMUM of the set said the opposite of what it meant.
+      detail: `${expensive.length} הלוואות בריבית ${
+        cheapest === worst ? `${worst.toFixed(2)}%` : `${cheapest.toFixed(2)}%–${worst.toFixed(2)}%`
+      } — מועמדות ראשונות למיחזור לתוך המשכנתא.`,
+      client: show(
+        `${expensive.length === 1 ? "הלוואה אחת" : `${expensive.length} הלוואות`} בריבית ${
+          cheapest === worst ? `${worst.toFixed(1)}%` : `${cheapest.toFixed(1)}%–${worst.toFixed(1)}%`
+        } — ${expensive.length === 1 ? "אפשר למחזר אותה" : "אפשר למחזר אותן"} לריבית נמוכה בהרבה`,
+        expensive.map((l) => l.uid)
+      ),
       amount: expensive.reduce((s, l) => s + l.balance, 0),
       where: Array.from(new Set(expensive.map((l) => l.bank))),
     });
@@ -924,6 +1322,10 @@ function buildFlags(a: Omit<Analysis, "flags">): Flag[] {
       severity: "medium",
       title: "הלוואות בלון",
       detail: `${balloons.length} התחייבויות שהקרן בהן נפרעת בסוף התקופה. ההחזר החודשי הנוכחי אינו משקף את החבות.`,
+      client: show(
+        `${balloons.length === 1 ? "הלוואה אחת" : `${balloons.length} הלוואות`} מסוג בלון — הקרן כולה נפרעת בסוף, וההחזר החודשי היום אינו משקף את החוב`,
+        balloons.map((l) => l.uid)
+      ),
       amount: balloons.reduce((s, l) => s + l.balance, 0),
       where: Array.from(new Set(balloons.map((l) => l.bank))),
     });
@@ -931,45 +1333,58 @@ function buildFlags(a: Omit<Analysis, "flags">): Flag[] {
 
   /* ---- mortgage risk composition */
   if (a.mortgage.balance > 0) {
-    if (a.mortgage.variableShare >= 0.66) {
+    const varSeverity = variableSeverity(a.mortgage.variableShare);
+    if (varSeverity) {
       push({
         id: "variable",
-      target: { section: "mortgage" },
-        severity: "medium",
+        target: { section: "mortgage" },
+        severity: varSeverity,
         title: "חשיפה גבוהה לריבית משתנה",
         detail: `${Math.round(a.mortgage.variableShare * 100)}% מהמשכנתא במסלולים משתנים. כל עליית ריבית מתגלגלת כמעט במלואה להחזר.`,
+        client: show(
+          `${Math.round(a.mortgage.variableShare * 100)}% מהמשכנתא נע עם הריבית — אם הריבית תעלה, ההחזר יעלה`
+        ),
         amount: Math.round(a.mortgage.balance * a.mortgage.variableShare),
       });
     }
-    if (a.mortgage.linkedShare >= 0.5) {
+    if (linkedIsHigh(a.mortgage.linkedShare)) {
       push({
         id: "linked",
-      target: { section: "mortgage" },
+        target: { section: "mortgage" },
         severity: "medium",
         title: "חשיפה גבוהה למדד",
         detail: `${Math.round(a.mortgage.linkedShare * 100)}% מהמשכנתא צמוד למדד — הקרן עצמה גדלה עם האינפלציה.`,
+        client: show(
+          `${Math.round(a.mortgage.linkedShare * 100)}% מהמשכנתא צמוד למדד — הקרן עצמה גדלה עם האינפלציה, לא רק ההחזר`
+        ),
         amount: Math.round(a.mortgage.balance * a.mortgage.linkedShare),
       });
     }
-    if (a.mortgage.ltv !== null && a.mortgage.ltv >= 0.75) {
+    if (a.mortgage.ltv !== null && a.mortgage.ltv >= LTV_TRIGGER) {
       push({
         id: "ltv",
-      target: { section: "mortgage" },
-        severity: a.mortgage.ltv >= 0.9 ? "high" : "medium",
+        target: { section: "mortgage" },
+        severity: a.mortgage.ltv >= LTV_HIGH ? "high" : "medium",
         title: `יחס מימון ${Math.round(a.mortgage.ltv * 100)}%`,
         detail: "יחס מימון גבוה מצמצם מאוד את מרחב המיחזור ואת הנכונות של בנקים להגדיל.",
+        client: show(
+          `המשכנתא מכסה ${Math.round((a.mortgage.ltv ?? 0) * 100)}% משווי הנכס — יחס גבוה שמצמצם את מרחב התמרון`
+        ),
       });
     }
   }
 
   /* ---- how the monthly burden is split */
-  if (a.consumer.shareOfMonthly >= 0.4 && a.consumer.monthly > 0) {
+  if (a.consumer.shareOfMonthly >= CONSUMER_MONTHLY_SHARE_TRIGGER && a.consumer.monthly > 0) {
     push({
       id: "consumer-weight",
       target: { section: "consumer" },
       severity: "medium",
       title: "משקל גבוה להלוואות צרכניות",
       detail: `${Math.round(a.consumer.shareOfMonthly * 100)}% מההחזר החודשי הולך להלוואות צרכניות ולא למשכנתא — הפוטנציאל הגדול ביותר לשיפור תזרים.`,
+      client: show(
+        `${Math.round(a.consumer.shareOfMonthly * 100)}% מההחזר החודשי הולך להלוואות צרכניות ולא למשכנתא`
+      ),
       amount: a.consumer.monthly,
     });
   }
@@ -999,6 +1414,11 @@ function buildFlags(a: Omit<Analysis, "flags">): Flag[] {
           ? "הלקוח כבר נבדק במקום אחר — כדאי לברר מה הוצע לו לפני שמציעים."
           : "אשראי שיאושר יופיע כחוב נוסף."
       }`,
+      client: show(
+        mortgageAsk > 0
+          ? "קיימת בקשת משכנתה פתוחה אצל מלווה אחר — כדאי לברר מה הוצע שם לפני שמחליטים"
+          : "קיימות בקשות אשראי פתוחות שטרם אושרו — אם יאושרו, הן יתווספו לחוב"
+      ),
       amount: mortgageAsk || undefined,
       where: Array.from(new Set(a.inquiries.pending.map((q) => q.user).filter(Boolean))),
     });
@@ -1016,15 +1436,20 @@ function buildFlags(a: Omit<Analysis, "flags">): Flag[] {
       }${a.reconcile.balanceGap > 500 && a.reconcile.limitGap > 500 ? " ו" : ""}${
         a.reconcile.limitGap > 500 ? `מסגרות גבוהות ב-₪${a.reconcile.limitGap.toLocaleString("en-US")}` : ""
       } מהמופיע בעמודי הפירוט. יש לקרוא את התמצית במסמך המקורי — הניתוח כאן עלול לחסר.`,
+      // About how well the document was READ, not about the client's finances.
+      client: silent("מדבר על איכות קריאת המסמך, לא על מצבו של הלקוח"),
     });
   }
-  if (a.inquiries.last3 >= 3) {
+  if (a.inquiries.last3 >= APPLICATIONS_IN_WINDOW_TRIGGER) {
     push({
       id: "shopping",
       target: { section: "inquiries" },
       severity: "medium",
       title: "ריבוי פניות בזמן קצר",
       detail: `${a.inquiries.last3} פניות לקבלת מידע ב-3 החודשים האחרונים (${a.inquiries.last12} בשנה). דפוס שנקרא כחיפוש אשראי.`,
+      // The count mixes lender applications with the client's own report pulls, so
+      // it overstates credit-seeking. Not sound enough to put in front of them.
+      client: silent("הספירה כוללת גם בקשות שהלקוח עצמו יזם — לא אמינה דיה לרמת הלקוח"),
     });
   }
 
@@ -1039,6 +1464,9 @@ function buildFlags(a: Omit<Analysis, "flags">): Flag[] {
       severity: "info",
       title: "ערבויות",
       detail: `הלקוח ערב ל-${a.totals.guaranteedCount} התחייבויות. אינן החזר שלו, אך נחשבות חשיפה בבדיקת בנק.`,
+      client: show(
+        `אתם ערבים ל-${a.totals.guaranteedCount} התחייבויות בסך ${Math.round(a.totals.guaranteedBalance).toLocaleString("en-US")} ₪ — לא ההחזר שלכם, אך הבנק מביא אותן בחשבון`
+      ),
       amount: a.totals.guaranteedBalance,
     });
   }
@@ -1052,6 +1480,9 @@ function buildFlags(a: Omit<Analysis, "flags">): Flag[] {
       severity: "info",
       title: "התחייבויות משותפות",
       detail: `${shared.length} התחייבויות הופיעו ביותר מדוח אחד ונספרו פעם אחת בלבד.`,
+      // How two reports were merged, not a fact about the household's finances.
+      // The client sees each debt once, which is the correct outcome either way.
+      client: silent("פרט על אופן איחוד שני הדוחות, לא על מצב הלקוח"),
       amount: shared.reduce((s, l) => s + l.balance, 0),
     });
   }
@@ -1128,10 +1559,20 @@ export function analyseReports(rawReports: CreditReport[], rawNames: string[] = 
   const tracks = mortgageTracks(lines);
   const trackTotal = tracks.reduce((s, t) => s + t.amount, 0);
 
-  const revolvingLimit = revolvingRows.reduce((s, l) => s + l.limit, 0);
-  const revolvingUsed = revolvingRows.reduce((s, l) => s + l.balance, 0);
+  // A utilisation ratio is only meaningful over facilities that state a ceiling.
+  // Summing every balance over only the limits that happen to be printed made a
+  // real report read "ניצול מסגרות 10,889.5%": a ₪336,296 overdraft with no limit
+  // on record landed in the numerator against a ₪3,192 card limit. Balance with
+  // no approved limit behind it is still debt — it is reported as its own figure
+  // rather than divided by somebody else's ceiling.
+  const priced = revolvingRows.filter((l) => l.reported.limit && l.limit > 0);
+  const revolvingLimit = priced.reduce((s, l) => s + l.limit, 0);
+  const revolvingUsed = priced.reduce((s, l) => s + l.balance, 0);
+  const revolvingUnlimited = revolvingRows
+    .filter((l) => !(l.reported.limit && l.limit > 0))
+    .reduce((s, l) => s + l.balance, 0);
 
-  const base: Omit<Analysis, "flags"> = {
+  const base: Omit<Analysis, "flags" | "clientView"> = {
     clients: reports.map((r, i) => ({
       name: r.client?.name ?? "",
       idNumber: r.client?.idNumber ?? "",
@@ -1182,7 +1623,10 @@ export function analyseReports(rawReports: CreditReport[], rawNames: string[] = 
       limit: revolvingLimit,
       used: revolvingUsed,
       utilization: revolvingLimit > 0 ? Math.round((revolvingUsed / revolvingLimit) * 1000) / 10 : null,
+      unlimitedBalance: revolvingUnlimited,
       peak: revolvingRows.reduce((s, l) => s + l.peak, 0),
+      /** Every open card and overdraft, priced ceiling or not — what the client owes. */
+      totalBalance: revolvingRows.reduce((s, l) => s + l.balance, 0),
     },
     cards: {
       monthlyCharge: revolvingRows.reduce((s, l) => s + l.monthly, 0),
@@ -1219,5 +1663,19 @@ export function analyseReports(rawReports: CreditReport[], rawNames: string[] = 
     warnings: Array.from(new Set(reports.flatMap((r) => r.warnings ?? []))),
   };
 
-  return { ...base, flags: buildFlags(base) };
+  const flags = buildFlags(base);
+  const clientView = buildClientView(base, flags);
+
+  // The invariant, said out loud rather than trusted. If a debt counts toward the
+  // footer but has no row, the page must not quietly show a smaller sum than it
+  // announces — so the gap becomes a warning the advisor sees.
+  const warnings =
+    clientView.unshownBalance === 0
+      ? base.warnings
+      : [
+          ...base.warnings,
+          `סיכום ללקוח: ${Math.abs(clientView.unshownBalance).toLocaleString("en-US")} ₪ מהיתרה אינם מופיעים באף שורה בעמוד.`,
+        ];
+
+  return { ...base, warnings, flags, clientView };
 }
