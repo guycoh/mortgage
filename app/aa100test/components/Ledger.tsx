@@ -151,34 +151,46 @@ export default function Ledger({
   const signed = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${Math.abs(n).toFixed(2)}%`;
 
   /**
-   * The anchor's own level, where a lender printed one. Read-only on the note
-   * line because it is the one part of the sum nobody types: only the Discount
-   * template carries it, and it comes with the row or not at all. It stays
-   * editable in the settings sheet for the rare hand correction.
+   * One of the two rate fields in the עוגן cell.
    *
-   * Tested for being a number, not for being positive — the real anchor on an
-   * index-linked tranche is genuinely negative. Discount prints −1.50%, and
-   * −1.50 + 3.00 is the 1.50% the borrower actually pays; requiring base > 0
-   * threw exactly those rows' anchors away.
+   * Empty means absent, not zero: a fixed-rate row has no anchor and no margin,
+   * and writing 0 into either would claim it is anchored at nothing. So the value
+   * clears to null rather than to 0 — which also keeps the numeric columns
+   * nullable in the database, the way they are declared.
    */
-  const anchorLevel = (loan: ImportedLoan) => {
-    const base = Number(loan.anchor);
-    if (loan.anchor === null || loan.anchor === undefined || !Number.isFinite(base)) return "";
-    // Purely numeric, and with the same typographic minus the rest of the page
-    // uses. A Hebrew word here would be a right-to-left run inside an LTR isolate
-    // for no gain: it sits under the anchor's own name, and the cell's tooltip
-    // says the whole sum out loud.
-    return `${base < 0 ? "−" : ""}${Math.abs(base).toFixed(2)}%`;
-  };
+  const numField = (
+    loan: ImportedLoan,
+    key: "anchor" | "anchor_margin",
+    label: string,
+    placeholder: string
+  ) => (
+    <input
+      className="fin-cell fin-num-in"
+      type="number"
+      step="0.01"
+      aria-label={label}
+      title={label}
+      placeholder={placeholder}
+      value={loan[key] ?? ""}
+      onFocus={(e) => e.currentTarget.select()}
+      onChange={(e) =>
+        patch(loan.id, {
+          [key]: e.target.value === "" ? null : Number(e.target.value),
+        } as Partial<ImportedLoan>)
+      }
+    />
+  );
 
-  /** The whole sum in words, for the cell's tooltip: level + margin = the rate. */
+  /** The sum spelled out, for the cell's tooltip: anchor + margin = the rate. */
   const anchorTip = (loan: ImportedLoan) => {
-    if (!loan.source_anchor && loan.anchor_margin === null) return "המסמך לא ציין עוגן לשורה הזו";
-    const margin = Number(loan.anchor_margin);
+    if (loan.anchor === null && loan.anchor_margin === null)
+      return "המסמך לא ציין עוגן לשורה הזו";
     const parts = [loan.source_anchor || "עוגן"];
-    if (anchorLevel(loan)) parts.push(`ברמה של ${Number(loan.anchor).toFixed(2)}%`);
-    if (loan.anchor_margin !== null && Number.isFinite(margin))
-      parts.push(`מרווח ${signed(margin)} — סה"כ ${(Number(loan.rate) || 0).toFixed(2)}%`);
+    if (loan.anchor !== null && Number.isFinite(Number(loan.anchor)))
+      parts.push(`${Number(loan.anchor).toFixed(2)}%`);
+    if (loan.anchor_margin !== null && Number.isFinite(Number(loan.anchor_margin)))
+      parts.push(`מרווח ${signed(Number(loan.anchor_margin))}`);
+    parts.push(`סה"כ ${(Number(loan.rate) || 0).toFixed(2)}%`);
     return parts.join(" · ");
   };
 
@@ -480,51 +492,23 @@ export default function Ledger({
                             </div>
                           </td>
 
-                          {/* --- עוגן: the name, and the margin over it ---
-                              Both typed, so a hand-added row can say what it is
-                              anchored to and what it pays above it. The anchor's
-                              own level sits on the note line where a lender
-                              printed one — only Discount does — and together the
-                              three reconcile with the ריבית cell before this one.
-                              It is also editable in the row's settings sheet. */}
+                          {/* --- עוגן / מרווח: two rates, both numeric ---
+                              The pair IS the ריבית cell before this one, taken
+                              apart: anchor + margin = the rate. Both typed, so a
+                              hand-added row can price an anchor as fully as an
+                              imported one. The lender's own name for the anchor is
+                              words, so it stays off the grid and rides on the
+                              cell's tooltip and the row's settings sheet. */}
                           <td>
                             <div
                               className="fin-well"
-                              data-dirty={
-                                dirty.has("source_anchor") || dirty.has("anchor_margin") || undefined
-                              }
+                              data-dirty={dirty.has("anchor") || dirty.has("anchor_margin") || undefined}
                               title={anchorTip(loan)}
                             >
                               <div className="fin-pair">
-                                <input
-                                  className="fin-cell"
-                                  data-text="true"
-                                  aria-label="עוגן"
-                                  placeholder="—"
-                                  value={loan.source_anchor ?? ""}
-                                  onChange={(e) => patch(loan.id, { source_anchor: e.target.value })}
-                                />
-                                <input
-                                  className="fin-cell fin-num-in"
-                                  type="number"
-                                  step="0.01"
-                                  aria-label="מרווח מהעוגן באחוזים"
-                                  title="מרווח מהעוגן, בנקודות אחוז"
-                                  placeholder="מרווח"
-                                  value={loan.anchor_margin ?? ""}
-                                  onFocus={(e) => e.currentTarget.select()}
-                                  onChange={(e) =>
-                                    patch(loan.id, {
-                                      anchor_margin: e.target.value === "" ? null : Number(e.target.value),
-                                    } as Partial<ImportedLoan>)
-                                  }
-                                />
+                                {numField(loan, "anchor", "ריבית העוגן באחוזים", "עוגן")}
+                                {numField(loan, "anchor_margin", "מרווח מהעוגן באחוזים", "מרווח")}
                               </div>
-                              {anchorLevel(loan) && (
-                                <span className="fin-note fin-note-num fin-note-anchor">
-                                  {anchorLevel(loan)}
-                                </span>
-                              )}
                             </div>
                           </td>
 

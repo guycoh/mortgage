@@ -93,12 +93,18 @@ for (let r = headerRow + 1; r <= ws.rowCount; r++) {
     return typeof v === "number" ? `${(v * 100).toFixed(2)}%` : v === null ? "—" : String(v);
   };
   console.log(
-    `  ${fam}  amount=${String(g(cols.amount).value).padStart(8)} rate=${pct(cols.rate).padStart(7)} anchor="${g(cols.anchor).value ?? ""}" margin=${pct(cols.margin).padStart(7)} freq="${g(cols.freq).value ?? ""}" monthly=${g(cols.monthly).value}`
+    `  ${fam}  amount=${String(g(cols.amount).value).padStart(8)} rate=${pct(cols.rate).padStart(7)} anchor=${pct(cols.anchor).padStart(7)} margin=${pct(cols.margin).padStart(7)} freq="${g(cols.freq).value ?? ""}" monthly=${g(cols.monthly).value}`
   );
   // formats: the two money columns and the two percent columns must keep theirs
-  if (!String(g(cols.margin).numFmt ?? "").includes("%") && g(cols.margin).value !== null) {
-    console.log(`     !! מרווח cell has no percent format (${g(cols.margin).numFmt})`);
-    issues++;
+  for (const [name, c] of [["עוגן", cols.anchor], ["מרווח", cols.margin], ["ריבית", cols.rate]]) {
+    if (g(c).value !== null && !String(g(c).numFmt ?? "").includes("%")) {
+      console.log(`     !! ${name} cell has no percent format (${g(c).numFmt})`);
+      issues++;
+    }
+    if (g(c).value !== null && typeof g(c).value !== "number") {
+      console.log(`     !! ${name} is not numeric (${typeof g(c).value})`);
+      issues++;
+    }
   }
   if (typeof g(cols.amount).value !== "number") {
     console.log("     !! יתרה is not a number");

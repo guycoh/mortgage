@@ -131,7 +131,7 @@ export default function Simulator({
   const [compareMixId, setCompareMixId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [menuFor, setMenuFor] = useState<string | null>(null);
-  const [annualInflation, setAnnualInflation] = useState(2.8);
+  const [annualInflation, setAnnualInflation] = useState(2.0);
   const [schedFor, setSchedFor] = useState<ImportedLoan | "mix" | null>(null);
   const [toast, setToast] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
   const [flash, setFlash] = useState(false);

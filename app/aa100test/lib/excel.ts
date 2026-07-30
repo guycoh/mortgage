@@ -77,7 +77,7 @@ const COLS: Col[] = [
   { header: "לוח סילוקין", width: 12.5 },
   { header: "יתרה (₪)", width: 14, fmt: "money", total: true },
   { header: "ריבית", width: 9.5, fmt: "pct" },
-  { header: "עוגן", width: 20 },
+  { header: "עוגן", width: 9.5, fmt: "pct" },
   { header: "מרווח", width: 9, fmt: "pct" },
   { header: "תדירות שינוי", width: 14 },
   { header: "חודשים", width: 9.5, fmt: "int" },
@@ -111,6 +111,13 @@ function toDate(v?: string | null): Date | null {
 
 /** Blank instead of a bare 0, so an empty cell reads as "no value". */
 const num = (n: number) => (Math.round(n) !== 0 ? Math.round(n) : null);
+
+/** A percentage column's value: Excel wants the fraction, absent stays absent. */
+const pctOrNull = (v: number | string | null | undefined) => {
+  if (v === null || v === undefined || v === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n / 100 : null;
+};
 
 const scheduleName = (id: number) => schedules.find((s) => s.id === id)?.schedule_name ?? "";
 
@@ -368,10 +375,10 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
         scheduleName(l.amortization_schedule_id),
         num(Number(l.amount) || 0),
         (Number(l.rate) || 0) / 100,
-        l.source_anchor || null,
-        l.anchor_margin === null || l.anchor_margin === undefined
-          ? null
-          : (Number(l.anchor_margin) || 0) / 100,
+        // Both anchor fields are percentages; blank stays blank, because 0% and
+        // "not anchored" are different facts about a row.
+        pctOrNull(l.anchor),
+        pctOrNull(l.anchor_margin),
         l.change_frequency || null,
         Number(l.months) || null,
         toDate(l.loan_end_date ?? l.end_date),
@@ -391,9 +398,9 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
           bold: ci === CI.family || ci === CI.amount || ci === CI.monthly,
         };
         cell.alignment = {
-          // words right, figures centred — עוגן and תדירות שינוי are words
-          horizontal:
-            ci <= 3 || ci === CI.anchor || ci === CI.frequency || ci === SPAN - 1 ? "right" : "center",
+          // words right, figures centred — תדירות שינוי is the one worded column
+          // among the numbers
+          horizontal: ci <= 3 || ci === CI.frequency || ci === SPAN - 1 ? "right" : "center",
           vertical: "middle",
         };
         const fmt = COLS[ci].fmt;

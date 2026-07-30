@@ -131,16 +131,15 @@ const probe = () =>
       }).filter((v) => v !== null),
       rows: rows.map((r) => {
         const anchorCell = r.children[COL.anchor];
-        const note = anchorCell.querySelector(".fin-note");
         const payNote = r.children[COL.pay].querySelector(".fin-note-pay");
         return {
           fam: r.children[0].innerText.trim().split("\n")[0],
           amount: r.children[COL.amount].querySelector("input").value,
           rate: r.children[COL.rate].querySelector("input").value,
-          anchorName: anchorCell.querySelectorAll("input")[0].value,
+          anchorRate: anchorCell.querySelectorAll("input")[0].value,
           margin: anchorCell.querySelectorAll("input")[1].value,
-          anchorLevel: note?.textContent ?? "",
-          anchorLevelVisual: visualWords(note),
+          anchorTip: anchorCell.querySelector(".fin-well")?.getAttribute("title") ?? "",
+          anchorNotes: anchorCell.querySelectorAll(".fin-note").length,
           freq: r.children[COL.freq].innerText.trim(),
           months: r.children[COL.months].querySelector("input").value,
           end: r.children[COL.end].querySelector("input")?.value ?? "",
@@ -171,7 +170,8 @@ for (const doc of DOCS) {
   console.log(`  totals: ${p.totals.amount} / ${p.totals.monthly}`);
   for (const r of p.rows) {
     console.log(
-      `    ${r.fam.padEnd(8)} ${r.amount.padStart(9)}  ${String(r.rate).padStart(5)}%  anchor="${r.anchorName}" margin=${String(r.margin || "-").padStart(5)} level="${r.anchorLevel}"  freq="${r.freq}"  ${r.months}m  ${r.end}  ${r.pay}${r.payNote ? ` [${r.payNote}]` : ""}`
+      `    ${r.fam.padEnd(8)} ${r.amount.padStart(9)}  rate=${String(r.rate).padStart(5)}%  anchor=${String(r.anchorRate || "-").padStart(6)} margin=${String(r.margin || "-").padStart(6)}  freq="${r.freq}"  ${r.months}m  ${r.end}  ${r.pay}${r.payNote ? ` [${r.payNote}]` : ""}
+             tip: ${r.anchorTip}`
     );
   }
 
@@ -186,22 +186,18 @@ for (const doc of DOCS) {
   check(p.verticalDrift.every((d) => d < 0.5), "החזר figure sits level with the row's fields",
     `max drift ${Math.max(0, ...p.verticalDrift)}px`);
   check(p.rows.every((r) => !r.pay.includes("/")), "no /ח suffix on any monthly figure");
-  const scrambled = p.rows.filter((r) => r.anchorLevel.trim() && r.anchorLevel.trim() !== r.anchorLevelVisual);
-  check(scrambled.length === 0, "anchor note renders in source order (no bidi scramble)",
-    scrambled.map((r) => `"${r.anchorLevel}" → "${r.anchorLevelVisual}"`).join("; ") || `${p.rows.filter(r=>r.anchorLevel.trim()).length} notes checked`);
+  check(p.rows.every((r) => r.anchorNotes === 0), "עוגן cell is numeric — no worded note left in it");
+  const priced = p.rows.filter((r) => r.anchorRate !== "" && r.margin !== "");
+  const wrongSum = priced.filter((r) => Math.abs(Number(r.anchorRate) + Number(r.margin) - Number(r.rate)) > 0.011);
+  check(wrongSum.length === 0, "עוגן + מרווח = the row's ריבית, on every priced row",
+    wrongSum.map((r) => `${r.anchorRate}+${r.margin}≠${r.rate}`).join("; ") || `${priced.length} of ${p.rows.length} rows priced`);
+  // a row with a margin must have an anchor and vice versa — half a sum is a bug
+  const halfSum = p.rows.filter((r) => (r.anchorRate === "") !== (r.margin === ""));
+  check(halfSum.length === 0, "no row carries one half of the anchor sum",
+    halfSum.map((r) => `anchor="${r.anchorRate}" margin="${r.margin}"`).join("; "));
   check(p.rows.every((r) => r.freq), "every row carries a תדירות שינוי",
     p.rows.filter((r) => !r.freq).length + " blank");
   check(p.clippedFields.length === 0, "no field clips its own value", p.clippedFields.join(", "));
-
-  // anchor level + margin must reproduce the row's rate wherever both are present
-  for (const r of p.rows) {
-    const lvl = parseFloat(((r.anchorLevel.match(/[-−]?\d+(\.\d+)?/) ?? [])[0] ?? "").replace("−", "-"));
-    const mar = parseFloat(r.margin);
-    if (Number.isFinite(lvl) && Number.isFinite(mar)) {
-      const gap = Math.abs(lvl + mar - parseFloat(r.rate));
-      check(gap < 0.02, `anchor ${lvl} + margin ${mar} = the row's ${r.rate}%`, `gap ${gap.toFixed(3)}`);
-    }
-  }
 
   await page.screenshot({ path: path.join(OUT, `${doc.key}-page.png`), fullPage: false });
   const card = ledger();
@@ -223,7 +219,7 @@ check(after === before + 1, "adding a row appends one", `${before} → ${after}`
 
 const newRow = ledgerRows().last();
 const anchorInputs = newRow.locator("td").nth(5).locator("input");
-await anchorInputs.nth(0).fill('עוגן בנק ישראל אג"ח');
+await anchorInputs.nth(0).fill("1.75");
 await anchorInputs.nth(1).fill("2.5");
 await newRow.locator("td").nth(6).locator(".fin-sel-btn").click();
 await page.waitForTimeout(200);
@@ -236,7 +232,7 @@ const manual = await page.evaluate(() => {
   const r = rows[rows.length - 1];
   const ai = r.children[5].querySelectorAll("input");
   return {
-    anchorName: ai[0].value,
+    anchorRate: ai[0].value,
     margin: ai[1].value,
     freq: r.children[6].innerText.trim(),
     dirtyAnchor: r.children[5].querySelector(".fin-well")?.getAttribute("data-dirty"),
@@ -244,7 +240,7 @@ const manual = await page.evaluate(() => {
   };
 });
 console.log(`    ${JSON.stringify(manual)}`);
-check(manual.anchorName === 'עוגן בנק ישראל אג"ח', "manual row accepts an anchor name", manual.anchorName);
+check(manual.anchorRate === "1.75", "manual row accepts an עוגן rate", manual.anchorRate);
 check(manual.margin === "2.5", "manual row accepts a margin", manual.margin);
 check(manual.freq === "כל 5 שנים", "manual row accepts a תדירות שינוי", manual.freq);
 
@@ -256,8 +252,9 @@ await ledgerRows().first().locator('button[aria-label="שדות נוספים"]')
 await page.waitForSelector(".fin-sheet", { timeout: 5000 });
 const sheetLabels = await page.locator(".fin-sheet .fin-label").allInnerTexts();
 console.log(`    sheet fields: ${sheetLabels.join(" | ")}`);
-check(sheetLabels.some((l) => l.includes("ריבית העוגן")), "sheet keeps ריבית העוגן");
-check(!sheetLabels.some((l) => l.includes("תדירות")), "תדירות is no longer duplicated in the sheet");
+check(!sheetLabels.some((l) => /עוגן|מרווח|תדירות/.test(l)),
+  "nothing on the grid is duplicated in the sheet", sheetLabels.join(" | "));
+check(sheetLabels.some((l) => l.includes("גרייס")), "sheet keeps the grace fields");
 await page.locator(".fin-sheet").screenshot({ path: path.join(OUT, "row-settings.png") });
 console.log("  shot row-settings.png");
 await page.keyboard.press("Escape");

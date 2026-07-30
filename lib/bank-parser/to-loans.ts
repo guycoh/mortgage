@@ -79,7 +79,35 @@ function frequencyOf(t: BankTranche): string {
 }
 
 /**
- * The anchor, as words.
+ * The anchor's own rate.
+ *
+ * Only Discount prints it. Everywhere else it is the rate the borrower pays less
+ * the margin over the anchor — both printed, on the same row, by every template
+ * that quotes a margin at all.
+ *
+ * This is arithmetic on printed figures, not a guess, and Discount proves it:
+ * that template prints anchor, margin AND rate, and anchor + margin reproduces
+ * the rate to the agora on all seven of its priced tranches. Run backwards on the
+ * others it lands on the numbers it should — a Leumi prime tranche at 5.80% with
+ * a margin of −0.20% gives 6.00%, which is the prime rate those statements were
+ * printed under.
+ *
+ * Null when there is no margin: a fixed-rate tranche is not anchored to anything,
+ * and subtracting nothing from its rate would dress the rate up as an anchor.
+ */
+function anchorRateOf(t: BankTranche): number | null {
+  // A fixed rate is not anchored to anything — it was set once and does not
+  // track. Discount still fills its base-rate column on those loans, with the
+  // loan's own rate and no margin beside it, which put "עוגן 2.80%" on a קל"צ
+  // and made it look like it repriced. Half a sum is worse than no sum.
+  if (t.rateKind === "fixed") return null;
+  if (t.anchorRate !== null && t.anchorRate !== undefined) return t.anchorRate;
+  if (t.margin === null || t.rate === null) return null;
+  return Math.round((t.rate - t.margin) * 100) / 100;
+}
+
+/**
+ * The anchor, as words — kept for provenance, not for the grid.
  *
  * Every lender writes it differently, and two of them write it into the same cell
  * as the margin — Leumi "עוגן+0.95%", Hapoalim "P + 0.15%". The margin is already
@@ -90,6 +118,8 @@ function anchorNameOf(t: BankTranche): string {
   // Prime is prime at all four banks, however they abbreviate it — "P", "פריי",
   // "ר.פריים". Naming it once beats carrying four spellings onto the board.
   if (t.rateKind === "prime") return "ריבית פריים";
+  // Nothing to name on a fixed tranche — see anchorRateOf.
+  if (t.rateKind === "fixed") return "";
 
   const s = t.anchor
     .replace(/[+\-−]\s*\d+(?:\.\d+)?\s*%?/g, " ") // the margin sharing the cell
@@ -122,9 +152,10 @@ function toRow(t: BankTranche, mixId: string, st: BankStatement): ImportedLoan {
     amortization_schedule_id: amortizationId(t.amortization),
     grace_type_id: 1,
     grace_months: 0,
-    // This column is the anchor's own RATE, which only the Discount template
-    // prints. Its name is words and lives in source_anchor.
-    anchor: t.anchorRate ?? null,
+    // Numeric: the anchor's own rate, printed where a lender prints it and
+    // derived from rate − margin where one does not. Its name is words and lives
+    // in source_anchor, off the grid.
+    anchor: anchorRateOf(t),
     anchor_margin: t.margin ?? null,
     anchor_interval: t.resetMonths ?? null,
     change_frequency: frequencyOf(t),
