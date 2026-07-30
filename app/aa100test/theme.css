@@ -278,6 +278,30 @@
 /* text-bearing wells (selects, the date field) speak UI, not figures */
 .fin-cell[data-text="true"] { font-family: var(--ui); font-weight: 600; letter-spacing: -0.005em; }
 
+/* TWO FIELDS, ONE CONTROL — the עוגן cell.
+   An anchor is a name and a margin over it, and both are typed on a manual row.
+   Showing the margin as a read-only grey note meant a hand-added row could state
+   an anchor it could not price. They are joined rather than given a column each,
+   because they are one fact and the grid stays one cell per column. The shared
+   border is a negative margin, so the seam is 1px rather than 2. */
+.fin-pair { display: flex; align-items: stretch; }
+.fin-pair > .fin-cell { position: relative; border-radius: 0; }
+.fin-pair > .fin-cell:first-child {
+  flex: 1;
+  min-width: 0;
+  border-start-start-radius: var(--r-sm);
+  border-end-start-radius: var(--r-sm);
+}
+.fin-pair > .fin-cell:last-child {
+  flex: 0 0 56px;
+  margin-inline-start: -1px;
+  padding-inline: 6px;
+  border-start-end-radius: var(--r-sm);
+  border-end-end-radius: var(--r-sm);
+}
+/* the focused half owns the seam, so its ring is never sliced by its neighbour */
+.fin-pair > .fin-cell:focus { z-index: 1; }
+
 /* CHANGED — the classic spreadsheet corner tick. */
 .fin-well { position: relative; }
 .fin-well[data-dirty="true"]::after {
@@ -310,6 +334,18 @@
 /* The one calculated figure people actually read: the monthly payment. 9px on
    top of the td's 5px is the column's 14px inset — see --col-inset. */
 .fin-pay { padding: 0 9px; font-size: 16px; font-weight: 700; color: var(--ink); line-height: 1.15; }
+
+/* The החזר חודשי cell has no well, but it needs a well's box: 32px tall and
+   position:relative, so its "צמוד מדד" / "תאריך עבר" note can hang off the bottom
+   like every other column's note instead of taking a line of its own. In flow the
+   note added its own height, and because the cell is vertically centred it shoved
+   the figure upward — so a row carrying the note sat 3px taller and its ₪ figure
+   3px higher than its neighbours, all the way down the column. */
+.fin-paycell { position: relative; display: flex; align-items: center; height: 32px; }
+.fin-paycell > .fin-pay { flex: 1; min-width: 0; }
+/* Two words at 9px need the room; 5px from the edge is where the other notes sit. */
+.fin-note-pay { left: 5px; display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+.fin-note-stale { color: var(--warn); font-weight: 700; }
 
 /* HIGH RATE — the figure itself carries it, and nothing else.
    No fill, no border, no motion: the column reads normally at a glance, and a
@@ -942,6 +978,18 @@ tr:hover .fin-act { color: var(--ink-3); }
   color: var(--ink-4);
   pointer-events: none;
 }
+/* A note that is arithmetic rather than words — "−1.08% + 3.05%".
+   Without the isolate the bidi algorithm walks it: inside an RTL cell the signs
+   and the two percentages get reordered, and "6.00% −0.40%" renders as
+   "0.40%− 6.00%" — a different, wrong sum. Same reason Money isolates; see the
+   note above .fin-money. Notes that ARE words (a bank name, "צמוד מדד") must stay
+   RTL, which is why this is a modifier and not baked into .fin-note. */
+.fin-note-num { direction: ltr; unicode-bidi: isolate; text-align: left; }
+/* The anchor's level belongs under the anchor's NAME, not under the margin field
+   at the cell's other end — parked there it read as an annotation of the margin,
+   so a row whose margin was blank appeared to have a margin of 2.80%. Pinned to
+   the cell's start edge on the column's own 14px inset. */
+.fin-note-anchor { left: auto; right: 9px; text-align: right; }
 
 /* ---------------------------------------------------------------- tooltips */
 /* Opens to the row's inside, never past the scroll container, so it cannot be

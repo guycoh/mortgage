@@ -150,20 +150,37 @@ export default function Ledger({
   /* --- עוגן: the name is the value, its margin is the note underneath --- */
   const signed = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${Math.abs(n).toFixed(2)}%`;
 
-  /** מרווח, and the anchor's own level where the lender printed it. */
-  const anchorNote = (loan: ImportedLoan) => {
-    const margin = Number(loan.anchor_margin);
+  /**
+   * The anchor's own level, where a lender printed one. Read-only on the note
+   * line because it is the one part of the sum nobody types: only the Discount
+   * template carries it, and it comes with the row or not at all. It stays
+   * editable in the settings sheet for the rare hand correction.
+   *
+   * Tested for being a number, not for being positive — the real anchor on an
+   * index-linked tranche is genuinely negative. Discount prints −1.50%, and
+   * −1.50 + 3.00 is the 1.50% the borrower actually pays; requiring base > 0
+   * threw exactly those rows' anchors away.
+   */
+  const anchorLevel = (loan: ImportedLoan) => {
     const base = Number(loan.anchor);
-    const hasMargin = Number.isFinite(margin) && loan.anchor_margin !== null && margin !== 0;
-    if (Number.isFinite(base) && loan.anchor !== null && base > 0)
-      return hasMargin ? `${base.toFixed(2)}% ${signed(margin)}` : `${base.toFixed(2)}%`;
-    return hasMargin ? signed(margin) : "";
+    if (loan.anchor === null || loan.anchor === undefined || !Number.isFinite(base)) return "";
+    // Purely numeric, and with the same typographic minus the rest of the page
+    // uses. A Hebrew word here would be a right-to-left run inside an LTR isolate
+    // for no gain: it sits under the anchor's own name, and the cell's tooltip
+    // says the whole sum out loud.
+    return `${base < 0 ? "−" : ""}${Math.abs(base).toFixed(2)}%`;
   };
 
-  const anchorTip = (loan: ImportedLoan) =>
-    loan.source_anchor
-      ? `${loan.source_anchor}${anchorNote(loan) ? ` · מרווח ${anchorNote(loan)}` : ""}`
-      : "המסמך לא ציין עוגן לשורה הזו";
+  /** The whole sum in words, for the cell's tooltip: level + margin = the rate. */
+  const anchorTip = (loan: ImportedLoan) => {
+    if (!loan.source_anchor && loan.anchor_margin === null) return "המסמך לא ציין עוגן לשורה הזו";
+    const margin = Number(loan.anchor_margin);
+    const parts = [loan.source_anchor || "עוגן"];
+    if (anchorLevel(loan)) parts.push(`ברמה של ${Number(loan.anchor).toFixed(2)}%`);
+    if (loan.anchor_margin !== null && Number.isFinite(margin))
+      parts.push(`מרווח ${signed(margin)} — סה"כ ${(Number(loan.rate) || 0).toFixed(2)}%`);
+    return parts.join(" · ");
+  };
 
   /** Why the cell says what it says — the report's own wording, where there was one. */
   const freqTip = (loan: ImportedLoan) =>
@@ -270,7 +287,7 @@ export default function Ledger({
         <div>
           <table className="fin-table">
             <colgroup>
-              {["10.5%", "11.5%", "9.5%", "9%", "6%", "11.5%", "10%", "6%", "9.5%", "10%", "6.5%"].map(
+              {["10.5%", "11.5%", "9%", "8%", "6%", "13%", "10%", "6%", "9.5%", "10%", "6.5%"].map(
                 (w, i) => (
                   <col key={i} style={{ width: w }} />
                 )
@@ -283,7 +300,9 @@ export default function Ledger({
                 <th>מסלול</th>
                 <th>לוח סילוקין</th>
                 <th>ריבית %</th>
-                <th>עוגן</th>
+                {/* one header for the paired field, so both halves are named and
+                    the margin's unit is stated once instead of per row */}
+                <th>עוגן / מרווח %</th>
                 <th>תדירות שינוי</th>
                 <th>חודשים</th>
                 <th>תאריך סיום</th>
@@ -461,27 +480,51 @@ export default function Ledger({
                             </div>
                           </td>
 
-                          {/* --- עוגן ---
-                              The anchor by name, with the margin over it on the
-                              note line: together they are the rate in the cell
-                              before this one, taken apart. Discount also prints
-                              the anchor's own level, and where it does the note
-                              shows the whole sum. */}
+                          {/* --- עוגן: the name, and the margin over it ---
+                              Both typed, so a hand-added row can say what it is
+                              anchored to and what it pays above it. The anchor's
+                              own level sits on the note line where a lender
+                              printed one — only Discount does — and together the
+                              three reconcile with the ריבית cell before this one.
+                              It is also editable in the row's settings sheet. */}
                           <td>
                             <div
                               className="fin-well"
-                              data-dirty={dirty.has("source_anchor") || undefined}
+                              data-dirty={
+                                dirty.has("source_anchor") || dirty.has("anchor_margin") || undefined
+                              }
                               title={anchorTip(loan)}
                             >
-                              <input
-                                className="fin-cell"
-                                data-text="true"
-                                aria-label="עוגן"
-                                placeholder="—"
-                                value={loan.source_anchor ?? ""}
-                                onChange={(e) => patch(loan.id, { source_anchor: e.target.value })}
-                              />
-                              {anchorNote(loan) && <span className="fin-note">{anchorNote(loan)}</span>}
+                              <div className="fin-pair">
+                                <input
+                                  className="fin-cell"
+                                  data-text="true"
+                                  aria-label="עוגן"
+                                  placeholder="—"
+                                  value={loan.source_anchor ?? ""}
+                                  onChange={(e) => patch(loan.id, { source_anchor: e.target.value })}
+                                />
+                                <input
+                                  className="fin-cell fin-num-in"
+                                  type="number"
+                                  step="0.01"
+                                  aria-label="מרווח מהעוגן באחוזים"
+                                  title="מרווח מהעוגן, בנקודות אחוז"
+                                  placeholder="מרווח"
+                                  value={loan.anchor_margin ?? ""}
+                                  onFocus={(e) => e.currentTarget.select()}
+                                  onChange={(e) =>
+                                    patch(loan.id, {
+                                      anchor_margin: e.target.value === "" ? null : Number(e.target.value),
+                                    } as Partial<ImportedLoan>)
+                                  }
+                                />
+                              </div>
+                              {anchorLevel(loan) && (
+                                <span className="fin-note fin-note-num fin-note-anchor">
+                                  {anchorLevel(loan)}
+                                </span>
+                              )}
                             </div>
                           </td>
 
@@ -537,34 +580,29 @@ export default function Ledger({
                             </div>
                           </td>
 
-                          {/* --- החזר חודשי (calculated: no well) --- */}
+                          {/* --- החזר חודשי (calculated: no well, but a well's box
+                              so the note underneath cannot move the figure) --- */}
                           <td>
-                            {noTerm ? (
-                              <span
-                                className="flex items-center justify-end gap-1 px-1 text-[11.5px] font-bold"
-                                style={{ color: "var(--neg)" }}
-                                title="לשורה יש יתרה אבל אין תקופה — הזינו חודשים או תאריך סיום"
-                              >
-                                <Warning size={13} weight="fill" />
-                                חסרה תקופה
-                              </span>
-                            ) : (
-                              <Money value={res.monthlyPayment} className="fin-pay" style={{ color: "var(--ink)" }} />
-                            )}
-                            {(res.isIndexed || stale) && (
-                              <div className="flex items-center justify-start gap-1.5 px-2 pt-0.5" dir="ltr">
-                                {stale && (
-                                  <span className="text-[9.5px] font-bold" style={{ color: "var(--warn)" }} dir="rtl">
-                                    תאריך עבר
-                                  </span>
-                                )}
-                                {res.isIndexed && (
-                                  <span className="text-[9.5px]" style={{ color: "var(--ink-4)" }} dir="rtl">
-                                    צמוד מדד
-                                  </span>
-                                )}
-                              </div>
-                            )}
+                            <div className="fin-paycell">
+                              {noTerm ? (
+                                <span
+                                  className="flex flex-1 items-center justify-end gap-1 px-1 text-[11.5px] font-bold"
+                                  style={{ color: "var(--neg)" }}
+                                  title="לשורה יש יתרה אבל אין תקופה — הזינו חודשים או תאריך סיום"
+                                >
+                                  <Warning size={13} weight="fill" />
+                                  חסרה תקופה
+                                </span>
+                              ) : (
+                                <Money value={res.monthlyPayment} className="fin-pay" style={{ color: "var(--ink)" }} />
+                              )}
+                              {(res.isIndexed || stale) && (
+                                <span className="fin-note fin-note-pay">
+                                  {stale && <span className="fin-note-stale">תאריך עבר</span>}
+                                  {res.isIndexed && <span>צמוד מדד</span>}
+                                </span>
+                              )}
+                            </div>
                           </td>
 
                           {/* --- actions --- */}

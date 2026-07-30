@@ -102,7 +102,10 @@ function anchorNameOf(t: BankTranche): string {
   // Hapoalim names its bond anchor with a single letter. Left bare it is a
   // riddle; saying it IS the anchor keeps the lender's own code and the meaning.
   if (/^[A-Za-z]{1,2}$/.test(s)) return `עוגן ${s.toUpperCase()}`;
-  return s;
+  // Discount spells the central bank out in full, which does not fit the column
+  // beside a margin field. ב"י is what the trade writes and says (ריבית ב"י);
+  // the lender's untouched wording is still on the row in source_track.
+  return s.replace(/בנק\s+ישראל/g, 'ב"י');
 }
 
 function toRow(t: BankTranche, mixId: string, st: BankStatement): ImportedLoan {
