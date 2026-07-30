@@ -17,10 +17,10 @@ import { motion } from "motion/react";
 import { Printer, WarningCircle, X } from "@phosphor-icons/react";
 import { BankIcon } from "@/app/aa4test/components/bankIcons";
 import Money, { fmt } from "./Money";
+import { noteOf, rateHeat } from "@/lib/verdicts";
 import {
   TRACK_COLOR,
   TRACK_LABEL,
-  trackKey,
   type StatementAnalysis,
 } from "@/lib/bank-parser/analysis";
 
@@ -56,39 +56,19 @@ export default function StatementSummaryModal({
   const st = a.statement;
 
   // One row per track, biggest first — the client's mortgage as they'd describe
-  // it, not as the bank booked it.
-  const rows = a.tracks.map((t) => {
-    const ts = a.live.filter((x) => trackKey(x) === t.key);
-    const years = ts.reduce((m, x) => Math.max(m, x.months ?? 0), 0) / 12;
-    return {
-      ...t,
-      years: years > 0 ? Math.round(years) : null,
-      late: ts.some((x) => (x.arrears ?? 0) > 0),
-      dear: (t.rate ?? 0) >= (t.key === "prime" ? 6.5 : t.linked ? 4.5 : 6),
-      fee: ts.reduce((s, x) => s + (x.breakFee ?? 0), 0),
-    };
-  });
+  // it, not as the bank booked it. Every verdict on the row (years, late, dear,
+  // fee) is computed once in the engine and read here. It used to be recomputed
+  // in this component, and `dear` was tested on the track's BALANCE-WEIGHTED rate
+  // while the analysis tested each tranche: a slice averaging 4.01% out of real
+  // tranches at 4.98% and 3.25% hid an expensive tranche from the client and named
+  // it first to the advisor.
+  const rows = a.tracks;
 
-  const worries: string[] = [];
-  if (a.totals.arrears > 0)
-    worries.push(`יש פיגור בתשלומים — ${fmt(a.totals.arrears)} ₪ שלא שולמו`);
-  if (a.exposure.variableShare >= 0.5)
-    worries.push(
-      `${Math.round(a.exposure.variableShare * 100)}% מהמשכנתא נע עם הריבית — אם הריבית תעלה, ההחזר יעלה`
-    );
-  if (a.totals.indexation > 0)
-    worries.push(
-      `ההצמדה למדד הוסיפה עד היום ${fmt(a.totals.indexation)} ₪ לקרן — חוב שנוצר בלי שנלקחה הלוואה חדשה`
-    );
-  if (a.exposure.fxShare > 0)
-    worries.push(`חלק מהמשכנתא צמוד למטבע חוץ — שער החליפין משנה את הקרן ואת ההחזר`);
-  const dear = rows.filter((r) => r.dear);
-  if (dear.length)
-    worries.push(
-      `${dear.length === 1 ? "מסלול אחד" : `${dear.length} מסלולים`} בריבית גבוהה (${dear
-        .map((r) => `${r.rate?.toFixed(1)}%`)
-        .join(", ")}) — מועמדים ראשונים למיחזור`
-    );
+  // Projected from the engine's own findings, severity-ordered, rather than a
+  // second list written here with its own thresholds.
+  const worries = a.findings
+    .map((f) => ({ note: noteOf(f.client), severity: f.severity }))
+    .filter((x): x is { note: { say: string }; severity: typeof x.severity } => x.note !== null);
 
   return createPortal(
     <div
@@ -164,6 +144,15 @@ export default function StatementSummaryModal({
                           <span className={r.dear ? "fin-cs-warn" : undefined}>ריבית {r.rate.toFixed(2)}%</span>
                         </>
                       )}
+                      {/* When only some of the slice is expensive, the average rate
+                          beside it is not the reason it is red — say which part is.
+                          A slice averaging 4.01% out of tranches at 4.98% and 3.25%
+                          would otherwise look mispainted. */}
+                      {r.dear && r.dearTranches < r.count && (
+                        <span className="fin-cs-warn">
+                          {` · ${r.dearTranches === 1 ? "מסלול אחד" : `${r.dearTranches} מסלולים`} בריבית גבוהה`}
+                        </span>
+                      )}
                       {r.late && <span className="fin-cs-warn"> · בפיגור</span>}
                     </div>
                   </div>
@@ -221,7 +210,9 @@ export default function StatementSummaryModal({
               </div>
               <ul>
                 {worries.map((w) => (
-                  <li key={w}>{w}</li>
+                  <li key={w.note.say} data-sev={w.severity}>
+                    {w.note.say}
+                  </li>
                 ))}
               </ul>
             </section>

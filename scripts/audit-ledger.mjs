@@ -140,7 +140,7 @@ const probe = () =>
           margin: anchorCell.querySelectorAll("input")[1].value,
           anchorTip: anchorCell.querySelector(".fin-well")?.getAttribute("title") ?? "",
           anchorNotes: anchorCell.querySelectorAll(".fin-note").length,
-          freq: r.children[COL.freq].innerText.trim(),
+          freq: (r.children[COL.freq].querySelector("input")?.value ?? "").trim(),
           months: r.children[COL.months].querySelector("input").value,
           end: r.children[COL.end].querySelector("input")?.value ?? "",
           pay: r.children[COL.pay].querySelector(".fin-pay")?.textContent ?? r.children[COL.pay].innerText.trim(),
@@ -195,8 +195,12 @@ for (const doc of DOCS) {
   const halfSum = p.rows.filter((r) => (r.anchorRate === "") !== (r.margin === ""));
   check(halfSum.length === 0, "no row carries one half of the anchor sum",
     halfSum.map((r) => `anchor="${r.anchorRate}" margin="${r.margin}"`).join("; "));
-  check(p.rows.every((r) => r.freq), "every row carries a תדירות שינוי",
-    p.rows.filter((r) => !r.freq).length + " blank");
+  // Months, not a phrase. Blank is a valid answer — a fixed rate has no reset
+  // cycle — so what is asserted is that whatever IS there is a whole number.
+  const badFreq = p.rows.filter((r) => r.freq !== "" && !/^\d+$/.test(r.freq));
+  check(badFreq.length === 0, "תדירות שינוי holds whole months or nothing",
+    badFreq.map((r) => `"${r.freq}"`).join(", ") ||
+      `${p.rows.filter((r) => r.freq).length}/${p.rows.length} rows have an interval`);
   check(p.clippedFields.length === 0, "no field clips its own value", p.clippedFields.join(", "));
 
   await page.screenshot({ path: path.join(OUT, `${doc.key}-page.png`), fullPage: false });
@@ -221,9 +225,7 @@ const newRow = ledgerRows().last();
 const anchorInputs = newRow.locator("td").nth(5).locator("input");
 await anchorInputs.nth(0).fill("1.75");
 await anchorInputs.nth(1).fill("2.5");
-await newRow.locator("td").nth(6).locator(".fin-sel-btn").click();
-await page.waitForTimeout(200);
-await page.locator('.fin-pop[role=listbox] [role=option]', { hasText: "כל 5 שנים" }).first().click();
+await newRow.locator("td").nth(6).locator("input").fill("60");
 await page.waitForTimeout(250);
 
 const manual = await page.evaluate(() => {
@@ -234,7 +236,8 @@ const manual = await page.evaluate(() => {
   return {
     anchorRate: ai[0].value,
     margin: ai[1].value,
-    freq: r.children[6].innerText.trim(),
+    freq: r.children[6].querySelector("input")?.value ?? "",
+    freqNote: r.children[6].querySelector(".fin-note")?.textContent ?? "",
     dirtyAnchor: r.children[5].querySelector(".fin-well")?.getAttribute("data-dirty"),
     dirtyFreq: r.children[6].querySelector(".fin-well")?.getAttribute("data-dirty"),
   };
@@ -242,7 +245,8 @@ const manual = await page.evaluate(() => {
 console.log(`    ${JSON.stringify(manual)}`);
 check(manual.anchorRate === "1.75", "manual row accepts an עוגן rate", manual.anchorRate);
 check(manual.margin === "2.5", "manual row accepts a margin", manual.margin);
-check(manual.freq === "כל 5 שנים", "manual row accepts a תדירות שינוי", manual.freq);
+check(manual.freq === "60", "manual row accepts a תדירות שינוי in months", manual.freq);
+check(manual.freqNote === "5 שנ׳", "the months are echoed in words", manual.freqNote);
 
 await ledger().screenshot({ path: path.join(OUT, "manual-row.png") });
 console.log("  shot manual-row.png");
@@ -259,13 +263,11 @@ await page.locator(".fin-sheet").screenshot({ path: path.join(OUT, "row-settings
 console.log("  shot row-settings.png");
 await page.keyboard.press("Escape");
 
-/* ---- the frequency dropdown ---- */
-await ledgerRows().first().locator("td").nth(6).locator(".fin-sel-btn").click();
+/* ---- the מסלול dropdown still works ---- */
+await ledgerRows().first().locator("td").nth(2).locator(".fin-sel-btn").click();
 await page.waitForSelector(".fin-pop[role=listbox]", { timeout: 5000 });
 const opts = await page.locator(".fin-pop[role=listbox] [role=option]").count();
-check(opts >= 14, "frequency dropdown offers the full vocabulary", `${opts} options`);
-await page.locator(".fin-pop[role=listbox]").screenshot({ path: path.join(OUT, "freq-dropdown.png") });
-console.log("  shot freq-dropdown.png");
+check(opts >= 5, "track dropdown offers the five canonical tracks", `${opts} options`);
 await page.keyboard.press("Escape");
 
 /* ---- console health, ignoring the repo's pre-existing root-page bug ---- */

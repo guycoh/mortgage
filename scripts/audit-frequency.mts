@@ -10,6 +10,7 @@ import { bankStatementToLoans } from "../lib/bank-parser/to-loans";
 import { parseReport } from "../lib/credit-parser/parse";
 import { extractLoans } from "../lib/credit-parser/loan-mapping";
 import { importReportToLoans } from "../app/aa100test/lib/credit";
+import { freqLabel } from "../lib/rate-frequency";
 import type { RawPage } from "../lib/credit-parser/types";
 
 const require = createRequire(import.meta.url);
@@ -76,8 +77,17 @@ for (const f of fs.readdirSync(DIR).filter((f) => /\.pdf$/i.test(f))) {
     console.log(
       `      amount=${String(l.amount).padStart(9)} path=${l.path_id} freq="${(l as any).change_frequency ?? ""}" interval=${String((l as any).anchor_interval ?? "-").padStart(3)} anchor="${(l as any).source_anchor ?? ""}" rate=${String(l.anchor ?? "-").padStart(5)} margin=${String(l.anchor_margin ?? "-").padStart(5)}`
     );
-    if (!(l as any).change_frequency) {
-      console.log("      !! row with no תדירות שינוי");
+    // The column is months now. Blank is a valid answer — a fixed rate has no
+    // reset cycle — so what must hold is that the two shapes of the field agree,
+    // and that a variable tranche whose lender printed an interval kept it.
+    const iv = (l as any).anchor_interval as number | null;
+    const label = ((l as any).change_frequency as string) ?? "";
+    if (label !== freqLabel(iv)) {
+      console.log(`      !! change_frequency "${label}" does not match interval ${iv}`);
+      issues++;
+    }
+    if (iv !== null && !(Number.isInteger(iv) && iv > 0)) {
+      console.log(`      !! interval is not a positive whole number of months: ${iv}`);
       issues++;
     }
   }

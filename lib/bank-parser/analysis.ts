@@ -16,7 +16,22 @@ import {
   type Linkage,
   type RateKind,
 } from "./types";
+import { show, silent, type ClientDisposition } from "@/lib/verdicts";
 import { toDate, monthsBetween } from "./text";
+import {
+  BREAK_FEE_RATIO_HIGH,
+  BREAK_FEE_RATIO_MEDIUM,
+  FEE_MONTHS_OF_INTEREST_CHEAP,
+  INDEXATION_DRAG_HIGH,
+  LINKED_SHARE_TRIGGER,
+  LONG_TERM_MONTHS,
+  RESET_HORIZON_MONTHS,
+  RESET_SHARE_HIGH,
+  fxIsHigh,
+  isDearRate,
+  linkedIsHigh,
+  variableSeverity,
+} from "@/lib/verdicts";
 
 export type Severity = "critical" | "high" | "medium" | "info";
 
@@ -33,6 +48,13 @@ export interface Finding {
   severity: Severity;
   title: string;
   detail: string;
+  /**
+   * Whether the client hears this, and in what words. NOT optional — see the same
+   * field on the credit engine's Flag. The client sheet used to keep its own list
+   * of worries, so `resets` (the top-ranked finding on a real statement, ₪430,381)
+   * and `linked` (63% of the balance) never reached it.
+   */
+  client: ClientDisposition;
   amount?: number;
   /** Which tranches it is about, so the claim can be pointed at. */
   uids?: string[];
@@ -47,11 +69,28 @@ export interface TrackSlice {
   balance: number;
   share: number;
   monthly: number;
-  /** Balance-weighted nominal rate within the slice. */
+  /**
+   * Balance-weighted nominal rate within the slice.
+   *
+   * Useful as a headline and useless as a verdict: a slice holding tranches at
+   * 4.98% and 3.25% averages to 4.01%, a rate printed on no line of the statement.
+   * Judging dearness on it hid every expensive tranche inside a cheap track, which
+   * is why `dear` below is decided per tranche instead.
+   */
   rate: number | null;
   count: number;
   variable: boolean;
   linked: boolean;
+  /** Longest remaining term in the slice, in whole years. */
+  years: number | null;
+  /** Any tranche in the slice is in arrears. */
+  late: boolean;
+  /** Break fee to exit the whole slice. */
+  breakFee: number;
+  /** At least one TRANCHE here is priced above its track's norm. */
+  dear: boolean;
+  dearTranches: number;
+  dearBalance: number;
 }
 
 export interface RecycleCandidate {
@@ -169,11 +208,9 @@ function remainingInterest(t: BankTranche): number | null {
 }
 
 /** Where a mortgage rate stops being ordinary, by track. */
+/** Per TRANCHE, and from the one place that defines it. */
 function isDear(t: BankTranche): boolean {
-  const r = t.rate ?? 0;
-  if (t.rateKind === "prime") return r >= 6.5;
-  if (t.linkage === "linked") return r >= 4.5;
-  return r >= 6;
+  return isDearRate(t.rate, t.rateKind, t.linkage);
 }
 
 /* -------------------------------------------------------------------- main */
@@ -210,6 +247,15 @@ export function analyseStatement(st: BankStatement): StatementAnalysis {
         count: ts.length,
         variable: ts.some((t) => t.rateKind === "variable" || t.rateKind === "prime"),
         linked: ts.some((t) => t.linkage === "linked"),
+        years: (() => {
+          const m = ts.reduce((x, t) => Math.max(x, t.months ?? 0), 0);
+          return m > 0 ? Math.round(m / 12) : null;
+        })(),
+        late: ts.some((t) => (t.arrears ?? 0) > 0),
+        breakFee: ts.reduce((x, t) => x + (t.breakFee ?? 0), 0),
+        dear: ts.some(isDear),
+        dearTranches: ts.filter(isDear).length,
+        dearBalance: ts.filter(isDear).reduce((x, t) => x + (t.balance ?? 0), 0),
       };
     })
     .sort((a, b) => b.balance - a.balance);
@@ -221,7 +267,7 @@ export function analyseStatement(st: BankStatement): StatementAnalysis {
   const upcomingResets = live
     .filter((t) => {
       const d = toDate(t.nextReset);
-      return d ? monthsBetween(asOf, d) <= 12 : false;
+      return d ? monthsBetween(asOf, d) <= RESET_HORIZON_MONTHS : false;
     })
     .sort((a, b) => {
       const x = toDate(a.nextReset)?.getTime() ?? 0;
@@ -311,6 +357,7 @@ function buildFindings(a: StatementAnalysis): Finding[] {
     const late = a.live.filter((t) => (t.arrears ?? 0) > 0);
     push({
       id: "arrears",
+      client: show(`יש פיגור בתשלומים — ${money(a.totals.arrears)} ₪ שלא שולמו`, late.map((t) => t.uid)),
       severity: "critical",
       section: "tranches",
       title: "פיגור בתשלומים",
@@ -323,18 +370,27 @@ function buildFindings(a: StatementAnalysis): Finding[] {
   /* ---- the recycle case, stated in the terms it is actually decided on */
   const dear = a.recycle.filter((c) => isDear(c.tranche));
   if (dear.length) {
-    const worst = dear[0];
-    const cheap = dear.filter((c) => (c.feeInMonthsOfInterest ?? 99) <= 3);
+    const cheap = dear.filter((c) => (c.feeInMonthsOfInterest ?? 99) <= FEE_MONTHS_OF_INTEREST_CHEAP);
+    // Describe the set being counted, not the set it was drawn from. The sentence
+    // used to quote the MAXIMUM rate in `dear` and then say "N מסלולים בריבית X%
+    // ומעלה" — every tranche it counted was at or below that figure.
+    const set = cheap.length ? cheap : dear;
+    const rates = set.map((c) => c.tranche.rate ?? 0).filter((r) => r > 0);
+    const from = rates.length ? Math.min(...rates) : 0;
     push({
       id: "recycle",
+      client: show(
+        `${set.length === 1 ? "מסלול אחד" : `${set.length} מסלולים`} בריבית גבוהה — כדאי לבדוק מיחזור`,
+        set.map((c) => c.tranche.uid)
+      ),
       severity: cheap.length ? "high" : "medium",
       section: "recycle",
       title: cheap.length ? "מסלולים יקרים שזול לצאת מהם" : "מסלולים בריבית גבוהה",
       detail: cheap.length
-        ? `${cheap.length} מסלולים בריבית ${worst.tranche.rate?.toFixed(2)}% ומעלה שעמלת היציאה מהם שווה עד 3 חודשי ריבית — המועמדים הראשונים למיחזור.`
-        : `${dear.length} מסלולים בריבית גבוהה, אך עמלת היציאה מהם משמעותית. כדאי לבדוק מיחזור סמוך למועד שינוי ריבית, שבו העמלה יורדת.`,
-      amount: (cheap.length ? cheap : dear).reduce((s, c) => s + (c.tranche.balance ?? 0), 0),
-      uids: (cheap.length ? cheap : dear).map((c) => c.tranche.uid),
+        ? `${set.length === 1 ? "מסלול אחד" : `${set.length} מסלולים`} בריבית ${from.toFixed(2)}% ומעלה שעמלת היציאה מהם שווה עד ${FEE_MONTHS_OF_INTEREST_CHEAP} חודשי ריבית — המועמדים הראשונים למיחזור.`
+        : `${set.length === 1 ? "מסלול אחד" : `${set.length} מסלולים`} בריבית ${from.toFixed(2)}% ומעלה, אך עמלת היציאה מהם משמעותית. כדאי לבדוק מיחזור סמוך למועד שינוי ריבית, שבו העמלה יורדת.`,
+      amount: set.reduce((s, c) => s + (c.tranche.balance ?? 0), 0),
+      uids: set.map((c) => c.tranche.uid),
     });
   }
 
@@ -343,6 +399,7 @@ function buildFindings(a: StatementAnalysis): Finding[] {
     const b = a.freeToBreak.reduce((s, t) => s + (t.balance ?? 0), 0);
     push({
       id: "free",
+      client: show(`${money(b)} ₪ מהמשכנתא ניתן להזיז לבנק אחר בלי עמלת יציאה`, a.freeToBreak.map((t) => t.uid)),
       severity: "info",
       section: "fees",
       title: "מסלולים בלי עמלת פירעון",
@@ -357,7 +414,8 @@ function buildFindings(a: StatementAnalysis): Finding[] {
     const ratio = a.totals.balance > 0 ? a.totals.breakFee / a.totals.balance : 0;
     push({
       id: "breakfee",
-      severity: ratio >= 0.02 ? "high" : ratio >= 0.005 ? "medium" : "info",
+      client: show(`סילוק מלא היום יעלה ${money(a.totals.breakFee)} ₪ בעמלת פירעון מוקדם`),
+      severity: ratio >= BREAK_FEE_RATIO_HIGH ? "high" : ratio >= BREAK_FEE_RATIO_MEDIUM ? "medium" : "info",
       section: "fees",
       title: "עמלת פירעון מוקדם",
       detail: `${money(a.totals.breakFee)} ₪ לסילוק מלא היום — ${(ratio * 100).toFixed(2)}% מהיתרה${
@@ -368,10 +426,14 @@ function buildFindings(a: StatementAnalysis): Finding[] {
   }
 
   /* ---- rate risk */
-  if (a.exposure.variableShare >= 0.5) {
+  const varSeverity = variableSeverity(a.exposure.variableShare);
+  if (varSeverity) {
     push({
       id: "variable",
-      severity: a.exposure.variableShare >= 0.75 ? "high" : "medium",
+      client: show(
+        `${pc(a.exposure.variableShare)} מהמשכנתא נע עם הריבית — אם הריבית תעלה, ההחזר יעלה`
+      ),
+      severity: varSeverity,
       section: "mix",
       title: "חשיפה גבוהה לריבית משתנה",
       detail: `${pc(a.exposure.variableShare)} מהיתרה במסלולים משתנים${
@@ -385,7 +447,13 @@ function buildFindings(a: StatementAnalysis): Finding[] {
     const soonest = a.upcomingResets[0];
     push({
       id: "resets",
-      severity: a.exposure.resettingWithinYear / (a.totals.balance || 1) >= 0.4 ? "high" : "medium",
+      client: show(
+        `${money(a.exposure.resettingWithinYear)} ₪ מהמשכנתא יתעדכנו בריבית חדשה בשנה הקרובה${
+          a.upcomingResets[0]?.nextReset ? `, הראשון ב-${a.upcomingResets[0].nextReset}` : ""
+        }`,
+        a.upcomingResets.map((t) => t.uid)
+      ),
+      severity: a.exposure.resettingWithinYear / (a.totals.balance || 1) >= RESET_SHARE_HIGH ? "high" : "medium",
       section: "resets",
       title: "שינוי ריבית בתוך שנה",
       detail: `${money(a.exposure.resettingWithinYear)} ₪ מהיתרה יעברו עדכון ריבית בשנה הקרובה${
@@ -397,9 +465,10 @@ function buildFindings(a: StatementAnalysis): Finding[] {
   }
 
   /* ---- inflation risk, and what it has already cost */
-  if (a.exposure.linkedShare >= 0.4) {
+  if (linkedIsHigh(a.exposure.linkedShare)) {
     push({
       id: "linked",
+      client: show(`${pc(a.exposure.linkedShare)} מהמשכנתא צמוד למדד — הקרן עצמה גדלה עם האינפלציה, לא רק ההחזר`),
       severity: "medium",
       section: "index",
       title: "חשיפה גבוהה למדד",
@@ -410,16 +479,20 @@ function buildFindings(a: StatementAnalysis): Finding[] {
   if (a.totals.indexation > 0) {
     push({
       id: "indexation",
-      severity: a.exposure.indexationDrag >= 0.1 ? "high" : "medium",
+      client: show(
+        `ההצמדה למדד הוסיפה עד היום ${money(a.totals.indexation)} ₪ לקרן — חוב שנוצר בלי שנלקחה הלוואה חדשה`
+      ),
+      severity: a.exposure.indexationDrag >= INDEXATION_DRAG_HIGH ? "high" : "medium",
       section: "index",
       title: "הצמדה שנצברה על הקרן",
       detail: `${money(a.totals.indexation)} ₪ נוספו לקרן בגין הצמדה — ${pc(a.exposure.indexationDrag)} מעל הקרן המקורית. זה חוב שנוצר בלי שנלקחה הלוואה חדשה.`,
       amount: a.totals.indexation,
     });
   }
-  if (a.exposure.fxShare > 0) {
+  if (fxIsHigh(a.exposure.fxShare)) {
     push({
       id: "fx",
+      client: show("חלק מהמשכנתא צמוד למטבע חוץ — שער החליפין משנה את הקרן ואת ההחזר, גם בלי שינוי ריבית"),
       severity: "high",
       section: "mix",
       title: 'חשיפה למטבע חוץ',
@@ -433,6 +506,10 @@ function buildFindings(a: StatementAnalysis): Finding[] {
   if (balloon.length) {
     push({
       id: "balloon",
+      client: show(
+        "יש מסלול בלון — הקרן כולה נפרעת בסוף התקופה, וההחזר החודשי היום אינו משקף אותה",
+        balloon.map((t) => t.uid)
+      ),
       severity: "high",
       section: "tranches",
       title: "מסלולי בלון",
@@ -445,6 +522,7 @@ function buildFindings(a: StatementAnalysis): Finding[] {
   if (a.totals.longestMonths && a.totals.longestMonths >= 300) {
     push({
       id: "term",
+      client: show("המשכנתא ארוכה מאוד — ככל שהתקופה ארוכה, סך הריבית שתשולם גדול יותר"),
       severity: "info",
       section: "tranches",
       title: "טווח ארוך",
@@ -457,6 +535,7 @@ function buildFindings(a: StatementAnalysis): Finding[] {
   if (apportioned.length) {
     push({
       id: "apportioned",
+      client: silent("מסביר איך חולקה יתרה שהבנק לא פירט לפי מרכיב — פרט קריאה, לא מצב הלקוח"),
       severity: "info",
       section: "tranches",
       title: "יתרה מחולקת בין מסלולים",
@@ -468,6 +547,7 @@ function buildFindings(a: StatementAnalysis): Finding[] {
   if (derived.length === a.live.length && a.live.length > 0) {
     push({
       id: "derived-term",
+      client: silent("מסביר שהתקופה חושבה מתאריך הסיום ולא הודפסה — פרט קריאה, לא מצב הלקוח"),
       severity: "info",
       section: "tranches",
       title: "יתרת התקופה חושבה",

@@ -5,7 +5,9 @@ import SignUpUserSteps from "@/components/tutorial/sign-up-user-steps";
 import { hasEnvVars } from "@/utils/supabase/check-env-vars";
 import { useEffect } from "react";
 
-export default async function Home() {
+// NOT async: React rejects an async Client Component, and this one also calls
+// useEffect. It threw on every load and the redirect below fired unreliably.
+export default function Home() {
  
   useEffect(() => {
     window.location.href = '/muhni';
