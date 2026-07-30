@@ -7,17 +7,18 @@
 // evidence; this is written for someone seeing their own finances laid out for
 // the first time, across a desk, in about a minute.
 //
-// So: no ratios, no weighted averages, no field codes. Who lent it, how much is
-// left, what it costs every month. One line at the bottom for the number the
-// client actually feels — what leaves their account. And where something is
-// genuinely wrong, plain language for it, in red, at the end where it lands
-// after the facts rather than before them.
+// It selects nothing and decides nothing. Every row, every sentence and both
+// footer figures come from `analysis.clientView`, built in the engine beside the
+// flags. That is deliberate: while this component chose its own rows and wrote its
+// own worries with its own thresholds, it announced ₪372,873 of arrears above rows
+// accounting for ₪33,825, printed a ₪799,555 footer over ₪451,962 of visible
+// balances, and silently omitted five of the nine critical findings. All three were
+// the same bug — two populations with no arithmetic tying them together.
 //
-// One debt per lender, not one per tranche. A מסלול is an artefact of how the
-// bank booked the loan: a household with a fourteen-tranche mortgage has three
-// mortgages, at three banks, and listing fourteen near-identical rows — five of
-// them reading "משכנתה · נותרו כ-26 שנים" — turns the one page into four and
-// tells the client nothing they would recognise as their own.
+// One debt per lender for mortgages and loans: a מסלול is an artefact of how the
+// bank booked the loan, and fourteen near-identical rows tell a client nothing they
+// would recognise. Cards are the opposite — one row per facility, because what each
+// card costs every month is the whole point of that section.
 
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
@@ -25,54 +26,14 @@ import { motion } from "motion/react";
 import { Printer, WarningCircle, X } from "@phosphor-icons/react";
 import { BankIcon } from "@/app/aa4test/components/bankIcons";
 import { shortBank } from "@/app/aa4test/debtTags";
+import { rateHeat, utilisationHeat } from "@/lib/verdicts";
 import Money from "./Money";
-import { rateHeat } from "../lib/credit";
-import type { Analysis, DebtLine } from "../lib/analysis";
+import type { Analysis, ClientRow, ClientSection } from "../lib/analysis";
 
 /** Lenders past this fold into one line — the page has to stay a page. */
 const MAX_ROWS = 5;
 
-type Family = "mortgage" | "loan" | "card";
-
-/** Everything one lender holds in one family, as the client thinks of it. */
-interface Holding {
-  key: string;
-  bank: string;
-  family: Family;
-  parts: number;
-  balance: number;
-  monthly: number;
-  /** The longest of the parts — when the last of it is paid off. */
-  months: number | null;
-  late: boolean;
-  overdue: number;
-  /** The spread of rates inside this lender's holding, so "ריבית גבוהה" is
-   *  something the client can see on the row rather than take on trust. */
-  minRate: number | null;
-  maxRate: number | null;
-}
-
-function group(lines: DebtLine[], family: Family): Holding[] {
-  const by = new Map<string, Holding>();
-  for (const l of lines) {
-    const key = l.bank.replace(/\s+/g, "");
-    const cur =
-      by.get(key) ??
-      { key, bank: l.bank, family, parts: 0, balance: 0, monthly: 0, months: null, late: false, overdue: 0, minRate: null, maxRate: null };
-    cur.parts += 1;
-    cur.balance += l.balance;
-    cur.monthly += l.monthly;
-    if (l.months && (cur.months === null || l.months > cur.months)) cur.months = l.months;
-    if (l.overdue > 0 || l.arrearsRange) cur.late = true;
-    cur.overdue += l.overdue;
-    if (l.rate !== null) {
-      cur.minRate = cur.minRate === null ? l.rate : Math.min(cur.minRate, l.rate);
-      cur.maxRate = cur.maxRate === null ? l.rate : Math.max(cur.maxRate, l.rate);
-    }
-    by.set(key, cur);
-  }
-  return Array.from(by.values()).sort((a, b) => b.balance - a.balance || b.monthly - a.monthly);
-}
+const ils = (n: number) => Math.round(n).toLocaleString("en-US");
 
 /**
  * How much longer this runs, said properly.
@@ -81,49 +42,40 @@ function group(lines: DebtLine[], family: Family): Holding[] {
  * indefinitely, and the report's "months" for one is an artefact, not a fact to
  * tell a client. And Hebrew does not say "נותרו 1 תשלומים".
  */
-function remaining(h: Holding): string {
-  if (h.family === "card" || !h.months || h.months <= 0) return "";
-  if (h.months === 1) return "נותר תשלום אחד";
-  if (h.months < 24) return `נותרו ${h.months} תשלומים`;
-  return `עוד כ-${Math.round(h.months / 12)} שנים`;
+function remaining(r: ClientRow): string {
+  if (r.family === "card" || !r.months || r.months <= 0) return "";
+  if (r.months === 1) return "נותר תשלום אחד";
+  if (r.months < 24) return `נותרו ${r.months} תשלומים`;
+  return `עוד כ-${Math.round(r.months / 12)} שנים`;
 }
 
-const NOUN: Record<Family, [string, string]> = {
+const NOUN: Record<ClientRow["family"], [string, string]> = {
   mortgage: ["מסלול", "מסלולים"],
   loan: ["הלוואה", "הלוואות"],
   card: ["מסגרת", "מסגרות"],
 };
 
 /** "ריבית 5.2%" — or the spread, when one lender holds several at once. */
-function rateText(h: Holding): string {
-  if (h.minRate === null || h.maxRate === null) return "";
-  // A reported 0% is almost always "not priced" rather than free — the report
-  // leaves the rate empty on revolving facilities. Telling a client their card
-  // is at 0% would be worse than telling them nothing.
-  if (h.maxRate <= 0) return "";
-  const lo = h.minRate.toFixed(1).replace(/\.0$/, "");
-  const hi = h.maxRate.toFixed(1).replace(/\.0$/, "");
+function rateText(r: ClientRow): string {
+  if (r.minRate === null || r.maxRate === null || r.maxRate <= 0) return "";
+  const lo = r.minRate.toFixed(1).replace(/\.0$/, "");
+  const hi = r.maxRate.toFixed(1).replace(/\.0$/, "");
   return lo === hi ? `ריבית ${lo}%` : `ריבית ${lo}%–${hi}%`;
 }
 
-function Row({ h }: { h: Holding }) {
-  const [one, many] = NOUN[h.family];
-  const rate = rateText(h);
-  // A rate is only alarming relative to its own kind: 6.5% is dear for a
-  // mortgage and cheap for a consumer loan.
-  const dear =
-    h.family !== "card" &&
-    h.maxRate !== null &&
-    rateHeat(h.maxRate, h.family === "mortgage" ? "mortgage" : "loan") === "hot";
+/* ------------------------------------------------- mortgages and loans */
 
-  const bits = [h.parts > 1 ? `${h.parts} ${many}` : one, remaining(h)].filter(Boolean);
+function LenderRow({ r }: { r: ClientRow }) {
+  const [one, many] = NOUN[r.family];
+  const rate = rateText(r);
+  const dear = rateHeat(r.maxRate, r.family) === "hot";
+  const bits = [r.parts > 1 ? `${r.parts} ${many}` : one, remaining(r)].filter(Boolean);
 
   return (
     <li className="fin-cs-row">
-      <BankIcon source={h.bank} size={30} />
-
+      <BankIcon source={r.bank} size={30} />
       <div className="min-w-0 flex-1">
-        <div className="fin-cs-bank">{shortBank(h.bank) || h.bank}</div>
+        <div className="fin-cs-bank">{shortBank(r.bank) || r.bank}</div>
         <div className="fin-cs-meta">
           {bits.join(" · ")}
           {rate && (
@@ -132,25 +84,192 @@ function Row({ h }: { h: Holding }) {
               <span className={dear ? "fin-cs-warn" : undefined}>{rate}</span>
             </>
           )}
-          {h.late && (
+          {r.late && (
             <span className="fin-cs-warn">
               {" · בפיגור"}
-              {h.overdue > 0 ? ` ${Math.round(h.overdue).toLocaleString("en-US")} ₪` : ""}
+              {r.overdue > 0 ? ` ${ils(r.overdue)} ₪` : ""}
             </span>
           )}
         </div>
       </div>
-
-      {h.family !== "card" && (
-        <div className="fin-cs-amt">
-          <Money value={h.balance} size={17} weight={800} />
-        </div>
-      )}
-
       <div className="fin-cs-amt">
-        <Money value={h.monthly} size={17} weight={800} color={h.late ? "var(--neg)" : undefined} />
+        <Money value={r.balance} size={17} weight={800} />
+      </div>
+      <div className="fin-cs-amt">
+        <Money value={r.monthly} size={17} weight={800} color={r.late ? "var(--neg)" : undefined} />
       </div>
     </li>
+  );
+}
+
+/* ---------------------------------------------------- one card, one row */
+
+/**
+ * What this facility costs, and what it would cost if it were used.
+ *
+ * Two rates rather than one, because the report answers two different questions and
+ * collapsing them lies in both directions: a card drawn on an interest-free track
+ * is not a free card, and a rate quoted on an unused limit is not the price of the
+ * balance. A facility with no drawn rate on record says "עד X%" rather than passing
+ * off the dearest quote as what is being paid.
+ */
+function cardPricing(r: ClientRow): { text: string; hot: boolean } | null {
+  const drawn = r.rate;
+  const max = r.rateMaxQuoted;
+  if (drawn !== null && drawn > 0) {
+    const hot = rateHeat(drawn, "card") === "hot";
+    const tail = max !== null && max > drawn ? ` · עד ${max.toFixed(2)}% על יתר המסגרת` : "";
+    return { text: `ריבית ${drawn.toFixed(2)}% על היתרה${tail}`, hot };
+  }
+  if (r.interestFree && max !== null)
+    return { text: `היתרה ללא ריבית · עד ${max.toFixed(2)}% על יתר המסגרת`, hot: rateHeat(max, "card") === "hot" };
+  if (max !== null) return { text: `עד ${max.toFixed(2)}%`, hot: rateHeat(max, "card") === "hot" };
+  return null;
+}
+
+function CardRow({ r }: { r: ClientRow }) {
+  const price = cardPricing(r);
+  const util = r.utilization === null ? null : r.utilization / 100;
+  const utilHeat = utilisationHeat(util);
+  // A balance drawn against a ceiling the document prints as zero is the one case
+  // where the balance itself is the alarm.
+  const noCeiling = r.reported.limit && r.limit === 0 && r.balance > 0;
+  const enforced = r.remarks.some((x) => /הוצאה לפועל|לא התקבל כל תשלום/.test(x));
+
+  const meta: React.ReactNode[] = [];
+  if (r.reported.limit && r.limit > 0) {
+    meta.push(
+      <span key="limit">
+        מסגרת {ils(r.limit)} ₪
+        {util !== null && (
+          <span className={utilHeat === "hot" ? "fin-cs-warn" : utilHeat === "warm" ? "fin-cs-warm" : undefined}>
+            {" "}· נוצלו {Math.round(r.utilization ?? 0)}%
+          </span>
+        )}
+      </span>
+    );
+  } else if (noCeiling) {
+    meta.push(
+      <span key="nolimit" className="fin-cs-warn">
+        אין מסגרת מאושרת בדוח
+      </span>
+    );
+  }
+  // Only worth saying when the month told a different story than the closing date.
+  if (r.reported.peak && r.peak > r.balance * 1.15)
+    meta.push(<span key="peak">שיא בחודש {ils(r.peak)} ₪</span>);
+  if (price) meta.push(<span key="rate" className={price.hot ? "fin-cs-warn" : undefined}>{price.text}</span>);
+  if (r.late)
+    meta.push(
+      <span key="late" className="fin-cs-warn">
+        בפיגור {r.overdue > 0 ? `${ils(r.overdue)} ₪` : ""}
+        {r.arrearsRange ? ` · ${r.arrearsRange}` : ""}
+      </span>
+    );
+  if (enforced)
+    meta.push(
+      <span key="enf" className="fin-cs-warn">
+        בטיפול ההוצאה לפועל
+      </span>
+    );
+
+  return (
+    <li className="fin-cs-row" data-alarm={r.late || enforced || undefined}>
+      <BankIcon source={r.bank} size={30} />
+      <div className="min-w-0 flex-1">
+        <div className="fin-cs-bank">
+          {shortBank(r.bank) || r.bank}
+          <span className="fin-cs-kind">{r.type}</span>
+        </div>
+        <div className="fin-cs-meta fin-cs-meta-wrap">
+          {meta.map((m, i) => (
+            <span key={i} className="fin-cs-bit">
+              {m}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      <div className="fin-cs-amt">
+        <Money value={r.balance} size={17} weight={800} color={noCeiling ? "var(--neg)" : undefined} />
+      </div>
+
+      {/* The number the client asked about: what this card takes each month. */}
+      <div className="fin-cs-amt">
+        {r.reported.monthly ? (
+          <>
+            <Money
+              value={r.monthly}
+              size={17}
+              weight={800}
+              color={r.rolled > 0 ? "var(--neg)" : undefined}
+            />
+            {r.rolled > 0 && <div className="fin-cs-rolled">מזה {ils(r.rolled)} ₪ לא נפרעו</div>}
+          </>
+        ) : (
+          <span className="fin-cs-none">לא דווח</span>
+        )}
+      </div>
+    </li>
+  );
+}
+
+/* -------------------------------------------------------------- the page */
+
+function Section({ sec }: { sec: ClientSection }) {
+  const shown = sec.rows.slice(0, MAX_ROWS);
+  const rest = sec.rows.slice(MAX_ROWS);
+  const restMonthly = rest.reduce((s, r) => s + r.monthly, 0);
+  const restBalance = rest.reduce((s, r) => s + r.balance, 0);
+  const total = sec.rows.reduce((s, r) => s + r.balance, 0);
+  const totalMonthly = sec.rows.reduce((s, r) => s + r.monthly, 0);
+
+  return (
+    <section className="fin-cs-group">
+      <h3 className="fin-cs-title" style={{ ["--fam" as string]: sec.accent }}>
+        {sec.title}
+      </h3>
+      <div className="fin-cs-cols" aria-hidden>
+        <span className="fin-cs-colspacer" />
+        <span className="flex-1" />
+        <span className="fin-cs-amt">יתרה</span>
+        <span className="fin-cs-amt">לחודש</span>
+      </div>
+      <ul>
+        {shown.map((r) =>
+          sec.key === "card" ? <CardRow key={r.uids.join()} r={r} /> : <LenderRow key={r.uids.join()} r={r} />
+        )}
+        {rest.length > 0 && (
+          <li className="fin-cs-more">
+            ועוד {rest.length} {rest.length === 1 ? "מלווה" : "מלווים"}
+            {restBalance > 0 && (
+              <>
+                {" · "}
+                <Money value={restBalance} block={false} weight={700} /> יתרה
+              </>
+            )}
+            {restMonthly > 0 && (
+              <>
+                {" · "}
+                <Money value={restMonthly} block={false} weight={700} /> לחודש
+              </>
+            )}
+          </li>
+        )}
+      </ul>
+      {/* A per-section subtotal, so the footer is arrived at rather than asserted. */}
+      {sec.rows.length > 1 && (
+        <div className="fin-cs-sub">
+          <span className="flex-1">סה״כ {sec.title}</span>
+          <span className="fin-cs-amt">
+            <Money value={total} size={14} weight={800} />
+          </span>
+          <span className="fin-cs-amt">
+            <Money value={totalMonthly} size={14} weight={800} />
+          </span>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -172,61 +291,7 @@ export default function ClientSummaryModal({
   }, [onClose]);
 
   const a = analysis;
-  const own = a.lines.filter((l) => l.role === "debtor");
-
-  const sections: { key: Family; title: string; accent: string; rows: Holding[] }[] = ([
-    {
-      key: "mortgage" as const,
-      title: "משכנתאות",
-      accent: "#6b53d8",
-      rows: group(own.filter((l) => l.category === "mortgage"), "mortgage"),
-    },
-    {
-      key: "loan" as const,
-      title: "הלוואות",
-      accent: "#c4681a",
-      rows: group(own.filter((l) => l.category === "loan"), "loan"),
-    },
-    {
-      key: "card" as const,
-      title: "כרטיסי אשראי ומסגרות",
-      accent: "#0d8b9b",
-      rows: group(
-        own.filter((l) => (l.category === "card" || l.category === "overdraft") && l.monthly > 0),
-        "card"
-      ),
-    },
-  ] satisfies { key: Family; title: string; accent: string; rows: Holding[] }[]).filter(
-    (s) => s.rows.length > 0
-  );
-
-  // Said the way a client would say it, not the way the report does.
-  const worries: string[] = [];
-  const late = own.filter((l) => l.overdue > 0 || l.arrearsRange);
-  if (late.length) {
-    const owed = late.reduce((s, l) => s + l.overdue, 0);
-    worries.push(
-      `יש פיגור בתשלומים${owed > 0 ? ` — ${Math.round(owed).toLocaleString("en-US")} ₪ שלא שולמו` : ""}`
-    );
-  }
-  if (a.cards.rolled > 0)
-    worries.push(`חלק מהחיוב בכרטיס לא נפרע והתגלגל לחודש הבא (${Math.round(a.cards.rolled).toLocaleString("en-US")} ₪)`);
-  const dear = own.filter((l) => l.category === "loan" && (l.rate ?? 0) >= 10);
-  if (dear.length) {
-    const rates = dear.map((l) => l.rate ?? 0);
-    const lo = Math.min(...rates).toFixed(1).replace(/\.0$/, "");
-    const hi = Math.max(...rates).toFixed(1).replace(/\.0$/, "");
-    const banks = Array.from(new Set(dear.map((l) => shortBank(l.bank) || l.bank)));
-    const sum = dear.reduce((t, l) => t + l.balance, 0);
-    worries.push(
-      `${dear.length === 1 ? "הלוואה אחת" : `${dear.length} הלוואות`} בריבית ${lo === hi ? `${lo}%` : `${lo}%–${hi}%`} ` +
-        `ב${banks.slice(0, 3).join(", ב")} — ${Math.round(sum).toLocaleString("en-US")} ₪ שאפשר למחזר`
-    );
-  }
-  if (a.legal.executionOpen.length) worries.push("קיים תיק פתוח בהוצאה לפועל");
-  if (a.legal.insolvency.length) worries.push("קיים הליך חדלות פירעון");
-  if (a.legal.nonPayment.some((n) => n.allowsBureauTransfer))
-    worries.push("קיים רישום על אי עמידה בתשלומים שמופיע בדירוג האשראי");
+  const v = a.clientView;
 
   return createPortal(
     <div
@@ -239,7 +304,7 @@ export default function ClientSummaryModal({
         initial={{ opacity: 0, y: 10, scale: 0.99 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-        className="fin-card flex max-h-[92vh] w-full max-w-[720px] flex-col overflow-hidden"
+        className="fin-card flex max-h-[92vh] w-full max-w-[760px] flex-col overflow-hidden"
         style={{ boxShadow: "var(--shadow-lift)" }}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
@@ -267,80 +332,48 @@ export default function ClientSummaryModal({
         </header>
 
         <div className="fin-cs min-h-0 flex-1 overflow-y-auto">
-          {sections.map((sec) => {
-            const shown = sec.rows.slice(0, MAX_ROWS);
-            const rest = sec.rows.slice(MAX_ROWS);
-            const restMonthly = rest.reduce((s, h) => s + h.monthly, 0);
-            const restBalance = rest.reduce((s, h) => s + h.balance, 0);
-            return (
-              <section key={sec.key} className="fin-cs-group">
-                <h3 className="fin-cs-title" style={{ ["--fam" as string]: sec.accent }}>
-                  {sec.title}
-                </h3>
-                {/* Said once, over the column, rather than whispered under every
-                    number — two captions per row was most of the grey. */}
-                <div className="fin-cs-cols" aria-hidden>
-                  <span className="fin-cs-colspacer" />
-                  <span className="flex-1" />
-                  {sec.key !== "card" && <span className="fin-cs-amt">יתרה</span>}
-                  <span className="fin-cs-amt">לחודש</span>
-                </div>
-                <ul>
-                  {shown.map((h) => (
-                    <Row key={h.key} h={h} />
-                  ))}
-                  {rest.length > 0 && (
-                    <li className="fin-cs-more">
-                      ועוד {rest.length} {rest.length === 1 ? "מלווה" : "מלווים"}
-                      {restBalance > 0 && (
-                        <>
-                          {" · "}
-                          <Money value={restBalance} block={false} weight={700} /> יתרה
-                        </>
-                      )}
-                      {restMonthly > 0 && (
-                        <>
-                          {" · "}
-                          <Money value={restMonthly} block={false} weight={700} /> לחודש
-                        </>
-                      )}
-                    </li>
-                  )}
-                </ul>
-              </section>
-            );
-          })}
+          {v.sections.map((sec) => (
+            <Section key={sec.title} sec={sec} />
+          ))}
 
-          {!sections.length && (
+          {!v.sections.length && (
             <p className="px-1 py-6 text-center text-[14px]" style={{ color: "var(--ink-3)" }}>
               לא נמצאו התחייבויות פעילות בדוח.
             </p>
           )}
 
-          {worries.length > 0 && (
+          {v.worries.length > 0 && (
             <section className="fin-cs-worry">
               <div className="fin-cs-worry-head">
                 <WarningCircle size={17} weight="fill" />
                 מה חשוב לשים לב אליו
               </div>
               <ul>
-                {worries.map((w) => (
-                  <li key={w}>{w}</li>
+                {v.worries.map((w) => (
+                  <li key={w.say} data-sev={w.severity}>
+                    {w.say}
+                  </li>
                 ))}
               </ul>
             </section>
           )}
         </div>
 
-        {/* The one number a client actually feels. */}
         <footer className="fin-cs-foot">
           <div>
             <div className="fin-cs-foot-cap">סך ההתחייבויות</div>
-            <Money value={a.totals.balance} size={19} weight={800} style={{ textAlign: "start" }} block={false} />
+            <Money value={v.footer.balance} size={19} weight={800} style={{ textAlign: "start" }} block={false} />
+            {/* Cannot normally fire — the engine asserts it. Rendered rather than
+                trusted, so a future regression is visible instead of silent. */}
+            {v.unshownBalance !== 0 && (
+              <div className="fin-cs-none">
+                מזה {ils(Math.abs(v.unshownBalance))} ₪ ללא שורה בעמוד
+              </div>
+            )}
           </div>
           <div className="text-end">
             <div className="fin-cs-foot-cap">יוצא מהחשבון כל חודש</div>
-            <Money value={a.totals.monthly} size={22} weight={800} style={{ textAlign: "start" }} block={false} />
+            <Money value={v.footer.monthly} size={22} weight={800} style={{ textAlign: "start" }} block={false} />
           </div>
         </footer>
       </motion.div>

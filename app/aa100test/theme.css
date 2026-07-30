@@ -355,6 +355,14 @@
 .fin-cell[data-heat="warm"] { color: #9a6410; }
 .fin-cell[data-heat="hot"] { color: #ac4a13; font-weight: 700; }
 
+/* The same two steps on a read-only figure in an analysis table. These had no
+   rule at all: four `data-heat` attributes were being set on `<td class="fin-fig">`
+   and rendering nothing, because the only heat rules in the sheet were scoped to
+   .fin-cell — the Ledger's <input>. Every high rate in the advisor's tables was
+   silently plain text. */
+.fin-fig[data-heat="warm"] { color: #9a6410; font-weight: 700; }
+.fin-fig[data-heat="hot"] { color: #ac4a13; font-weight: 800; }
+
 /* native spinners fight the grid */
 .fin-cell[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 .fin-cell[type="number"]::-webkit-outer-spin-button,
@@ -1282,6 +1290,46 @@ tr:hover .fin-act { color: var(--ink-3); }
    footnotes — it has to be read, not skimmed past. */
 .fin-cs-meta { margin-top: 2px; font-size: 12.5px; color: var(--ink-3); }
 .fin-cs-warn { color: var(--neg); font-weight: 700; }
+/* One step below red: high but not alarming. A card drawn to 80% of its limit is
+   worth noticing; the same card at 100% is the thing to act on, and they must not
+   look the same. */
+.fin-cs-warm { color: var(--warn); font-weight: 700; }
+
+/* A CARD ROW carries more facts than a lender row — limit, utilisation, peak, two
+   rates, arrears — so its meta line wraps instead of truncating. Separated by a
+   middot drawn in CSS rather than typed between the spans, because a conditional
+   separator in JSX is how you end up with a leading " · " on the row that happens
+   to have nothing before it. */
+.fin-cs-meta-wrap { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 4px; row-gap: 1px; }
+.fin-cs-bit + .fin-cs-bit::before { content: "·"; margin-inline-end: 4px; color: var(--ink-4); }
+/* What kind of facility it is, beside the lender's name — a client holds several
+   cards at one issuer and "מסגרת אשראי מתחדשת" vs "חשבון עובר ושב" is the
+   difference between a card and an overdraft. */
+.fin-cs-kind {
+  margin-inline-start: 7px;
+  font-family: var(--ui);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-4);
+  letter-spacing: -0.005em;
+}
+/* The part of the charge that was not actually paid. Sits under the figure it
+   qualifies, and only ever appears when the document printed both numbers. */
+.fin-cs-rolled { margin-top: 1px; font-size: 10.5px; font-weight: 700; color: var(--neg); }
+/* An absent field. Not ₪0 — a stated zero is a claim and this is silence. */
+.fin-cs-none { font-family: var(--ui); font-size: 11.5px; font-weight: 600; color: var(--ink-4); }
+
+/* A section subtotal, so the footer is arrived at rather than asserted. */
+.fin-cs-sub {
+  display: flex; align-items: center; gap: 11px;
+  margin-top: 2px; padding: 7px 2px 0;
+  border-top: 1px solid var(--line-2);
+  font-family: var(--ui); font-size: 12px; font-weight: 700; color: var(--ink-2);
+}
+
+/* A row whose facility is in arrears or under enforcement. Tinted, not shouted:
+   the row's own figures already carry red where it matters. */
+.fin-cs-row[data-alarm] { background: var(--neg-tint); }
 
 /* One header per group, sitting over its column. */
 .fin-cs-cols {
