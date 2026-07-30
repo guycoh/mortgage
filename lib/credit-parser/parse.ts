@@ -87,14 +87,41 @@ function sectionBounds(flat: FlatLine[]): Record<string, [number, number]> {
   const order = ["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8"];
   for (const key of order) {
     const kw = SECTION_KW[key];
+    // Anchored to the numbered heading, not merely containing the words.
+    //
+    // §1 carries a sub-heading of its own — "סיכום מידע שהתקבל מרשויות וגופים
+    // ציבוריים" — which contains §5's keyword verbatim. A loose match therefore
+    // put §5 on page 3 instead of page 33, which made §4's range run backwards
+    // and silently dropped every inactive transaction in the report: thirteen of
+    // them on a real 37-page file, the closed מזרחי mortgages that the
+    // non-payment indicators point at.
+    const heading = `.${key.slice(1)}${kw}`;
     for (let i = 0; i < flat.length; i++) {
       if (idx[key] !== undefined) break;
       const fl = flat[i];
       // Skip the table-of-contents page (page 2) — its lines have dot leaders.
       if (fl.page <= 2) continue;
       const txt = despace(blockText([fl.line]));
-      if (txt.includes(kw)) idx[key] = i;
+      if (txt.startsWith(heading)) idx[key] = i;
     }
+    // A shorter report may print a section without its number; fall back to the
+    // old containment test, but only for a section still unplaced.
+    if (idx[key] === undefined) {
+      for (let i = 0; i < flat.length; i++) {
+        if (idx[key] !== undefined) break;
+        const fl = flat[i];
+        if (fl.page <= 2) continue;
+        if (despace(blockText([fl.line])).includes(kw)) idx[key] = i;
+      }
+    }
+  }
+  // Sections run in order. Anything that resolved out of order matched something
+  // that only looked like a heading, and is better dropped than trusted.
+  let last = -1;
+  for (const key of order) {
+    if (idx[key] === undefined) continue;
+    if (idx[key] < last) delete idx[key];
+    else last = idx[key];
   }
   const bounds: Record<string, [number, number]> = {};
   for (let k = 0; k < order.length; k++) {
