@@ -17,12 +17,14 @@ export type Loan = {
   rate: number;
   months: number;
   loan_end_date?: string | null;
-  anchor?: string | null;
+  /** ריבית העוגן — NUMERIC בפוסטגרס, לא תווית. כמחרוזת, המילה "פריים" עברה קומפילציה ונפלה ב-22P02. */
+  anchor?: number | null;
   anchor_margin?: number | null;
   change_frequency?: string | null;
   number?: number;
   created_at?: string;
-  anchor_interval?: string | null;
+  /** תדירות שינוי בחודשים — עמודת INTEGER. */
+  anchor_interval?: number | null;
   end_date?: string | null;
   amortization_schedule_id: number;
   grace_type_id?: number | null; // סוג גרייס (מתוך grace_types)

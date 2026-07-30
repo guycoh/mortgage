@@ -370,6 +370,13 @@ export default function ClientSummaryModal({
                 מזה {ils(Math.abs(v.unshownBalance))} ₪ ללא שורה בעמוד
               </div>
             )}
+            {/* Not part of the total, but the reason the mix board shows a larger
+                one — said here so the two never differ without explanation. */}
+            {v.guaranteedBalance > 0 && (
+              <div className="fin-cs-none">
+                ובנוסף {ils(v.guaranteedBalance)} ₪ בערבות — לא ההחזר שלכם
+              </div>
+            )}
           </div>
           <div className="text-end">
             <div className="fin-cs-foot-cap">יוצא מהחשבון כל חודש</div>

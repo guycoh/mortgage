@@ -1050,14 +1050,14 @@ export default function AnalysisModal({
               // stays folded unless it disagrees with them — which is exactly
               // when an advisor needs to look at it.
               fold={
-                a.reconcile.balanceGap > 500 || a.reconcile.limitGap > 500
+                a.reconcile.balanceDisagrees || a.reconcile.limitDisagrees || a.reconcile.originalDisagrees
                   ? undefined
                   : `${a.sources.length} שורות`
               }
               note={
-                a.reconcile.balanceGap > 500 || a.reconcile.limitGap > 500 ? (
+                a.reconcile.balanceDisagrees || a.reconcile.limitDisagrees || a.reconcile.originalDisagrees ? (
                   <span style={{ color: "var(--neg)" }}>
-                    פער מול הפירוט: ₪{fmt(a.reconcile.balanceGap)} יתרה · ₪{fmt(a.reconcile.limitGap)} מסגרת
+                    פער מול הפירוט: ₪{fmt(a.reconcile.balanceGap)} יתרה · ₪{fmt(a.reconcile.limitGap)} מסגרת · ₪{fmt(a.reconcile.originalGap)} סכום מקורי
                   </span>
                 ) : (
                   "תואם לפירוט העסקאות"

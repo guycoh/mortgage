@@ -65,13 +65,15 @@ ws.getRow(headerRow).eachCell({ includeEmpty: true }, (c) => headers.push(String
 console.log(`\nheader row ${headerRow}:`);
 headers.forEach((h, i) => console.log(`  col ${i + 1}: ${h}`));
 
-const at = (name: string) => headers.indexOf(name) + 1;
+// Prefix match: headers carry units now ("תדירות שינוי (ח׳)").
+const at = (name: string) => headers.findIndex((h) => h.startsWith(name)) + 1;
 const cols = {
   amount: at("יתרה (₪)"),
   rate: at("ריבית"),
   anchor: at("עוגן"),
   margin: at("מרווח"),
   freq: at("תדירות שינוי"),
+  months: at("חודשים"),
   monthly: at("החזר חודשי (₪)"),
 };
 console.log("\nresolved columns:", cols);
@@ -93,7 +95,7 @@ for (let r = headerRow + 1; r <= ws.rowCount; r++) {
     return typeof v === "number" ? `${(v * 100).toFixed(2)}%` : v === null ? "—" : String(v);
   };
   console.log(
-    `  ${fam}  amount=${String(g(cols.amount).value).padStart(8)} rate=${pct(cols.rate).padStart(7)} anchor=${pct(cols.anchor).padStart(7)} margin=${pct(cols.margin).padStart(7)} freq="${g(cols.freq).value ?? ""}" monthly=${g(cols.monthly).value}`
+    `  ${fam}  amount=${String(g(cols.amount).value).padStart(8)} rate=${pct(cols.rate).padStart(7)} anchor=${pct(cols.anchor).padStart(7)} margin=${pct(cols.margin).padStart(7)} freq=${String(g(cols.freq).value ?? "—").padStart(4)} monthly=${g(cols.monthly).value}`
   );
   // formats: the two money columns and the two percent columns must keep theirs
   for (const [name, c] of [["עוגן", cols.anchor], ["מרווח", cols.margin], ["ריבית", cols.rate]]) {

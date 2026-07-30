@@ -44,7 +44,7 @@ import {
   type ImportedLoan,
 } from "../lib/credit";
 import { addMonths, monthsBetween, parseDate, startOfToday, toIso } from "../lib/dates";
-import { FREQ_FIXED, FREQ_UNSTATED, freqMonths, freqOptionsFor } from "@/lib/rate-frequency";
+import { freqLabel } from "@/lib/rate-frequency";
 
 const ORDER: DebtGroup[] = ["mortgage", "loan"];
 
@@ -66,6 +66,7 @@ const TRACKED = [
   "anchor",
   "anchor_margin",
   "change_frequency",
+  "anchor_interval",
   "source_anchor",
 ] as const;
 
@@ -129,22 +130,26 @@ export default function Ledger({
     patch(id, { loan_end_date: iso, end_date: iso, months: d ? monthsBetween(today, d) : 0 });
   };
 
-  /* --- תדירות שינוי is words, anchor_interval is the same fact as a number --- */
-  // Two columns describing one thing, so they are written together — a board
-  // where the label says five years and the interval still says twelve months is
-  // worse than one where only the label is filled in.
-  //
-  // But three of the answers carry no interval, and only one of them means the
-  // interval is gone: "ללא שינוי" says there is no reset at all. "עם הפריים" and
-  // "לא צוין" say the period is not a fixed number of months — while the lender
-  // may still have printed one, and throwing that away to record an answer that
-  // agrees with it would be a net loss of data.
-  const setFreq = (id: string, label: string) => {
-    const months = freqMonths(label);
+  /* --- תדירות שינוי: months are the value, the wording is derived from them --- */
+  // The grid edits the number. `change_frequency` is a text column other pages
+  // read, so it is kept in step rather than left to contradict the integer beside
+  // it — one fact, written once, in both shapes.
+  const setFreq = (id: string, raw: string) => {
+    const months = raw === "" ? null : Math.max(0, Math.round(Number(raw))) || null;
     patch(id, {
-      change_frequency: label,
-      ...(months !== null || label === FREQ_FIXED ? { anchor_interval: months } : {}),
+      anchor_interval: months,
+      change_frequency: freqLabel(months),
     } as Partial<ImportedLoan>);
+  };
+
+  /** The interval in the words an advisor would say, under the figure. */
+  const freqNote = (loan: ImportedLoan) => {
+    const m = Number(loan.anchor_interval);
+    if (loan.anchor_interval === null || loan.anchor_interval === undefined || !Number.isFinite(m) || m <= 0)
+      return "";
+    if (m === 1) return "כל חודש";
+    if (m % 12 === 0) return `${m / 12} שנ׳`;
+    return `${m} ח׳`;
   };
 
   /* --- עוגן: the name is the value, its margin is the note underneath --- */
@@ -195,12 +200,14 @@ export default function Ledger({
   };
 
   /** Why the cell says what it says — the report's own wording, where there was one. */
-  const freqTip = (loan: ImportedLoan) =>
-    loan.change_frequency === FREQ_UNSTATED
-      ? "הדוח מציין ריבית משתנה אך לא כל כמה זמן היא מתעדכנת"
-      : loan.source_track
-        ? `מהדוח: ${loan.source_track}`
-        : undefined;
+  const freqTip = (loan: ImportedLoan) => {
+    const m = Number(loan.anchor_interval);
+    if (loan.anchor_interval === null || !Number.isFinite(m) || m <= 0)
+      return loan.source_track
+        ? `המסמך לא ציין תדירות שינוי · מהדוח: ${loan.source_track}`
+        : "ריק = הריבית אינה מתעדכנת במחזור קבוע";
+    return `הריבית מתעדכנת כל ${m} חודשים${loan.source_track ? ` · מהדוח: ${loan.source_track}` : ""}`;
+  };
 
   /* ------------------------------------------------------------- grouping */
   // Rows with no family (hand-added before an import) sit with the mortgages,
@@ -314,7 +321,15 @@ export default function Ledger({
                 <th>ריבית %</th>
                 {/* one header for the paired field, so both halves are named and
                     the margin's unit is stated once instead of per row */}
-                <th>עוגן / מרווח %</th>
+                {/* One <th> over a paired cell, split on the same 1fr/56px grid the
+                    pair uses, so "מרווח" sits over the מרווח box instead of trailing
+                    off the end of the column. */}
+                <th>
+                  <span className="fin-th-pair">
+                    <span>עוגן %</span>
+                    <span className="fin-th-pair-b">מרווח %</span>
+                  </span>
+                </th>
                 <th>תדירות שינוי</th>
                 <th>חודשים</th>
                 <th>תאריך סיום</th>
@@ -512,25 +527,34 @@ export default function Ledger({
                             </div>
                           </td>
 
-                          {/* --- תדירות שינוי ---
-                              Read from the document on import: the bank statement
-                              prints it, the credit report does not and says "לא
-                              צוין" instead of guessing. Editable, because an
-                              advisor on the phone to the bank will know. */}
+                          {/* --- תדירות שינוי, in months ---
+                              A number, not a phrase: the interval is arithmetic and
+                              the column is read alongside ריבית and עוגן, which are
+                              also numbers. The words the documents use ("כל 5 שנים",
+                              "עדכ':3 חודשים", "תדירות שינוי הריבית בחודשים") all
+                              reduce to the same integer, and the human phrasing is
+                              still derived from it for the database and the export.
+                              Blank means the rate does not reset on a fixed cycle —
+                              which the מסלול column already distinguishes between a
+                              fixed rate and a variable one the document left open. */}
                           <td>
                             <div
                               className="fin-well"
-                              data-dirty={dirty.has("change_frequency") || undefined}
+                              data-dirty={dirty.has("anchor_interval") || undefined}
                               title={freqTip(loan)}
                             >
-                              <Select
-                                value={loan.change_frequency ?? ""}
-                                onChange={(v) => setFreq(loan.id, String(v))}
-                                options={freqOptionsFor(loan.change_frequency)}
-                                ariaLabel="תדירות שינוי הריבית"
-                                placeholder="—"
-                                minWidth={214}
+                              <input
+                                className="fin-cell fin-num-in"
+                                type="number"
+                                min={0}
+                                step={1}
+                                aria-label="תדירות שינוי הריבית, בחודשים"
+                                placeholder="ח׳"
+                                value={loan.anchor_interval ?? ""}
+                                onFocus={(e) => e.currentTarget.select()}
+                                onChange={(e) => setFreq(loan.id, e.target.value)}
                               />
+                              {freqNote(loan) && <span className="fin-note">{freqNote(loan)}</span>}
                             </div>
                           </td>
 

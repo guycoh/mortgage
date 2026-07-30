@@ -1438,3 +1438,11 @@ tr:hover .fin-act { color: var(--ink-3); }
   .fin-sec[data-hl], .fin-mini tbody tr[data-hl] { animation-duration: 0.01ms; }
   .fin-flag[data-go]:hover { transform: none; }
 }
+
+/* A HEADER OVER A PAIRED CELL.
+   The עוגן column holds two fields, so one start-aligned label left "מרווח %"
+   floating over the gap between them. This splits the header on the same
+   1fr / 56px grid `.fin-pair` uses, so each word sits over the box it names. */
+.fin-th-pair { display: flex; align-items: baseline; gap: 0; }
+.fin-th-pair > :first-child { flex: 1; min-width: 0; }
+.fin-th-pair-b { flex: 0 0 56px; }

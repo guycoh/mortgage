@@ -79,7 +79,7 @@ const COLS: Col[] = [
   { header: "ריבית", width: 9.5, fmt: "pct" },
   { header: "עוגן", width: 9.5, fmt: "pct" },
   { header: "מרווח", width: 9, fmt: "pct" },
-  { header: "תדירות שינוי", width: 14 },
+  { header: "תדירות שינוי (ח׳)", width: 15, fmt: "int" },
   { header: "חודשים", width: 9.5, fmt: "int" },
   { header: "תאריך סיום", width: 13, fmt: "date" },
   { header: "החזר חודשי (₪)", width: 15, fmt: "money", total: true },
@@ -129,7 +129,7 @@ const CI = {
   amount: COLS.findIndex((c) => c.header.startsWith("יתרה")),
   rate: COLS.findIndex((c) => c.header === "ריבית"),
   anchor: COLS.findIndex((c) => c.header === "עוגן"),
-  frequency: COLS.findIndex((c) => c.header === "תדירות שינוי"),
+  frequency: COLS.findIndex((c) => c.header.startsWith("תדירות שינוי")),
   monthly: COLS.findIndex((c) => c.header.startsWith("החזר")),
   interest: COLS.findIndex((c) => c.header.startsWith('סה"כ ריבית')),
 } as const;
@@ -379,7 +379,8 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
         // "not anchored" are different facts about a row.
         pctOrNull(l.anchor),
         pctOrNull(l.anchor_margin),
-        l.change_frequency || null,
+        // Months, so the column sorts and filters like the number it is.
+        Number(l.anchor_interval) > 0 ? Number(l.anchor_interval) : null,
         Number(l.months) || null,
         toDate(l.loan_end_date ?? l.end_date),
         num(res.monthlyPayment),
@@ -398,9 +399,8 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
           bold: ci === CI.family || ci === CI.amount || ci === CI.monthly,
         };
         cell.alignment = {
-          // words right, figures centred — תדירות שינוי is the one worded column
-          // among the numbers
-          horizontal: ci <= 3 || ci === CI.frequency || ci === SPAN - 1 ? "right" : "center",
+          // words right, figures centred
+          horizontal: ci <= 3 || ci === SPAN - 1 ? "right" : "center",
           vertical: "middle",
         };
         const fmt = COLS[ci].fmt;

@@ -236,14 +236,47 @@ export function parseDiscount(
         monthly: tranche.monthly,
         breakFee: tranche.breakFee,
         forecastRate: tranche.forecastRate,
-        // This template itemises it per loan, so there is nothing to reconcile.
-        operationalFee: num(g("עמלה תיפעולית")),
+        // Charged once on the ACCOUNT, not once per loan — attached below, after
+        // the blocks are read, so three loans do not become three ₪60 fees.
+        // (It was also looked up as "עמלה תיפעולית"; the form prints "תפעולית",
+        //  so the lookup never matched and the fee silently vanished.)
+        operationalFee: null,
       },
     });
   }
 
+  // ---- the account-level block, printed once below the loans
+  //
+  // "עמלה תפעולית 60.00" and "סה\"כ יתרה לסילוק: 715,460.33". The fee sits outside
+  // every tranche's payoff, so a tranche-by-tranche sum lands exactly ₪60 short of
+  // the lender's own printed figure — which read as a parse error and was in fact
+  // a charge nobody had captured.
+  // Every page, not just the data pages: this block is the account summary that
+  // follows the loans, and it is not one of them. The two patterns below both
+  // require a figure immediately before the words, so the fee boilerplate
+  // ("נגבית עמלה תפעולית בסך 60 ש\"ח") cannot match them.
+  const bodyText = all.flat().map((l) => l.text).join("\n");
+  const opFee = num((bodyText.match(/עמלה\s*תפעולית\s+([\d,]+\.\d{2})/) ?? [])[1] ?? "");
+  // The COLON is the discriminator. Every loan block ends with an uncoloned
+  // "סה"כ יתרה לסילוק 234,891.27"; only the account summary writes
+  // "סה"כ יתרה לסילוק: 715,460.33", and that is the figure to reconcile against.
+  const printedPayoff = num(
+    (bodyText.match(/סה"כ\s*יתרה\s*לסילוק\s*:\s*([\d,]+\.\d{2})/) ?? [])[1] ?? ""
+  );
+  if (opFee !== null && loans.length) loans[0].printed.operationalFee = opFee;
+
   const tranches = loans.flatMap((l) => l.tranches);
   if (!tranches.length) warnings.push("לא נמצאו הלוואות פעילות עם יתרה בתדפיס.");
+
+  // Assert against the lender's own total rather than trusting the sum.
+  if (printedPayoff !== null) {
+    const computed = tranches.reduce((s, t) => s + (t.payoff ?? 0), 0) + (opFee ?? 0);
+    if (Math.abs(computed - printedPayoff) > 0.5) {
+      warnings.push(
+        `סכום הסילוק המחושב (${computed.toFixed(2)}) שונה מהמודפס בתדפיס (${printedPayoff.toFixed(2)}).`
+      );
+    }
+  }
 
   return {
     bank,

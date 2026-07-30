@@ -12,7 +12,7 @@
 
 import { PATH_IDS, type ImportedLoan, type ImportSummary } from "@/app/aa100test/lib/credit";
 import type { Loan } from "@/app/private/crm/leads/simulators/components/LoanTable";
-import { FREQ_FIXED, FREQ_PRIME, FREQ_UNSTATED, freqLabel } from "@/lib/rate-frequency";
+import { freqLabel } from "@/lib/rate-frequency";
 import { monthsBetween, toDate } from "./text";
 import type { BankStatement, BankTranche } from "./types";
 
@@ -59,23 +59,6 @@ function termOf(t: BankTranche, statementDate: string): number {
   const from = toDate(statementDate) ?? new Date();
   const to = toDate(t.endDate);
   return to ? monthsBetween(from, to) : 0;
-}
-
-/**
- * תדירות שינוי for one tranche.
- *
- * The printed interval wins wherever there is one. Prime is named rather than
- * given a number even when the lender prints "1": Hapoalim's own column says one
- * month, but the rate does not actually change monthly — it changes when the Bank
- * of Israel changes, which is the thing an advisor needs to hear.
- */
-function frequencyOf(t: BankTranche): string {
-  if (t.rateKind === "prime") return FREQ_PRIME;
-  if (t.resetMonths && t.resetMonths > 0) return freqLabel(t.resetMonths);
-  // A fixed rate has no reset by definition, so a blank column is a fact here
-  // rather than a gap. On a variable tranche the same blank is a gap, and says so.
-  if (t.rateKind === "fixed") return FREQ_FIXED;
-  return t.rateKind === "variable" ? FREQ_UNSTATED : "";
 }
 
 /**
@@ -158,7 +141,10 @@ function toRow(t: BankTranche, mixId: string, st: BankStatement): ImportedLoan {
     anchor: anchorRateOf(t),
     anchor_margin: t.margin ?? null,
     anchor_interval: t.resetMonths ?? null,
-    change_frequency: frequencyOf(t),
+    // Derived from the interval, never stated independently. The board edits the
+    // number; this text column exists for other pages, and two fields describing
+    // one fact must not be able to contradict each other.
+    change_frequency: freqLabel(t.resetMonths),
     source_anchor: anchorNameOf(t),
     group: "mortgage",
     is_guarantor: false,
