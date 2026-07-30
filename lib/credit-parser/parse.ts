@@ -330,27 +330,90 @@ function parseSummary(flat: FlatLine[], bounds: [number, number]): SummaryGroup[
 // Non-payment indicators (the table on the debt-development page)
 // ---------------------------------------------------------------------------
 
+/**
+ * נתונים המעידים באופן מובהק על אי עמידה בפירעון — the most damaging table in the
+ * report, and the one an underwriter reads first.
+ *
+ * A row is a case id, a date and two ticks. The id is written three different ways
+ * — "X522830-08-18" for enforcement, "70698-03" for an insolvency file, and a
+ * masked "XX- 000060400" in two tokens for a lender's account — and the previous
+ * detector recognised only the first, so a real report showing THIRTEEN rows
+ * reported one. Everything after the first was invisible: eleven court-proceeding
+ * debts at מזרחי and one more, none of them counted, none of them named.
+ *
+ * The date and the ticks are what make a row a row; the id is then whatever sits
+ * in the id column beside them, whatever shape it takes. The lender's name is
+ * printed once per group and inherited by the rows beneath it, exactly as the page
+ * reads.
+ */
 function parseNonPayment(flat: FlatLine[], s1: [number, number]): NonPaymentIndicator[] {
   // It lives between §1 and §2 (the debt-development page). Scan that window.
   const out: NonPaymentIndicator[] = [];
   void s1;
+  const ID_BAND: [number, number] = [370, 450];
+  const rows: number[] = [];
   for (let i = 0; i < flat.length; i++) {
+    const toks = flat[i].line.toks;
+    const hasCheck = toks.some((t) => t.str.includes("ü"));
+    const hasDate = toks.some((t) => /^\d{2}\/\d{2}\/\d{4}$/.test(t.str));
+    if (hasCheck && hasDate) rows.push(i);
+  }
+
+  let lastSource = "";
+  rows.forEach((i, n) => {
     const fl = flat[i];
     const line = fl.line;
-    // The indicator row has a source, a case id, a date and check marks.
-    const hasCheck = line.toks.some((t) => t.str.includes("ü"));
-    const idTok = line.toks.find((t) => /-\d{2}-\d{2}$|^[A-Z]\d/.test(t.str));
-    const dateTok = line.toks.find((t) => /^\d{2}\/\d{2}\/\d{4}$/.test(t.str));
-    if (!hasCheck || !dateTok || !idTok) continue;
-    const sourceTok = line.toks.filter((t) => isHebrew(t.str) && t.x > 440);
-    const source = NAME_JOIN(sourceTok) || "הוצאה לפועל";
+    const dateTok = line.toks.find((t) => /^\d{2}\/\d{2}\/\d{4}$/.test(t.str))!;
+
+    // Whatever occupies the id column, joined right-to-left. Two tokens on the
+    // masked form ("XX-" and the digits), one on the others.
+    const id = [...line.toks]
+      .filter((t) => t !== dateTok && !isHebrew(t.str) && t.x >= ID_BAND[0] && t.x < ID_BAND[1])
+      .sort((a, b) => b.x - a.x)
+      .map((t) => t.str)
+      .join("")
+      .trim();
+
+    // The name sits on the group's first row, sometimes wrapped above it, and is
+    // inherited by the rest of the group.
+    // The name wraps, and so does the PREVIOUS row's — "חדלות פירעון ושיקום כלכלי"
+    // hangs below its own row and sits directly above the next one. Walking up
+    // blindly therefore attributes one lender's rows to another. So the search
+    // looks for a line that actually opens a lender's name, and reads from there
+    // down to this row; anything else is left blank and inherited from the group
+    // above, which is how the page itself reads.
+    const nameCol = (j: number) =>
+      NAME_JOIN(flat[j].line.toks.filter((t) => isHebrew(t.str) && t.x > 450));
+    // Openers only. בע"מ is a suffix — treating it as one stopped the search on
+    // the name's own last fragment and reported every lender as "בע\"מ".
+    const OPENS_NAME = /בנק|חברה|כרטיסי|ישראכרט|מקס|כאל|לאומי|מזרחי|דיסקונט|הפועלים|הבינלאומי|טריא|הוצאה לפועל|הממונה/;
+    let source = nameCol(i);
+    if (!source) {
+      for (let j = i - 1; j >= 0 && j > i - 7 && flat[j].page === fl.page; j--) {
+        if (rows.includes(j)) break;
+        const up = nameCol(j);
+        if (!up || !OPENS_NAME.test(up)) continue;
+        const parts = [up];
+        for (let k = j + 1; k < i; k++) {
+          const mid = nameCol(k);
+          if (mid) parts.push(mid);
+        }
+        source = parts.join(" ").replace(/\s+/g, " ").trim();
+        break;
+      }
+    }
+    if (source) lastSource = source;
+    else source = lastSource || "הוצאה לפועל";
+
     const checks = line.toks.filter((t) => t.str.includes("ü"));
     const has = (lo: number, hi: number) => checks.some((t) => t.x >= lo && t.x < hi);
-    // Description: low-x Hebrew tokens on this and the following few lines.
+
+    // Description: the low-x column, bounded by the NEXT indicator row so one
+    // row's wording cannot be read onto its neighbour.
+    const stop = Math.min(rows[n + 1] ?? flat.length, i + 8);
     const desc: string[] = [];
-    for (let j = i; j < Math.min(i + 8, flat.length); j++) {
+    for (let j = i; j < stop; j++) {
       if (flat[j].page !== fl.page) break;
-      if (!flat[j].line.toks.some((t) => isHebrew(t.str))) continue; // skip footer
       const dt = flat[j].line.toks
         .filter((t) => t.x < 165 && (isHebrew(t.str) || /[₪%\d]/.test(t.str)))
         .sort((a, b) => b.x - a.x)
@@ -358,16 +421,17 @@ function parseNonPayment(flat: FlatLine[], s1: [number, number]): NonPaymentIndi
         .join("");
       if (dt) desc.push(dt);
     }
+
     out.push({
       source,
-      id: idTok.str,
+      id,
       reportDate: dateTok.str,
       prevents: has(238, 262),
       stopsCollection: has(262, 305),
       allowsBureauTransfer: has(160, 235),
       description: desc.join(" ").replace(/\s+/g, " ").trim(),
     });
-  }
+  });
   return out;
 }
 
@@ -375,73 +439,161 @@ function parseNonPayment(flat: FlatLine[], s1: [number, number]): NonPaymentIndi
 // Transactions (§2 current accounts, §3 active, §4 inactive)
 // ---------------------------------------------------------------------------
 
+/**
+ * The מסלולי ריבית table.
+ *
+ * Two things make this table harder than it looks, and both were getting fields
+ * wrong on real reports.
+ *
+ * A cell WRAPS onto the lines above and below its own row. A mortgage anchored to
+ * "הריבית הממוצעת על משכנתאות צמודות מדד" prints that phrase across four lines
+ * with the figures on the middle one, and its "צמוד למדד המחירים לצרכן" linkage
+ * across two. Reading only the line carrying the percentages returned an empty
+ * linkage — so an index-linked tranche was modelled as unlinked, in the mix maths
+ * as well as on the page — and an empty anchor.
+ *
+ * And the numbers were positional: fourth-from-left was taken as the margin, but
+ * only when anchor text happened to fall on the same line. A wrapped anchor
+ * therefore also cost the margin. They are read by their own column's x-range
+ * now, so a missing column shifts nothing.
+ */
+const TRACK_BAND = {
+  type: [410, 475],
+  linkage: [360, 410],
+  anchor: [280, 360],
+  margin: [230, 290],
+  nominal: [165, 228],
+  effective: [100, 162],
+  utilization: [0, 100],
+} as const;
+
 function parseInterestTracks(lines: Line[]): InterestTrack[] {
-  const tracks: InterestTrack[] = [];
-  let inTracks = false;
+  /* ---- 1. the table's own extent */
+  let start = -1;
+  let end = lines.length;
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const txt = despace(blockText([line]));
-    if (txt.includes("מסלוליריבית")) {
-      inTracks = true;
+    const txt = despace(blockText([lines[i]]));
+    if (start < 0) {
+      if (txt.includes("מסלוליריבית")) start = i + 1;
       continue;
     }
-    if (!inTracks) continue;
-    // Stop when a new sub-section begins.
     if (
       txt.includes("מסגרתאשראי") ||
       txt.includes("שםמקור") ||
       txt.includes("בטחונות") ||
       txt.includes("פרטיתאגיד") ||
-      txt.includes("עסקאותבהן")
+      txt.includes("עסקאותבהן") ||
+      txt.includes("היסטורייתפיגורים") ||
+      txt.includes("הערות")
     ) {
-      inTracks = false;
-      continue;
+      end = i;
+      break;
     }
-    const hasPct = line.toks.some((t) => t.str === "%");
-    const idxTok = line.toks.find((t) => t.x > 515 && /^\d{1,2}$/.test(t.str));
-    if (!hasPct || !idxTok) continue;
+  }
+  if (start < 0) return [];
 
-    const nums = line.toks
-      .filter((t) => /^\d+(\.\d+)?$|^[\d,]+$/.test(t.str) && t.x < 470 && t !== idxTok)
-      .sort((a, b) => a.x - b.x)
-      .map((t) => t.str);
-    const noInterest = txt.includes("הריבית") || txt.includes("ללאריבית");
-    let type = "";
-    if (noInterest) type = "ללא ריבית (הריבית = אפס)";
-    else {
-      const tt = line.toks.filter((t) => isHebrew(t.str) && t.x >= 410 && t.x < 475);
-      type = NAME_JOIN(tt);
+  /* ---- 2. the rows carrying the figures, and the headings to ignore */
+  const isHeading = (i: number) => {
+    const t = despace(blockText([lines[i]]));
+    return (
+      /\(201-0\d\d\)/.test(blockText([lines[i]])) ||
+      (t.includes("מסלול") && t.includes("עוגן")) ||
+      (t.includes("נומינלית") && t.includes("מתואמת"))
+    );
+  };
+  const rowAt: number[] = [];
+  for (let i = start; i < end; i++) {
+    if (isHeading(i)) continue;
+    const hasPct = lines[i].toks.some((t) => t.str === "%");
+    const idxTok = lines[i].toks.find((t) => t.x > 515 && /^\d{1,2}$/.test(t.str));
+    if (hasPct && idxTok) rowAt.push(i);
+  }
+  if (!rowAt.length) return [];
+
+  /* ---- 3. every other line belongs to the row it sits closest to */
+  const own: number[][] = rowAt.map((i) => [i]);
+  for (let i = start; i < end; i++) {
+    if (rowAt.includes(i) || isHeading(i)) continue;
+    if (!lines[i].toks.some((t) => isHebrew(t.str))) continue;
+    let best = 0;
+    for (let k = 1; k < rowAt.length; k++) {
+      if (Math.abs(rowAt[k] - i) < Math.abs(rowAt[best] - i)) best = k;
     }
-    const linkTok = line.toks.filter((t) => isHebrew(t.str) && t.x >= 360 && t.x < 410);
-    const anchorTok = line.toks.filter((t) => isHebrew(t.str) && t.x >= 290 && t.x < 360);
-    const hasAnchor = anchorTok.length > 0;
+    own[best].push(i);
+  }
+
+  /* ---- 4. read each column out of the block, in document order */
+  const tracks: InterestTrack[] = [];
+  rowAt.forEach((at, k) => {
+    const block = own[k].sort((a, b) => a - b);
+    // Line by line, and right-to-left within each line. NAME_JOIN cannot be used
+    // across a wrapped cell: it sorts every token by x, so the second line of
+    // "אג\"ח מדינה לא / צמודות" comes back as "צמודות אג\"ח מדינה לא" — the words
+    // of one phrase reordered by where they happen to start.
+    const words = (band: readonly [number, number]) =>
+      block
+        .map((i) =>
+          [...lines[i].toks]
+            .filter((t) => isHebrew(t.str) && t.x >= band[0] && t.x < band[1])
+            .sort((a, b) => b.x - a.x)
+            .map((t) => t.str)
+            .join(" ")
+        )
+        .filter(Boolean)
+        .join(" ")
+        .replace(/\s+/g, " ")
+        .trim();
+    const figure = (band: readonly [number, number]) =>
+      lines[at].toks.find(
+        (t) => /^\d+(\.\d+)?$|^[\d,]+$/.test(t.str) && t.x >= band[0] && t.x < band[1]
+      )?.str ?? "";
+
+    // Tested on the figures' own line only. The wrapped anchor above contains the
+    // word הריבית, and reading it out of the whole block would report every
+    // index-linked mortgage as interest-free.
+    const rowText = despace(blockText([lines[at]]));
+    const noInterest = rowText.includes("הריבית") || rowText.includes("ללאריבית");
 
     tracks.push({
-      index: idxTok.str,
-      type,
-      linkage: NAME_JOIN(linkTok),
-      anchor: NAME_JOIN(anchorTok),
-      utilization: nums[0] ?? "",
-      effective: nums[1] ?? "",
-      nominal: nums[2] ?? "",
-      margin: hasAnchor ? nums[3] ?? "" : "",
+      index: lines[at].toks.find((t) => t.x > 515 && /^\d{1,2}$/.test(t.str))!.str,
+      type: noInterest ? "ללא ריבית (הריבית = אפס)" : words(TRACK_BAND.type),
+      linkage: words(TRACK_BAND.linkage),
+      anchor: words(TRACK_BAND.anchor),
+      margin: figure(TRACK_BAND.margin),
+      nominal: figure(TRACK_BAND.nominal),
+      effective: figure(TRACK_BAND.effective),
+      utilization: figure(TRACK_BAND.utilization),
     });
-  }
+  });
   return tracks;
 }
 
+/**
+ * בטחונות הקשורים לעסקה — the security behind a mortgage, and the denominator of
+ * every LTV the analysis can offer.
+ *
+ * The file id comes in at least two shapes: a plain "1990769056" on a deposit and
+ * a hyphenated "12039923-000194802" on a property charge. The old test demanded
+ * twelve or more consecutive digits, which matches neither — so no report has ever
+ * produced a collateral row, `mortgage.collateralValue` was always 0, and the LTV
+ * flag could not fire on any file. The id is simply whatever sits in the id
+ * column; its shape is the lender's business.
+ */
 function parseCollateral(lines: Line[]): Collateral[] {
   const out: Collateral[] = [];
   for (let i = 0; i < lines.length; i++) {
     if (!despace(blockText([lines[i]])).includes("בטחונותהקשורים")) continue;
-    for (let j = i + 1; j < Math.min(i + 5, lines.length); j++) {
+    for (let j = i + 1; j < Math.min(i + 6, lines.length); j++) {
+      const txt = despace(blockText([lines[j]]));
+      // The block ends where the next one starts.
+      if (txt.includes("מסלוליריבית") || txt.includes("בטחונותהקשורים") || txt.includes("הערות")) break;
       const toks = lines[j].toks;
-      const fileId = toks.find((t) => /^\d{12,}$/.test(t.str));
+      const fileId = toks.find((t) => !isHebrew(t.str) && t.x > 430 && /^[\d][\d-]{6,}$/.test(t.str));
       if (!fileId) continue;
-      const type = toks.filter((t) => isHebrew(t.str)).sort((a, b) => b.x - a.x).map((t) => t.str).join(" ").trim();
+      const type = NAME_JOIN(toks.filter((t) => isHebrew(t.str)));
       const value =
         toks
-          .filter((t) => /^[\d,]+$/.test(t.str) && t.str !== fileId.str && t.x < 260)
+          .filter((t) => /^[\d,]+$/.test(t.str) && t !== fileId && t.x < 260)
           .map((t) => t.str)[0] ?? "";
       out.push({ fileId: fileId.str, type, value });
     }

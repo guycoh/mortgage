@@ -370,7 +370,10 @@ export interface Analysis {
     utilization: number | null;
     /** Balance on facilities with no approved limit on record. Debt, not draw-down. */
     unlimitedBalance: number;
+    /** Peak draw during the month, over the facilities that state a limit. */
     peak: number;
+    /** The same, for facilities with no limit on record — never a ratio. */
+    unlimitedPeak: number;
     /** Every open revolving balance, whether or not a limit was printed. */
     totalBalance: number;
   };
@@ -1396,7 +1399,7 @@ function buildFlags(a: Omit<Analysis, "flags" | "clientView">): Flag[] {
       target: { section: "revolving" },
       severity: "medium",
       title: "שיא ניצול גבוה מהיתרה המוצגת",
-      detail: `שיא הניצול בחודש הדיווח היה ${Math.round(a.revolving.peak).toLocaleString("en-US")} ₪ מול יתרה מוצגת של ${Math.round(a.revolving.used).toLocaleString("en-US")} ₪ — המסגרת נוצלה כמעט במלואה במהלך החודש.`,
+      detail: `שיא הניצול במסגרות המאושרות היה ${Math.round(a.revolving.peak).toLocaleString("en-US")} ₪ מול יתרה מוצגת של ${Math.round(a.revolving.used).toLocaleString("en-US")} ₪ — המסגרת נוצלה כמעט במלואה במהלך החודש.`,
       client: show(
         `במהלך החודש המסגרת נוצלה עד ${Math.round(a.revolving.peak).toLocaleString("en-US")} ₪ — גם אם ביום הדוח היא נראית פנויה`
       ),
@@ -1795,7 +1798,14 @@ export function analyseReports(rawReports: CreditReport[], rawNames: string[] = 
       used: revolvingUsed,
       utilization: revolvingLimit > 0 ? Math.round((revolvingUsed / revolvingLimit) * 1000) / 10 : null,
       unlimitedBalance: revolvingUnlimited,
-      peak: revolvingRows.reduce((s, l) => s + l.peak, 0),
+      // Over the SAME facilities as `limit` and `used`. Summed across all of them
+      // it took a ₪327,751 peak from an overdraft with no ceiling and divided it
+      // by a ₪3,192 card limit — the identical population error that produced a
+      // 10,889% utilisation, one field along.
+      peak: priced.reduce((s, l) => s + l.peak, 0),
+      unlimitedPeak: revolvingRows
+        .filter((l) => !(l.reported.limit && l.limit > 0))
+        .reduce((s, l) => s + l.peak, 0),
       /** Every open card and overdraft, priced ceiling or not — what the client owes. */
       totalBalance: revolvingRows.reduce((s, l) => s + l.balance, 0),
     },
