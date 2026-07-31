@@ -39,3 +39,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# /aa4testinfo usage log (local analytics store)
+/.aa4info
+
+# audit fixtures: real client statements, copied into public/ so the Playwright
+# ledger audit can fetch them. Never committed.
+/public/__t_*.pdf

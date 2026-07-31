@@ -12,10 +12,20 @@ const BASE = "http://localhost:3400";
 const LEAD = 6201;
 fs.mkdirSync(OUT, { recursive: true });
 
+// `rows` is what each document actually contains. It is asserted, not printed:
+// until the wait in drop() was fixed this harness was measuring whatever the
+// lead already had saved, and every doc silently passed against the wrong board.
+// A row count is the cheapest thing that cannot be satisfied by the last import.
 const DOCS = [
-  { key: "mercantile", url: "/__t_merc.pdf", note: "מרכנתיל — anchor levels, one צמוד מדד row" },
-  { key: "leumi", url: "/__t_leumi.pdf", note: "לאומי — 6 tranches, prime + variable + fixed" },
-  { key: "credit", url: "/__t_credit.pdf", note: "חיווי אשראי — two families, no anchors printed" },
+  { key: "mercantile", url: "/__t_merc.pdf", note: "מרכנתיל — anchor levels, one צמוד מדד row", bank: /מרכנתיל/, rows: 3 },
+  { key: "leumi", url: "/__t_leumi.pdf", note: "לאומי — 6 tranches, prime + variable + fixed", bank: /לאומי/, rows: 6 },
+  // The statement that proved the template had been attributed to the wrong
+  // lender for its whole life, and that the block naming עוגן and מרווח on every
+  // variable חלק was never read.
+  { key: "mizrahi", url: "/__t_mizrahi.pdf", note: "מזרחי טפחות — עוגן+מרווח per חלק, a 30-month reset", bank: /מזרחי/, rows: 6 },
+  // A חיווי DOES print an anchor and a margin — 201-034 and 201-035 — on the
+  // mortgages that have one. Two of these four carry them.
+  { key: "credit", url: "/__t_credit.pdf", note: "חיווי אשראי — two families, anchors on the mortgages", bank: null, rows: 4 },
 ];
 
 let issues = 0;
@@ -37,8 +47,39 @@ const consoleErrors = [];
 page.on("console", (m) => m.type() === "error" && consoleErrors.push(m.text().slice(0, 200)));
 page.on("pageerror", (e) => consoleErrors.push(`pageerror: ${e.message.slice(0, 200)}`));
 
-/** Drop a PDF through the Bay's file input and wait for rows. */
+/**
+ * The board as a string, for telling one import from another.
+ *
+ * Waiting for "any rows" is not enough: the lead can already hold a saved mix,
+ * which renders before the dropped file is even read. The wait then returns on
+ * the OLD board and every assertion is made against the previous document — the
+ * מזרחי pass once reported Leumi and Beinleumi rows that way, which looks like a
+ * parser bug and is a harness bug.
+ */
+const boardSig = () =>
+  page.evaluate(() => {
+    const rows = [...document.querySelectorAll("table.fin-table tr.fin-row")];
+    return rows.map((r) => r.children[1].querySelector("input")?.value ?? "").join("|");
+  });
+
+/** Wait until the board stops moving, whatever it currently holds. */
+async function settle(quiet = 3) {
+  for (let last = null, still = 0; still < quiet; ) {
+    await page.waitForTimeout(400);
+    const now = await boardSig();
+    still = now === last ? still + 1 : 0;
+    last = now;
+  }
+}
+
+/** Drop a PDF through the Bay's file input and wait for the board to become it. */
 async function drop(url) {
+  // The lead's own saved mix loads asynchronously after the navigation. Sampled
+  // before it arrives, "the board changed" is satisfied by the SAVED mix and the
+  // probe measures that instead of the file — which is how a חיווי of thirty
+  // liabilities came back as four rows carrying anchors it cannot print.
+  await settle();
+  const before = await boardSig();
   await page.evaluate(async (u) => {
     const inp = document.querySelector('input[type=file][accept*=pdf]');
     const r = await fetch(u);
@@ -49,9 +90,17 @@ async function drop(url) {
     inp.dispatchEvent(new Event("change", { bubbles: true }));
   }, url);
   await page.waitForFunction(
-    () => document.querySelectorAll("table.fin-table tr.fin-row").length > 0,
+    (prev) => {
+      const rows = [...document.querySelectorAll("table.fin-table tr.fin-row")];
+      if (!rows.length) return false;
+      return rows.map((r) => r.children[1].querySelector("input")?.value ?? "").join("|") !== prev;
+    },
+    before,
     { timeout: 45000 }
   );
+  // ...and then for it to stop moving. A 30-row חיווי lands in more than one
+  // render, and the first change is a board halfway through being replaced.
+  await settle();
   await page.waitForTimeout(700); // let the charts settle before shooting
 }
 
@@ -134,6 +183,9 @@ const probe = () =>
         const payNote = r.children[COL.pay].querySelector(".fin-note-pay");
         return {
           fam: r.children[0].innerText.trim().split("\n")[0],
+          // The lender as the row states it — full text, not the abbreviated
+          // form the cell prints, because that is what is stored and exported.
+          source: r.children[COL.amount].querySelector(".fin-note")?.getAttribute("title") ?? "",
           amount: r.children[COL.amount].querySelector("input").value,
           rate: r.children[COL.rate].querySelector("input").value,
           anchorRate: anchorCell.querySelectorAll("input")[0].value,
@@ -173,6 +225,18 @@ for (const doc of DOCS) {
       `    ${r.fam.padEnd(8)} ${r.amount.padStart(9)}  rate=${String(r.rate).padStart(5)}%  anchor=${String(r.anchorRate || "-").padStart(6)} margin=${String(r.margin || "-").padStart(6)}  freq="${r.freq}"  ${r.months}m  ${r.end}  ${r.pay}${r.payNote ? ` [${r.payNote}]` : ""}
              tip: ${r.anchorTip}`
     );
+  }
+
+  check(p.rows.length === doc.rows, "the board is this document and not the last one",
+    `${p.rows.length} rows, expected ${doc.rows}`);
+
+  if (doc.bank) {
+    // A statement read under the wrong template does not fail loudly — it reads
+    // right-looking numbers out of the wrong cells — so the lender each row
+    // names is asserted against the file, not merely printed.
+    const wrongBank = p.rows.filter((r) => !doc.bank.test(r.source));
+    check(wrongBank.length === 0, `every row names the lender that printed the file`,
+      wrongBank.map((r) => `"${r.source}"`).join(", ") || p.rows[0]?.source);
   }
 
   check(p.headers.length === 11, "11 columns", p.headers.join(" | "));

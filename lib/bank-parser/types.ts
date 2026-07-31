@@ -11,14 +11,14 @@
 // invented number is worse than one made on an acknowledged gap.
 
 /** Which lender's template produced this. */
-export type BankId = "leumi" | "poalim" | "discount" | "mercantile" | "jerusalem";
+export type BankId = "leumi" | "poalim" | "discount" | "mercantile" | "mizrahi";
 
 export const BANK_LABEL: Record<BankId, string> = {
   leumi: "בנק לאומי",
   poalim: "בנק הפועלים",
   discount: "בנק דיסקונט",
   mercantile: "מרכנתיל דיסקונט",
-  jerusalem: "בנק ירושלים",
+  mizrahi: "בנק מזרחי טפחות",
 };
 
 /**
