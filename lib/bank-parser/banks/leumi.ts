@@ -204,11 +204,22 @@ export function parseLeumi(pages: RawPage[], dataPages: number[]): BankStatement
   // The appendix names the borrower; the grid pages do not.
   const wholeText = pages.flatMap((p) => pageLines(p)).map((l) => l.text).join("\n");
   const name = clean((wholeText.match(/שם הלווים\s*(.+?)\s*מספר הלוואה/) ?? [])[1] ?? "");
+  // The signature block at the end of the appendix carries every borrower's ID.
+  // It is the only place in the file that does, and it was not being read at
+  // all, so a Leumi import reached the Bay with a blank ת"ז beside the name.
+  // Not every variant of this appendix prints it; absent is absent.
+  // Deduped: one file can hold two complete statements, appendix and all, and
+  // the same two borrowers would otherwise be named four times.
+  const ids = Array.from(
+    new Set(Array.from(wholeText.matchAll(/ת\.ז\.?\s*\/?\s*דרכון\s*(\d{6,9})/g)).map((m) => m[1]))
+  );
 
   const tranches: BankTranche[] = [];
   let printedTotalBalance: number | null = null;
   let printedTotalMonthly: number | null = null;
   let operationalFee: number | null = null;
+  let printedBreakFee: number | null = null;
+  let printedForecast: number | null = null;
 
   for (const { grid } of grids) {
     const width = grid.numbers.length;
@@ -258,6 +269,19 @@ export function parseLeumi(pages: RawPage[], dataPages: number[]): BankStatement
       // the loan, and it is exactly what makes the columns sum short.
       const feeKey = Array.from(grid.totalsColumn.cells.keys()).find((k) => has(k, "עמלה תפעולית"));
       operationalFee = num(grid.totalsColumn.cells.get(feeKey ?? "") ?? "") ?? operationalFee;
+      // The loan's own break fee and forecast rate — printed in the same column
+      // as the totals above and left null while the per-משנה figures were read.
+      // The forecast is not the average of the parts and cannot be derived from
+      // them: it is weighted by balance and term, which the lender does and we
+      // would only be guessing at.
+      const breakKey = Array.from(grid.totalsColumn.cells.keys()).find((k) =>
+        has(k, 'סה"כ עמלות פירעון מוקדם')
+      );
+      printedBreakFee = num(grid.totalsColumn.cells.get(breakKey ?? "") ?? "") ?? printedBreakFee;
+      const forecastKey = Array.from(grid.totalsColumn.cells.keys()).find((k) =>
+        has(k, "שיעור ריבית כוללת חזויה")
+      );
+      printedForecast = pct(grid.totalsColumn.cells.get(forecastKey ?? "") ?? "") ?? printedForecast;
     }
 
     for (let c = 0; c < width; c++) {
@@ -347,8 +371,8 @@ export function parseLeumi(pages: RawPage[], dataPages: number[]): BankStatement
       balance: printedTotalBalance,
       payoff: printedTotalBalance,
       monthly: printedTotalMonthly,
-      breakFee: null,
-      forecastRate: null,
+      breakFee: printedBreakFee,
+      forecastRate: printedForecast,
       operationalFee,
     },
   };
@@ -358,7 +382,7 @@ export function parseLeumi(pages: RawPage[], dataPages: number[]): BankStatement
     bankLabel: BANK_LABEL.leumi,
     template: "leumi/payoff-detail",
     statementDate: asOf,
-    client: { name, idNumber: "", address: "" },
+    client: { name, idNumber: ids.join(", "), address: "" },
     accountNumber: loanNumber,
     loans: tranches.length ? [loan] : [],
     tranches,

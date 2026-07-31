@@ -410,6 +410,102 @@ function afterPhrase(text: string, phrase: string): string {
   return "";
 }
 
+/* ------------------------------------------- the file-level summary page */
+
+/**
+ * "מידע נוסף לחישוב הסכומים" — a page of its own, and the parser never opened it.
+ *
+ * It is not a חלק page, so it is not in dataPages, and nothing else looked for
+ * it. On it: the index every linked balance was revalued at, the exchange rate
+ * every foreign-currency one was, the loan-level break fee, the forecast rate,
+ * and the ₪60 operational fee that was until now inferred from a residual and
+ * described in a warning as though it had been deduced. All of it printed.
+ *
+ * Labels sit right of x≈420 with the figure a few points below and to the left,
+ * and a bare ":" of its own between them. That colon is why the generic `beside`
+ * cannot read this page: it is a non-empty run on the label's exact baseline, so
+ * it anchors the row and the value one line down is never reached.
+ */
+interface Summary {
+  /** מדד ידוע — what every linked balance was revalued at. */
+  index: number | null;
+  /** שער אירו / שער דולר — the same for a foreign-currency tranche. */
+  fxRate: number | null;
+  /** עמלות לסילוק ההלוואה, at loan level. */
+  breakFee: number | null;
+  /** עמלת עלות — the flat charge, printed rather than deduced. */
+  operationalFee: number | null;
+  /** סה"כ לסילוק. */
+  payoff: number | null;
+  forecastRate: number | null;
+  comparisonRate: number | null;
+}
+
+/**
+ * A figure from the summary page.
+ *
+ * `top` picks the highest match on the page, which is how "מדד ידוע" is told
+ * from "מדד ידוע 2022": both runs spell the same words, the rebased one is
+ * printed below, and the two indices are on different scales — pairing the wrong
+ * one with a base index would report an eight-percent uplift as sixty.
+ */
+function summaryFigure(items: RawItem[], phrase: string, top = false): number | null {
+  const hits = items.filter((i) => has(i.str, phrase));
+  if (!hits.length) return null;
+  const label = top ? hits.reduce((b, i) => (i.y > b.y ? i : b), hits[0]) : hits[0];
+  const near = items
+    .filter((i) => i !== label && i.x < label.x && Math.abs(i.y - label.y) <= 8 && /\d/.test(i.str))
+    .sort((a, b) => Math.abs(a.y - label.y) - Math.abs(b.y - label.y) || b.x - a.x);
+  return near.length ? num(near[0].str) : null;
+}
+
+function readSummary(pages: RawPage[]): Summary {
+  const page = pages.find((p) =>
+    p.items.some((i: RawItem) => has(i.str, "מידע נוסף לחישוב הסכומים"))
+  );
+  const empty: Summary = {
+    index: null,
+    fxRate: null,
+    breakFee: null,
+    operationalFee: null,
+    payoff: null,
+    forecastRate: null,
+    comparisonRate: null,
+  };
+  if (!page) return empty;
+  const it = page.items;
+  return {
+    index: summaryFigure(it, "מדד ידוע", true),
+    // "שער אירו", "שער דולר" — named for whichever currency the tranche is in,
+    // so it is found by the word that does not change.
+    fxRate: summaryFigure(it, "שער אירו") ?? summaryFigure(it, "שער דולר"),
+    breakFee: summaryFigure(it, "עמלות לסילוק ההלוואה"),
+    operationalFee: summaryFigure(it, "עמלת עלות"),
+    payoff: summaryFigure(it, 'סה"כ לסילוק'),
+    forecastRate: summaryFigure(it, "הריבית הכוללת החזויה"),
+    comparisonRate: summaryFigure(it, "שיעור הריבית לצרכי השוואה"),
+  };
+}
+
+/**
+ * The חלק number the document prints, not the order the pages came in.
+ *
+ * A file skips numbers — one statement runs 1, 2, 4, 6, 7 because parts 3 and 5
+ * were repaid — so counting data pages names the parts wrongly, and a warning
+ * saying "חלק 3" sends the advisor to a page the bank calls חלק 4. The number
+ * sits in the boxed field right of its own label, and is the leftmost of them:
+ * the boxes run loan-number then part-number, right to left.
+ */
+function readPartNumber(items: RawItem[]): string {
+  const label = items.find((i) => has(i.str, "שם החלק בהלוואה"));
+  if (!label) return "";
+  const boxes = items.filter(
+    (i) => i.x > label.x && Math.abs(i.y - label.y) <= 3 && /^\d+$/.test(i.str.trim())
+  );
+  if (!boxes.length) return "";
+  return boxes.reduce((best, i) => (i.x < best.x ? i : best), boxes[0]).str.trim();
+}
+
 /**
  * The file-level table on page one: four labels on one line, their figures on
  * the next, matched by column rather than by order in the text.
@@ -450,6 +546,7 @@ export function parseMizrahi(pages: RawPage[], dataPages: number[]): BankStateme
   const loanNumber = fileNo?.[1] ?? "";
 
   const tranches: BankTranche[] = [];
+  const summary = readSummary(pages);
 
   dataPages.forEach((pageNo, idx) => {
     const page = pages.find((p) => p.page === pageNo);
@@ -483,6 +580,10 @@ export function parseMizrahi(pages: RawPage[], dataPages: number[]): BankStateme
       pct(besideExact(right.items, "שיעור הריבית בחלק זה:")) ??
       pct(besideExact(right.items, "שיעור הריבית:"));
 
+    // The number the document calls this part, so a warning points at the page
+    // the advisor is holding.
+    const partNo = readPartNumber(page.items) || String(idx + 1);
+
     // Anchor + margin must reproduce the rate the borrower pays. The lender
     // prints all three, so this is not a plausibility check but a proof that the
     // two columns were told apart — swap them and a prime tranche reads 4.75%
@@ -491,7 +592,25 @@ export function parseMizrahi(pages: RawPage[], dataPages: number[]): BankStateme
       const gap = Math.abs(priced.rate + priced.margin - rate);
       if (gap > 0.02) {
         warnings.push(
-          `חלק ${idx + 1}: עוגן ${priced.rate}% + מרווח ${priced.margin}% אינם מסתכמים לריבית המודפסת ${rate}% (פער ${gap.toFixed(2)}) — יש לוודא מול התדפיס.`
+          `חלק ${partNo}: עוגן ${priced.rate}% + מרווח ${priced.margin}% אינם מסתכמים לריבית המודפסת ${rate}% (פער ${gap.toFixed(2)}) — יש לוודא מול התדפיס.`
+        );
+      }
+    }
+
+    // Linkage arithmetic, where both ends of it are printed. A linked balance
+    // was revalued from its own base index to the one index the file states, so
+    // principal × (ידוע/בסיס − 1) must reproduce the uplift the lender charged.
+    // It is the only check that proves the right index was paired with the right
+    // tranche — and there are two candidates on that page, on different scales.
+    const baseIndex =
+      num(G("מדד הבסיס לחישוב ההצמדה")) ?? num(G("שער הבסיס לחישוב ההצמדה"));
+    const currentIndex = linkage === "fx" ? summary.fxRate : summary.index;
+    if (linkage !== "unlinked" && baseIndex && currentIndex && principal && indexation !== null) {
+      const expected = principal * (currentIndex / baseIndex - 1);
+      const off = Math.abs(expected - indexation);
+      if (off > Math.max(50, Math.abs(indexation) * 0.02)) {
+        warnings.push(
+          `חלק ${partNo}: הפרשי ההצמדה המודפסים (${Math.round(indexation).toLocaleString("en-US")} ₪) אינם תואמים לחישוב ממדד ${baseIndex} למדד ${currentIndex} (${Math.round(expected).toLocaleString("en-US")} ₪).`
         );
       }
     }
@@ -503,9 +622,9 @@ export function parseMizrahi(pages: RawPage[], dataPages: number[]): BankStateme
     ].filter((f): f is { label: string; amount: number } => f.amount !== null && f.amount > 0);
 
     tranches.push({
-      uid: `${loanNumber}#${idx + 1}`,
+      uid: `${loanNumber}#${partNo}`,
       loanNumber,
-      trancheNumber: String(idx + 1),
+      trancheNumber: partNo,
       rawTrack: trackName,
       rateKind: kind,
       linkage,
@@ -545,8 +664,11 @@ export function parseMizrahi(pages: RawPage[], dataPages: number[]): BankStateme
       endDate,
       months: asOfDate && to ? monthsBetween(asOfDate, to) : null,
       monthsDerived: true,
-      baseIndex: num(G("מדד הבסיס לחישוב ההצמדה")),
-      currentIndex: null,
+      // For a foreign-currency tranche the same two fields are an exchange rate
+      // rather than an index — "שער הבסיס לחישוב ההצמדה: 4.858900 ש"ח לאירו"
+      // against "שער אירו" on the summary page. Same arithmetic, same slots.
+      baseIndex,
+      currentIndex,
       breakFee: num(P('סה"כ עמלת פרעון מוקדם')),
       breakFeeParts: fees,
     });
@@ -573,13 +695,32 @@ export function parseMizrahi(pages: RawPage[], dataPages: number[]): BankStateme
     }
   }
 
-  // This lender names the fee only in its explanatory pages ("תשלום חד פעמי שלא
-  // יעלה על ₪ 60 … בגין העלות התפעולית"), never as a field. The residual between
-  // its printed file payoff and the sum of the parts IS that fee, and the cap
-  // stated in the document is what makes the identification safe rather than a
-  // guess: anything larger is a missed page and is reported as one.
+  // The fee is printed, on the summary page, as "עמלת עלות". It used to be
+  // deduced from the residual between the printed file payoff and the sum of the
+  // parts, under a cap taken from the explanatory pages — sound arithmetic that
+  // happened to be unnecessary, and that would have quietly attributed a real
+  // shortfall to a fee had a חלק page ever been missed. The residual is still
+  // computed, but only as a fallback and as a check on the printed figure.
   const residual = printedPayoff ? Math.round((printedPayoff - sumPayoff) * 100) / 100 : 0;
-  const operationalFee = residual > 0 && residual <= 200 ? residual : null;
+  const operationalFee =
+    summary.operationalFee ?? (residual > 0 && residual <= 200 ? residual : null);
+  if (
+    summary.operationalFee !== null &&
+    residual > 0 &&
+    Math.abs(summary.operationalFee - residual) > 1
+  ) {
+    warnings.push(
+      `עמלת העלות המודפסת (${summary.operationalFee} ₪) אינה מסבירה את הפער בין היתרה לסילוק בתיק לסכום החלקים (${Math.round(residual).toLocaleString("en-US")} ₪).`
+    );
+  }
+  // Two printed payoffs, on two pages, which must agree. They are produced by
+  // different parts of the form and a disagreement means one of them was read
+  // off the wrong row.
+  if (printedPayoff && summary.payoff && Math.abs(printedPayoff - summary.payoff) > 1) {
+    warnings.push(
+      `היתרה לסילוק בתיק בעמוד הראשון (${Math.round(printedPayoff).toLocaleString("en-US")} ₪) שונה מ"סה"כ לסילוק" בעמוד הסיכום (${Math.round(summary.payoff).toLocaleString("en-US")} ₪).`
+    );
+  }
 
   const loan: BankLoan = {
     loanNumber,
@@ -587,10 +728,12 @@ export function parseMizrahi(pages: RawPage[], dataPages: number[]): BankStateme
     tranches,
     printed: {
       balance: null,
-      payoff: printedPayoff,
+      payoff: printedPayoff ?? summary.payoff,
       monthly: headerFigure(pages[0].items, "ההחזר החודשי"),
-      breakFee: null,
-      forecastRate: null,
+      // Loan-level, off the summary page: the sum of the parts' own fees is not
+      // the same figure — it excludes the flat charge and any נלוים.
+      breakFee: summary.breakFee,
+      forecastRate: summary.forecastRate,
       operationalFee,
     },
   };

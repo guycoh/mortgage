@@ -77,6 +77,8 @@ function dedupe(items: RawItem[]): RawItem[] {
 
 export interface LoanTotals {
   loanNumber: string;
+  /** The bank account the loan is collected from, printed under its number. */
+  accountNumber: string;
   principal: number | null;
   indexation: number | null;
   arrears: number | null;
@@ -86,17 +88,29 @@ export interface LoanTotals {
   monthly: number | null;
 }
 
+/** "87374-544" on a line of its own — the account, never anything else here. */
+const ACCOUNT_RE = /^\s*(\d{4,7}-\d{2,4})\s*$/;
+
 /**
  * The summary table: one row per loan, nine figures in printed order.
  *
  * Positional rather than by column x, because the row is a simple ordered
  * sequence and the header spans three wrapped lines that no single y groups.
+ *
+ * The first column is headed "מספר הלוואה ומספר חשבון" and is two lines deep:
+ * the loan number, then the account it is collected from on the line below. The
+ * second line was skipped, so every Hapoalim statement imported with no account
+ * number at all.
  */
 function readTotals(lines: Line[]): LoanTotals[] {
   const out: LoanTotals[] = [];
-  for (const line of lines) {
+  for (let li = 0; li < lines.length; li++) {
+    const line = lines[li];
     const m = line.text.match(LOAN_RE);
     if (!m) continue;
+    const below = lines[li + 1];
+    const account =
+      below && line.y - below.y < 24 ? (below.text.match(ACCOUNT_RE) ?? [])[1] ?? "" : "";
     const nums = line.items
       .map((i) => i.str)
       .filter((s) => /[\d,]+\.\d{2}-?$/.test(s.trim()))
@@ -105,6 +119,7 @@ function readTotals(lines: Line[]): LoanTotals[] {
     const [principal, indexation, arrears, interest, , , breakFee, payoff, monthly] = nums;
     out.push({
       loanNumber: m[0],
+      accountNumber: account,
       principal,
       indexation,
       arrears,
@@ -422,7 +437,9 @@ export function parsePoalim(pages: RawPage[], dataPages: number[]): BankStatemen
       idNumber: idNum?.[1] ?? "",
       address: "",
     },
-    accountNumber: "",
+    // Every loan in one file is collected from the same account, so the first
+    // one that states it names the statement.
+    accountNumber: totals.find((t) => t.accountNumber)?.accountNumber ?? "",
     loans,
     tranches,
     totals: {
