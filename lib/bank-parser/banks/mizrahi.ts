@@ -1,4 +1,10 @@
-// בנק ירושלים — "נתונים לסילוק מלא של הלוואה בתיק".
+// בנק מזרחי טפחות — "נתונים לסילוק מלא של הלוואה בתיק".
+//
+// This template was read as Bank Jerusalem's for as long as it has existed, and
+// it never was: all three samples print "בנק מזרחי-טפחות בע"מ" in their closing
+// pages, the *8860 line and the 03-5656621 fax are Mizrahi's, and no sample of
+// this form carries Bank Jerusalem's name anywhere. Every Mizrahi statement
+// imported before this was filed under the wrong lender.
 //
 // One חלק per page, and two independent columns on it: נתונים כלליים on the
 // right (terms) and נתונים לסילוק on the left (what it costs to close). Read as
@@ -12,15 +18,30 @@
 // This lender also puts the whole track description in one string —
 // "משתנה לא צמודה כל 2 שנים על בסיס אג"ח ממשלתי" — which is the richest wording
 // of the four and carries the reset interval that the others print as a number.
+//
+// And on every variable tranche it prints the price twice over — the anchor's
+// own level, the margin above it, the resulting rate and the reset cycle, each
+// as it stands today AND as it stood at drawdown. That block is the most
+// valuable thing in the document and sits below x≈390, in a two-column table of
+// its own; see readAnchorBlock.
 
 import type { RawItem, RawPage } from "@/lib/credit-parser/types";
-import { date, has, norm, num, pageLines, pct, toDate, monthsBetween } from "../text";
+import { date, has, norm, num, pageLines, pct, signedPct, toDate, monthsBetween } from "../text";
 import { clean } from "../fields";
 import type { BankLoan, BankStatement, BankTranche, Linkage, RateKind } from "../types";
 import { BANK_LABEL } from "../types";
 
 /** Everything left of this is the payoff column. */
 const SPLIT_X = 270;
+
+/**
+ * The payoff column never reaches past here.
+ *
+ * Its innermost run is "ריבית:" at x≈219 on every page of every sample; the
+ * split at 270 leaves a 50-point gutter that the general column is free to
+ * spill into, and one field does. See readTrackName.
+ */
+const GUTTER_X = 222;
 
 const GENERAL = [
   "שם החלק בהלוואה",
@@ -110,6 +131,191 @@ function readTrack(
   return { kind, linkage, resetMonths };
 }
 
+/**
+ * The track description — the one field that outgrows its column.
+ *
+ * It is set right-aligned under its label, so the longer it is the further left
+ * it starts: "ריבית משתנה על בסיס הפריים,לא צמוד,לפי ריבית ב"י,1.22" runs 54
+ * characters and begins at x≈259, eleven points the payoff side of the split.
+ * The general-column lookup could not see it, and three prime tranches of one
+ * statement arrived with no track, no anchor name and no linkage of their own —
+ * only what the separate סוג הריבית and סוג ההצמדה fields happened to say. No
+ * value of SPLIT_X fixes this, because a longer description starts further left
+ * still.
+ *
+ * So it is found by shape: Hebrew, one row below the label, inside the gutter
+ * the payoff column never reaches, and rightmost — which is where the shortest
+ * of them starts and where a stray from the other column never is.
+ */
+function readTrackName(items: RawItem[]): string {
+  const label = items.find((i) => has(i.str, "שם החלק בהלוואה"));
+  if (!label) return "";
+  const below = items.filter(
+    (i) =>
+      i.x < label.x &&
+      i.x >= GUTTER_X &&
+      label.y - i.y >= 6 &&
+      label.y - i.y <= 20 &&
+      /[֐-׿]{2,}/.test(i.str)
+  );
+  if (!below.length) return "";
+  const first = below.reduce((best, i) => (i.x > best.x ? i : best), below[0]);
+  return clean(
+    below
+      .filter((i) => Math.abs(i.y - first.y) <= 2)
+      .sort((a, b) => b.x - a.x)
+      .map((i) => i.str)
+      .join(" ")
+  );
+}
+
+/* ------------------------------------------------------- the pricing block */
+
+/**
+ * How far a value may sit from its label's baseline and still be its value.
+ * Rows in this block are 15-18 points apart, so 7 catches the pair — label and
+ * figure are set up to 3 points out — and cannot reach the row above or below.
+ */
+const ROW_DY = 7;
+
+/**
+ * How far left of a label its own block reaches. The widest row runs from
+ * "שיעור הריבית:" at x≈420 to the drawdown figure at x≈268; 170 covers it and
+ * stops short of the payoff column, whose innermost label sits at x≈219.
+ */
+const BLOCK_SPAN = 170;
+
+/**
+ * The rate-setting block, and what it says today versus at drawdown.
+ *
+ * Every variable tranche carries a small two-column table:
+ *
+ *     נתונים למועד -        מועד החישוב      מתן ההלוואה
+ *     שיעור ריבית העוגן:    + 6.000000 %     + 4.750000 %
+ *     שיעור התוספת לעוגן:   + 0.500000 %     + 0.500000 %
+ *     שיעור הריבית:           6.500000 %       5.250000 %
+ *     תדירות שינוי הריבית:  בהתאם לשינוי הריבית ע'י בנק ישראל
+ *
+ * None of it was being read: `margin` was hardcoded null and the עוגן column
+ * took whatever followed "על בסיס" in the track sentence, which is the anchor's
+ * NAME. So the one lender that prints the anchor's level outright was the one
+ * lender whose עוגן column came out empty.
+ *
+ * מועד החישוב is what the borrower pays now and is what the mix needs; מתן
+ * ההלוואה is history and is read only to prove the columns were told apart.
+ * Assignment is by x against the two column headers rather than by order,
+ * because a row can print one figure or two — "+ 4.220000" with nothing beside
+ * it is a tranche whose anchor has not moved since drawdown.
+ */
+interface AnchorBlock {
+  /** The anchor's own level at the calculation date. */
+  rate: number | null;
+  /** Margin over it — signed, and negative on more than one real statement. */
+  margin: number | null;
+  /** The same pair at drawdown, for the reconciliation check only. */
+  rateAtDrawdown: number | null;
+  marginAtDrawdown: number | null;
+  /** Months between resets, where the lender states a cycle. */
+  resetMonths: number | null;
+  /** The cycle as printed — prime tranches answer in words, not months. */
+  frequencyText: string;
+  /** מועד החיוב הראשון בריבית המעודכנת, dd/mm/yyyy. */
+  nextReset: string;
+}
+
+/** The block's header row, giving each column an x to be measured against. */
+function anchorColumns(items: RawItem[]): { now: number; drawdown: number } | null {
+  const head = items.find((i) => has(i.str, "נתונים למועד"));
+  if (!head) return null;
+  const row = items.filter((i) => Math.abs(i.y - head.y) <= 4 && i.x < head.x);
+  const now = row.find((i) => norm(i.str) === norm("מועד החישוב"));
+  const drawdown = row.find((i) => norm(i.str) === norm("מתן ההלוואה"));
+  return now && drawdown ? { now: now.x, drawdown: drawdown.x } : null;
+}
+
+/** One signed figure, from however many runs the cell arrived in. */
+function cellPct(parts: RawItem[]): number | null {
+  if (!parts.length) return null;
+  const ordered = [...parts].sort((a, b) => b.x - a.x);
+  const joined = signedPct(ordered.map((i) => i.str).join(""));
+  if (joined !== null) return joined;
+  const each = ordered.map((i) => signedPct(i.str)).find((v) => v !== null);
+  return each ?? null;
+}
+
+/**
+ * The two figures on one labelled row of the block, current first.
+ *
+ * Without column headers the fallback is order: right-to-left is
+ * current-then-drawdown, which is also the order the headers themselves are
+ * printed in, so the two rules cannot disagree about which is which.
+ */
+function anchorRow(
+  items: RawItem[],
+  phrase: string,
+  cols: { now: number; drawdown: number } | null
+): [number | null, number | null] {
+  const label = items.find((i) => has(i.str, phrase));
+  if (!label) return [null, null];
+
+  const floor = cols ? Math.min(cols.now, cols.drawdown) - 40 : label.x - BLOCK_SPAN;
+  const cells = items.filter(
+    (i) =>
+      i !== label &&
+      i.x < label.x - 1 &&
+      i.x > floor &&
+      Math.abs(i.y - label.y) <= ROW_DY &&
+      /\d/.test(i.str)
+  );
+  if (!cells.length) return [null, null];
+
+  if (!cols) {
+    const ordered = [...cells].sort((a, b) => b.x - a.x);
+    return [cellPct(ordered.slice(0, 1)), cellPct(ordered.slice(1, 2))];
+  }
+  // 35 points is half the gap between the two columns, so a figure that belongs
+  // to neither — a stray from the payoff side on the same baseline — is dropped
+  // rather than pulled into whichever column happens to be nearer.
+  const near = (x: number) => cells.filter((i) => Math.abs(i.x - x) <= 35);
+  return [cellPct(near(cols.now)), cellPct(near(cols.drawdown))];
+}
+
+/** A single-valued field of the block — words or a date, left of its label. */
+function blockValue(items: RawItem[], phrase: string): string {
+  const label = items.find((i) => has(i.str, phrase));
+  if (!label) return "";
+  const near = items.filter(
+    (i) =>
+      i !== label &&
+      i.x < label.x - 1 &&
+      i.x > label.x - BLOCK_SPAN &&
+      Math.abs(i.y - label.y) <= ROW_DY
+  );
+  return clean(near.sort((a, b) => b.x - a.x).map((i) => i.str).join(" "));
+}
+
+function readAnchorBlock(items: RawItem[]): AnchorBlock {
+  const cols = anchorColumns(items);
+  const [rate, rateAtDrawdown] = anchorRow(items, "שיעור ריבית העוגן", cols);
+  const [margin, marginAtDrawdown] = anchorRow(items, "שיעור התוספת לעוגן", cols);
+
+  // "30 חודשים" / "3 חודשים" on a variable tranche; "בהתאם לשינוי הריבית ע'י
+  // בנק ישראל" on a prime one, which states the cycle without a number and is
+  // left to the track reader's prime default rather than invented here.
+  const frequencyText = blockValue(items, "תדירות שינוי הריבית");
+  const months = frequencyText.match(/(\d+)\s*חוד/);
+  const years = frequencyText.match(/(\d+(?:\.\d+)?)\s*שנ/);
+
+  return {
+    rate,
+    margin,
+    rateAtDrawdown,
+    marginAtDrawdown,
+    resetMonths: months ? Number(months[1]) : years ? Math.round(Number(years[1]) * 12) : null,
+    frequencyText,
+    nextReset: date(blockValue(items, "מועד החיוב הראשון בריבית המעודכנת")),
+  };
+}
 
 /**
  * A value beside its label, found by coordinate rather than by line.
@@ -218,7 +424,7 @@ function headerFigure(items: RawItem[], phrase: string): number | null {
   return below.length ? num(below[0].str) : null;
 }
 
-export function parseJerusalem(pages: RawPage[], dataPages: number[]): BankStatement {
+export function parseMizrahi(pages: RawPage[], dataPages: number[]): BankStatement {
   const warnings: string[] = [];
   const head = pageLines(pages[0], 5);
   const headText = head.map((l) => l.text).join("\n");
@@ -264,10 +470,31 @@ export function parseJerusalem(pages: RawPage[], dataPages: number[]): BankState
 
     // The part-number box printed beside this cell leaves stray "0 0" runs in
     // front of the description.
-    const trackName = clean(G("שם החלק בהלוואה").replace(/^[\d\s]+/, ""));
+    const trackName = clean(readTrackName(page.items).replace(/^[\d\s]+/, ""));
     const { kind, linkage, resetMonths } = readTrack(trackName, G("סוג הריבית"), G("סוג ההצמדה"));
     const endDate = date(G("תאריך סיום חלק זה של ההלוואה"));
     const to = toDate(endDate);
+
+    // The pricing block straddles the column split — its labels sit at x≈390-420
+    // and its drawdown figures at x≈261 — so it is read from the whole page.
+    const priced = readAnchorBlock(page.items);
+
+    const rate =
+      pct(besideExact(right.items, "שיעור הריבית בחלק זה:")) ??
+      pct(besideExact(right.items, "שיעור הריבית:"));
+
+    // Anchor + margin must reproduce the rate the borrower pays. The lender
+    // prints all three, so this is not a plausibility check but a proof that the
+    // two columns were told apart — swap them and a prime tranche reads 4.75%
+    // when it is 6.00%, which reconciles against nothing.
+    if (priced.rate !== null && priced.margin !== null && rate !== null) {
+      const gap = Math.abs(priced.rate + priced.margin - rate);
+      if (gap > 0.02) {
+        warnings.push(
+          `חלק ${idx + 1}: עוגן ${priced.rate}% + מרווח ${priced.margin}% אינם מסתכמים לריבית המודפסת ${rate}% (פער ${gap.toFixed(2)}) — יש לוודא מול התדפיס.`
+        );
+      }
+    }
 
     const fees = [
       { label: "עמלת אי הודעה", amount: num(P("עמלת אי הודעה")) },
@@ -292,21 +519,27 @@ export function parseJerusalem(pages: RawPage[], dataPages: number[]): BankState
       payoff,
       originalAmount: num(G("סכום חלק זה בעת הביצוע")),
       monthly: num(G("סכום החיוב החודשי בגין חלק זה")) ?? num(G("החיוב החודשי בגין חלק זה")),
-      rate:
-        pct(besideExact(right.items, "שיעור הריבית בחלק זה:")) ??
-        pct(besideExact(right.items, "שיעור הריבית:")),
+      rate,
       effectiveRate:
         pct(besideExact(right.items, "שיעור הריבית המתואמת:")) ??
         pct(besideExact(right.items, "המתואמת:")),
       forecastRate: pct(G("הריבית הכוללת החזויה")),
       comparisonRate: pct(G("שיעור הריבית לצרכי השוואה")),
-      // Only what follows "על בסיס" is an anchor. Where the sentence has no such
-      // clause it is describing the track and nothing else — returning the whole
-      // sentence put "לא צמוד, ריבית פריים, שפיצר" in the עוגן column.
-      anchor: clean((trackName.match(/על בסיס\s*(.+)$/) ?? ["", ""])[1]),
-      margin: null,
-      resetMonths,
-      nextReset: "",
+      // Only what follows "על בסיס" is an anchor, and only up to the comma: the
+      // sentence carries on into linkage and a product code
+      // ("על בסיס הפריים,לא צמוד,לפי ריבית ב"י,1.22"), none of which names the
+      // anchor. Where there is no such clause it is describing the track and
+      // nothing else — returning the whole sentence put
+      // "לא צמוד, ריבית פריים, שפיצר" in the עוגן column.
+      anchor: clean((trackName.match(/על בסיס\s*([^,]+)/) ?? ["", ""])[1]),
+      anchorRate: priced.rate,
+      margin: priced.margin,
+      // The printed cycle beats the one inferred from the track sentence: the
+      // sentence describes the product ("כל 1,2.5,5 שנים" — the options the
+      // tranche could have been struck on), while תדירות שינוי הריבית states
+      // the one it actually runs on. That tranche resets every 30 months.
+      resetMonths: priced.resetMonths ?? resetMonths,
+      nextReset: priced.nextReset,
       startDate: date(G("תאריך הביצוע")),
       firstPaymentDate: date(G("תאריך חיוב ראשון")),
       endDate,
@@ -363,9 +596,9 @@ export function parseJerusalem(pages: RawPage[], dataPages: number[]): BankState
   };
 
   return {
-    bank: "jerusalem",
-    bankLabel: BANK_LABEL.jerusalem,
-    template: "jerusalem/full-payoff",
+    bank: "mizrahi",
+    bankLabel: BANK_LABEL.mizrahi,
+    template: "mizrahi/full-payoff",
     statementDate: asOf,
     client: { name: names.join(", "), idNumber: "", address: "" },
     accountNumber: loanNumber,

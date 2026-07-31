@@ -13,9 +13,13 @@ const LEAD = 6201;
 fs.mkdirSync(OUT, { recursive: true });
 
 const DOCS = [
-  { key: "mercantile", url: "/__t_merc.pdf", note: "מרכנתיל — anchor levels, one צמוד מדד row" },
-  { key: "leumi", url: "/__t_leumi.pdf", note: "לאומי — 6 tranches, prime + variable + fixed" },
-  { key: "credit", url: "/__t_credit.pdf", note: "חיווי אשראי — two families, no anchors printed" },
+  { key: "mercantile", url: "/__t_merc.pdf", note: "מרכנתיל — anchor levels, one צמוד מדד row", bank: /מרכנתיל/ },
+  { key: "leumi", url: "/__t_leumi.pdf", note: "לאומי — 6 tranches, prime + variable + fixed", bank: /לאומי/ },
+  // The statement that proved the template had been attributed to the wrong
+  // lender for its whole life, and that the block naming עוגן and מרווח on every
+  // variable חלק was never read.
+  { key: "mizrahi", url: "/__t_mizrahi.pdf", note: "מזרחי טפחות — עוגן+מרווח per חלק, a 30-month reset", bank: /מזרחי/ },
+  { key: "credit", url: "/__t_credit.pdf", note: "חיווי אשראי — two families, no anchors printed", bank: null },
 ];
 
 let issues = 0;
@@ -134,6 +138,9 @@ const probe = () =>
         const payNote = r.children[COL.pay].querySelector(".fin-note-pay");
         return {
           fam: r.children[0].innerText.trim().split("\n")[0],
+          // The lender as the row states it — full text, not the abbreviated
+          // form the cell prints, because that is what is stored and exported.
+          source: r.children[COL.amount].querySelector(".fin-note")?.getAttribute("title") ?? "",
           amount: r.children[COL.amount].querySelector("input").value,
           rate: r.children[COL.rate].querySelector("input").value,
           anchorRate: anchorCell.querySelectorAll("input")[0].value,
@@ -173,6 +180,15 @@ for (const doc of DOCS) {
       `    ${r.fam.padEnd(8)} ${r.amount.padStart(9)}  rate=${String(r.rate).padStart(5)}%  anchor=${String(r.anchorRate || "-").padStart(6)} margin=${String(r.margin || "-").padStart(6)}  freq="${r.freq}"  ${r.months}m  ${r.end}  ${r.pay}${r.payNote ? ` [${r.payNote}]` : ""}
              tip: ${r.anchorTip}`
     );
+  }
+
+  if (doc.bank) {
+    // A statement read under the wrong template does not fail loudly — it reads
+    // right-looking numbers out of the wrong cells — so the lender each row
+    // names is asserted against the file, not merely printed.
+    const wrongBank = p.rows.filter((r) => !doc.bank.test(r.source));
+    check(wrongBank.length === 0, `every row names the lender that printed the file`,
+      wrongBank.map((r) => `"${r.source}"`).join(", ") || p.rows[0]?.source);
   }
 
   check(p.headers.length === 11, "11 columns", p.headers.join(" | "));

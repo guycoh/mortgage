@@ -18,7 +18,18 @@
 // and still marked as apportioned.
 
 import type { RawItem, RawPage } from "@/lib/credit-parser/types";
-import { date, has, norm, num, pageLines, pct, toDate, monthsBetween, type Line } from "../text";
+import {
+  date,
+  has,
+  norm,
+  num,
+  pageLines,
+  pct,
+  signedPct,
+  toDate,
+  monthsBetween,
+  type Line,
+} from "../text";
 import { clean } from "../fields";
 import type { BankLoan, BankStatement, BankTranche, Linkage, RateKind } from "../types";
 import { BANK_LABEL } from "../types";
@@ -322,8 +333,11 @@ export function parsePoalim(pages: RawPage[], dataPages: number[]): BankStatemen
         // The template prints a bare "%" in the cell of any tranche that has no
         // anchor, and prepends one to those that do. Neither is the anchor.
         anchor: clean(g.basis[c].replace(/(^|\s)%(\s|$)/g, " ")),
-        // "P + 0.15%" / "F + 3.00%" — the number after the sign is the margin.
-        margin: pct((g.basis[c].match(/[+-]\s*([\d.]+)/) ?? [])[1] ?? ""),
+        // "P + 0.15%" / "F + 3.00%" — the number after the sign is the margin,
+        // and the sign is part of it: a tranche priced under its anchor prints
+        // "P - 0.20%", and capturing only the digits turns the discount into a
+        // premium of the same size.
+        margin: signedPct((g.basis[c].match(/([+-]\s*[\d.]+)/) ?? [])[1] ?? ""),
         resetMonths: num(g.resetFreq[c]),
         nextReset: date(g.nextReset[c]),
         startDate: date(g.start[c]),

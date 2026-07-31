@@ -4,9 +4,10 @@
 // all:
 //
 //   A bank statement prints it outright. Leumi and Discount head a column
-//   "תדירות שינוי הריבית", Hapoalim adds "בחודשים", and Jerusalem writes it into
-//   the track sentence ("משתנה לא צמודה כל 2 שנים", "עדכ':3 חודשים"). All four
-//   land as BankTranche.resetMonths.
+//   "תדירות שינוי הריבית", Hapoalim adds "בחודשים", and Mizrahi prints it twice
+//   — as a field ("30 חודשים") and inside the track sentence ("משתנה לא צמודה
+//   כל 2 שנים", "עדכ':3 חודשים"), the field being the one it actually runs on.
+//   All four land as BankTranche.resetMonths.
 //
 //   A חיווי אשראי never prints it. The דוח ריכוז נתונים carries סוג ריבית
 //   (201-032), עוגן (201-034) and מרווח (201-035) and no reset interval — the

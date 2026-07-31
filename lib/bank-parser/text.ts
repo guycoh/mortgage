@@ -99,6 +99,29 @@ export function pct(s: string | undefined | null): number | null {
   return v === null ? null : v;
 }
 
+/**
+ * A percentage whose SIGN carries meaning, printed with the sign detached.
+ *
+ * Mizrahi sets the margin column as "+ 3.750000 %" and "- 0.900000 %" — a space
+ * between the sign and the digits. `num` scans for the first run of digits and a
+ * sign only counts if it is glued to them, so it reads "- 0.900000" as +0.9 and
+ * turns a discount off the anchor into a premium over it. On a prime tranche at
+ * 6.00% that is the difference between 5.10% and 6.90%.
+ *
+ * Whitespace, direction marks and the unit come out first, so what is matched is
+ * the number and nothing else — and a cell holding anything more than one signed
+ * figure returns null rather than the part of it that happened to parse.
+ */
+export function signedPct(s: string | undefined | null): number | null {
+  if (s == null) return null;
+  const t = s.replace(/[‎‏|*%]/g, "").replace(/\s+/g, "");
+  const m = t.match(/^([+\-−–])?(\d+(?:[.,]\d+)?)$/);
+  if (!m) return null;
+  const v = Number(m[2].replace(/,/g, ""));
+  if (!Number.isFinite(v)) return null;
+  return m[1] && m[1] !== "+" ? -v : v;
+}
+
 /** dd/mm/yyyy or dd/mm/yy → dd/mm/yyyy. */
 export function date(s: string | undefined | null): string {
   if (!s) return "";

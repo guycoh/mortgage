@@ -81,10 +81,16 @@ const RULES: Rule[] = [
     docStart: "הנדון: פרטי משכנתאות",
   },
   {
-    bank: "jerusalem",
-    template: "jerusalem/full-payoff",
+    // Mizrahi-Tefahot. Named for the form, not for a logo: the heading, the
+    // *8860 mortgage line and the 03-5656621 fax are all this lender's, and its
+    // own name appears only in the closing pages ("בנק מזרחי-טפחות בע"מ"), which
+    // an advisor sending in the first few pages of a statement will not include.
+    // So the form title is the must and the name is a hint — the reverse would
+    // reject a perfectly readable extract.
+    bank: "mizrahi",
+    template: "mizrahi/full-payoff",
     must: ["נתונים לסילוק מלא של הלוואה"],
-    hints: ["8860", "שם החלק בהלוואה", "03-5656621", "הופק באינטרנט"],
+    hints: ["מזרחי-טפחות", "8860", "שם החלק בהלוואה", "03-5656621", "הופק באינטרנט"],
     dataPage: ["שם החלק בהלוואה"],
     docStart: "נתונים לסילוק מלא של הלוואה בתיק",
   },

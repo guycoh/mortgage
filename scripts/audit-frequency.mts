@@ -1,6 +1,6 @@
 // Reset-frequency audit: every tranche of every bank template, and every
 // liability of a חיווי אשראי, with the תדירות שינוי the row will carry.
-// Run: npx tsx scripts/audit-frequency.mts
+// Run: npx tsx scripts/audit-frequency.mts [extra-statement.pdf ...]
 import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
@@ -42,8 +42,15 @@ const DIR = "C:/Users/noama/OneDrive/Desktop/Credit Data System report extractor
 let issues = 0;
 
 console.log("================ BANK STATEMENTS ================");
-for (const f of fs.readdirSync(DIR).filter((f) => /\.pdf$/i.test(f))) {
-  const st = parseBankStatement(await pagesOf(path.join(DIR, f)));
+const statements = [
+  ...fs.readdirSync(DIR).filter((f) => /\.pdf$/i.test(f)).map((f) => path.join(DIR, f)),
+  // Anything handed in on the command line, so a statement that exposed a bug
+  // can be checked against the fixtures without being copied into the repo.
+  ...process.argv.slice(2).filter((a) => /\.pdf$/i.test(a)),
+];
+for (const full of statements) {
+  const f = path.basename(full);
+  const st = parseBankStatement(await pagesOf(full));
   const sum = bankStatementToLoans(st, "mix");
   console.log(`\n### ${f}  [${st.bankLabel} / ${st.template}]`);
   st.tranches.forEach((t, i) => {
