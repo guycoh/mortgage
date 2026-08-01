@@ -3,11 +3,15 @@
 // would hand them a way to probe for which leads exist.
 
 import { WarningCircle } from "@phosphor-icons/react/dist/ssr";
-import "@fontsource-variable/rubik";
+// Same theme as the board it guards, so a refusal does not look like a
+// different product. This page renders no Simulator, so unlike /simulator/board
+// it has to pull the fonts and stylesheet in itself.
+import "@fontsource-variable/inter";
 import "@fontsource/assistant/hebrew-400.css";
+import "@fontsource/assistant/hebrew-500.css";
 import "@fontsource/assistant/hebrew-600.css";
 import "@fontsource/assistant/hebrew-700.css";
-import "@/app/aa100test/theme.css";
+import "@/app/aa102test/theme.css";
 
 const TEXT: Record<string, { head: string; body: string }> = {
   expired: {
@@ -60,21 +64,21 @@ export default async function DeniedPage({
   const got = (Array.isArray(sp.got) ? sp.got[0] : sp.got) ?? "";
 
   return (
-    <div className="fin-root grid min-h-dvh place-items-center px-6" dir="rtl">
-      <div className="fin-card max-w-[430px] px-7 py-9 text-center">
+    <div className="lgr-root grid min-h-dvh place-items-center px-6" dir="rtl">
+      <div className="lgr-card max-w-[430px] px-7 py-9 text-center">
         <span
           className="mx-auto mb-4 grid size-11 place-items-center rounded-full"
           style={{ background: "var(--warn-tint)", color: "var(--warn)" }}
         >
           <WarningCircle size={22} weight="fill" />
         </span>
-        <h1 className="fin-display text-[19px]">{t.head}</h1>
-        <p className="mt-2 text-[13px] leading-relaxed" style={{ color: "var(--ink-3)" }}>
+        <h1 className="lgr-display text-[19px]">{t.head}</h1>
+        <p className="mt-2 text-[13px] leading-relaxed" style={{ color: "var(--lgr-3)" }}>
           {t.body}
         </p>
         {key === "notoken" && got && (
           <div className="mt-4 text-start">
-            <div className="fin-label mb-1">מה שהתקבל בפועל מהכפתור</div>
+            <div className="lgr-label mb-1">מה שהתקבל בפועל מהכפתור</div>
             <code
               dir="ltr"
               className="block truncate rounded border px-2.5 py-2 text-[12px]"

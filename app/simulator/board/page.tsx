@@ -8,14 +8,12 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
-import Simulator from "@/app/aa100test/Simulator";
+// /aa102test — the ledger — is the design and behaviour of record for this
+// board. It is imported whole rather than copied: one simulator, rendered here
+// with the lead fixed instead of chosen. Fonts and theme.css travel with the
+// component (see its own imports), so this route declares neither.
+import Simulator from "@/app/aa102test/Simulator";
 import { FB_COOKIE, readCookie } from "../lib/fblink";
-import "@fontsource-variable/rubik";
-import "@fontsource-variable/archivo";
-import "@fontsource/assistant/hebrew-400.css";
-import "@fontsource/assistant/hebrew-600.css";
-import "@fontsource/assistant/hebrew-700.css";
-import "@/app/aa100test/theme.css";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "סימולטור תמהילים" };
@@ -34,7 +32,7 @@ export default async function BoardPage() {
   if (!lead) redirect("/simulator/denied?r=invalid");
 
   // locked: this session was granted one lead. The picker would navigate to
-  // /aa100test/<id>, which is unauthenticated and takes its id from the URL —
+  // /aa102test/<id>, which is unauthenticated and takes its id from the URL —
   // a door out of the very scoping the cookie exists to enforce.
   return <Simulator lead={lead} endpoint="/api/simulator/mixes" locked />;
 }
