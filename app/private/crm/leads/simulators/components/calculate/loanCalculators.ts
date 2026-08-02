@@ -9,6 +9,10 @@ export type Loan = {
   amortization_schedule_id: number; // 1=שפיצר, 2=קרן שווה, 3=בלון חלקי, 4=בלון מלא
   mix_id: string;
   path_id: number; // מקשר למסלול
+  /** 1=ללא, 2=חלקי (ריבית בלבד), 3=מלא (הריבית נצברת לקרן). אופציונלי —
+   *  שורות ותיקות בלי השדות (או עם null מה־DB) מתנהגות כ"ללא", כמו קודם. */
+  grace_type_id?: number | null;
+  grace_months?: number | null;
 };
 
 export type ScheduleRow = {
@@ -49,6 +53,16 @@ export function calculateLoan(
   const r = loan.rate / 12 / 100;
   const infl = isIndexed ? annualInflation / 12 / 100 : 0;
 
+  // גרייס — עד עכשיו השדות נערכו בממשק ונשמרו, אבל המנוע התעלם מהם לגמרי.
+  // חלקי (2): בחודשי הגרייס משולמת ריבית בלבד והקרן קופאת.
+  // מלא (3): לא משולם דבר והריבית נצברת לקרן (וגם ההצמדה, במסלול צמוד).
+  // בלונים (3/4) הם ממילא צורת גרייס — השדות לא חלים עליהם.
+  const graceType = loan.grace_type_id ?? 1;
+  const g =
+    (graceType === 2 || graceType === 3) && n > 1
+      ? Math.min(Math.max(Math.floor(loan.grace_months ?? 0), 0), n - 1)
+      : 0;
+
   let schedule: ScheduleRow[] = [];
   let totalPrincipal = 0;
   let totalInterest = 0;
@@ -62,13 +76,51 @@ export function calculateLoan(
       // נשמור את היתרה ברמות "ריאליות" (ללא הצמדה)
       let balanceReal = P;
 
-      // תשלום חודשי בסיסי (ריאלי, ללא הצמדה)
+      /* ── חודשי הגרייס, אם ישנם ─────────────────────────────────────
+         בחלקי הקרן קופאת והריבית משולמת; במלא דבר לא משולם והריבית
+         מצטרפת לקרן. בגרייס מלא הקרן ה"שלילית" בשורה שומרת על הזהות
+         סך־תשלומים = סך־קרן + סך־ריבית: הריבית שנצברה נספרת פעם אחת
+         כאן, ונפרעת אחר־כך דרך שורות הקרן של החודשים האמורטיים. */
+      for (let month = 1; month <= g; month++) {
+        const factorPrev = Math.pow(1 + infl, month - 1);
+        const factorCurr = Math.pow(1 + infl, month);
+        const openingReal = balanceReal;
+        const openingDisplay = openingReal * factorPrev;
+
+        const interestReal = openingReal * r;
+        const interestNominal = isIndexed ? interestReal * factorCurr : interestReal;
+
+        const full = graceType === 3;
+        const paymentNominal = full ? 0 : interestNominal;
+        const principalNominal = full ? -interestNominal : 0;
+        const closingReal = full ? openingReal * (1 + r) : openingReal;
+        const closingDisplay = isIndexed ? closingReal * factorCurr : closingReal;
+
+        schedule.push({
+          month,
+          payment: paymentNominal,
+          principal: principalNominal,
+          interest: interestNominal,
+          openingBalance: openingDisplay,
+          closingBalance: closingDisplay,
+        });
+
+        balanceReal = closingReal;
+        totalPrincipal += principalNominal;
+        totalInterest += interestNominal;
+        totalPaid += paymentNominal;
+        maxMonthlyPayment = Math.max(maxMonthlyPayment, paymentNominal);
+      }
+
+      // תשלום חודשי בסיסי (ריאלי, ללא הצמדה) — על היתרה שאחרי הגרייס,
+      // לאורך החודשים שנותרו. בלי גרייס זה בדיוק החישוב הקודם.
+      const nAmort = n - g;
       const baseMp =
         r === 0
-          ? P / n
-          : (P * r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
+          ? balanceReal / nAmort
+          : (balanceReal * r * Math.pow(1 + r, nAmort)) / (Math.pow(1 + r, nAmort) - 1);
 
-      for (let month = 1; month <= n; month++) {
+      for (let month = g + 1; month <= n; month++) {
         // גורמי הצמדה
         const factorPrev = Math.pow(1 + infl, month - 1); // להצגת י.פ
         const factorCurr = Math.pow(1 + infl, month); // להצגת תשלום/ריבית/י.ס
@@ -122,14 +174,34 @@ export function calculateLoan(
     /* ─────────────── קרן שווה ─────────────── */
     case 2: {
       let balance = P;
-      const basePrincipal = P / n; // קרן חודשית נומינלית
 
-      for (let month = 1; month <= n; month++) {
+      /* ── חודשי הגרייס, אם ישנם — אותם כללים כמו בשפיצר ── */
+      for (let month = 1; month <= g; month++) {
+        const openingBalance = balance;
+        const interest = openingBalance * r;
+        const full = graceType === 3;
+        const payment = full ? 0 : interest;
+        const principal = full ? -interest : 0;
+        let closingBalance = full ? openingBalance + interest : openingBalance;
+        if (isIndexed) closingBalance *= 1 + infl;
+
+        schedule.push({ month, payment, principal, interest, openingBalance, closingBalance });
+        balance = closingBalance;
+        totalPrincipal += principal;
+        totalInterest += interest;
+        totalPaid += payment;
+        maxMonthlyPayment = Math.max(maxMonthlyPayment, payment);
+      }
+
+      // הקרן החודשית — היתרה שאחרי הגרייס על פני החודשים שנותרו.
+      const basePrincipal = balance / (n - g);
+
+      for (let month = g + 1; month <= n; month++) {
         const openingBalance = balance;
 
-        // קרן חודשית צמודה
+        // קרן חודשית צמודה — ההצמדה נמדדת מסוף הגרייס, כי הבסיס כבר צמוד
         const principal = isIndexed
-          ? basePrincipal * Math.pow(1 + infl, month)
+          ? basePrincipal * Math.pow(1 + infl, month - g)
           : basePrincipal;
 
         // ריבית חודשית צמודה
@@ -219,6 +291,11 @@ export function calculateLoan(
 
         balance = openingBalance + interest + indexation;
         let payment = 0;
+
+        // עלות המימון נצברת בכל חודש — קודם totalInterest נשאר 0 לנצח,
+        // וסרגל "סה"כ ריבית" והאקסל הציגו אפס ריבית על בלון מלא.
+        // ההצמדה נספרת יחד עם הריבית, כך שסך־תשלום = קרן + ריבית.
+        totalInterest += interest + indexation;
 
         if (month === n) {
           payment = balance;

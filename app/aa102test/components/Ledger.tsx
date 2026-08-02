@@ -123,15 +123,32 @@ export default function Ledger({
       },
     ]);
 
-  /* --- תאריך סיום and חודשים describe one fact, so they move together --- */
+  /* --- תאריך סיום and חודשים describe one fact, so they move together ---
+     The anchor for the conversion is the row's OWN frame — end minus months —
+     not today. An imported row carries a term measured from its report's
+     date; anchoring the sync on today silently rewrote that term the moment
+     either cell was touched (on a 14-month-old report, editing the end date
+     snapped 74 months back to 60 — the exact bug the import just fixed).
+     A hand-made row has no dates yet, and there the anchor IS today. */
+  const anchorOf = (l: ImportedLoan): Date => {
+    const end = parseDate(l.loan_end_date ?? l.end_date);
+    const m = Number(l.months) || 0;
+    return end && m > 0 ? addMonths(end, -m) : today;
+  };
   const setTerm = (id: string, months: number) => {
+    const l = loans.find((x) => x.id === id);
     const m = Math.max(0, Math.round(months) || 0);
-    const iso = m > 0 ? toIso(addMonths(today, m)) : null;
+    const iso = l && m > 0 ? toIso(addMonths(anchorOf(l), m)) : null;
     patch(id, { months: m, loan_end_date: iso, end_date: iso });
   };
   const setEnd = (id: string, iso: string | null) => {
+    const l = loans.find((x) => x.id === id);
     const d = iso ? parseDate(iso) : null;
-    patch(id, { loan_end_date: iso, end_date: iso, months: d ? monthsBetween(today, d) : 0 });
+    patch(id, {
+      loan_end_date: iso,
+      end_date: iso,
+      months: l && d ? Math.max(0, monthsBetween(anchorOf(l), d)) : 0,
+    });
   };
 
   /* --- תדירות שינוי: months are the value, the wording is derived from them --- */
