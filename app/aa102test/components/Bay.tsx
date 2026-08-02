@@ -33,6 +33,7 @@ import {
 import { extractPages, parsePdfFile } from "@/lib/credit-parser/extract.client";
 import { detectBank, parseBankStatement } from "@/lib/bank-parser";
 import { bankStatementToLoans } from "@/lib/bank-parser/to-loans";
+import { track } from "../lib/track.client";
 import { FAMILY, importReportToLoans, type ImportSummary } from "../lib/credit";
 import Btn from "./Btn";
 import { settle, snap } from "../lib/transitions";
@@ -191,6 +192,7 @@ export default function Bay({
       }
       setBusy(true);
       setError("");
+      const t0 = performance.now();
       try {
         // Decode once, then decide what it is. A חיווי אשראי and a bank's own
         // mortgage statement are alternatives — whichever arrives fills the same
@@ -203,6 +205,15 @@ export default function Bay({
 
         if (!summary.loans.length) {
           setRejects((n) => n + 1);
+          track("import", {
+            ok: false,
+            kind: summary.kind,
+            file_name: pdf.name,
+            pages: pages.length,
+            duration_ms: Math.round(performance.now() - t0),
+            skipped: summary.skipped.reduce((s, x) => s + x.count, 0),
+            error: "no-importable-rows",
+          });
           setError(
             summary.skipped.length
               ? `בדוח נמצאו רק ${summary.skipped
@@ -214,11 +225,32 @@ export default function Bay({
           );
           return;
         }
+        track("import", {
+          ok: true,
+          kind: summary.kind,
+          bank: summary.bank?.bank || undefined,
+          client_name: summary.clientName || undefined,
+          client_id: summary.clientId || undefined,
+          file_name: pdf.name,
+          pages: pages.length,
+          duration_ms: Math.round(performance.now() - t0),
+          mortgages: summary.mortgages.length,
+          loans: summary.others.length,
+          skipped: summary.skipped.reduce((s, x) => s + x.count, 0),
+          total_balance: Math.round(summary.totalBalance),
+          total_monthly: Math.round(summary.totalMonthly),
+        });
         // Keep the file itself: the advisor reads the original alongside the
         // analysis, and re-picking it just to look at it is friction.
         onImport({ ...summary, file: pdf });
       } catch (e) {
         setRejects((n) => n + 1);
+        track("import", {
+          ok: false,
+          file_name: pdf.name,
+          duration_ms: Math.round(performance.now() - t0),
+          error: ((e as Error)?.message || "unreadable").slice(0, 300),
+        });
         setError((e as Error)?.message || "לא הצלחנו לקרוא את המסמך.");
       } finally {
         setBusy(false);
