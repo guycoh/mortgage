@@ -28,8 +28,8 @@ import {
   type ColumnDef,
   type SortingState,
 } from "@tanstack/react-table";
-import type { SimEvent } from "../lib/telemetry";
-import type { Dashboard as Data, LeadRow, OperatorRow } from "./aggregate";
+import type { SimEvent } from "@/app/simulator/lib/telemetry";
+import type { Dashboard as Data, LeadRow, OperatorRow, SessionRow } from "./aggregate";
 import "@fontsource-variable/inter";
 import "@fontsource/assistant/hebrew-400.css";
 import "@fontsource/assistant/hebrew-600.css";
@@ -169,14 +169,29 @@ const importCols = [
   }),
 ] as ColumnDef<SimEvent, any>[];
 
+const sesH = createColumnHelper<SessionRow>();
 const sessionCols = [
-  ev.accessor("ts", { header: "מתי", cell: (c) => when(c.getValue()) }),
-  ev.accessor("event", { header: "אירוע", cell: (c) => EVENT_LABEL[c.getValue()] ?? c.getValue() }),
-  ev.accessor("operator", { header: "נציג", cell: (c) => c.getValue() || "—" }),
-  ev.accessor("lead_name", { header: "ליד", cell: (c) => c.getValue() || (c.row.original.lead_id ?? "—") }),
-  ev.accessor("fb_id", { header: "רשומת פיירברי", cell: (c) => (c.getValue() ? c.getValue()!.slice(0, 8) : "—") }),
-  ev.accessor("ip", { header: "IP", cell: (c) => c.getValue() || "—" }),
-] as ColumnDef<SimEvent, any>[];
+  sesH.accessor("start", { header: "מתי", cell: (c) => when(c.getValue()) }),
+  sesH.accessor("operator", { header: "נציג" }),
+  sesH.accessor("lead", { header: "ליד" }),
+  sesH.accessor("minutes", {
+    header: "משך",
+    cell: (c) => (c.getValue() < 1 ? "רגע" : `${c.getValue()} דק׳`),
+  }),
+  sesH.accessor("trail", {
+    header: "מה קרה, לפי הסדר",
+    enableSorting: false,
+    cell: (c) => (
+      <span className="adm-trail">
+        {c.getValue().map((t: SessionRow["trail"][number], i: number) => (
+          <span key={i} className="adm-step" data-bad={!t.ok || undefined}>
+            {t.label}
+          </span>
+        ))}
+      </span>
+    ),
+  }),
+] as ColumnDef<SessionRow, any>[];
 
 const errorCols = [
   ev.accessor("ts", { header: "מתי", cell: (c) => when(c.getValue()) }),
@@ -236,10 +251,13 @@ export default function Dashboard({
         </div>
         <nav className="adm-range">
           {[7, 30, 90].map((d) => (
-            <a key={d} href={`/simulator/admin?days=${d}`} data-on={d === data.days || undefined}>
+            <a key={d} href={`/adminoam?days=${d}`} data-on={d === data.days || undefined}>
               {d} ימים
             </a>
           ))}
+          <a href="/adminoam/auth?logout" className="adm-logout" title="יציאה">
+            יציאה
+          </a>
         </nav>
       </header>
 
@@ -247,7 +265,7 @@ export default function Dashboard({
         <Kpi label="ייבואים היום" value={num(kpis.importsToday)} />
         <Kpi label="ייבואים · 7 ימים" value={num(kpis.imports7)} />
         <Kpi label={`ייבואים · ${data.days} ימים`} value={num(kpis.importsWindow)} />
-        <Kpi label="כניסות מפיירברי" value={num(kpis.sessionsWindow)} hint={`${num(kpis.deniedWindow)} נדחו`} />
+        <Kpi label="ביקורים בבורד" value={num(kpis.sessionsWindow)} hint={kpis.deniedWindow ? `${num(kpis.deniedWindow)} כניסות נדחו` : undefined} />
         <Kpi label="לידים פעילים" value={num(kpis.uniqueLeads)} />
         <Kpi label="נציגים" value={num(kpis.uniqueOperators)} />
         <Kpi
@@ -318,12 +336,12 @@ export default function Dashboard({
         </Section>
       </div>
 
-      <Section title="ייבואים אחרונים" hint="50 האחרונים בחלון">
-        <DataTable data={data.recentImports} columns={importCols} empty="עוד לא יובאו דוחות בחלון הזה" />
+      <Section title="מי השתמש, מתי, ומה עשה" hint="ביקור = אותו ליד ברצף, הפסקה של 30 דק׳ פותחת ביקור חדש">
+        <DataTable data={data.sessions} columns={sessionCols} empty="אין ביקורים בחלון הזה" />
       </Section>
 
-      <Section title="כניסות אחרונות" hint="דלת פיירברי ופתיחות בורד">
-        <DataTable data={data.recentSessions} columns={sessionCols} empty="אין כניסות בחלון הזה" />
+      <Section title="ייבואים אחרונים" hint="50 האחרונים בחלון">
+        <DataTable data={data.recentImports} columns={importCols} empty="עוד לא יובאו דוחות בחלון הזה" />
       </Section>
 
       <div className="adm-cols">
@@ -337,7 +355,7 @@ export default function Dashboard({
       </div>
 
       <footer className="adm-foot">
-        הפאנל קורא בלעדית בצד השרת; הדפדפן לא מחזיק מפתח שיכול לגעת בנתונים. אין קישורים לכאן מהסימולטור.
+        הפאנל קורא בלעדית בצד השרת; הדפדפן לא מחזיק מפתח שיכול לגעת בנתונים. אין קישורים לכאן מהסימולטור, והכניסה מוגנת בסיסמה.
       </footer>
     </div>
   );

@@ -299,11 +299,20 @@ function deriveLoan(t: Transaction, asOf: Date): ExtractedLoan {
   const anchor = anchorOf(t.interestTracks);
 
   // 1) Remaining months from the planned end date (independent of interest).
+  //
+  // Measured from the REPORT date, not from today: the balance on the row is
+  // the balance as of the report, and pairing it with a term measured from a
+  // later "now" amortizes a stale balance over a shortened term — on a
+  // 14-month-old report that showed ₪1,766/mo where the bank printed ₪1,417.
+  // The bank-statement parser already measures from the statement date; this
+  // makes both documents agree.
   let months: number | null = null;
+  let endPassed = false;
   const end = parseDmy(t.fields["201-018"]);
   if (end) {
     const m = Math.round(monthsBetween(asOf, end));
     if (m > 0) months = m;
+    else endPassed = true;
   }
 
   // 2) Interest from the tracks; if none, back-solve from the known payment.
@@ -313,8 +322,13 @@ function deriveLoan(t: Transaction, asOf: Date): ExtractedLoan {
     if (r > 0) interest = round2(r * 12 * 100);
   }
 
-  // 3) Months still unknown? back-solve from the known payment + interest.
-  if (months === null && knownPayment > 0 && balance > 0) {
+  // 3) Months still unknown? back-solve from the known payment + interest —
+  // but only when there was no end date at all. A loan whose planned end has
+  // PASSED is not amortizing on schedule (it is defaulted or in collection),
+  // and back-solving a term for it fabricated a 1-month loan whose fake
+  // payment then polluted the mix totals. Leaving months empty lets the grid
+  // say "חסרה תקופה" and keeps the debt out of the monthly arithmetic.
+  if (months === null && !endPassed && knownPayment > 0 && balance > 0) {
     const r = parseFloat(interest || "0") / 100 / 12;
     const solved = solveMonths(balance, r, knownPayment);
     if (solved) months = solved;
@@ -369,9 +383,10 @@ function deriveLoan(t: Transaction, asOf: Date): ExtractedLoan {
  * that pre-populate the loans table (the client's own, non-mortgage debts).
  */
 export function extractLoans(report: CreditReport): ExtractedLoan[] {
-  // Remaining term is measured from *today* to the planned end date (201-018),
-  // so the months shown reflect what is actually left to pay now.
-  const asOf = new Date();
+  // Remaining term is measured from the REPORT's own date to the planned end
+  // date (201-018), because every balance in the report is a balance as of
+  // that date. Falls back to today only when the header date failed to parse.
+  const asOf = parseDmy(report.meta?.reportDate) ?? new Date();
   return report.transactions
     .filter(
       (t) =>

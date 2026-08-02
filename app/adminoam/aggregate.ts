@@ -6,7 +6,7 @@
 // path that cannot drift between the two. At this tool's volume (an office of
 // advisors, not a public site) the window is thousands of rows, not millions.
 
-import type { SimEvent } from "../lib/telemetry";
+import type { SimEvent } from "@/app/simulator/lib/telemetry";
 
 export interface DayBucket {
   day: string; // "02/08"
@@ -35,6 +35,21 @@ export interface LeadRow {
   lastSeen: string;
 }
 
+/** One working visit: a person, a lead, and what they did, in order. */
+export interface SessionRow {
+  start: string;
+  end: string;
+  minutes: number;
+  operator: string;
+  lead: string;
+  leadId: number | null;
+  /** The visit's actions in the order they happened, ready to render. */
+  trail: { event: string; ok: boolean; label: string }[];
+  imports: number;
+  saves: number;
+  errors: number;
+}
+
 export interface Dashboard {
   days: number;
   kpis: {
@@ -54,8 +69,8 @@ export interface Dashboard {
   byKind: { kind: string; imports: number }[];
   byOperator: OperatorRow[];
   byLead: LeadRow[];
+  sessions: SessionRow[];
   recentImports: SimEvent[];
-  recentSessions: SimEvent[];
   recentErrors: SimEvent[];
 }
 
@@ -75,6 +90,89 @@ function median(xs: number[]): number | null {
   const s = [...xs].sort((a, b) => a - b);
   const mid = s.length >> 1;
   return s.length % 2 ? s[mid] : Math.round((s[mid - 1] + s[mid]) / 2);
+}
+
+/** A short human label for one action in a session trail. */
+function trailLabel(e: SimEvent): string {
+  switch (e.event) {
+    case "door_entry":
+      return "כניסה";
+    case "board_view":
+      return "פתיחת בורד";
+    case "import":
+      if (e.ok === false) return "ייבוא נכשל";
+      return e.kind === "bank" ? "ייבוא דוח בנק" : "ייבוא חיווי";
+    case "analysis_open":
+      return "ניתוח חיווי";
+    case "statement_analysis_open":
+      return "ניתוח משכנתא";
+    case "summary_open":
+    case "statement_summary_open":
+      return "סיכום ללקוח";
+    case "schedule_open":
+      return "לוח סילוקין";
+    case "compare_open":
+      return "השוואה";
+    case "excel_export":
+      return "ייצוא אקסל";
+    case "report_view":
+      return "צפייה במסמך";
+    case "save":
+      return e.ok === false ? "שמירה נכשלה" : "שמירה";
+    default:
+      return e.event;
+  }
+}
+
+/**
+ * Rebuild working sessions from the raw stream: same lead, events ordered in
+ * time, a new session whenever the gap tops 30 minutes. This is the panel's
+ * answer to "who used the board, when, and what did they do" — one row per
+ * visit with the actions in the order they happened.
+ */
+function sessionize(events: SimEvent[]): SessionRow[] {
+  const byLead = new Map<string, SimEvent[]>();
+  for (const e of events) {
+    if (e.event === "door_denied") continue; // never became a session
+    const key = String(e.lead_id ?? e.lead_name ?? "?");
+    (byLead.get(key) ?? byLead.set(key, []).get(key)!).push(e);
+  }
+
+  const out: SessionRow[] = [];
+  const GAP = 30 * 60_000;
+
+  for (const list of Array.from(byLead.values())) {
+    const asc = [...list].sort((a, b) => (a.ts > b.ts ? 1 : -1));
+    let cur: SimEvent[] = [];
+    const flush = () => {
+      if (!cur.length) return;
+      const start = cur[0].ts;
+      const end = cur[cur.length - 1].ts;
+      const named = cur.find((e) => e.lead_name)?.lead_name;
+      out.push({
+        start,
+        end,
+        minutes: Math.max(0, Math.round((+new Date(end) - +new Date(start)) / 60_000)),
+        operator: cur.find((e) => e.operator)?.operator || "—",
+        lead: named || `ליד ${cur[0].lead_id ?? "?"}`,
+        leadId: cur[0].lead_id ?? null,
+        trail: cur
+          .filter((e) => e.event !== "board_view" || cur.indexOf(e) === 0)
+          .map((e) => ({ event: e.event, ok: e.ok !== false, label: trailLabel(e) })),
+        imports: cur.filter((e) => e.event === "import" && e.ok !== false).length,
+        saves: cur.filter((e) => e.event === "save" && e.ok !== false).length,
+        errors: cur.filter((e) => e.ok === false || e.event === "error").length,
+      });
+      cur = [];
+    };
+    for (const e of asc) {
+      if (cur.length && +new Date(e.ts) - +new Date(cur[cur.length - 1].ts) > GAP) flush();
+      cur.push(e);
+    }
+    flush();
+  }
+
+  return out.sort((a, b) => (a.start < b.start ? 1 : -1));
 }
 
 export function buildDashboard(events: SimEvent[], days: number): Dashboard {
@@ -158,13 +256,15 @@ export function buildDashboard(events: SimEvent[], days: number): Dashboard {
     .map((e) => e.duration_ms)
     .filter((n): n is number => typeof n === "number" && n > 0);
 
+  const visitRows = sessionize(events);
+
   return {
     days,
     kpis: {
       importsToday: imports.filter((e) => dayKey(e.ts) === todayKey).length,
       imports7: imports.filter((e) => e.ts >= weekAgo).length,
       importsWindow: imports.length,
-      sessionsWindow: sessions.length,
+      sessionsWindow: visitRows.length,
       uniqueLeads: leadMap.size,
       uniqueOperators: opMap.size,
       failureRatePct: imports.length
@@ -183,10 +283,8 @@ export function buildDashboard(events: SimEvent[], days: number): Dashboard {
       .sort((a, b) => b.imports - a.imports),
     byOperator: Array.from(opMap.values()).sort((a, b) => (a.lastSeen < b.lastSeen ? 1 : -1)),
     byLead: Array.from(leadMap.values()).sort((a, b) => (a.lastSeen < b.lastSeen ? 1 : -1)).slice(0, 100),
+    sessions: visitRows.slice(0, 40),
     recentImports: imports.slice(0, 50),
-    recentSessions: [...sessions, ...events.filter((e) => e.event === "board_view")]
-      .sort((a, b) => (a.ts < b.ts ? 1 : -1))
-      .slice(0, 50),
     recentErrors: errors.slice(0, 50),
   };
 }

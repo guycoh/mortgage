@@ -495,6 +495,43 @@ export default function Simulator({
       const first = reports.length === 0;
       let duplicates = 0;
 
+      // A second document naming a DIFFERENT person is either the legitimate
+      // household case (a couple's two חיווי reports — the very reason the
+      // merge exists) or a mis-drag of another client's file. The board cannot
+      // tell a spouse from a stranger, so it asks — one click for the couple,
+      // a saved disaster for the wrong file. Same person is recognised by ת"ז
+      // when both sides carry one, by name otherwise; with no identity on
+      // either side the drop passes, since refusing on missing data would
+      // block real work.
+      if (!first) {
+        const norm = (s: string) => s.replace(/\s+/g, " ").trim();
+        const sameClient = reports.some((r) => {
+          if (r.clientId && summary.clientId) return r.clientId === summary.clientId;
+          if (r.clientName && summary.clientName)
+            return norm(r.clientName) === norm(summary.clientName);
+          return true;
+        });
+        if (!sameClient) {
+          const held = reports.map((r) => r.clientName).filter(Boolean).join(", ");
+          const ok = window.confirm(
+            `המסמך שייך ל־${summary.clientName || "אדם אחר"}, והבורד פתוח על ${held || "לקוח אחר"}.\n\n` +
+              `אם אלה בני זוג — אישור יאחד את החובות לתמהיל משותף.\n` +
+              `אם זה קובץ של לקוח אחר — ביטול ישאיר את הבורד כמו שהוא.`
+          );
+          if (!ok) {
+            track("import", {
+              ok: false,
+              kind: summary.kind,
+              file_name: summary.fileName,
+              client_name: summary.clientName || undefined,
+              error: "client-mismatch-declined",
+            });
+            flash4s({ kind: "err", text: "הייבוא בוטל — המסמך לא אוחד לבורד" });
+            return;
+          }
+        }
+      }
+
       setMixes((prev) => {
         const next = (prev ?? []).map((m) => {
           if (m.id !== activeMixId) return m;

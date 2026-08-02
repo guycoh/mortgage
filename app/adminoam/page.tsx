@@ -1,16 +1,16 @@
-// /simulator/admin — the board's monitoring panel.
+// /adminoam — the board's monitoring panel, behind a login.
 //
-// Reached only by knowing the key: /simulator/admin/auth?key=… mints the
-// cookie, and everything else — a missing cookie, a stale one, a missing
-// env — renders the same 404 as any path that does not exist. No page in the
-// app links here, and the simulator itself carries no trace of it.
+// No page in the app links here. Without a valid session cookie the route
+// shows a bare login card; the credentials live in env as a scrypt hash and
+// the session is a signed httpOnly cookie scoped to this path.
 
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
-import { ADMIN_COOKIE, verifyAdminCookie } from "../lib/admin-auth";
-import { loadEvents } from "../lib/telemetry";
+import { ADMIN_COOKIE, verifyAdminCookie } from "@/app/simulator/lib/admin-auth";
+import { loadEvents } from "@/app/simulator/lib/telemetry";
 import { buildDashboard } from "./aggregate";
 import Dashboard from "./Dashboard";
+import Login from "./Login";
 
 export const dynamic = "force-dynamic";
 export const metadata = {
@@ -23,15 +23,20 @@ const WINDOWS = [7, 30, 90] as const;
 export default async function AdminPage({
   searchParams,
 }: {
-  searchParams: Promise<{ days?: string }>;
+  searchParams: Promise<{ days?: string; e?: string }>;
 }) {
+  // Without the signing secret the panel cannot exist at all — behave like
+  // any unknown path rather than half-working.
   const secret = process.env.SIMULATOR_ADMIN_KEY;
   if (!secret) notFound();
 
-  const jar = await cookies();
-  if (!verifyAdminCookie(jar.get(ADMIN_COOKIE)?.value, secret)) notFound();
-
   const sp = await searchParams;
+  const jar = await cookies();
+
+  if (!verifyAdminCookie(jar.get(ADMIN_COOKIE)?.value, secret)) {
+    return <Login error={sp.e} />;
+  }
+
   const days = (WINDOWS as readonly number[]).includes(Number(sp.days))
     ? Number(sp.days)
     : 30;
