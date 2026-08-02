@@ -101,22 +101,62 @@ export function signLink(fbId: string, name: string, ttlSeconds = 12 * 60 * 60) 
  * request, so there is no parameter left to tamper with — you can only ever
  * reach the board your link was for.
  */
-export function signCookie(leadId: number): string | null {
+export function signCookie(leadId: number, operator = ""): string | null {
   const secret = process.env.FB_LINK_SECRET;
   if (!secret) return null;
   const exp = Math.floor(Date.now() / 1000) + 12 * 60 * 60;
-  return `${leadId}.${exp}.${hmac(`${leadId}|${exp}`, secret)}`;
+  // The operator travels base64url-encoded so its own dots or pipes can never
+  // masquerade as field separators, and it is covered by the signature.
+  const op = Buffer.from(operator, "utf8").toString("base64url");
+  return `${leadId}.${exp}.${op}.${hmac(`${leadId}|${exp}|${op}`, secret)}`;
 }
 
-/** The lead a cookie grants, or null if it is absent, stale or forged. */
-export function readCookie(value: string | undefined): number | null {
+export interface CookieSession {
+  leadId: number;
+  /** Fireberry operator name the door was told about, "" when it wasn't. */
+  operator: string;
+}
+
+/**
+ * The session a cookie grants, or null if it is absent, stale or forged.
+ * Accepts both shapes: the pre-telemetry 3-field cookie (id.exp.sig) keeps
+ * working so live sessions survive the deploy.
+ */
+export function readCookieSession(value: string | undefined): CookieSession | null {
   const secret = process.env.FB_LINK_SECRET;
   if (!secret || !value) return null;
-  const [idRaw, expRaw, sig] = value.split(".");
-  const id = Number(idRaw);
-  const exp = Number(expRaw);
-  if (!Number.isFinite(id) || !Number.isFinite(exp) || !sig) return null;
-  if (exp * 1000 < Date.now()) return null;
-  if (!equal(hmac(`${id}|${exp}`, secret), sig)) return null;
-  return id;
+  const parts = value.split(".");
+
+  if (parts.length === 3) {
+    const [idRaw, expRaw, sig] = parts;
+    const id = Number(idRaw);
+    const exp = Number(expRaw);
+    if (!Number.isFinite(id) || !Number.isFinite(exp) || !sig) return null;
+    if (exp * 1000 < Date.now()) return null;
+    if (!equal(hmac(`${id}|${exp}`, secret), sig)) return null;
+    return { leadId: id, operator: "" };
+  }
+
+  if (parts.length === 4) {
+    const [idRaw, expRaw, op, sig] = parts;
+    const id = Number(idRaw);
+    const exp = Number(expRaw);
+    if (!Number.isFinite(id) || !Number.isFinite(exp) || !sig) return null;
+    if (exp * 1000 < Date.now()) return null;
+    if (!equal(hmac(`${id}|${exp}|${op}`, secret), sig)) return null;
+    let operator = "";
+    try {
+      operator = Buffer.from(op, "base64url").toString("utf8");
+    } catch {
+      /* an unreadable name is not a reason to drop a valid session */
+    }
+    return { leadId: id, operator };
+  }
+
+  return null;
+}
+
+/** The lead a cookie grants, or null. Kept for the existing call sites. */
+export function readCookie(value: string | undefined): number | null {
+  return readCookieSession(value)?.leadId ?? null;
 }

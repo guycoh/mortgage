@@ -46,3 +46,4 @@ next-env.d.ts
 # audit fixtures: real client statements, copied into public/ so the Playwright
 # ledger audit can fetch them. Never committed.
 /public/__t_*.pdf
+.sim-events.jsonl

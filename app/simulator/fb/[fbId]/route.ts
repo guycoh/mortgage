@@ -16,6 +16,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { FB_COOKIE, signCookie, verifyLink } from "../../lib/fblink";
 import { leadForFireberry } from "../../lib/lead";
 import { lookupAccount } from "../../lib/fireberry";
+import { recordEvent, requestIp, requestUa } from "../../lib/telemetry";
 
 export const dynamic = "force-dynamic";
 
@@ -41,8 +42,23 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ fbId: strin
   const hit = raw.match(GUID);
   const fbId = hit ? hit[0] : raw;
 
-  const deny = (reason: string) =>
-    NextResponse.redirect(new URL(`/simulator/denied?r=${reason}`, req.url));
+  // Who clicked, when the button knows. The questionnaire passes the record's
+  // account owner as ?u=; absent on old buttons, and never trusted for
+  // anything but attribution.
+  const operator = (sp.get("u") || "").trim().slice(0, 80);
+
+  const deny = (reason: string) => {
+    void recordEvent({
+      ts: new Date().toISOString(),
+      event: "door_denied",
+      fb_id: hit ? fbId : null,
+      operator: operator || null,
+      error: reason,
+      ip: requestIp(req),
+      ua: requestUa(req),
+    });
+    return NextResponse.redirect(new URL(`/simulator/denied?r=${reason}`, req.url));
+  };
 
   // If the placeholder in the Fireberry button is wrong, what arrives here is
   // the literal token — "{{accountid}}" — rather than a GUID. That is a
@@ -92,8 +108,21 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ fbId: strin
   // signCookie fails for one reason only: no FB_LINK_SECRET. That is a
   // deployment that was never configured, not a fault the client can retry
   // their way out of, so it says so rather than hiding behind "משהו השתבש".
-  const cookie = signCookie(lead.id);
+  const cookie = signCookie(lead.id, operator);
   if (!cookie) return deny("nosecret");
+
+  // The session that was just minted, with everything only this route knows.
+  void recordEvent({
+    ts: new Date().toISOString(),
+    event: "door_entry",
+    surface: "board",
+    fb_id: fbId,
+    lead_id: lead.id,
+    lead_name: name || null,
+    operator: operator || null,
+    ip: requestIp(req),
+    ua: requestUa(req),
+  });
 
   const res = NextResponse.redirect(new URL("/simulator/board", req.url));
   res.cookies.set(FB_COOKIE, cookie, {

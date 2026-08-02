@@ -60,6 +60,7 @@ import {
   type ImportSummary,
 } from "./lib/credit";
 import { exportMixToExcel } from "./lib/excel";
+import { track } from "./lib/track.client";
 import { collapse, collapseOut, rise, settle } from "./lib/transitions";
 // ONE TYPEFACE. Inter carries the Latin, the figures and the tabular numerals;
 // Assistant carries the Hebrew, which Inter has no glyphs for. Their x-heights
@@ -260,6 +261,24 @@ export default function Simulator({
   const [saving, setSaving] = useState(false);
   /** Held for a beat after a save lands, so the button can confirm it. */
   const [justSaved, setJustSaved] = useState(false);
+
+  // Telemetry — openings only, on the transition to open, so a modal held
+  // open for ten minutes is one event, not a stream. No-ops off the board.
+  useEffect(() => {
+    if (showAnalysis) track(statement ? "statement_analysis_open" : "analysis_open");
+  }, [showAnalysis, statement]);
+  useEffect(() => {
+    if (showClient) track(statement ? "statement_summary_open" : "summary_open");
+  }, [showClient, statement]);
+  useEffect(() => {
+    if (showDoc) track("report_view");
+  }, [showDoc]);
+  useEffect(() => {
+    if (schedFor) track("schedule_open", { data: { subject: schedFor === "mix" ? "mix" : "row" } });
+  }, [schedFor]);
+  useEffect(() => {
+    if (compareMixId) track("compare_open");
+  }, [compareMixId]);
   const router = useRouter();
   const boardRef = useRef<HTMLDivElement>(null);
 
@@ -441,6 +460,12 @@ export default function Simulator({
       });
       const data = await res.json();
       if (!res.ok || data.error) throw new Error(data.error ?? `HTTP ${res.status}`);
+      track("save", {
+        ok: true,
+        mortgages: mixes.reduce((s, m) => s + m.loans.filter((l) => l.group === "mortgage").length, 0),
+        loans: mixes.reduce((s, m) => s + m.loans.filter((l) => l.group !== "mortgage").length, 0),
+        data: { mixes: mixes.length },
+      });
       rebaseline(mixes);
       setJustSaved(true);
       setTimeout(() => setJustSaved(false), 2200);
@@ -452,6 +477,7 @@ export default function Simulator({
             : `נשמר לליד ${lead.id}`,
       });
     } catch (e) {
+      track("save", { ok: false, error: ((e as Error).message || "").slice(0, 300) });
       flash4s({ kind: "err", text: `השמירה נכשלה: ${(e as Error).message}` });
     } finally {
       setSaving(false);
@@ -519,6 +545,7 @@ export default function Simulator({
   const exportExcel = async () => {
     if (!activeMix || !loans.length) return;
     setExporting(true);
+    track("excel_export", { mortgages: loans.filter((l) => l.group === "mortgage").length, loans: loans.filter((l) => l.group !== "mortgage").length });
     try {
       await exportMixToExcel({
         mixName: activeMix.mix_name,
