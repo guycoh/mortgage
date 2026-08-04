@@ -1,0 +1,25 @@
+/* /hachamsim — the CEO's layout, as a thin layer over the ledger's theme.
+ *
+ * Loaded AFTER @/app/aa102test/theme.css and scoped to .hacham-sim, so nothing
+ * here can reach /aa102test or /simulator/board. Only the rules that differ
+ * live in this file; everything else is the shared theme, unchanged.
+ */
+
+/* The תאריך סיום / calendar-button overlap is NOT fixed here. It was a defect
+ * on every surface, not a layout preference, so it lives in the shared theme
+ * (see .lgr-date-in) where /aa102test and /simulator/board get it too. Only
+ * things this route does DIFFERENTLY belong in this file.
+ */
+
+/* ------------------------------------------- the family subtotal, as a footer
+
+   Same band, other end of the group. Its rule moves with it: a total is closed
+   by the line above it, not below, and the 4px family spine now caps the rows
+   it follows. The margin keeps consecutive groups from reading as one block. */
+.hacham-sim .lgr-groupbar-foot > td {
+  border-top: 1px solid var(--fam-line, var(--line-2));
+  border-bottom: 1px solid var(--line);
+}
+.hacham-sim .lgr-groupbar-foot > td:first-child {
+  border-inline-start: 4px solid var(--fam);
+}

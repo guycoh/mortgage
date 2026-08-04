@@ -575,14 +575,25 @@
   border-color: var(--focus);
   box-shadow: 0 0 0 2px var(--focus-ring-strong);
 }
-/* THE תאריך סיום FIELD. A ten-character date very nearly fills its column, so
-   it was arriving two pixels short of the calendar button — close enough to
-   read as a collision. Three small moves rather than one blunt one, because
-   padding alone would have clipped the date instead of shifting it: the button
-   moves a little closer to the edge and loses two pixels, and the field gives
-   back two from its start inset. Worst case goes from 2px of air to 8px. */
+/* THE תאריך סיום FIELD, AND WHY THE BUTTON KEPT LANDING ON THE DATE.
+   The calendar button is absolutely positioned at the field's end edge, but the
+   input reserved nothing for it: `.lgr-cell` gives 9px of end padding while the
+   button occupies 4px–22px from that edge. A ten-character date therefore ran
+   straight underneath it and lost its leading digit — "10/11/2044" reading as
+   "0/11/2044".
+
+   Shrinking the button and trimming the start inset, which is what was tried
+   first, only shifts the text a little; it reserves nothing, so the collision
+   returns the moment the column narrows — and it did, when אחוז was budgeted
+   in. The fix is to make the button's footprint part of the input's padding.
+   The date is then laid out in the space that is actually free, and one too
+   long for its column is clipped at the edge rather than printed under an icon.
+   Paired with 10% of the grid in the colgroup, worst case is ~16px of air. */
 .lgr-date-btn { width: 18px; height: 18px; }
-.lgr-date-in { padding-inline-start: 7px; }
+.lgr-date-in {
+  padding-inline-start: 8px;
+  padding-inline-end: 26px;
+}
 
 /* text-bearing fields (selects, the date field) speak UI, not figures */
 /* פריים, שפיצר, a picked date — these are values, not captions, and they are
@@ -1040,6 +1051,51 @@
 .lgr-share { height: 2px; border-radius: 1px; background: var(--line); overflow: hidden; opacity: 0.3; transition: opacity var(--t) var(--ease); }
 .lgr-row:hover .lgr-share, .lgr-row:focus-within .lgr-share { opacity: 0.9; }
 .lgr-share span { display: block; height: 100%; background: var(--fam); border-radius: 1px; transition: width 0.45s var(--ease); }
+
+/* --------------------------------------------------------- אחוז / גובה תמהיל
+
+   The read-only face of the אחוז column: the master mix, and any proposal that
+   has no גובה תמהיל yet. It is deliberately quieter than the fields around it —
+   a figure the table worked out, not one waiting to be typed — but it keeps the
+   tabular figures so a column of percentages stays on one decimal point. */
+.lgr-pct-ro {
+  display: block;
+  padding-inline: 9px;
+  font-family: var(--num);
+  font-variant-numeric: tabular-nums lining-nums;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--lgr-3);
+  text-align: start;
+}
+.lgr-pct-ro[data-over] { color: var(--neg); }
+
+/* גובה התמהיל sits in the ledger header rather than the toolbar: it is the
+   figure the אחוז column divides by, and a divisor that lives on another
+   surface from the column it governs is a divisor nobody finds. */
+.lgr-target { display: flex; align-items: center; gap: 10px; margin-inline-start: 6px; }
+.lgr-target-field { display: flex; align-items: center; gap: 7px; }
+.lgr-target-field > span { font-size: 12px; color: var(--lgr-3); white-space: nowrap; }
+.lgr-target-field > .lgr-cell { width: 124px; height: 30px; font-size: 12.5px; }
+.lgr-target-left {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 8px;
+  background: var(--card-3);
+  font-size: 11.5px;
+  color: var(--lgr-3);
+  white-space: nowrap;
+}
+.lgr-target-left > b {
+  font-family: var(--num);
+  font-variant-numeric: tabular-nums lining-nums;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--lgr-1);
+}
+.lgr-target-left[data-over] > b { color: var(--neg); }
 
 /* The in-table group divider — one continuous table, still scannable.
    Tinted at 4% of the family so the band belongs to the rows beneath it

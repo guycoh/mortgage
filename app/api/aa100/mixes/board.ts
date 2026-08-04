@@ -62,9 +62,23 @@ const ANCHOR = ["source_anchor"] as const;
 /** Flips to false the first time Postgres says the columns aren't there. */
 let hasExtra = true;
 let hasAnchor = true;
+/**
+ * loan_mixes.target_amount — גובה התמהיל, the figure the board's אחוז column
+ * allocates against. Same deal as the two above, on the other table: without the
+ * migration the board still loads and saves, the target just does not survive a
+ * reload. It is a planning figure, never an input to any calculation, so losing
+ * it costs a retype rather than a wrong number.
+ */
+let hasTarget = true;
 
 export type Row = Record<string, unknown>;
-export type BoardMix = { id: string; mix_name: string; is_base?: boolean; loans?: Row[] };
+export type BoardMix = {
+  id: string;
+  mix_name: string;
+  is_base?: boolean;
+  target_amount?: number | null;
+  loans?: Row[];
+};
 
 const numOrNull = (v: unknown) => {
   if (v === null || v === undefined || v === "") return null;
@@ -119,17 +133,28 @@ function fromDbRow(row: Row): Row {
 
 /* -------------------------------------------------------------------- read */
 
+/** The mix column list this deployment is known to have. */
+const mixCols = () => `id, mix_name, is_base, created_at${hasTarget ? ", target_amount" : ""}`;
+
 export async function loadBoard(lead: number) {
-  const { data: mixes, error: mixErr } = await supabase
-    .from("loan_mixes")
-    .select("id, mix_name, is_base, created_at")
-    .eq("lead_id", lead)
-    .order("created_at", { ascending: true });
-  if (mixErr) throw mixErr;
+  const readMixes = () =>
+    supabase
+      .from("loan_mixes")
+      .select(mixCols())
+      .eq("lead_id", lead)
+      .order("created_at", { ascending: true });
 
-  if (!mixes?.length) return { mixes: [], hasExtra };
+  let mixRes = await readMixes();
+  if (mixRes.error && isMissingColumn(mixRes.error)) {
+    hasTarget = false;
+    mixRes = await readMixes();
+  }
+  if (mixRes.error) throw mixRes.error;
+  const mixes = (mixRes.data ?? []) as unknown as Row[];
 
-  const ids = mixes.map((m) => m.id);
+  if (!mixes.length) return { mixes: [], hasExtra };
+
+  const ids = mixes.map((m) => String(m.id));
   let loansRes = await supabase.from("loans").select(selectCols()).in("mix_id", ids);
 
   // Retire the newest column set first, then the older one, so a deployment that
@@ -150,29 +175,36 @@ export async function loadBoard(lead: number) {
 
   return {
     mixes: mixes.map((m) => ({
-      id: m.id,
-      mix_name: m.mix_name,
+      id: m.id as string,
+      mix_name: m.mix_name as string,
       is_base: !!m.is_base,
-      loans: byMix.get(m.id) ?? [],
+      target_amount: hasTarget ? numOrNull(m.target_amount) : null,
+      loans: byMix.get(String(m.id)) ?? [],
     })),
     hasExtra,
     hasAnchor,
+    hasTarget,
   };
 }
 
 /* ------------------------------------------------------------------- write */
 
 export async function saveBoard(lead: number, mixes: BoardMix[]) {
-  const { error: upMixErr } = await supabase.from("loan_mixes").upsert(
-    mixes.map((m) => ({
-      id: m.id,
-      lead_id: lead,
-      mix_name: m.mix_name,
-      is_base: !!m.is_base,
-    })),
-    { onConflict: "id" }
-  );
-  if (upMixErr) throw upMixErr;
+  const mixRow = (m: BoardMix): Row => {
+    const row: Row = { id: m.id, lead_id: lead, mix_name: m.mix_name, is_base: !!m.is_base };
+    if (hasTarget) row.target_amount = numOrNull(m.target_amount);
+    return row;
+  };
+
+  const upsertMixes = () =>
+    supabase.from("loan_mixes").upsert(mixes.map(mixRow), { onConflict: "id" });
+
+  let upMix = await upsertMixes();
+  if (upMix.error && isMissingColumn(upMix.error)) {
+    hasTarget = false;
+    upMix = await upsertMixes();
+  }
+  if (upMix.error) throw upMix.error;
 
   const { data: existing, error: exErr } = await supabase
     .from("loan_mixes")

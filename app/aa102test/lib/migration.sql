@@ -32,3 +32,15 @@ alter table public.loans
 
 -- Loading a lead's board reads loans by mix; this is the index that read wants.
 create index if not exists loans_mix_id_idx on public.loans (mix_id);
+
+-- גובה התמהיל — the total a proposal's rows are allocated against, and the
+-- figure the אחוז column is a percentage OF. It belongs to the mix, not to any
+-- row: every row divides by the same number, and a per-row copy of it would go
+-- stale the moment the total was retyped.
+--
+-- Nothing calculates from it — the engine reads amounts, as it always has — so a
+-- deployment that has not run this line still loads, edits and saves boards.
+-- loadBoard degrades this column on its own; the target simply does not survive
+-- a reload until this runs.
+alter table public.loan_mixes
+  add column if not exists target_amount numeric;

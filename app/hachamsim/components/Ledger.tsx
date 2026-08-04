@@ -32,13 +32,13 @@ import {
 import { schedules } from "@/app/data/amortization_schedules";
 import type { LoanPath } from "@/app/data/hooks/useLoanPaths";
 import { calculateLoan } from "@/app/private/crm/leads/simulators/components/calculate/loanCalculators";
-import Select from "./Select";
-import DateField from "./DateField";
-import { BankIcon } from "./bankIcons";
-import Money from "./Money";
-import RowSettings from "./RowSettings";
-import Btn from "./Btn";
-import { settle, snap } from "../lib/transitions";
+import Select from "@/app/aa102test/components/Select";
+import DateField from "@/app/aa102test/components/DateField";
+import { BankIcon } from "@/app/aa102test/components/bankIcons";
+import Money from "@/app/aa102test/components/Money";
+import RowSettings from "@/app/aa102test/components/RowSettings";
+import Btn from "@/app/aa102test/components/Btn";
+import { settle, snap } from "@/app/aa102test/lib/transitions";
 import {
   FAMILY,
   PATH_SHORT,
@@ -46,8 +46,8 @@ import {
   rateHeat,
   type DebtGroup,
   type ImportedLoan,
-} from "../lib/credit";
-import { addMonths, monthsBetween, parseDate, startOfToday, toIso } from "../lib/dates";
+} from "@/app/aa102test/lib/credit";
+import { addMonths, monthsBetween, parseDate, startOfToday, toIso } from "@/app/aa102test/lib/dates";
 import { freqLabel } from "@/lib/rate-frequency";
 
 const ORDER: DebtGroup[] = ["mortgage", "loan"];
@@ -414,11 +414,11 @@ export default function Ledger({
                   not be squeezed: a ten-character date plus the calendar button
                   is the widest fixed content in the grid, and shaving it is what
                   put the button on top of the digits. It gets 10% here, and the
-                  button's space is reserved in padding rather than hoped for —
-                  see .lgr-date-in. */}
+                  button's space is reserved in padding rather than hoped for. */}
               {[
                 "9.5%", // סוג
                 "11%", // סכום
+                "9.5%", // החזר חודשי
                 "6%", // אחוז
                 "9%", // מסלול
                 "8%", // לוח סילוקין
@@ -427,7 +427,6 @@ export default function Ledger({
                 "8%", // תדירות שינוי
                 "5.5%", // חודשים
                 "10%", // תאריך סיום
-                "9.5%", // החזר חודשי
                 "6%", // actions
               ].map((w, i) => (
                 <col key={i} style={{ width: w }} />
@@ -437,8 +436,10 @@ export default function Ledger({
               <tr>
                 <th>סוג</th>
                 <th>סכום</th>
-                {/* the same fact as סכום in the other unit, so it sits beside it
-                    rather than at the far edge of the grid */}
+                {/* What it costs, beside what it is — the two figures the CEO
+                    reads first, so neither is at the far end of a twelve-column
+                    scan. The unit lives in the header, stated once. */}
+                <th>החזר חודשי</th>
                 <th>אחוז</th>
                 <th>מסלול</th>
                 <th>לוח סילוקין</th>
@@ -458,9 +459,6 @@ export default function Ledger({
                 <th>תדירות שינוי</th>
                 <th>חודשים</th>
                 <th>תאריך סיום</th>
-                {/* the unit lives in the header, so it is stated once instead of
-                    once per row — and the figures below keep a clean right edge */}
-                <th>החזר חודשי</th>
                 <th />
               </tr>
             </thead>
@@ -482,37 +480,6 @@ export default function Ledger({
 
                 return (
                   <Fragment key={g.key}>
-                    {/* Group divider — still one table, just legible. Its two
-                        subtotals sit in the real סכום and החזר חודשי cells rather
-                        than floating in a spanned row: hand-tuned widths could
-                        never land on the same pixel as the rows beneath them,
-                        and a ledger whose three levels of total each hang at a
-                        different offset is unreadable at a glance. */}
-                    <tr className="lgr-groupbar" style={famVars}>
-                      <td>
-                        <div className="lgr-groupbar-in">
-                          <span className="lgr-groupbar-title">
-                            {FAM_ICON[g.key]}
-                            {fam.plural}
-                          </span>
-                          <span className="lgr-count">{g.rows.length}</span>
-                        </div>
-                      </td>
-                      <td>
-                        <Money value={g.amount} className="lgr-groupbar-sum" />
-                      </td>
-                      <td>
-                        <span className="lgr-pct-ro lgr-groupbar-sum">
-                          {denom ? `${((g.amount / denom) * 100).toFixed(0)}%` : ""}
-                        </span>
-                      </td>
-                      <td colSpan={7} />
-                      <td>
-                        <Money value={g.monthly} className="lgr-groupbar-sum" style={{ color: fam.text }} />
-                      </td>
-                      <td />
-                    </tr>
-
                     {g.rows.map((loan) => {
                       const res = calculateLoan(loan, annualInflation);
                       const dirty = dirtyOf(loan);
@@ -601,6 +568,33 @@ export default function Ledger({
                                       משותף
                                     </span>
                                   )}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* --- החזר חודשי (calculated: no well, but a well's box
+                              so the note underneath cannot move the figure).
+                              Second column now: what a row costs every month is
+                              read in the same glance as what it is worth. --- */}
+                          <td>
+                            <div className="lgr-paycell">
+                              {noTerm ? (
+                                <span
+                                  className="flex flex-1 items-center justify-end gap-1 px-1 text-[11.5px] font-bold"
+                                  style={{ color: "var(--neg)" }}
+                                  title="לשורה יש יתרה אבל אין תקופה — הזינו חודשים או תאריך סיום"
+                                >
+                                  <Warning size={13} weight="fill" />
+                                  חסרה תקופה
+                                </span>
+                              ) : (
+                                <Money value={res.monthlyPayment} className="lgr-pay" style={{ color: "var(--ink)" }} />
+                              )}
+                              {(res.isIndexed || stale) && (
+                                <span className="lgr-note lgr-note-pay">
+                                  {stale && <span className="lgr-note-stale">תאריך עבר</span>}
+                                  {res.isIndexed && <span>צמוד מדד</span>}
                                 </span>
                               )}
                             </div>
@@ -790,31 +784,6 @@ export default function Ledger({
                             </div>
                           </td>
 
-                          {/* --- החזר חודשי (calculated: no well, but a well's box
-                              so the note underneath cannot move the figure) --- */}
-                          <td>
-                            <div className="lgr-paycell">
-                              {noTerm ? (
-                                <span
-                                  className="flex flex-1 items-center justify-end gap-1 px-1 text-[11.5px] font-bold"
-                                  style={{ color: "var(--neg)" }}
-                                  title="לשורה יש יתרה אבל אין תקופה — הזינו חודשים או תאריך סיום"
-                                >
-                                  <Warning size={13} weight="fill" />
-                                  חסרה תקופה
-                                </span>
-                              ) : (
-                                <Money value={res.monthlyPayment} className="lgr-pay" style={{ color: "var(--ink)" }} />
-                              )}
-                              {(res.isIndexed || stale) && (
-                                <span className="lgr-note lgr-note-pay">
-                                  {stale && <span className="lgr-note-stale">תאריך עבר</span>}
-                                  {res.isIndexed && <span>צמוד מדד</span>}
-                                </span>
-                              )}
-                            </div>
-                          </td>
-
                           {/* --- actions --- */}
                           <td>
                             <div className="flex items-center justify-end gap-0.5 pe-0.5">
@@ -857,13 +826,47 @@ export default function Ledger({
                         </motion.tr>
                       );
                     })}
+
+                    {/* THE FAMILY SUBTOTAL, UNDER WHAT IT TOTALS.
+                        It used to lead the group, which reads as a heading and
+                        makes you hold the figure in your head while scanning the
+                        rows that produce it. A total belongs after its addends —
+                        the same order the סה״כ row already uses, now applied one
+                        level down. Its subtotals still sit in the real סכום,
+                        החזר חודשי and אחוז cells rather than floating in a
+                        spanned row, so the three levels of total line up on one
+                        edge instead of three. */}
+                    <tr className="lgr-groupbar lgr-groupbar-foot" style={famVars}>
+                      <td>
+                        <div className="lgr-groupbar-in">
+                          <span className="lgr-groupbar-title">
+                            {FAM_ICON[g.key]}
+                            {fam.plural}
+                          </span>
+                          <span className="lgr-count">{g.rows.length}</span>
+                        </div>
+                      </td>
+                      <td>
+                        <Money value={g.amount} className="lgr-groupbar-sum" />
+                      </td>
+                      <td>
+                        <Money value={g.monthly} className="lgr-groupbar-sum" style={{ color: fam.text }} />
+                      </td>
+                      <td>
+                        <span className="lgr-pct-ro lgr-groupbar-sum">
+                          {denom ? `${((g.amount / denom) * 100).toFixed(0)}%` : ""}
+                        </span>
+                      </td>
+                      <td colSpan={7} />
+                      <td />
+                    </tr>
                   </Fragment>
                 );
               })}
 
               {/* add a row from the bottom, so a long list never sends you back up */}
               <tr className="lgr-addrow">
-                <td colSpan={11}>
+                <td colSpan={12}>
                   <div className="lgr-addrow-in">
                     {addBtns()}
                     <span className="lgr-addrow-hint">הוספת שורה ריקה לתמהיל</span>
@@ -880,6 +883,9 @@ export default function Ledger({
                 </td>
                 <td>
                   <Money value={grand.amount} className="lgr-total-fig" />
+                </td>
+                <td>
+                  <Money value={grand.monthly} className="lgr-total-fig" hot />
                 </td>
                 {/* Over-allocation states itself here: with a target set this
                     reads 108%, which is the same news as a negative יתרה לשיוך
@@ -911,9 +917,6 @@ export default function Ledger({
                         </span>
                       ))}
                   </div>
-                </td>
-                <td>
-                  <Money value={grand.monthly} className="lgr-total-fig" hot />
                 </td>
                 <td />
               </tr>

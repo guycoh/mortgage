@@ -35,22 +35,22 @@ import {
 import type { LoanPath } from "@/app/data/hooks/useLoanPaths";
 import { paths as STATIC_PATHS } from "@/app/data/paths";
 import { calculateLoan } from "@/app/private/crm/leads/simulators/components/calculate/loanCalculators";
-import Bay from "./components/Bay";
-import Btn from "./components/Btn";
-import AnalysisModal from "./components/AnalysisModal";
-import ClientSummaryModal from "./components/ClientSummaryModal";
-import ReportViewerModal from "./components/ReportViewerModal";
-import { analyseReports } from "./lib/analysis";
-import StatementAnalysisModal from "./components/StatementAnalysisModal";
-import StatementSummaryModal from "./components/StatementSummaryModal";
+import Bay from "@/app/aa102test/components/Bay";
+import Btn from "@/app/aa102test/components/Btn";
+import AnalysisModal from "@/app/aa102test/components/AnalysisModal";
+import ClientSummaryModal from "@/app/aa102test/components/ClientSummaryModal";
+import ReportViewerModal from "@/app/aa102test/components/ReportViewerModal";
+import { analyseReports } from "@/app/aa102test/lib/analysis";
+import StatementAnalysisModal from "@/app/aa102test/components/StatementAnalysisModal";
+import StatementSummaryModal from "@/app/aa102test/components/StatementSummaryModal";
 import { analyseStatement } from "@/lib/bank-parser/analysis";
 import { useRouter } from "next/navigation";
-import LeadPicker, { type Lead } from "./components/LeadPicker";
+import LeadPicker, { type Lead } from "@/app/aa102test/components/LeadPicker";
 import Ledger from "./components/Ledger";
-import Charts from "./components/Charts";
-import Compare from "./components/Compare";
-import ScheduleModal from "./components/ScheduleModal";
-import Select from "./components/Select";
+import Charts from "@/app/aa102test/components/Charts";
+import Compare from "@/app/aa102test/components/Compare";
+import ScheduleModal from "@/app/aa102test/components/ScheduleModal";
+import Select from "@/app/aa102test/components/Select";
 import {
   FAMILY,
   PATH_LABEL,
@@ -58,10 +58,10 @@ import {
   mergeReportLoans,
   type ImportedLoan,
   type ImportSummary,
-} from "./lib/credit";
-import { exportMixToExcel } from "./lib/excel";
-import { track } from "./lib/track.client";
-import { collapse, collapseOut, rise, settle } from "./lib/transitions";
+} from "@/app/aa102test/lib/credit";
+import { exportMixToExcel } from "@/app/aa102test/lib/excel";
+import { track } from "@/app/aa102test/lib/track.client";
+import { collapse, collapseOut, rise, settle } from "@/app/aa102test/lib/transitions";
 // ONE TYPEFACE. Inter carries the Latin, the figures and the tabular numerals;
 // Assistant carries the Hebrew, which Inter has no glyphs for. Their x-heights
 // and stroke weights are close enough that "משכנתא 1,240,000" reads as a single
@@ -72,7 +72,8 @@ import "@fontsource/assistant/hebrew-400.css";
 import "@fontsource/assistant/hebrew-500.css";
 import "@fontsource/assistant/hebrew-600.css";
 import "@fontsource/assistant/hebrew-700.css";
-import "./theme.css";
+import "@/app/aa102test/theme.css";
+import "./hacham.css";
 
 type Mix = {
   id: string;
@@ -627,7 +628,9 @@ export default function Simulator({
 
   /* ----------------------------------------------------------------- ui */
   return (
-    <div className="lgr-root" dir="rtl">
+    // hacham-sim is what scopes hacham.css. It rides on the existing root
+    // rather than a wrapper div, so this variant adds no box to the layout.
+    <div className="lgr-root hacham-sim" dir="rtl">
       <div className="mx-auto w-full max-w-[1300px] px-4 py-5 md:px-6 md:py-7">
         {/* ------------------------------------------------- 1. the title row */}
         <motion.header {...rise(0)} className="mb-4 flex flex-wrap items-center gap-3">
