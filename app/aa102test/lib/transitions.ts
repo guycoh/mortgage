@@ -82,3 +82,43 @@ export const rise = (i: number) => ({
   animate: { opacity: 1, y: 0 },
   transition: { ...settle, delay: i * 0.04 },
 });
+
+/**
+ * ALREADY THERE.
+ *
+ * The counterpart to `rise`, for when the whole view is arriving as one object
+ * — switching between the two tools moves the entire surface, and blocks that
+ * also staggered themselves inside it would be two animations of the same
+ * pixels. The page-load stagger belongs to the page load; a tool switch gets
+ * the view's own move and nothing else.
+ */
+export const still = { initial: false as const, animate: { opacity: 1, y: 0 } };
+
+/** How a block enters: staggered on first paint, settled on a tool switch. */
+export type Enter = (i: number) => typeof still | ReturnType<typeof rise>;
+
+/**
+ * THE VIEW CHANGE.
+ *
+ * Quieter than a page transition on purpose: the switch's travelling fill is
+ * the event, and the surface underneath should read as the same desk with a
+ * different instrument set down on it. So the exit is a plain 120ms dissolve,
+ * and the entry is a dissolve with 8px of drift from the side the chosen
+ * switch button is on — enough to tie the surface to the fill's travel,
+ * nothing anyone would call a slide. No scale, no vertical hop: a surface
+ * that shrinks while leaving is a surface going somewhere, and this one
+ * isn't.
+ */
+export const viewOut = {
+  opacity: 0,
+  transition: { duration: 0.12, ease: "easeIn" as const },
+};
+export const viewIn = (dir: -1 | 1) => ({
+  initial: { opacity: 0, x: 8 * dir },
+  animate: { opacity: 1, x: 0 },
+  exit: viewOut,
+  transition: {
+    x: { duration: 0.3, ease: [0.2, 0, 0, 1] as [number, number, number, number] },
+    opacity: { duration: 0.2, ease: "easeOut" as const },
+  },
+});

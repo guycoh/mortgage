@@ -399,6 +399,80 @@
 .lgr-picker-caret { color: var(--lgr-4); flex: none; transition: transform 200ms var(--ease); }
 .lgr-picker[data-open="true"] .lgr-picker-caret { transform: rotate(180deg); color: var(--primary); }
 
+/* ----------------------------------------------------------- the tool switch */
+/* TWO INSTRUMENTS, ONE CLIENT, ONE SURFACE.
+   סימולטור תמהילים and משכנתא הפוכה are different tools on the same file, so
+   they are not two pages with a link between them: they are two positions of
+   one switch, and both are on screen the whole time. You can always see where
+   you are and what else you could be looking at.
+
+   The fill is a SINGLE OBJECT THAT MOVES (Motion layoutId, see ToolSwitch) —
+   one lighting up as the other goes out would read as two buttons that happen
+   to be adjacent. A control that slides has a position, which is the whole
+   point of a switch.
+
+   Built to the lead picker's 40px, because they are the same kind of object:
+   things that name where you are rather than perform a step. Violet, because
+   rule 4 — the identity hue is what says "mortgage", and both tools price one. */
+/* A MACHINED SEGMENTED CONTROL, not a pill. Same anatomy as every control on
+   the page: 10px radius, hairline border, the sunken card-3 track the schedule
+   modal's שנתי/חודשי toggle already uses — so it reads as part of the
+   instrument's chassis rather than as a floating capsule. The active segment
+   is the system's one solid violet, and it TRAVELS (Motion layoutId in
+   ToolSwitch) rather than blinking from one side to the other.
+
+   Hover is the system's hover: ink darkens, a quiet wash appears, nothing
+   surfaces or scales. The travelling fill is the event; hover just answers. */
+.lgr-switch {
+  display: inline-flex;
+  align-items: stretch;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  background: var(--card-3);
+  box-shadow: inset 0 1px 2px rgba(23, 23, 30, 0.05);
+}
+.lgr-switch-item {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 15px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  font-family: var(--ui);
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--lgr-2);
+  white-space: nowrap;
+  cursor: pointer;
+  /* The ink crosses over while the fill is still travelling, which is what
+     makes the two labels trade places rather than blink. */
+  transition: color 160ms var(--ease), background 160ms var(--ease);
+}
+.lgr-switch-item:hover:not([data-on="true"]) { color: var(--ink); background: rgba(28, 28, 30, 0.045); }
+.lgr-switch-item[data-on="true"] { color: #fff; }
+.lgr-switch-item:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring-strong); }
+/* The travelling fill. Same face as .lgr-btn-primary — the one solid violet in
+   the system — so "filled" means the same thing here as everywhere else. */
+.lgr-switch-pill {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: 7px;
+  background: var(--primary);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.26), 0 1px 2px rgba(68, 60, 176, 0.32);
+}
+.lgr-switch-in { position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 7px; }
+.lgr-switch-ico { flex: none; opacity: 0.9; }
+
+@media (prefers-reduced-motion: reduce) {
+  .lgr-switch-item { transition: none; }
+}
+
 /* THE SAVE BUTTON. Primary shape, and a fixed minimum width so the four
    states — שמירת שינויים / שומר… / נשמר / disabled — never resize it under the
    cursor. Disabled it keeps its shape and loses its voice: the control stays

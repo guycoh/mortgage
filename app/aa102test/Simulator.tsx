@@ -12,6 +12,7 @@
 // picked, and nothing is restored from a previous visit.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { AnimatePresence, motion } from "motion/react";
 import NumberFlow from "@number-flow/react";
 import {
@@ -47,6 +48,7 @@ import { analyseStatement } from "@/lib/bank-parser/analysis";
 import { useRouter } from "next/navigation";
 import LeadPicker, { type Lead } from "./components/LeadPicker";
 import Ledger from "./components/Ledger";
+import ToolSwitch, { type Tool } from "./components/ToolSwitch";
 import Charts from "./components/Charts";
 import Compare from "./components/Compare";
 import ScheduleModal from "./components/ScheduleModal";
@@ -61,7 +63,7 @@ import {
 } from "./lib/credit";
 import { exportMixToExcel } from "./lib/excel";
 import { track } from "./lib/track.client";
-import { collapse, collapseOut, rise, settle } from "./lib/transitions";
+import { collapse, collapseOut, rise, settle, still, viewIn, type Enter } from "./lib/transitions";
 // ONE TYPEFACE. Inter carries the Latin, the figures and the tabular numerals;
 // Assistant carries the Hebrew, which Inter has no glyphs for. Their x-heights
 // and stroke weights are close enough that "משכנתא 1,240,000" reads as a single
@@ -73,6 +75,29 @@ import "@fontsource/assistant/hebrew-500.css";
 import "@fontsource/assistant/hebrew-600.css";
 import "@fontsource/assistant/hebrew-700.css";
 import "./theme.css";
+
+/**
+ * THE OTHER TOOL, code-split.
+ *
+ * It is a whole second instrument — its own console, two product cards, an
+ * ECharts canvas and a 361-row schedule — and most sessions never open it. It
+ * loads on the pointer entering its switch button, which is 200ms before the
+ * click lands, so by the time the fill has travelled the chunk is already in.
+ */
+const ReverseTool = dynamic(() => import("./reverse/ReverseMortgage"), {
+  loading: () => (
+    <div className="lgr-card overflow-hidden">
+      <div className="lgr-head">
+        <div className="lgr-skel h-4 w-40" />
+      </div>
+      <div className="flex flex-col gap-2 p-3">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="lgr-skel h-10 w-full" style={{ opacity: 1 - i * 0.2 }} />
+        ))}
+      </div>
+    </div>
+  ),
+});
 
 type Mix = {
   id: string;
@@ -220,6 +245,7 @@ export default function Simulator({
   lead,
   endpoint = "/api/aa100/mixes",
   locked = false,
+  initialTool = "mix",
 }: {
   lead: Lead | null;
   /**
@@ -238,6 +264,12 @@ export default function Simulator({
    * was taken out of the URL.
    */
   locked?: boolean;
+  /**
+   * Which tool the surface opens on, resolved on the server from ?tool= so a
+   * deep link paints the right one on the first frame instead of showing the
+   * ledger and then swapping it out.
+   */
+  initialTool?: Tool;
 }) {
   const [mixes, setMixes] = useState<Mix[] | null>(null);
   const [activeMixId, setActiveMixId] = useState<string | null>(null);
@@ -268,6 +300,65 @@ export default function Simulator({
   const [saving, setSaving] = useState(false);
   /** Held for a beat after a save lands, so the button can confirm it. */
   const [justSaved, setJustSaved] = useState(false);
+
+  /* ------------------------------------------------------------- the tools */
+  /**
+   * TWO INSTRUMENTS, ONE SURFACE.
+   *
+   * משכנתא הפוכה is not another page. The switch in the title row swaps the
+   * body under it and nothing else moves — same route, same lead, no
+   * navigation, so the change costs a render and the fill can travel between
+   * the two buttons while it happens.
+   *
+   * The address bar is kept in step with a NATIVE pushState rather than the
+   * router: `?tool=reverse` makes the tool linkable and the Back button
+   * behave, without paying for a soft navigation that would re-run the page's
+   * server component and tear the board down.
+   */
+  const [tool, setTool] = useState<Tool>(initialTool);
+  const dir: -1 | 1 = tool === "reverse" ? -1 : 1;
+
+  /** The page-load stagger belongs to the page load. A tool switch moves the
+   *  whole view as one object, and blocks that also staggered inside it would
+   *  be two animations of the same pixels — so after first paint they arrive
+   *  already in place. */
+  const firstPaint = useRef(true);
+  useEffect(() => {
+    firstPaint.current = false;
+  }, []);
+  const enter: Enter = (i) => (firstPaint.current ? rise(i) : still);
+
+  const pickTool = (next: Tool) => {
+    if (next === tool) return;
+    setTool(next);
+    try {
+      const url = new URL(window.location.href);
+      if (next === "reverse") url.searchParams.set("tool", "reverse");
+      else url.searchParams.delete("tool");
+      window.history.pushState(null, "", url);
+    } catch {
+      /* the tool still switches — only the address bar missed it */
+    }
+    // The two tools are different heights and the eye should land on the top
+    // of the new one, not halfway down it.
+    if (window.scrollY > 0) window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    const onPop = () =>
+      setTool(new URLSearchParams(window.location.search).get("tool") === "reverse" ? "reverse" : "mix");
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+
+  // The pointer-enter preload covers mouse users; this covers everyone else.
+  // One idle-time import, so the switch never lands on a skeleton — the chunk
+  // is a few KB against a board that already shipped ECharts.
+  useEffect(() => {
+    const idle = window.requestIdleCallback ?? ((cb: () => void) => window.setTimeout(cb, 1200));
+    const id = idle(() => void import("./reverse/ReverseMortgage"));
+    return () => (window.cancelIdleCallback ?? window.clearTimeout)(id as number);
+  }, []);
 
   // Telemetry — openings only, on the transition to open, so a modal held
   // open for ten minutes is one event, not a stream. No-ops off the board.
@@ -630,8 +721,28 @@ export default function Simulator({
     <div className="lgr-root" dir="rtl">
       <div className="mx-auto w-full max-w-[1300px] px-4 py-5 md:px-6 md:py-7">
         {/* ------------------------------------------------- 1. the title row */}
-        <motion.header {...rise(0)} className="mb-4 flex flex-wrap items-center gap-3">
-          <h1 className="lgr-display text-[30px]">סימולטור תמהילים</h1>
+        <motion.header {...enter(0)} className="mb-4 flex flex-wrap items-center gap-3">
+          {/* The title IS the tool, and it arrives with the switch's fill.
+              Keyed, but deliberately NOT inside an AnimatePresence: mode="wait"
+              would hold the old word for its exit and only then start the new
+              one, which left the row with no title at all for a third of a
+              second — and, worse, with no title-shaped hole either, so the
+              picker slid across and back. Replacing the element outright keeps
+              the row's geometry honest from the first frame; only the ink
+              fades. The picker is layout-animated because the two names are
+              different widths and a chip that teleports 40px is the one thing
+              that would give away that anything was replaced. */}
+          <motion.h1
+            key={tool}
+            className="lgr-display text-[30px]"
+            initial={{ opacity: 0, y: 7 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.18, ease: [0.2, 0, 0, 1] }}
+          >
+            {tool === "mix" ? "סימולטור תמהילים" : "משכנתא הפוכה"}
+          </motion.h1>
+
+          <motion.div layout transition={settle} className="flex items-center gap-3">
           {locked ? (
             // Same picker, no way out of it: the client is stated, not chosen.
             <span className="lgr-picker" data-static="" title="הליד שאליו משויך התמהיל">
@@ -652,13 +763,52 @@ export default function Simulator({
               }}
             />
           )}
+          </motion.div>
+
+          {/* WHICH INSTRUMENT. Both are always here and the filled one is where
+              you are — see ToolSwitch for why the fill travels rather than
+              blinks. It sits at the row's far end, opposite the title it
+              governs.
+
+              On a locked board too: the switch swaps the body of THIS page and
+              navigates nowhere, so it opens no door out of the cookie's
+              scoping — and a Fireberry session is exactly where the reverse
+              tool can pre-fill itself from the client's card. */}
+          <ToolSwitch
+            className="ms-auto"
+            value={tool}
+            onChange={pickTool}
+            onPreload={(t) => {
+              if (t === "reverse") void import("./reverse/ReverseMortgage");
+            }}
+          />
         </motion.header>
+
+        <AnimatePresence mode="wait" initial={false}>
+        {tool === "reverse" ? (
+          <motion.div key="reverse" {...viewIn(dir)}>
+            <ReverseTool
+              enter={enter}
+              // A Fireberry session is named by its cookie; the open sandbox
+              // names its lead. Either way the tool can ask for the client's
+              // שווי נכס and ages — read-only — and open already filled in.
+              profileUrl={
+                locked
+                  ? "/api/simulator/reverse-profile"
+                  : lead
+                    ? `/api/simulator/reverse-profile?lead=${lead.id}`
+                    : null
+              }
+            />
+          </motion.div>
+        ) : (
+        <motion.div key="mix" {...viewIn(dir)}>
 
         {/* ------------------------------------- 2 + 3. the console: one panel */}
         {/* Toolbar and KPI slab share an outline, a radius and a shadow, so the
             controls and the figures they drive read as one instrument rather
             than two stacked cards. Light on top, dark underneath. */}
-        <motion.section {...rise(1)} className="lgr-console mb-6">
+        <motion.section {...enter(1)} className="lgr-console mb-6">
           <div className="lgr-toolbar">
             {/* — simulation parameters — */}
             <div className="lgr-tool-group">
@@ -774,7 +924,7 @@ export default function Simulator({
             and the room it gives back carries the two mix-wide views — left
             edge shared with the export cluster on the strip below, so the two
             clusters read as one stack rather than as two stray rows. */}
-        <motion.div {...rise(2)} className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-3">
+        <motion.div {...enter(2)} className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-3">
           {/* THE STRIP BELONGS TO THE BASE MIX ONLY — a scenario you invented
               has nothing to import into. Switching to one used to delete the
               strip on the spot, dropping the band from 90px to 56px in a single
@@ -826,7 +976,7 @@ export default function Simulator({
             picked and the table it governed were two separate objects. They are
             one now: the strip sits flush on the card's top edge and shares its
             border, and both enter together rather than on staggered delays. */}
-        <motion.div {...rise(3)} className="mb-6">
+        <motion.div {...enter(3)} className="mb-6">
         <div className="lgr-tabs">
           {list.map((m) => (
             <div key={m.id} className="relative">
@@ -1010,12 +1160,12 @@ export default function Simulator({
         </motion.div>
 
         {/* ---------------------------------------------------------- charts */}
-        <motion.div {...rise(4)} className="mt-6">
+        <motion.div {...enter(4)} className="mt-6">
           <Charts loans={loans} annualInflation={annualInflation} />
         </motion.div>
 
         {/* ------------------------------------------------------ comparison */}
-        <motion.section {...rise(5)} className="lgr-card mt-6 overflow-hidden">
+        <motion.section {...enter(5)} className="lgr-card mt-6 overflow-hidden">
           <header className="lgr-head">
             <h2 className="lgr-title">השוואת תמהילים</h2>
             <span className="lgr-sub ms-auto">ערך שלילי = התמהיל הנוכחי זול יותר</span>
@@ -1027,6 +1177,9 @@ export default function Simulator({
             compareMixId={compareMixId}
           />
         </motion.section>
+        </motion.div>
+        )}
+        </AnimatePresence>
       </div>
 
       {/* ------------------------------------------------------------ toast */}

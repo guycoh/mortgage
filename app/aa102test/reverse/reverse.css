@@ -1,0 +1,495 @@
+/* ============================================================================
+   /aa102test/reverse — משכנתא הפוכה.
+
+   The simulator's stylesheet is the design system; this file adds only what a
+   different instrument needs and breaks none of its seven rules. Same two
+   radii, same hairlines, same two-layer shadows, same one typeface, same
+   "dead still until touched". Every token comes from theme.css — there is not
+   one hard-coded neutral below.
+
+   What IS new is the second product colour. This page compares two paths, and
+   they have to be told apart across a card, a bar and a chart:
+
+     בלון מלא  --rm-balloon  the identity violet. Nothing is paid, the debt
+                             compounds — this is the mortgage, undisturbed.
+     גרייס      --rm-grace    teal, the tracks' --t2. Not orange: orange is
+                             הלוואה's identity everywhere else in this system
+                             and a grace mortgage is not a consumer loan.
+
+   Prefixed lgr-rm- so it cannot collide with the simulator's own classes.
+   ========================================================================== */
+
+.lgr-root {
+  --rm-balloon: var(--primary);
+  --rm-balloon-deep: var(--primary-deep);
+  --rm-balloon-tint: var(--primary-tint);
+  --rm-balloon-line: var(--primary-line);
+  --rm-balloon-wash: var(--primary-wash);
+
+  --rm-grace: #0d8b9b;
+  --rm-grace-deep: #0a6b78;
+  --rm-grace-tint: #e6f4f6;
+  --rm-grace-line: #bfe0e5;
+  --rm-grace-wash: #f3fafb;
+}
+
+/* ---------------------------------------------------------------- the form */
+
+/* Seven fields in one band, grouped by what they are: the client's facts, then
+   the assumptions priced on top of them. The rule between the groups is the
+   toolbar's own idiom (.lgr-tool-group), at form scale. */
+.lgr-rm-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 13px 14px;
+  padding: 14px 16px 15px;
+}
+.lgr-rm-vsep { align-self: stretch; width: 1px; margin-block: 2px; background: var(--line); }
+
+.lgr-rm-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.lgr-rm-field[data-w="lg"] { flex: 1 1 220px; max-width: 290px; }
+.lgr-rm-field[data-w="md"] { flex: 0 0 124px; }
+.lgr-rm-field[data-w="sm"] { flex: 0 0 96px; }
+
+.lgr-rm-flabel {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  color: var(--lgr-2);
+  white-space: nowrap;
+}
+.lgr-rm-flabel i { font-style: normal; font-size: 11px; font-weight: 500; color: var(--lgr-4); }
+
+/* A field is 42px here rather than the grid's 36: this page has seven of them
+   and they are the whole instrument, where the ledger has forty and they are a
+   sheet. Same border, same radius, same focus ring. */
+.lgr-rm-well { position: relative; display: flex; align-items: center; }
+.lgr-rm-in {
+  width: 100%;
+  height: 42px;
+  padding: 0 12px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  background: #fff;
+  font-family: var(--num);
+  font-variant-numeric: tabular-nums lining-nums;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+  outline: none;
+  /* LTR so a figure never gets walked by the bidi algorithm, left-aligned so
+     it reads out from its ₪ or into its unit rather than drifting across an
+     empty box. */
+  direction: ltr;
+  text-align: left;
+  transition: border-color var(--t) var(--ease), box-shadow 120ms var(--ease), background var(--t) var(--ease);
+}
+.lgr-rm-in::placeholder { font-weight: 400; color: var(--lgr-placeholder); opacity: 1; }
+.lgr-rm-in:hover:not(:disabled) { border-color: var(--edge); }
+.lgr-rm-in:focus { border-color: var(--focus); box-shadow: 0 0 0 2px var(--focus-ring-strong); }
+.lgr-rm-in[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+.lgr-rm-in[type="number"]::-webkit-outer-spin-button,
+.lgr-rm-in[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+/* A field that fails its own rule — under 55. The border and the ink carry it;
+   the sentence under the rail says what to do about it. */
+.lgr-rm-in[data-state="err"] { border-color: var(--neg-line); background: var(--neg-tint); color: var(--neg); }
+.lgr-rm-in[data-state="err"]:focus { border-color: var(--neg); box-shadow: 0 0 0 2px rgba(180, 35, 24, 0.4); }
+
+/* PHYSICAL left/right, not logical: the input is direction:ltr, so its start
+   edge is the left one regardless of the RTL page around it. */
+.lgr-rm-cur { position: absolute; left: 12px; font-size: 13px; font-weight: 500; color: var(--lgr-4); pointer-events: none; }
+.lgr-rm-well:has(> .lgr-rm-cur) > .lgr-rm-in { padding-left: 27px; }
+.lgr-rm-unit { position: absolute; right: 12px; font-size: 13px; font-weight: 500; color: var(--lgr-4); pointer-events: none; }
+.lgr-rm-well:has(> .lgr-rm-unit) > .lgr-rm-in { padding-right: 30px; }
+/* תקופה carries its own years in the unit slot rather than in a note beneath
+   it. A note there added a line to ONE field in a row of seven and, with the
+   row bottom-aligned, lifted that field's box clean off the baseline the other
+   six sat on. The derived figure is quieter than a unit and needs more room. */
+.lgr-rm-unit[data-wide="true"] { font-size: 11.5px; font-weight: 600; color: var(--lgr-placeholder); }
+.lgr-rm-well:has(> .lgr-rm-unit[data-wide="true"]) > .lgr-rm-in { padding-right: 58px; }
+
+/* The one figure in the band nobody types. Flat on the paper with a hairline
+   under it — stated, not offered. */
+.lgr-rm-derived {
+  display: flex;
+  align-items: center;
+  height: 42px;
+  padding: 0 12px;
+  border-radius: var(--r-sm);
+  background: var(--card-3);
+  font-family: var(--num);
+  font-variant-numeric: tabular-nums lining-nums;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+}
+.lgr-rm-derived[data-empty="true"] { color: var(--lgr-4); font-weight: 400; }
+
+.lgr-rm-hint { margin-top: 5px; font-size: 11px; color: var(--lgr-4); white-space: nowrap; }
+
+/* "These numbers came off the client's card" — a statement, not a control.
+   Aligned to the fields' 42px line so it reads as part of the form band. */
+.lgr-rm-src {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 42px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--pos);
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------- the eligibility rail */
+
+.lgr-rm-rail-cells {
+  display: grid;
+  grid-template-columns: minmax(0, 0.7fr) minmax(0, 0.7fr) minmax(0, 1fr) minmax(300px, 1.5fr);
+  gap: 4px 26px;
+  padding: 11px 16px 13px;
+}
+@media (max-width: 1080px) {
+  .lgr-rm-rail-cells { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 26px; }
+}
+
+/* HOW MUCH OF THE HOUSE THIS IS. The eligible slice against the whole value,
+   drawn once and labelled at both ends — the percentage is already stated as a
+   figure two cells over, so the bar's job is the proportion, not the number. */
+.lgr-rm-gauge {
+  position: relative;
+  height: 12px;
+  border-radius: 6px;
+  background: var(--card-3);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+}
+.lgr-rm-gauge > span {
+  display: block;
+  height: 100%;
+  border-radius: 6px 0 0 6px;
+  background: linear-gradient(90deg, var(--primary-deep), var(--primary));
+  transition: width 0.45s var(--ease);
+}
+.lgr-rm-gauge-cap {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 11.5px;
+  color: var(--lgr-3);
+}
+
+/* NOT ELIGIBLE. One sentence on the rail, in the rail's own space — an alert
+   box would be a second surface for a fact this page can simply state. */
+.lgr-rm-notice {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  grid-column: 1 / -1;
+  padding: 11px 13px;
+  border: 1px solid var(--neg-line);
+  border-radius: var(--r-sm);
+  background: var(--neg-tint);
+  color: var(--neg);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* --------------------------------------------------------------- the amount */
+
+.lgr-rm-ask { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 16px 22px; padding: 15px 16px 17px; }
+.lgr-rm-ask-field { flex: 0 0 232px; }
+/* The one place on the page where a figure is both typed and large. 52px, and
+   the ₪ grows with it. */
+.lgr-rm-ask-field .lgr-rm-in { height: 52px; font-size: 24px; font-weight: 700; letter-spacing: -0.03em; padding-left: 34px; }
+.lgr-rm-ask-field .lgr-rm-cur { font-size: 17px; }
+.lgr-rm-ask-slider { flex: 1 1 340px; min-width: 260px; }
+
+.lgr-rm-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 22px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.lgr-rm-slider::-webkit-slider-runnable-track {
+  height: 8px;
+  border-radius: 99px;
+  background: linear-gradient(90deg, var(--primary) var(--pct, 0%), var(--card-3) var(--pct, 0%));
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06);
+}
+.lgr-rm-slider::-moz-range-track {
+  height: 8px;
+  border-radius: 99px;
+  background: linear-gradient(90deg, var(--primary) var(--pct, 0%), var(--card-3) var(--pct, 0%));
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06);
+}
+/* A machined thumb: white face, hairline edge, one contact shadow. It presses
+   by compressing — the same physics as every button in the system. */
+.lgr-rm-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  margin-top: -6px;
+  border: 1px solid var(--line-2);
+  border-radius: 99px;
+  background: linear-gradient(180deg, #ffffff, #f4f4f7);
+  box-shadow: inset 0 1px 0 #fff, 0 1px 2.5px rgba(0, 0, 0, 0.18);
+  transition: box-shadow var(--t) var(--ease), transform var(--t) var(--ease), border-color var(--t) var(--ease);
+}
+.lgr-rm-slider::-moz-range-thumb {
+  width: 19px;
+  height: 19px;
+  border: 1px solid var(--line-2);
+  border-radius: 99px;
+  background: #fff;
+  box-shadow: 0 1px 2.5px rgba(0, 0, 0, 0.18);
+}
+.lgr-rm-slider:hover::-webkit-slider-thumb { border-color: var(--edge); box-shadow: inset 0 1px 0 #fff, 0 2px 5px rgba(0, 0, 0, 0.22); }
+.lgr-rm-slider:active::-webkit-slider-thumb { transform: scale(0.94); }
+.lgr-rm-slider:focus-visible { outline: none; }
+.lgr-rm-slider:focus-visible::-webkit-slider-thumb { border-color: var(--primary); box-shadow: 0 0 0 3px var(--focus-ring-strong); }
+.lgr-rm-slider:focus-visible::-moz-range-thumb { border-color: var(--primary); box-shadow: 0 0 0 3px var(--focus-ring-strong); }
+.lgr-rm-slider:disabled { cursor: not-allowed; opacity: 0.5; }
+
+.lgr-rm-ends {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 2px;
+  font-size: 11.5px;
+  color: var(--lgr-4);
+}
+.lgr-rm-quick { display: flex; align-items: center; gap: 6px; }
+/* The share you are on is stated on the chip, so the slider's position is
+   readable without measuring it against its own track. */
+.lgr-rm-quick .lgr-btn[data-on] {
+  border-color: var(--primary-line);
+  background: linear-gradient(180deg, #fff, var(--primary-wash));
+  color: var(--primary-deep);
+}
+
+/* --------------------------------------------------------- the two products */
+
+.lgr-rm-prods { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+@media (max-width: 940px) { .lgr-rm-prods { grid-template-columns: minmax(0, 1fr); } }
+
+/* THE TWO PATHS, AS TWO OBJECTS.
+   These were two white cards with a hairline of colour, and side by side they
+   read as one long table split down the middle — you had to READ to know which
+   was which. A card is now unmistakably its product from three metres: a 4px
+   crown, a head washed in its own tint, a filled emblem, and a foot ruled in
+   the same hue carrying the figure and the action.
+
+   It is still the system: the tint is the tone at a whisper, the figures stay
+   black on white in the body where the comparing happens, and the only solid
+   fills are the emblem and the one button that does something. */
+.lgr-rm-prod {
+  position: relative;
+  overflow: hidden;
+  /* A real edge in the product's own hue, and a shadow that carries a breath
+     of it — the two together are what lift the card off the near-white canvas
+     instead of dissolving into it. */
+  border-color: color-mix(in srgb, var(--tone) 34%, var(--line-2));
+  box-shadow: 0 0.5px 1px rgba(0, 0, 0, 0.055),
+    0 10px 28px -14px color-mix(in srgb, var(--tone) 34%, rgba(0, 0, 0, 0.2));
+  transition: box-shadow var(--t) var(--ease) var(--t-exit-delay), translate var(--t) var(--ease) var(--t-exit-delay),
+    border-color var(--t) var(--ease) var(--t-exit-delay);
+}
+.lgr-rm-prod:hover {
+  border-color: color-mix(in srgb, var(--tone) 55%, var(--line-2));
+  box-shadow: 0 0.5px 1px rgba(0, 0, 0, 0.07), 0 4px 10px -4px color-mix(in srgb, var(--tone) 20%, rgba(0, 0, 0, 0.1)),
+    0 18px 44px -16px color-mix(in srgb, var(--tone) 42%, rgba(0, 0, 0, 0.24));
+  translate: 0 -2px;
+  transition-delay: 0ms;
+}
+.lgr-rm-prod::before {
+  content: "";
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--tone), color-mix(in srgb, var(--tone) 52%, #fff));
+  z-index: 1;
+}
+
+.lgr-rm-prod-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 16px 16px 14px;
+  border-bottom: 1px solid var(--tone-line);
+  background: linear-gradient(180deg, var(--tone-tint), color-mix(in srgb, var(--tone) 3%, #fff));
+}
+/* The emblem is the card's one solid mark — it is what you actually recognise
+   when the two cards are next to each other. */
+.lgr-rm-prod-emb {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  border-radius: 10px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--tone) 82%, #fff), var(--tone));
+  color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.32), 0 2px 6px -2px color-mix(in srgb, var(--tone) 65%, transparent);
+}
+.lgr-rm-prod-name {
+  font-family: var(--display);
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  color: var(--tone-text, var(--tone));
+}
+.lgr-rm-prod-say { margin-top: 3px; font-size: 12.5px; line-height: 1.5; color: var(--lgr-2); }
+/* The headline behaviour, in three words, on the head's far edge — the one
+   thing a client asks before anything else: do I pay every month or not.
+   Filled, not outlined: this is the card's thesis, not a footnote. */
+.lgr-rm-prod-tag {
+  align-self: center;
+  flex: none;
+  margin-inline-start: auto;
+  padding: 6px 12px;
+  border: 1px solid color-mix(in srgb, var(--tone) 30%, transparent);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--tone-text, var(--tone));
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.lgr-rm-hero { padding: 15px 16px 16px; border-bottom: 1px solid var(--line); }
+.lgr-rm-hero-label { font-size: 12.5px; font-weight: 700; color: var(--lgr-2); }
+.lgr-rm-hero-fig { margin-top: 3px; font-size: 38px; font-weight: 700; letter-spacing: -0.045em; line-height: 1; }
+.lgr-rm-hero-note { margin-top: 6px; font-size: 12px; color: var(--lgr-3); }
+
+.lgr-rm-lines { padding: 4px 16px 6px; }
+.lgr-rm-line {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--lgr-2);
+}
+.lgr-rm-line:last-child { border-bottom: 0; }
+.lgr-rm-line > :last-child { margin-inline-start: auto; }
+.lgr-rm-line[data-strong="true"] { font-weight: 700; color: var(--ink); }
+
+/* WHERE THE TOTAL COMES FROM. One bar, three parts, and they add up to the
+   figure printed beside it — principal in the neutral, then the two things
+   that grew on top of it in the product's own hue at two strengths. A pie of
+   three slices would have said the same thing in twice the height. */
+.lgr-rm-costbar {
+  display: flex;
+  height: 12px;
+  margin: 2px 0 9px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--card-3);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.05);
+}
+.lgr-rm-costbar > span { display: block; height: 100%; transition: width 0.45s var(--ease); }
+.lgr-rm-costbar > span + span { box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.85); }
+.lgr-rm-keys { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 11.5px; color: var(--lgr-3); }
+.lgr-rm-keys b { margin-inline-start: 5px; font-family: var(--num); font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); letter-spacing: -0.01em; }
+
+/* THE FOOT is where the card lands: the figure a client repeats afterwards,
+   and the one thing there is to do about it. Ruled and washed in the product's
+   own hue so the eye can tell, from the bottom of the page, which card it is
+   reading. */
+.lgr-rm-foot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-top: 1.5px solid var(--tone);
+  background: linear-gradient(180deg, #fff, var(--tone-tint));
+}
+.lgr-rm-foot-cap { font-family: var(--display); font-size: 12.5px; font-weight: 700; letter-spacing: -0.01em; color: var(--tone-text, var(--tone)); }
+
+/* The card's one action, filled in the card's own colour. Two identical grey
+   buttons side by side is the single place this page could make you open the
+   wrong schedule; filled, they are impossible to confuse and the click target
+   is obvious from across the desk. */
+.lgr-rm-open {
+  background: var(--tone);
+  border-color: color-mix(in srgb, var(--tone) 78%, #000);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24), 0 1px 2px rgba(0, 0, 0, 0.2);
+  color: #fff;
+}
+.lgr-rm-open:hover:not(:disabled) {
+  background: var(--tone-text, var(--tone));
+  border-color: var(--tone-text, var(--tone));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.26), 0 3px 8px -2px color-mix(in srgb, var(--tone) 55%, transparent);
+  color: #fff;
+}
+.lgr-rm-open:active:not(:disabled) { translate: 0; box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.22); }
+.lgr-rm-open:focus-visible { border-color: var(--tone-text, var(--tone)); box-shadow: 0 0 0 2px color-mix(in srgb, var(--tone) 45%, transparent); }
+
+/* ----------------------------------------------------------------- the chart */
+
+.lgr-rm-legend { display: flex; align-items: center; gap: 14px; font-size: 12px; color: var(--lgr-2); }
+.lgr-rm-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.lgr-rm-legend i { width: 12px; height: 3px; border-radius: 2px; display: inline-block; }
+.lgr-rm-legend i[data-dash="true"] { background: repeating-linear-gradient(90deg, var(--lgr-4) 0 3px, transparent 3px 6px); }
+
+/* ------------------------------------------------------------- the schedule */
+
+.lgr-rm-seg { display: inline-flex; padding: 2px; border: 1px solid var(--line-2); border-radius: var(--r-sm); background: var(--card-3); }
+.lgr-rm-seg > button {
+  height: 26px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  font-family: var(--ui);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--lgr-3);
+  cursor: pointer;
+  transition: background var(--t) var(--ease), color var(--t) var(--ease), box-shadow var(--t) var(--ease);
+}
+.lgr-rm-seg > button[data-on="true"] {
+  background: #fff;
+  color: var(--ink);
+  box-shadow: 0 0.5px 1px rgba(0, 0, 0, 0.08), 0 1px 3px -1px rgba(0, 0, 0, 0.12);
+}
+.lgr-rm-seg > button:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring-strong); }
+
+/* Month 0 is the drawdown, not a period — it states the balance and nothing
+   else, and the table says so by leaving the flow columns empty rather than
+   printing four zeros that never happened. */
+.lgr-rm-zero > td { background: var(--card-2); }
+.lgr-rm-nil { display: block; padding-inline: 8px; color: var(--lgr-placeholder); }
+
+/* --------------------------------------------------------------- the footnote */
+
+.lgr-rm-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 18px;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--lgr-4);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lgr-rm-gauge > span, .lgr-rm-costbar > span, .lgr-rm-slider::-webkit-slider-thumb, .lgr-rm-prod { transition: none; }
+  .lgr-rm-prod:hover { translate: none; }
+}

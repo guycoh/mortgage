@@ -21,13 +21,22 @@ export async function generateMetadata({ params }: { params: Promise<{ leadId: s
   return { title: `סימולטור תמהילים · ליד ${leadId}` };
 }
 
-export default async function LeadBoardPage({ params }: { params: Promise<{ leadId: string }> }) {
+export default async function LeadBoardPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ leadId: string }>;
+  /** ?tool=reverse opens on משכנתא הפוכה — resolved here so a deep link paints
+   *  the right instrument on the first frame. */
+  searchParams: Promise<{ tool?: string }>;
+}) {
   const { leadId } = await params;
+  const { tool } = await searchParams;
   const id = Number(leadId);
   if (!Number.isFinite(id) || id <= 0) notFound();
 
   const { data, error } = await supabase.from("leads").select("id, name").eq("id", id).limit(1);
   if (error || !data?.length) notFound();
 
-  return <Simulator lead={data[0]} />;
+  return <Simulator lead={data[0]} initialTool={tool === "reverse" ? "reverse" : "mix"} />;
 }
