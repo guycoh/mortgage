@@ -1,0 +1,344 @@
+/* ------------------------------------------------------------------ *
+ *  "Gold Leaf" — design system for /card_guy_cohen_test.
+ *
+ *  Everything is namespaced under .glc so this file cannot touch any
+ *  other route. No @theme block, no additions to globals.css.
+ * ------------------------------------------------------------------ */
+
+.glc {
+  /* paper */
+  --glc-paper: #fffdf8;
+  --glc-bone-50: #faf6ec;
+  --glc-bone-100: #f2ecdd;
+  --glc-bone-200: #e7dfca;
+
+  /* ink */
+  --glc-ink: #221d12;
+  --glc-ink-soft: #5c5544;
+  --glc-ink-faint: #8f8774;
+
+  /* brand gold, lifted off the live card (#9a8b38 / #5b4e19 / #d4c674) */
+  --glc-gold-50: #f8f3e2;
+  --glc-gold-100: #ece2c1;
+  --glc-gold-200: #d9ca86;
+  --glc-gold-300: #c4b358;
+  --glc-gold-500: #9a8b38;
+  --glc-gold-600: #7e7029;
+  --glc-gold-700: #5b4e19;
+  --glc-gold-900: #2a240b;
+
+  --glc-gutter: 20px;
+  /* vertical rhythm that gently compresses on short phones */
+  --glc-stack: clamp(11px, 2svh, 20px);
+
+  --glc-shadow-tile: 0 1px 1px rgba(42, 36, 11, 0.04), 0 4px 10px -6px rgba(42, 36, 11, 0.18);
+  --glc-shadow-lift: 0 1px 2px rgba(42, 36, 11, 0.05), 0 12px 28px -14px rgba(42, 36, 11, 0.35);
+  --glc-shadow-foil: 0 1px 1px rgba(255, 255, 255, 0.35) inset,
+    0 10px 22px -12px rgba(91, 78, 25, 0.75);
+  --glc-shadow-card: 0 2px 6px rgba(42, 36, 11, 0.06), 0 40px 80px -40px rgba(42, 36, 11, 0.45);
+
+  color: var(--glc-ink);
+  font-family: var(--glc-font-sans), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.glc-display {
+  font-family: var(--glc-font-display), "Times New Roman", serif;
+}
+
+/* globals.css sets `button { transition: all .3s ease }`, which fights
+   Motion's per-frame transform writes. Neutralise it inside the card. */
+.glc button,
+.glc a {
+  transition: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.glc ::selection {
+  background: var(--glc-gold-200);
+  color: var(--glc-gold-900);
+}
+
+/* ---- gold foil ---------------------------------------------------- */
+.glc-foil {
+  background-image: linear-gradient(
+    158deg,
+    #4f4315 0%,
+    #6e6127 22%,
+    #9a8b38 46%,
+    #b8a54c 58%,
+    #857629 78%,
+    #55491a 100%
+  );
+}
+
+/* diagonal light band that reads as brushed metal */
+.glc-sheen {
+  background-image: linear-gradient(
+    104deg,
+    transparent 26%,
+    rgba(255, 248, 214, 0.34) 44%,
+    rgba(255, 248, 214, 0.08) 54%,
+    transparent 72%
+  );
+}
+
+/* engine-turned guilloché weave, the way a certificate is printed */
+.glc-engrave {
+  background-image: repeating-linear-gradient(
+      48deg,
+      rgba(255, 250, 226, 0.055) 0 1px,
+      transparent 1px 6px
+    ),
+    repeating-linear-gradient(-48deg, rgba(40, 33, 8, 0.045) 0 1px, transparent 1px 6px);
+}
+
+/* concentric rosette radiating out from behind the portrait */
+.glc-rosette {
+  background-image: repeating-radial-gradient(
+    circle at 50% 27%,
+    rgba(255, 250, 226, 0.1) 0 1px,
+    transparent 1px 9px
+  );
+  -webkit-mask-image: radial-gradient(circle at 50% 27%, #000 12%, transparent 74%);
+  mask-image: radial-gradient(circle at 50% 27%, #000 12%, transparent 74%);
+}
+
+/* ---- grain -------------------------------------------------------- */
+/* over the foil: overlay reads as metal tooth */
+.glc-grain::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.5;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.42'/%3E%3C/svg%3E");
+}
+
+/* over light stock: overlay disappears on near-white, so multiply, weaker */
+.glc-grain-paper::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 60;
+  opacity: 0.2;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23p)' opacity='0.55'/%3E%3C/svg%3E");
+}
+
+/* the desk gets a coarser fibre so it reads as a different stock */
+.glc-grain-desk::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.3;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='d'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.62' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23d)' opacity='0.5'/%3E%3C/svg%3E");
+}
+
+/* type pressed into the foil */
+.glc-press {
+  text-shadow: 0 1px 0 rgba(255, 252, 235, 0.28), 0 -1px 1px rgba(38, 31, 7, 0.4);
+}
+
+/* slow sheen travelling across the primary action */
+.glc-sweep::after {
+  content: "";
+  position: absolute;
+  inset: -40% -60%;
+  background: linear-gradient(
+    100deg,
+    transparent 42%,
+    rgba(255, 250, 224, 0.5) 50%,
+    transparent 58%
+  );
+  transform: translateX(-140%);
+  animation: glc-sweep 6.5s cubic-bezier(0.5, 0, 0.2, 1) 1.6s infinite;
+  pointer-events: none;
+}
+
+@keyframes glc-sweep {
+  0% {
+    transform: translateX(-140%);
+  }
+  38%,
+  100% {
+    transform: translateX(140%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .glc-sweep::after {
+    animation: none;
+    opacity: 0;
+  }
+}
+
+/* ---- surfaces ----------------------------------------------------- */
+.glc-desk {
+  background-color: var(--glc-bone-100);
+}
+
+.glc-desk-light {
+  background-image: radial-gradient(
+      90% 55% at 50% -8%,
+      rgba(212, 198, 116, 0.42),
+      transparent 62%
+    ),
+    radial-gradient(70% 45% at 100% 105%, rgba(154, 139, 56, 0.24), transparent 65%);
+}
+
+.glc-vignette {
+  background-image: radial-gradient(120% 80% at 50% 45%, transparent 45%, rgba(74, 62, 20, 0.14));
+}
+
+.glc-card {
+  background-color: var(--glc-paper);
+}
+
+.glc-masthead-glow {
+  background-image: radial-gradient(
+      120% 70% at 50% -15%,
+      rgba(255, 250, 222, 0.34),
+      transparent 58%
+    ),
+    linear-gradient(to top, rgba(34, 28, 6, 0.38), transparent 46%);
+}
+
+.glc-portrait-pool {
+  background-image: radial-gradient(circle, rgba(255, 251, 226, 0.28), transparent 68%);
+}
+
+.glc-ring {
+  background-image: conic-gradient(
+    from 205deg,
+    #efe4b0,
+    #8b7a2a,
+    #fbf3d0,
+    #6b5e25,
+    #d8c883,
+    #8b7a2a,
+    #efe4b0
+  );
+}
+
+/* the four contact actions: one slab, hairline dividers */
+.glc-slab {
+  background-color: var(--glc-paper);
+  box-shadow: var(--glc-shadow-lift), 0 0 0 1px var(--glc-gold-100);
+}
+
+.glc-divider {
+  background-color: var(--glc-gold-100);
+}
+
+.glc-cell {
+  transition: background-color 0.18s ease;
+}
+
+.glc-cell:active {
+  background-color: var(--glc-gold-50);
+}
+
+/* round icon disc */
+.glc-disc {
+  background-image: linear-gradient(to bottom, var(--glc-gold-50), var(--glc-bone-50));
+  box-shadow: 0 0 0 1px var(--glc-gold-100);
+  color: var(--glc-gold-600);
+}
+
+/* calculator tile */
+.glc-tile {
+  background-image: linear-gradient(
+    to left,
+    rgba(248, 243, 226, 0.7),
+    var(--glc-paper) 45%,
+    var(--glc-paper)
+  );
+  box-shadow: var(--glc-shadow-tile), 0 0 0 1px var(--glc-gold-100);
+  transition: background-image 0.2s ease;
+}
+
+.glc-tile:hover {
+  background-image: linear-gradient(
+    to left,
+    rgba(236, 226, 193, 0.75),
+    var(--glc-paper) 45%,
+    var(--glc-paper)
+  );
+}
+
+/* office row */
+.glc-loc {
+  background-image: linear-gradient(to left, var(--glc-gold-50), var(--glc-paper));
+  box-shadow: var(--glc-shadow-tile), 0 0 0 1px var(--glc-gold-100);
+}
+
+/* ---- buttons ------------------------------------------------------ */
+.glc-btn-foil {
+  color: #fffaea;
+  box-shadow: var(--glc-shadow-foil);
+}
+
+.glc-btn-ghost {
+  background-color: var(--glc-paper);
+  color: var(--glc-gold-700);
+  box-shadow: var(--glc-shadow-tile), 0 0 0 1px var(--glc-gold-200);
+  transition: background-color 0.2s ease;
+}
+
+.glc-btn-ghost:hover {
+  background-color: var(--glc-gold-50);
+}
+
+.glc-btn-sheet {
+  background-color: var(--glc-bone-50);
+  color: var(--glc-gold-700);
+  box-shadow: 0 0 0 1px var(--glc-gold-100);
+  transition: background-color 0.2s ease;
+}
+
+.glc-btn-sheet:hover {
+  background-color: var(--glc-gold-50);
+}
+
+.glc-chip {
+  background-color: var(--glc-bone-50);
+  color: var(--glc-gold-700);
+  border: 1px solid var(--glc-gold-100);
+  transition: background-color 0.2s ease;
+}
+
+.glc-chip:hover {
+  background-color: var(--glc-gold-50);
+}
+
+.glc-hairline {
+  background-image: linear-gradient(
+    to left,
+    transparent,
+    var(--glc-gold-200) 22%,
+    var(--glc-gold-200) 78%,
+    transparent
+  );
+}
+
+/* ---- share sheet -------------------------------------------------- */
+.glc-sheet {
+  background-color: var(--glc-paper);
+  box-shadow: 0 0 0 1px var(--glc-gold-100);
+}
+
+.glc-sheet-overlay {
+  background-color: rgba(42, 36, 11, 0.45);
+  backdrop-filter: blur(2px);
+}
+
+.glc-qr-frame {
+  background-image: linear-gradient(to bottom, var(--glc-gold-50), var(--glc-paper));
+  box-shadow: var(--glc-shadow-tile), 0 0 0 1px var(--glc-gold-100);
+}
