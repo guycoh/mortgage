@@ -14,24 +14,24 @@ export function LocationRow() {
       target="_blank"
       rel="noopener noreferrer"
       whileTap={press}
-      className="glc-loc flex items-center gap-3 rounded-[14px] px-2.5 py-[clamp(8px,1.35svh,10px)]"
+      className="glc-loc flex items-center gap-3 rounded-[15px] px-2.5 py-[clamp(9px,1.5svh,11px)]"
     >
-      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[var(--glc-paper)] text-[var(--glc-gold-600)] shadow-[0_0_0_1px_var(--glc-gold-200)]">
-        <WazeIcon className="h-6 w-6" />
+      <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[var(--glc-paper)] text-[var(--glc-gold-600)] shadow-[0_0_0_1px_var(--glc-gold-200)]">
+        <WazeIcon className="h-[26px] w-[26px]" />
       </span>
 
       <span className="min-w-0 flex-1 text-start">
-        <span className="block text-[10px] font-semibold tracking-[0.2em] text-[var(--glc-gold-600)]">
+        <span className="block text-[10.5px] font-semibold tracking-[0.2em] text-[var(--glc-gold-600)]">
           המשרד
         </span>
-        <span className="mt-0.5 block truncate text-[13.5px] font-bold leading-tight text-[var(--glc-ink)]">
+        <span className="mt-0.5 block truncate text-[15px] font-bold leading-tight text-[var(--glc-ink)]">
           {person.street}, {person.city}
         </span>
       </span>
 
-      <span className="flex shrink-0 items-center gap-0.5 text-[11px] font-semibold text-[var(--glc-ink-faint)]">
+      <span className="flex shrink-0 items-center gap-0.5 text-[12px] font-semibold text-[var(--glc-ink-faint)]">
         ניווט
-        <ChevronLeft aria-hidden className="h-3.5 w-3.5 text-[var(--glc-gold-300)]" />
+        <ChevronLeft aria-hidden className="h-4 w-4 text-[var(--glc-gold-300)]" />
       </span>
     </motion.a>
   );

@@ -12,18 +12,18 @@ export function PrimaryActions({ onSaveContact }: { onSaveContact: () => void })
         type="button"
         onClick={onSaveContact}
         whileTap={press}
-        className="glc-foil glc-sweep glc-btn-foil glc-press relative isolate flex h-[clamp(46px,6.4svh,52px)] items-center justify-center gap-2 overflow-hidden rounded-[14px] text-[13px] font-bold"
+        className="glc-orb glc-btn-pigment glc-press relative isolate flex h-[clamp(52px,7svh,58px)] items-center justify-center gap-2 overflow-hidden rounded-[15px] text-[14.5px] font-bold"
       >
-        <UserPlus className="h-[17px] w-[17px]" />
+        <UserPlus className="h-[19px] w-[19px]" />
         הוספה לאנשי קשר
       </motion.button>
 
       <motion.a
         href={guideHref}
         whileTap={press}
-        className="glc-btn-ghost flex h-[clamp(46px,6.4svh,52px)] items-center justify-center gap-2 rounded-[14px] text-[13px] font-bold"
+        className="glc-btn-ghost flex h-[clamp(52px,7svh,58px)] items-center justify-center gap-2 rounded-[15px] text-[14.5px] font-bold"
       >
-        <BookOpenText className="h-[17px] w-[17px]" />
+        <BookOpenText className="h-[19px] w-[19px]" />
         מדריך דוח יתרות
       </motion.a>
     </motion.div>

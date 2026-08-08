@@ -21,15 +21,15 @@ export function ContactBar() {
           href={href}
           whileTap={press}
           {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-          className="glc-cell relative flex flex-col items-center gap-1.5 py-[clamp(11px,1.8svh,14px)]"
+          className="glc-cell relative flex flex-col items-center gap-1.5 py-[clamp(12px,1.9svh,15px)]"
         >
           {i > 0 && (
             <span aria-hidden className="glc-divider absolute inset-y-3 start-0 w-px" />
           )}
-          <span className="glc-disc grid h-9 w-9 place-items-center rounded-full">
-            <Icon className="h-[17px] w-[17px]" />
+          <span className="glc-disc grid h-10 w-10 place-items-center rounded-full">
+            <Icon className="h-[19px] w-[19px]" />
           </span>
-          <span className="text-[11px] font-semibold leading-none text-[var(--glc-ink-soft)]">
+          <span className="text-[12.5px] font-semibold leading-none text-[var(--glc-ink-soft)]">
             {label}
           </span>
         </motion.a>

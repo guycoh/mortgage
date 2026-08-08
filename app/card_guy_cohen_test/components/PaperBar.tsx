@@ -17,16 +17,16 @@ export function PaperBar({ onShare }: { onShare: () => void }) {
         src={person.logo}
         alt={person.org}
         draggable={false}
-        className="h-9 w-auto select-none"
+        className="h-10 w-auto select-none"
       />
 
       <motion.button
         type="button"
         onClick={onShare}
         whileTap={press}
-        className="glc-chip flex h-9 items-center gap-1.5 rounded-full px-3.5 text-[12px] font-semibold tracking-wide"
+        className="glc-chip flex h-10 items-center gap-1.5 rounded-full px-4 text-[13px] font-semibold tracking-wide"
       >
-        <QrCode className="h-[15px] w-[15px]" />
+        <QrCode className="h-4 w-4" />
         שיתוף
       </motion.button>
     </motion.header>

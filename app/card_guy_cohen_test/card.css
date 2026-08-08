@@ -29,7 +29,7 @@
 
   --glc-gutter: 20px;
   /* vertical rhythm that gently compresses on short phones */
-  --glc-stack: clamp(11px, 2svh, 20px);
+  --glc-stack: clamp(10px, 1.8svh, 18px);
 
   --glc-shadow-tile: 0 1px 1px rgba(42, 36, 11, 0.04), 0 4px 10px -6px rgba(42, 36, 11, 0.18);
   --glc-shadow-lift: 0 1px 2px rgba(42, 36, 11, 0.05), 0 12px 28px -14px rgba(42, 36, 11, 0.35);
@@ -44,7 +44,8 @@
 }
 
 .glc-display {
-  font-family: var(--glc-font-display), "Times New Roman", serif;
+  font-family: var(--glc-font-display), ui-sans-serif, system-ui, sans-serif;
+  font-feature-settings: "kern" 1;
 }
 
 /* globals.css sets `button { transition: all .3s ease }`, which fights
@@ -60,28 +61,55 @@
   color: var(--glc-gold-900);
 }
 
-/* ---- gold foil ---------------------------------------------------- */
-.glc-foil {
-  background-image: linear-gradient(
-    158deg,
-    #4f4315 0%,
-    #6e6127 22%,
-    #9a8b38 46%,
-    #b8a54c 58%,
-    #857629 78%,
-    #55491a 100%
-  );
+/* ---- pigment ------------------------------------------------------
+   Not a metal sheet with a linear ramp — a field of soft colour blobs
+   that bleed into each other, then grain over the top. Matte: no
+   specular band, no shine sweep. Same recipe at two scales.
+   ------------------------------------------------------------------ */
+
+/* the masthead plate — three hues (straw, copper, olive) bled into a
+   deep bottom, so the surface has somewhere to travel */
+.glc-plate {
+  background-color: #7c6b26;
+  background-image: radial-gradient(
+      62% 72% at 27% 2%,
+      rgba(235, 210, 134, 0.82),
+      rgba(235, 210, 134, 0) 62%
+    ),
+    radial-gradient(56% 68% at 91% 10%, rgba(174, 118, 50, 0.74), rgba(174, 118, 50, 0) 60%),
+    radial-gradient(68% 78% at 4% 50%, rgba(152, 134, 56, 0.55), rgba(152, 134, 56, 0) 62%),
+    radial-gradient(104% 116% at 76% 106%, rgba(34, 27, 6, 0.95), rgba(34, 27, 6, 0) 66%),
+    radial-gradient(88% 100% at 2% 102%, rgba(58, 47, 14, 0.9), rgba(58, 47, 14, 0) 64%),
+    radial-gradient(44% 44% at 50% 26%, rgba(255, 248, 222, 0.24), rgba(255, 248, 222, 0) 74%);
 }
 
-/* diagonal light band that reads as brushed metal */
-.glc-sheen {
-  background-image: linear-gradient(
-    104deg,
-    transparent 26%,
-    rgba(255, 248, 214, 0.34) 44%,
-    rgba(255, 248, 214, 0.08) 54%,
-    transparent 72%
-  );
+/* the primary action — same pigment, tightened to a small surface */
+.glc-orb {
+  background-color: #8d7a2c;
+  background-image: radial-gradient(
+      76% 150% at 11% 0%,
+      rgba(247, 226, 155, 0.98),
+      rgba(247, 226, 155, 0) 56%
+    ),
+    radial-gradient(62% 128% at 50% 6%, rgba(215, 179, 88, 0.72), rgba(215, 179, 88, 0) 54%),
+    radial-gradient(70% 142% at 97% 22%, rgba(196, 131, 52, 0.9), rgba(196, 131, 52, 0) 55%),
+    radial-gradient(120% 176% at 82% 112%, rgba(35, 27, 6, 0.96), rgba(35, 27, 6, 0) 62%),
+    radial-gradient(94% 134% at 27% 102%, rgba(95, 77, 23, 0.92), rgba(95, 77, 23, 0) 58%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 249, 224, 0.24),
+    inset 0 -16px 30px -16px rgba(26, 20, 4, 0.8),
+    0 10px 22px -12px rgba(74, 62, 20, 0.6);
+}
+
+/* the tooth. Sits above the label too — that is the point. */
+.glc-orb::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.55;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150'%3E%3Cfilter id='o'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.05' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23o)' opacity='0.5'/%3E%3C/svg%3E");
 }
 
 /* engine-turned guilloché weave, the way a certificate is printed */
@@ -106,15 +134,16 @@
 }
 
 /* ---- grain -------------------------------------------------------- */
-/* over the foil: overlay reads as metal tooth */
+/* over the plate: same tooth as the orb, so both pigmented surfaces
+   read as one material */
 .glc-grain::after {
   content: "";
   position: absolute;
   inset: 0;
   pointer-events: none;
-  opacity: 0.5;
+  opacity: 0.52;
   mix-blend-mode: overlay;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.42'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.05' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
 }
 
 /* over light stock: overlay disappears on near-white, so multiply, weaker */
@@ -143,39 +172,6 @@
 /* type pressed into the foil */
 .glc-press {
   text-shadow: 0 1px 0 rgba(255, 252, 235, 0.28), 0 -1px 1px rgba(38, 31, 7, 0.4);
-}
-
-/* slow sheen travelling across the primary action */
-.glc-sweep::after {
-  content: "";
-  position: absolute;
-  inset: -40% -60%;
-  background: linear-gradient(
-    100deg,
-    transparent 42%,
-    rgba(255, 250, 224, 0.5) 50%,
-    transparent 58%
-  );
-  transform: translateX(-140%);
-  animation: glc-sweep 6.5s cubic-bezier(0.5, 0, 0.2, 1) 1.6s infinite;
-  pointer-events: none;
-}
-
-@keyframes glc-sweep {
-  0% {
-    transform: translateX(-140%);
-  }
-  38%,
-  100% {
-    transform: translateX(140%);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .glc-sweep::after {
-    animation: none;
-    opacity: 0;
-  }
 }
 
 /* ---- surfaces ----------------------------------------------------- */
@@ -279,9 +275,8 @@
 }
 
 /* ---- buttons ------------------------------------------------------ */
-.glc-btn-foil {
+.glc-btn-pigment {
   color: #fffaea;
-  box-shadow: var(--glc-shadow-foil);
 }
 
 .glc-btn-ghost {

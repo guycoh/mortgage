@@ -1,14 +1,14 @@
 import type { Metadata, Viewport } from "next";
-import { Assistant, Frank_Ruhl_Libre } from "next/font/google";
+import { Assistant, Rubik } from "next/font/google";
 
 import DigitalCard from "./DigitalCard";
 import { CARD_URL, person } from "./data";
 import "./card.css";
 
 /* Self-hosted at build time by next/font — no runtime request to Google. */
-const display = Frank_Ruhl_Libre({
+const display = Rubik({
   subsets: ["hebrew", "latin"],
-  weight: ["400", "500", "700", "800"],
+  weight: ["500", "600", "700"],
   variable: "--glc-font-display",
   display: "swap",
 });

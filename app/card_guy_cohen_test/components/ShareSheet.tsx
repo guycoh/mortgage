@@ -43,10 +43,10 @@ export function ShareSheet({
           <div aria-hidden className="mx-auto mt-3 h-1 w-10 rounded-full bg-[var(--glc-bone-200)]" />
 
           <div className="px-[var(--glc-gutter)] pt-4">
-            <Drawer.Title className="glc-display text-center text-[19px] font-bold text-[var(--glc-ink)]">
+            <Drawer.Title className="glc-display text-center text-[22px] font-semibold tracking-[-0.015em] text-[var(--glc-ink)]">
               שיתוף הכרטיס
             </Drawer.Title>
-            <p className="mt-1 text-center text-[12px] text-[var(--glc-ink-faint)]">
+            <p className="mt-1.5 text-center text-[13px] text-[var(--glc-ink-faint)]">
               סרקו את הקוד כדי לפתוח את הכרטיס של {person.full}
             </p>
 
@@ -89,11 +89,11 @@ function SheetButton({
       type="button"
       onClick={onClick}
       className={
-        "flex h-[50px] items-center justify-center gap-2 rounded-[14px] text-[13.5px] font-bold active:scale-[0.985] " +
-        (primary ? "glc-foil glc-btn-foil" : "glc-btn-sheet")
+        "relative isolate flex h-[54px] items-center justify-center gap-2 overflow-hidden rounded-[15px] text-[14.5px] font-bold active:scale-[0.985] " +
+        (primary ? "glc-orb glc-btn-pigment glc-press" : "glc-btn-sheet")
       }
     >
-      <Icon className="h-[17px] w-[17px]" />
+      <Icon className="h-[19px] w-[19px]" />
       {label}
     </button>
   );
