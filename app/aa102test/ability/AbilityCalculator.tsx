@@ -196,12 +196,37 @@ function Field({
       <input
         className="lgr-ab-in"
         inputMode="numeric"
-        placeholder="0"
+        // "—", not "0". A grey zero in a money field still reads as a stated
+        // amount at a glance, and on an empty sheet ten of them read as a
+        // household that earns nothing rather than one nobody has filled in.
+        placeholder="—"
         value={grouped(value)}
         onChange={(e) => onChange(digits(e.target.value))}
         onFocus={(e) => e.currentTarget.select()}
         aria-label={ariaLabel}
       />
+    </span>
+  );
+}
+
+/**
+ * WHAT THIS ROW CONTRIBUTES — calculated, and it looks calculated.
+ *
+ * No border and no placeholder, which is the sheet's whole rule for telling a
+ * figure you type from a figure you are given. It carries the ×50% badge on the
+ * guarantor's row, so the rule is stated exactly where its effect is visible
+ * rather than as a footnote under a field.
+ */
+function Counted({ value, half = false }: { value: number; half?: boolean }) {
+  if (!(value > 0)) return <span className="lgr-ab-nil">—</span>;
+  return (
+    <span className="lgr-ab-calc" dir="ltr">
+      {half && (
+        <b className="lgr-ab-calc-b" dir="rtl">
+          ×{GUARANTOR_SHARE * 100}%
+        </b>
+      )}
+      <Amt value={value} />
     </span>
   );
 }
@@ -618,6 +643,7 @@ export default function AbilityCalculator({
             <col className="lgr-ab-c-age" />
             <col />
             <col />
+            <col className="lgr-ab-c-sum" />
             <col />
           </colgroup>
           <thead>
@@ -631,6 +657,13 @@ export default function AbilityCalculator({
               <th scope="col">גיל</th>
               <th scope="col">הכנסה חודשית</th>
               <th scope="col">הכנסה חודשית נוספת</th>
+              {/* EVERY ROW ENDS IN A NUMBER. Without this column the sheet had
+                  three rows of inputs and no row-level conclusion, the
+                  guarantor's 50% rule was a whisper under one field, and the
+                  totals at the foot had no column to stand under. */}
+              <th scope="col" data-calc="true">
+                סה״כ מוכר
+              </th>
               <th scope="col">
                 החזר הלוואות<i>לא כולל משכנתא</i>
               </th>
@@ -670,6 +703,9 @@ export default function AbilityCalculator({
                 <Field value={mainExtra} onChange={setMainExtra} ariaLabel="הכנסה חודשית נוספת, בן זוג ראשי" />
               </td>
               <td>
+                <Counted value={a.mainTotal} />
+              </td>
+              <td>
                 <Field value={loans} onChange={setLoans} ariaLabel="החזר חודשי על הלוואות קיימות" />
               </td>
             </tr>
@@ -702,6 +738,9 @@ export default function AbilityCalculator({
               </td>
               <td>
                 <Field value={secondExtra} onChange={setSecondExtra} ariaLabel="הכנסה חודשית נוספת, בן זוג משני" />
+              </td>
+              <td>
+                <Counted value={a.secondTotal} />
               </td>
               <td>
                 <span className="lgr-ab-nil" title="החזרי ההלוואות נרשמים במרוכז בשורת בן הזוג הראשי">
@@ -737,16 +776,17 @@ export default function AbilityCalculator({
               </td>
               <td>
                 <Field value={guarantorIncome} onChange={setGuarantorIncome} ariaLabel="הכנסה חודשית של הערב" />
-                <span className="lgr-ab-counted" data-on={a.guarantorRaw > 0 || undefined} aria-live="polite">
-                  נספרים{" "}
-                  <b dir="ltr">
-                    ₪
-                    <NumberFlow value={Math.round(a.guarantorCounted)} locales="he-IL" format={{ maximumFractionDigits: 0 }} />
-                  </b>
-                </span>
               </td>
               <td>
                 <span className="lgr-ab-nil">—</span>
+              </td>
+              {/* The halving lands HERE, in the same column as everyone else's
+                  total — which is the whole reason the column exists. It used
+                  to be a note hanging off the income field, in a place no other
+                  row had anything, and it made this row taller than its
+                  neighbours for the privilege. */}
+              <td>
+                <Counted value={a.guarantorCounted} half={a.guarantorRaw > 0} />
               </td>
               <td>
                 <span className="lgr-ab-nil" title="החזרי ההלוואות נרשמים במרוכז בשורת בן הזוג הראשי">
@@ -756,23 +796,23 @@ export default function AbilityCalculator({
             </tr>
           </tbody>
 
-          {/* THE TOTALS, IN THE COLUMNS THEY SUM. The first build printed them
-              in a loose grid under the table, so סה״כ הכנסה floated somewhere
-              between the columns it was adding up — a ledger's totals belong
-              under its rules. Income spans its two columns; the loans total
-              sits under the loans column; nothing is invented for גיל. */}
+          {/* THE TOTALS, EACH UNDER THE COLUMN IT SUMS — and now they can be,
+              because every row ends in a number. The first build printed them
+              in a loose grid under the table with their own mini-labels, so
+              סה״כ הכנסה floated between the two columns it was adding up and
+              repeated a heading the table already carried. */}
           <tfoot>
             <tr className="lgr-ab-tf">
               <th scope="row">סה״כ חודשי</th>
               <td />
-              <td colSpan={2}>
-                <span className="lgr-ab-tf-l">הכנסה מוכרת</span>
+              <td />
+              <td />
+              <td>
                 <span className="lgr-ab-tf-v" data-empty={a.totalIncome > 0 ? undefined : "true"}>
                   {a.totalIncome > 0 ? <Amt value={a.totalIncome} /> : "—"}
                 </span>
               </td>
               <td>
-                <span className="lgr-ab-tf-l">החזרי הלוואות</span>
                 <span className="lgr-ab-tf-v" data-empty={a.totalLoans > 0 ? undefined : "true"}>
                   {a.totalLoans > 0 ? <Amt value={a.totalLoans} /> : "—"}
                 </span>
@@ -801,20 +841,36 @@ export default function AbilityCalculator({
       </motion.section>
 
       {/* --------------------------------------------------- 3. the verdict */}
-      <motion.section {...enter(3)} className="lgr-ab-hero" data-empty={a.monthlyPayment > 0 ? undefined : "true"}>
+      {/* The card CARRIES its verdict: a quiet wash of the tone rises from the
+          start corner and crossfades as the numbers move it — the room changes
+          colour before the chip is read. Atmosphere, not signal: the chip and
+          the gauge still say it in words and positions, so the wash never has
+          to be decoded, only felt. */}
+      <motion.section
+        {...enter(3)}
+        className="lgr-ab-hero"
+        data-empty={a.monthlyPayment > 0 ? undefined : "true"}
+        data-tone={a.monthlyPayment > 0 ? (a.verdict ?? undefined) : undefined}
+      >
         {a.monthlyPayment > 0 ? (
           <>
-            <div className="lgr-ab-hero-top">
-              <div className="min-w-0">
-                <div className="lgr-ab-hero-cap">החזר חודשי</div>
-                <div className="lgr-ab-hero-fig" dir="ltr">
+            {/* ONE BAND, ONE BASELINE. The figure, its caption and the sentence
+                that qualifies it used to be three stacked blocks in the start
+                corner of a 200px card — so with no household income entered
+                (no gauge, no chip) two thirds of the card was empty. They read
+                across now, on one baseline, and the card is exactly as tall as
+                what it has to say. */}
+            <div className="lgr-ab-band">
+              <div className="lgr-ab-band-main">
+                <span className="lgr-ab-hero-cap">החזר חודשי</span>
+                <span className="lgr-ab-hero-fig" dir="ltr">
                   <Amt value={a.monthlyPayment} cur="lgr-ab-hero-cur" />
-                </div>
-                {/* ONE SENTENCE — the whole deal, restated under its price.
+                </span>
+                {/* ONE SENTENCE — the whole deal, restated beside its price.
                     The figures live in the equation above too, but a verdict
                     that gets read aloud (or screenshotted) has to stand on its
                     own: the loan, the term, the rate, the schedule. */}
-                <div className="lgr-ab-hero-sub">
+                <span className="lgr-ab-hero-sub">
                   משכנתא של{" "}
                   <b dir="ltr" style={{ unicodeBidi: "isolate" }}>
                     ₪{fmt(a.requested)}
@@ -825,7 +881,7 @@ export default function AbilityCalculator({
                   ריבית {a.rate}%
                   <span className="lgr-ab-dot">·</span>
                   לוח שפיצר
-                </div>
+                </span>
               </div>
 
               {/* THE VERDICT. The only claim the page makes rather than reports,
@@ -919,18 +975,18 @@ export default function AbilityCalculator({
             ) : null}
           </>
         ) : (
-          /* Nothing to price yet. The block holds the exact shape it will have
-             once it has a figure, so typing the first number fills it in rather
-             than growing the page. No instruction: an empty form is its own. */
-          <div className="lgr-ab-hero-blank">
-            <span className="lgr-ab-hero-mark" aria-hidden>
-              <AbilityMark size={26} />
-            </span>
-            <div>
-              <div className="lgr-ab-hero-cap">החזר חודשי</div>
-              <div className="lgr-ab-hero-fig" data-empty="true" dir="ltr" aria-label="טרם חושב">
+          /* Nothing to price yet. The same band, same baseline, same height —
+             so typing the first number fills the card in rather than growing
+             the page. No instruction: an empty form is its own. */
+          <div className="lgr-ab-band">
+            <div className="lgr-ab-band-main">
+              <span className="lgr-ab-hero-mark" aria-hidden>
+                <AbilityMark size={19} />
+              </span>
+              <span className="lgr-ab-hero-cap">החזר חודשי</span>
+              <span className="lgr-ab-hero-fig" data-empty="true" dir="ltr" aria-label="טרם חושב">
                 <span className="lgr-ab-hero-cur">₪</span>—
-              </div>
+              </span>
             </div>
           </div>
         )}

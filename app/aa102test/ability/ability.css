@@ -603,33 +603,41 @@
    failed to render. */
 .lgr-ab-nil { display: block; padding-inline: 12px; font-size: 15px; color: var(--lgr-placeholder); }
 
-/* WHAT ACTUALLY COUNTS. A guarantor's income is halved by the rule, and /aa1
-   halved it invisibly. The cell says what it contributed. */
-/* The slot is reserved whether or not there is anything in it, so typing an
-   income never nudges the two rows above it. */
-.lgr-ab-counted {
-  display: block;
-  height: 15px;
-  margin-top: 4px;
-  padding-inline: 2px;
-  font-size: 11.5px;
-  font-weight: 600;
-  color: var(--lgr-4);
-  white-space: nowrap;
-  opacity: 0;
-  transition: opacity 180ms var(--ease);
-}
-.lgr-ab-counted[data-on] { opacity: 1; }
-/* A bidi isolate swallows the space beside it, so the gap is a margin. */
-.lgr-ab-counted b {
-  margin-inline-start: 5px;
+/* WHAT THIS ROW CONTRIBUTES — calculated, and it looks it: flat on the paper,
+   no border, no placeholder. That is the sheet's whole rule for telling a
+   figure you type from a figure you are given, and it is why this column can
+   sit between two columns of inputs without being mistaken for one. */
+.lgr-ab-calc {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-inline: 12px;
   font-family: var(--num);
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: tabular-nums lining-nums;
+  font-size: 16px;
   font-weight: 700;
-  color: var(--lgr-2);
-  direction: ltr;
-  unicode-bidi: isolate;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+  white-space: nowrap;
 }
+/* THE HALVING, stated where its effect is. A guarantor's income counts at 50%
+   and /aa1 applied it in silence; this is the rule riding on the figure it
+   produced, rather than a note hanging off the field it consumed. */
+.lgr-ab-calc-b {
+  padding: 2px 7px;
+  border-radius: 7px;
+  background: var(--card-3);
+  color: var(--lgr-3);
+  font-family: var(--ui);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+/* The column head is a calculated column too, so it says so in the same ink as
+   the figures under it rather than in the input columns' near-black. */
+.lgr-ab-tbl thead th[data-calc] { color: var(--lgr-3); }
+.lgr-ab-c-sum { width: 17%; }
 
 /* --- the totals row: sums UNDER the columns they add up --- */
 .lgr-ab-tf th,
@@ -647,20 +655,11 @@
   color: var(--lgr-2);
   white-space: nowrap;
 }
-/* Label over figure, both on the column's own end edge — the same edge the
-   inputs above align their digits to, so the total sits under its column. */
-.lgr-ab-tf-l {
-  display: block;
-  padding-inline-end: 12px;
-  font-size: 11.5px;
-  font-weight: 600;
-  color: var(--lgr-4);
-  text-align: end;
-  white-space: nowrap;
-}
+/* On the column's own end edge — the same 12px inset the inputs above align
+   their digits to, so a total sits directly under the figures it sums. The
+   mini-labels are gone: the column head names the column. */
 .lgr-ab-tf-v {
   display: block;
-  margin-top: 2px;
   padding-inline-end: 12px;
   font-family: var(--num);
   font-variant-numeric: tabular-nums lining-nums;
@@ -729,7 +728,9 @@
    block that answers the question. */
 
 .lgr-ab-hero {
-  padding: 20px 22px 22px;
+  position: relative;
+  overflow: hidden;
+  padding: 15px 20px 17px;
   border: 1px solid var(--line-2);
   border-radius: var(--r);
   background: #fff;
@@ -737,42 +738,77 @@
 }
 .lgr-ab-hero[data-empty] { box-shadow: var(--shadow); }
 
-.lgr-ab-hero-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px 24px; }
-.lgr-ab-hero-cap { font-size: 13px; font-weight: 700; letter-spacing: -0.005em; color: var(--lgr-2); }
+/* THE CARD CARRIES ITS VERDICT. A 3px rule down the start edge and the faintest
+   wash out of that corner — atmosphere, not signal: the chip says it in words
+   and the gauge says it in a position, so this never has to be decoded, only
+   felt. Status colour doing status work, which is the one job it has here. */
+.lgr-ab-hero[data-tone="ok"] { --tone: var(--pos); }
+.lgr-ab-hero[data-tone="warn"] { --tone: var(--warn); }
+.lgr-ab-hero[data-tone="over"] { --tone: var(--neg); }
+.lgr-ab-hero[data-tone]::before {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: 3px;
+  background: var(--tone);
+}
+.lgr-ab-hero[data-tone]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  /* RTL: 100% 0% is the start corner — where the rule and the figure are. */
+  background: radial-gradient(115% 90% at 100% 0%, color-mix(in srgb, var(--tone) 6%, transparent), transparent 62%);
+}
+.lgr-ab-hero > * { position: relative; z-index: 1; }
+
+/* ONE BAND, ONE BASELINE. Caption, figure and the qualifying sentence read
+   ACROSS rather than stacking — the first build put all three in the start
+   corner, so a card with no gauge and no chip (nothing entered in the
+   household yet) was two thirds empty air. */
+.lgr-ab-band { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 20px; }
+.lgr-ab-band-main { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; min-width: 0; }
+.lgr-ab-hero-cap {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.005em;
+  color: var(--lgr-2);
+  white-space: nowrap;
+}
 .lgr-ab-hero-fig {
-  display: flex;
+  display: inline-flex;
   align-items: baseline;
   gap: 8px;
-  margin-top: 3px;
   font-family: var(--num);
   font-variant-numeric: tabular-nums lining-nums;
-  font-size: 46px;
+  font-size: 40px;
   font-weight: 700;
   letter-spacing: -0.04em;
-  line-height: 1.05;
+  line-height: 1.1;
   color: var(--ink);
   direction: ltr;
   unicode-bidi: isolate;
 }
-.lgr-ab-hero-cur { font-size: 22px; font-weight: 500; color: var(--lgr-4); }
-.lgr-ab-hero-fig[data-empty] { color: var(--lgr-placeholder); font-weight: 600; font-size: 32px; line-height: 1.5; }
-.lgr-ab-hero-fig[data-empty] .lgr-ab-hero-cur { color: inherit; opacity: 0.7; font-size: 19px; }
+.lgr-ab-hero-cur { font-size: 20px; font-weight: 500; color: var(--lgr-4); }
+.lgr-ab-hero-fig[data-empty] { color: var(--lgr-placeholder); font-weight: 600; font-size: 30px; }
+.lgr-ab-hero-fig[data-empty] .lgr-ab-hero-cur { color: inherit; opacity: 0.7; font-size: 17px; }
 /* Inline text, not a flex row: the figures inside it are bidi-isolated and need
    ordinary word spacing around them. */
-.lgr-ab-hero-sub { margin-top: 10px; font-size: 13px; line-height: 1.6; color: var(--lgr-3); }
+.lgr-ab-hero-sub { font-size: 13px; line-height: 1.5; color: var(--lgr-3); }
 .lgr-ab-hero-sub b { font-weight: 700; color: var(--ink); }
-.lgr-ab-hero-sub .lgr-ab-dot { margin-inline: 8px; color: var(--lgr-placeholder); }
+.lgr-ab-hero-sub .lgr-ab-dot { margin-inline: 7px; color: var(--lgr-placeholder); }
 
-/* nothing entered yet — the block holds the shape it will have with a figure in
-   it, so the first number fills it rather than growing the page */
-.lgr-ab-hero-blank { display: flex; align-items: center; gap: 16px; }
+/* nothing entered yet — the mark sits on the band's own line rather than in a
+   52px tile, because a tile is a block and this state has no block to fill */
 .lgr-ab-hero-mark {
   display: grid;
   place-items: center;
-  width: 52px;
-  height: 52px;
+  width: 30px;
+  height: 30px;
   flex: none;
-  border-radius: 15px;
+  align-self: center;
+  border-radius: 10px;
   background: var(--primary-tint);
   color: var(--primary);
 }
@@ -805,7 +841,9 @@
    edge is this" is answered by looking, not by comparing three figures in three
    cards the way /aa1 asked you to. */
 
-.lgr-ab-gauge { margin-top: 22px; }
+/* Ruled off the band above it: the price is one statement, how it sits against
+   the household's capacity is the next. */
+.lgr-ab-gauge { margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--line); }
 .lgr-ab-track {
   position: relative;
   height: 16px;
