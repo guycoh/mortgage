@@ -5,27 +5,24 @@ import { person } from "../data";
 import { rise, settle } from "../motion";
 
 /**
- * The foil plate. Everything here is layered rather than flat: base foil,
- * engine-turned guilloché, a concentric rosette radiating from behind the
- * portrait, a brushed light band, a top highlight and a bottom shade — then
- * grain over the whole thing.
+ * The pigment plate: drifting colour, a studio bloom behind the portrait,
+ * a whisper of print weave, and grain over all of it. Every layer lives
+ * inside one masked wrapper, so the gold dissolves into the paper on all
+ * four sides rather than ending on an edge.
  */
 export function Masthead() {
   return (
     <motion.section
       variants={rise}
-      className="glc-grain relative isolate flex max-h-[44svh] shrink-0 grow flex-col justify-center overflow-hidden rounded-b-[30px] px-[var(--glc-gutter)] pt-[clamp(10px,2svh,20px)] pb-[clamp(44px,6.2svh,54px)] text-center"
+      className="relative isolate flex max-h-[44svh] shrink-0 grow flex-col justify-center px-[var(--glc-gutter)] pt-[clamp(10px,2svh,20px)] pb-[clamp(44px,6.2svh,54px)] text-center"
     >
-      <div aria-hidden className="glc-plate absolute inset-0" />
-      <div aria-hidden className="glc-engrave absolute inset-0 opacity-55" />
-      <div aria-hidden className="glc-rosette absolute inset-0" />
-      <div aria-hidden className="glc-masthead-glow absolute inset-0" />
-      <div aria-hidden className="absolute inset-x-0 bottom-0 h-px bg-[rgba(217,202,134,0.35)]" />
-      {/* pool of light directly behind the portrait */}
-      <div
-        aria-hidden
-        className="glc-portrait-pool absolute left-1/2 top-2 h-44 w-44 -translate-x-1/2 rounded-full blur-md"
-      />
+      <div aria-hidden className="glc-fade-x absolute inset-0">
+        <div className="glc-fade-y glc-grain absolute inset-0">
+          <div className="glc-plate absolute inset-0" />
+          <div className="glc-engrave absolute inset-0 opacity-35" />
+          <div className="glc-bloom absolute inset-0" />
+        </div>
+      </div>
 
       <div className="relative">
         <motion.div

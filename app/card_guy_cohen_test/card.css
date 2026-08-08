@@ -67,20 +67,70 @@
    specular band, no shine sweep. Same recipe at two scales.
    ------------------------------------------------------------------ */
 
-/* the masthead plate — three hues (straw, copper, olive) bled into a
-   deep bottom, so the surface has somewhere to travel */
+/* the masthead plate — straw, copper and olive drifting across a warm
+   mid-gold. The dark accents sit mid-right rather than along the bottom
+   edge, because that edge now dissolves into paper. */
 .glc-plate {
-  background-color: #7c6b26;
+  background-color: #6f5f22;
   background-image: radial-gradient(
-      62% 72% at 27% 2%,
-      rgba(235, 210, 134, 0.82),
-      rgba(235, 210, 134, 0) 62%
+      44% 44% at 22% -8%,
+      rgba(234, 209, 136, 0.72),
+      rgba(234, 209, 136, 0) 66%
     ),
-    radial-gradient(56% 68% at 91% 10%, rgba(174, 118, 50, 0.74), rgba(174, 118, 50, 0) 60%),
-    radial-gradient(68% 78% at 4% 50%, rgba(152, 134, 56, 0.55), rgba(152, 134, 56, 0) 62%),
-    radial-gradient(104% 116% at 76% 106%, rgba(34, 27, 6, 0.95), rgba(34, 27, 6, 0) 66%),
-    radial-gradient(88% 100% at 2% 102%, rgba(58, 47, 14, 0.9), rgba(58, 47, 14, 0) 64%),
-    radial-gradient(44% 44% at 50% 26%, rgba(255, 248, 222, 0.24), rgba(255, 248, 222, 0) 74%);
+    radial-gradient(48% 50% at 97% -6%, rgba(196, 134, 54, 0.76), rgba(196, 134, 54, 0) 62%),
+    radial-gradient(64% 44% at 88% 74%, rgba(42, 34, 8, 0.64), rgba(42, 34, 8, 0) 70%),
+    radial-gradient(62% 44% at 4% 72%, rgba(50, 41, 13, 0.56), rgba(50, 41, 13, 0) 70%),
+    radial-gradient(58% 38% at 46% 50%, rgba(146, 126, 52, 0.48), rgba(146, 126, 52, 0) 72%),
+    radial-gradient(70% 30% at 50% 100%, rgba(150, 130, 58, 0.42), rgba(150, 130, 58, 0) 70%);
+}
+
+/* Studio light, not geometry. A tight key behind the head, a wider warm
+   halo around it, and one off-centre fill so the field never reads
+   symmetrical. This replaces the concentric rosette. */
+.glc-bloom {
+  background-image: radial-gradient(
+      34% 27% at 50% 29%,
+      rgba(255, 249, 228, 0.44),
+      rgba(255, 249, 228, 0) 72%
+    ),
+    radial-gradient(70% 56% at 50% 33%, rgba(248, 229, 170, 0.2), rgba(248, 229, 170, 0) 74%),
+    radial-gradient(52% 44% at 16% 78%, rgba(198, 168, 88, 0.16), rgba(198, 168, 88, 0) 72%),
+    radial-gradient(46% 40% at 92% 84%, rgba(120, 96, 34, 0.18), rgba(120, 96, 34, 0) 72%);
+}
+
+/* The plate has no edges — it fades out on all four sides so the gold
+   melts into the paper instead of stopping on a line.
+   Two nested masks rather than one element with mask-composite: nesting
+   multiplies the masks in every engine, where `mask-composite: intersect`
+   degrades to a union (a cross-shaped plate) wherever it isn't supported. */
+.glc-fade-x {
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0%,
+    #000 5%,
+    #000 95%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(to right, transparent 0%, #000 5%, #000 95%, transparent 100%);
+}
+
+.glc-fade-y {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    #000 6%,
+    #000 67%,
+    rgba(0, 0, 0, 0.45) 87%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    #000 6%,
+    #000 67%,
+    rgba(0, 0, 0, 0.45) 87%,
+    transparent 100%
+  );
 }
 
 /* the primary action — same pigment, tightened to a small surface */
@@ -120,17 +170,6 @@
       transparent 1px 6px
     ),
     repeating-linear-gradient(-48deg, rgba(40, 33, 8, 0.045) 0 1px, transparent 1px 6px);
-}
-
-/* concentric rosette radiating out from behind the portrait */
-.glc-rosette {
-  background-image: repeating-radial-gradient(
-    circle at 50% 27%,
-    rgba(255, 250, 226, 0.1) 0 1px,
-    transparent 1px 9px
-  );
-  -webkit-mask-image: radial-gradient(circle at 50% 27%, #000 12%, transparent 74%);
-  mask-image: radial-gradient(circle at 50% 27%, #000 12%, transparent 74%);
 }
 
 /* ---- grain -------------------------------------------------------- */
@@ -194,19 +233,6 @@
 
 .glc-card {
   background-color: var(--glc-paper);
-}
-
-.glc-masthead-glow {
-  background-image: radial-gradient(
-      120% 70% at 50% -15%,
-      rgba(255, 250, 222, 0.34),
-      transparent 58%
-    ),
-    linear-gradient(to top, rgba(34, 28, 6, 0.38), transparent 46%);
-}
-
-.glc-portrait-pool {
-  background-image: radial-gradient(circle, rgba(255, 251, 226, 0.28), transparent 68%);
 }
 
 .glc-ring {
