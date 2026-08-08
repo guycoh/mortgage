@@ -36,7 +36,11 @@ const calculators = [
   const baseSize = 200;
   const baseHeight = 220;
   const baseDepth = 15;
-  const cubeColor = "#1d75a1";
+  // שלוש פאות באותו צבע נקראות כמלבן שטוח. פאה קדמית מוארת, צד כהה
+  // ופאה עליונה בהירה — כך הקובייה נקראת כגוף תלת־מימדי.
+  const cubeFace = "linear-gradient(160deg, var(--hm-gold-500) 0%, var(--hm-gold-700) 100%)";
+  const cubeSide = "var(--hm-gold-800)";
+  const cubeTop = "var(--hm-gold-400)";
 
   return (
     <Link href={link}>
@@ -58,8 +62,9 @@ const calculators = [
             top: `clamp(6px, 1.2vw, ${baseDepth}px)`,
             left: 0,
             zIndex: 3,
-            background: cubeColor,
-            boxShadow: "0 18px 25px rgba(0,0,0,0.25), inset 0 2px 8px rgba(255,255,255,0.15)",
+            backgroundImage: cubeFace,
+            boxShadow:
+              "0 18px 25px -10px rgba(42,36,11,0.45), inset 0 2px 8px rgba(255,250,226,0.2)",
           }}
         >
           <div className="mb-2 sm:mb-3">
@@ -87,8 +92,7 @@ const calculators = [
             height: `clamp(150px, 38vw, ${baseHeight}px)`,
             top: `clamp(6px, 1.2vw, ${baseDepth}px)`,
             left: `clamp(130px, 33vw, ${baseSize}px)`,
-            background: cubeColor,
-            border: "1px solid #15516f",
+            background: cubeSide,
             transform: "skewY(-45deg)",
             transformOrigin: "top left",
             zIndex: 2,
@@ -103,8 +107,7 @@ const calculators = [
             height: `clamp(8px, 1.4vw, ${baseDepth}px)`,
             top: 0,
             left: 0,
-            background: cubeColor,
-            border: "1px solid #15516f",
+            background: cubeTop,
             transform: "skewX(-45deg)",
             transformOrigin: "bottom left",
             zIndex: 1,
@@ -118,9 +121,9 @@ const calculators = [
 
 export default function Calculators3DGrid() {
   return (
-    <div className="min-h-screen font-open-sans font-normal  bg-gray-100 py-12 px-6">
-      <h1 className="text-center text-gray-600 text-3xl font-bold mb-10 tracking-wide drop-shadow-lg">
-        מחשבוני משכנתא 
+    <div className="min-h-screen bg-gradient-to-b from-[var(--hm-paper)] to-[var(--hm-bone-100)] px-4 py-8 font-open-sans font-normal sm:px-6 sm:py-12">
+      <h1 className="mb-8 text-center text-2xl font-bold tracking-wide text-[var(--hm-gold-700)] sm:mb-10 sm:text-3xl">
+        מחשבוני משכנתא
       </h1>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-12 justify-items-center">
@@ -193,9 +196,9 @@ export default function Calculators3DGrid() {
 //       const Icon = calc.icon;
 //       return (
 //         <Link href={calc.link} key={index}>
-//           <div className="bg-white backdrop-blur-md p-6 rounded-3xl border border-main hover:border-main transition-all duration-300 cursor-pointer flex flex-col items-center text-center h-60 hover:scale-[1.04] hover:shadow-main/30 hover:shadow-2xl group">
-//             <div className="bg-[#1d75a1]/10 rounded-full p-4 mb-4 shadow-md group-hover:rotate-[8deg] transition-transform duration-300">
-//               <Icon size={42} color="#1d75a1" className="w-12 h-12 drop-shadow-md" />
+//           <div className="bg-white backdrop-blur-md p-6 rounded-3xl border border-[var(--hm-gold-500)] hover:border-[var(--hm-gold-500)] transition-all duration-300 cursor-pointer flex flex-col items-center text-center h-60 hover:scale-[1.04] hover:shadow-main/30 hover:shadow-2xl group">
+//             <div className="bg-[var(--hm-gold-700)]/10 rounded-full p-4 mb-4 shadow-md group-hover:rotate-[8deg] transition-transform duration-300">
+//               <Icon size={42} color="var(--hm-gold-700)" className="w-12 h-12 drop-shadow-md" />
 //             </div>
 //             <h2 className="text-xl font-semibold text-gray-800 mb-2 tracking-wide drop-shadow-sm">
 //               {calc.title}

@@ -1,0 +1,166 @@
+/* ------------------------------------------------------------------ *
+ *  חכם — brand theme for every /hachamm route.
+ *
+ *  Before this file each calculator carried its own copy of the same
+ *  inline gradients, shadows and #1d75a1 literals — six files to touch
+ *  for one colour change, and they had already drifted apart. The shell
+ *  now lives here once; the pages describe structure, not pigment.
+ *
+ *  Everything is scoped under .hm (applied in layout.tsx), so no rule
+ *  here can reach another route.
+ * ------------------------------------------------------------------ */
+
+.hm {
+  /* brand gold, identical to the digital card */
+  --hm-gold-50: #f8f3e2;
+  --hm-gold-100: #ece2c1;
+  --hm-gold-200: #d9ca86;
+  --hm-gold-300: #c4b358;
+  --hm-gold-400: #ad9a41;
+  --hm-gold-500: #9a8b38;
+  --hm-gold-600: #7e7029;
+  --hm-gold-700: #5b4e19;
+  --hm-gold-800: #3f3711;
+  --hm-gold-900: #2a240b;
+
+  /* paper + ink */
+  --hm-paper: #fffdf8;
+  --hm-bone-50: #faf6ec;
+  --hm-bone-100: #f2ecdd;
+  --hm-bone-200: #e7dfca;
+  --hm-ink: #221d12;
+  --hm-ink-soft: #5c5544;
+  --hm-ink-faint: #8f8774;
+
+  /* the masthead height, so the page shell and the sticky nav can never
+     drift apart */
+  --hm-nav-h: 60px;
+
+  /* CustomButton is shared with /home, which is a different brand. It
+     reads --btn-accent with the old blue as its fallback, so /home is
+     untouched and only this subtree turns gold. */
+  --btn-accent: var(--hm-gold-700);
+
+  color: var(--hm-ink);
+}
+
+/* ---- page shell --------------------------------------------------- */
+.hm-page {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: calc(100svh - var(--hm-nav-h));
+  padding: clamp(14px, 3vw, 28px) clamp(12px, 4vw, 24px) clamp(48px, 12vw, 96px);
+  background-image: linear-gradient(180deg, var(--hm-paper) 0%, var(--hm-bone-100) 100%);
+}
+
+/* the calculator "device" — was a flat blue slab in every file */
+.hm-device {
+  position: relative;
+  overflow: hidden;
+  border-radius: 18px;
+  background-image: radial-gradient(
+      120% 78% at 22% -6%,
+      rgba(240, 217, 142, 0.32),
+      rgba(240, 217, 142, 0) 62%
+    ),
+    radial-gradient(90% 70% at 96% 4%, rgba(196, 134, 54, 0.28), rgba(196, 134, 54, 0) 60%),
+    linear-gradient(180deg, #8a7830 0%, #6a5b21 52%, #453a12 100%);
+  box-shadow:
+    0 20px 34px -14px rgba(42, 36, 11, 0.5),
+    inset 0 2px 8px rgba(255, 250, 226, 0.18);
+  color: #fffaea;
+}
+
+/* the lit top lip and the shaded bottom lip of the device */
+.hm-device-gloss {
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  height: 10px;
+  background: rgba(255, 250, 226, 0.18);
+}
+
+.hm-device-shade {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 14px;
+  background: rgba(30, 24, 6, 0.24);
+  filter: blur(2px);
+}
+
+/* the "desk" the device stands on */
+.hm-device-base {
+  background-image: linear-gradient(180deg, #cfc3a0 0%, #8a7c58 100%);
+}
+
+/* ---- controls ----------------------------------------------------- */
+.hm-field {
+  width: 100%;
+  border-radius: 10px;
+  background: #fff;
+  color: var(--hm-ink);
+  padding: 12px;
+  box-shadow: inset 0 2px 4px rgba(42, 36, 11, 0.14);
+  transition:
+    box-shadow 0.18s ease,
+    background-color 0.18s ease;
+}
+
+.hm-field::placeholder {
+  color: var(--hm-ink-faint);
+}
+
+.hm-field:focus {
+  outline: none;
+  background: var(--hm-gold-50);
+  box-shadow:
+    inset 0 2px 4px rgba(42, 36, 11, 0.1),
+    0 0 0 3px rgba(154, 139, 56, 0.45);
+}
+
+/* radios, checkboxes and range thumbs all pick up the brand */
+.hm input[type="radio"],
+.hm input[type="checkbox"],
+.hm input[type="range"] {
+  accent-color: var(--hm-gold-500);
+}
+
+/* Validation text sits on the gold device, where text-red-500 is almost
+   unreadable. Light rose over a dark halo keeps it legible and still
+   reads unmistakably as an error. */
+.hm-error {
+  color: #ffd7cd;
+  font-weight: 600;
+  text-shadow: 0 1px 2px rgba(48, 12, 4, 0.55);
+}
+
+/* ---- result surfaces ---------------------------------------------- */
+.hm-panel {
+  width: 100%;
+  border-radius: 14px;
+  background: var(--hm-paper);
+  color: var(--hm-ink);
+  box-shadow: inset 0 2px 6px rgba(42, 36, 11, 0.1);
+}
+
+.hm-row {
+  border-radius: 10px;
+  background: var(--hm-bone-50);
+  color: var(--hm-ink);
+  box-shadow: 0 1px 2px rgba(42, 36, 11, 0.06);
+}
+
+.hm-figure {
+  color: var(--hm-gold-700);
+  font-weight: 800;
+}
+
+/* Wide tables are the main mobile failure in these pages: they push the
+   whole document sideways. Scroll them inside their own box instead. */
+.hm-scroll-x {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+}

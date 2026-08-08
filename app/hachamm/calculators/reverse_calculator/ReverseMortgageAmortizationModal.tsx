@@ -49,8 +49,8 @@ flex
 justify-between
 items-center
 p-4
-bg-[#1d75a1]
-text-white
+bg-[var(--hm-gold-700)]
+text-[#fffaea]
 ">
 
 

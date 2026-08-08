@@ -37,18 +37,19 @@ const banks = [
 
 const MenuPage = () => {
   return (
-    <main className="bg-galbg text-gray-700 leading-relaxed font-open-sans">
+    <main className="bg-gradient-to-b from-[var(--hm-paper)] to-[var(--hm-bone-100)] text-[var(--hm-ink-soft)] leading-relaxed font-open-sans">
 
-      <div className="min-h-screen flex flex-col justify-center items-center py-4">
+      {/* 6rem = הניווט הקבוע. min-h-screen דחף את התוכן מתחת לקיפול בנייד */}
+      <div className="flex min-h-[calc(100svh-6rem)] flex-col items-center justify-center px-3 py-6">
 
-        <div className="bg-white p-8 rounded-xl shadow-lg w-11/12 md:w-1/2 lg:w-1/3 border border-gray-200">
+        <div className="w-full max-w-lg rounded-2xl border border-[var(--hm-gold-100)] bg-[var(--hm-paper)] p-5 shadow-lg sm:p-8">
 
-          <h1 className="text-4xl font-bold text-gray-800 text-center tracking-tight">
+          <h1 className="text-center text-2xl font-bold tracking-tight text-[var(--hm-gold-700)] sm:text-4xl">
             מדריכים להוצאת יתרת סילוק
           </h1>
 
 
-          <div className="grid grid-cols-2 gap-4 mt-8">
+          <div className="mt-6 grid grid-cols-2 gap-3 sm:mt-8 sm:gap-4">
 
             {banks.map((bank) => (
 

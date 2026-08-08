@@ -101,7 +101,7 @@ export default function LoanTotals({
               {formatInt(grandPrincipal)}
             </td>
             {comparisonTotals && (
-              <td className="border border-gray-300 p-2 text-center text-blue-600 font-medium">
+              <td className="border border-gray-300 p-2 text-center text-[var(--hm-gold-600)] font-medium">
                 {formatInt(comparisonTotals.principal)}
               </td>
             )}
@@ -114,7 +114,7 @@ export default function LoanTotals({
               {formatInt(grandInterest)}
             </td>
             {comparisonTotals && (
-              <td className="border border-gray-300 p-2 text-center text-blue-600 font-medium">
+              <td className="border border-gray-300 p-2 text-center text-[var(--hm-gold-600)] font-medium">
                 {formatInt(comparisonTotals.interest)}
               </td>
             )}
@@ -127,7 +127,7 @@ export default function LoanTotals({
               {formatInt(grandPayment)}
             </td>
             {comparisonTotals && (
-              <td className="border border-gray-300 p-2 text-center text-blue-600 font-medium">
+              <td className="border border-gray-300 p-2 text-center text-[var(--hm-gold-600)] font-medium">
                 {formatInt(comparisonTotals.payment)}
               </td>
             )}

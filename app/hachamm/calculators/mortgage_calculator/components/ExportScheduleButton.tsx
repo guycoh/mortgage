@@ -37,7 +37,7 @@ export default function ExportScheduleButton({ schedule, fileName }: ExportSched
   return (
     <button
       onClick={handleExport}
-      className="mt-2 px-3 py-1 bg-blue-600 text-white rounded shadow hover:bg-blue-700 transition text-sm"
+      className="mt-2 px-3 py-1 bg-[var(--hm-gold-600)] text-white rounded shadow hover:bg-[var(--hm-gold-700)] transition text-sm"
     >
       הורד לוח סילוקין
     </button>

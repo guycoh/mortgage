@@ -115,7 +115,7 @@ export default function LoanTable({
       "0"
     )}-${String(date.getDate()).padStart(2, "0")}`;
 
-  const inputBaseStyle = "w-full bg-gray-50 border border-gray-200 focus:bg-orange-50 focus:border-orange-400 p-1.5 text-center outline-none transition-colors rounded-none";
+  const inputBaseStyle = "w-full bg-gray-50 border border-gray-200 focus:bg-[var(--hm-gold-50)] focus:border-orange-400 p-1.5 text-center outline-none transition-colors rounded-none";
 
   return (
     <div className="w-full">
@@ -132,27 +132,27 @@ export default function LoanTable({
       <div className="hidden lg:block border border-gray-200 rounded-none overflow-x-auto">
         <table className="w-full text-right border-collapse text-sm rounded-none">
           <thead>
-            <tr className="bg-[#1d75a1] text-white font-bold whitespace-nowrap divide-x divide-x-reverse divide-white/10 rounded-none">
+            <tr className="bg-[var(--hm-gold-700)] text-white font-bold whitespace-nowrap divide-x divide-x-reverse divide-white/10 rounded-none">
               <th className="p-3 text-center">סכום הלוואה</th>
               <th className="p-3 text-center">לוח סילוקין</th>
               <th className="p-3 text-center">מסלול</th>
               <th className="p-3 text-center">תדירות שינוי</th>
               <th className="p-3 text-center">עוגן</th>
               <th className="p-3 text-center">מרווח מהעוגן</th>
-              <th className="p-3 text-center bg-[#155b7e]">גרייס</th>
-              <th className="p-3 text-center bg-[#155b7e]">חודשי גרייס</th>
+              <th className="p-3 text-center bg-[var(--hm-gold-800)]">גרייס</th>
+              <th className="p-3 text-center bg-[var(--hm-gold-800)]">חודשי גרייס</th>
               <th className="p-3 text-center">תאריך סיום</th>
               <th className="p-3 text-center">חודשים</th>
               <th className="p-3 text-center">ריבית %</th>
               <th className="p-3 text-center">סכום חודשי</th>
-              <th className="p-3 text-center bg-[#155b7e]">פעולות</th>
+              <th className="p-3 text-center bg-[var(--hm-gold-800)]">פעולות</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200 text-gray-700">
             {loans.map((loan, idx) => {
               const parsedDate = parseISODate(loan.loan_end_date ?? loan.end_date ?? null);
               return (
-                <tr key={loan.id} className="hover:bg-[#1d75a1]/5 transition-colors duration-150 divide-x divide-x-reverse divide-gray-100">
+                <tr key={loan.id} className="hover:bg-[var(--hm-gold-700)]/5 transition-colors duration-150 divide-x divide-x-reverse divide-gray-100">
                   {/* סכום הלוואה */}
                   <td className="p-1.5">
                     <input
@@ -186,7 +186,7 @@ export default function LoanTable({
                     <select
                       value={loan.path_id}
                       onChange={(e) => updateLoan(idx, "path_id", Number(e.target.value))}
-                      className={`${inputBaseStyle} text-[#1d75a1] font-semibold`}
+                      className={`${inputBaseStyle} text-[var(--hm-gold-700)] font-semibold`}
                     >
                       {paths.map((p) => (
                         <option key={p.id} value={p.id}>
@@ -316,7 +316,7 @@ export default function LoanTable({
                           setActiveLoan(loan);
                           setIsAmortizationOpen(true);
                         }}
-                        className="bg-[#1d75a1] hover:bg-[#155b7e] text-white text-xs px-2 py-1 transition-colors"
+                        className="bg-[var(--hm-gold-700)] hover:bg-[var(--hm-gold-800)] text-white text-xs px-2 py-1 transition-colors"
                         title="לוח סילוקין"
                       >
                         <Calendar size={12} />
@@ -338,7 +338,7 @@ export default function LoanTable({
           {/* שורת סיכום פוטר לדסקטופ */}
           <tfoot className="bg-gray-100 font-bold text-gray-800 border-t-2 border-gray-300">
             <tr>
-              <td className="p-3 text-right text-base text-[#1d75a1]">
+              <td className="p-3 text-right text-base text-[var(--hm-gold-700)]">
                 {loans
                   .reduce((sum, loan) => sum + (Number(loan.amount) || 0), 0)
                   .toLocaleString("he-IL")}
@@ -367,7 +367,7 @@ export default function LoanTable({
           return (
             <div key={loan.id} className="border border-gray-200 rounded-none bg-white shadow-sm overflow-hidden">
               {/* כותרת הכרטיס */}
-              <div className="bg-[#1d75a1] text-white text-xs font-bold px-3 py-2">
+              <div className="bg-[var(--hm-gold-700)] text-white text-xs font-bold px-3 py-2">
                 שורה {idx + 1}: {path?.name || 'מסלול חדש'}
               </div>
 
@@ -404,7 +404,7 @@ export default function LoanTable({
                   <select
                     value={loan.path_id}
                     onChange={(e) => updateLoan(idx, "path_id", Number(e.target.value))}
-                    className={`${inputBaseStyle} text-[#1d75a1] font-semibold`}
+                    className={`${inputBaseStyle} text-[var(--hm-gold-700)] font-semibold`}
                   >
                     {paths.map((p) => (
                       <option key={p.id} value={p.id}>
@@ -507,9 +507,9 @@ export default function LoanTable({
                     className={`${inputBaseStyle} font-semibold text-emerald-600`}
                   />
                 </div>
-                <div className="col-span-2 sm:col-span-1 bg-[#1d75a1]/5 p-1">
-                  <label className="block text-[11px] text-[#1d75a1] font-bold mb-0.5">סכום חודשי</label>
-                  <div className="w-full bg-white border border-[#1d75a1]/30 p-1.5 text-sm font-bold text-center text-gray-900">
+                <div className="col-span-2 sm:col-span-1 bg-[var(--hm-gold-700)]/5 p-1">
+                  <label className="block text-[11px] text-[var(--hm-gold-700)] font-bold mb-0.5">סכום חודשי</label>
+                  <div className="w-full bg-white border border-[var(--hm-gold-600)]/30 p-1.5 text-sm font-bold text-center text-gray-900">
                     {calculateLoan(loan, annualInflation).monthlyPayment.toLocaleString("he-IL", {
                       minimumFractionDigits: 0,
                       maximumFractionDigits: 0,
@@ -527,7 +527,7 @@ export default function LoanTable({
                       setActiveLoan(loan);
                       setIsAmortizationOpen(true);
                     }}
-                    className="flex items-center gap-1.5 bg-[#1d75a1] hover:bg-[#155b7e] text-white text-xs px-3 py-1.5 transition-colors shadow-sm"
+                    className="flex items-center gap-1.5 bg-[var(--hm-gold-700)] hover:bg-[var(--hm-gold-800)] text-white text-xs px-3 py-1.5 transition-colors shadow-sm"
                   >
                     <Calendar size={14} />
                     לוח סילוקין
@@ -547,7 +547,7 @@ export default function LoanTable({
 
         {/* סיכום כולל קומפקטי למובייל */}
         <div className="p-4 bg-gray-100 border border-gray-200 font-bold text-sm space-y-2">
-          <div className="flex justify-between text-[#1d75a1]">
+          <div className="flex justify-between text-[var(--hm-gold-700)]">
             <span>סה"כ סכום הלוואות:</span>
             <span>
               {loans
@@ -807,7 +807,7 @@ export default function LoanTable({
 //                         const raw = e.target.value.replace(/[^\d]/g, "");
 //                         updateLoan(idx, "amount", Number(raw) || 0);
 //                       }}
-//                       className="w-full px-1 py-0.5 border rounded focus:ring-2 focus:ring-purple-400 text-right focus:bg-orange-100"
+//                       className="w-full px-1 py-0.5 border rounded focus:ring-2 focus:ring-purple-400 text-right focus:bg-[var(--hm-gold-50)]"
 //                     />
 //                   </td>
 
@@ -818,7 +818,7 @@ export default function LoanTable({
 //                       onChange={(e) =>
 //                         updateLoan(idx, "amortization_schedule_id", Number(e.target.value))
 //                       }
-//                       className="w-full px-1 py-0.5 border rounded focus:ring-2 focus:ring-purple-400 focus:bg-orange-100 "
+//                       className="w-full px-1 py-0.5 border rounded focus:ring-2 focus:ring-purple-400 focus:bg-[var(--hm-gold-50)] "
 //                     >
 //                       {schedules.map((s) => (
 //                         <option key={s.id} value={s.id}>
@@ -835,7 +835,7 @@ export default function LoanTable({
 //                       onChange={(e) =>
 //                         updateLoan(idx, "path_id", Number(e.target.value))
 //                       }
-//                       className="w-full px-1 py-0.5 border rounded focus:ring-2 focus:ring-purple-400 focus:bg-orange-100"
+//                       className="w-full px-1 py-0.5 border rounded focus:ring-2 focus:ring-purple-400 focus:bg-[var(--hm-gold-50)]"
 //                     >
 //                       {paths.map((p) => (
 //                         <option key={p.id} value={p.id}>
@@ -855,7 +855,7 @@ export default function LoanTable({
 //                       onChange={(e) =>
 //                         updateLoan(idx, "change_frequency", e.target.value)
 //                       }
-//                       className="w-full px-1 py-0.5 border rounded focus:ring-2 focus:ring-purple-400 text-center focus:bg-orange-100 "
+//                       className="w-full px-1 py-0.5 border rounded focus:ring-2 focus:ring-purple-400 text-center focus:bg-[var(--hm-gold-50)] "
 //                     />
 //                   </td>
 
@@ -866,7 +866,7 @@ export default function LoanTable({
 //                       maxLength={3}
 //                       value={loan.anchor || ""}
 //                       onChange={(e) => updateLoan(idx, "anchor", e.target.value)}
-//                       className="w-full px-1 py-0.5 border rounded focus:ring-2 focus:ring-purple-400 text-center focus:bg-orange-100 "
+//                       className="w-full px-1 py-0.5 border rounded focus:ring-2 focus:ring-purple-400 text-center focus:bg-[var(--hm-gold-50)] "
 //                     />
 //                   </td>
 
@@ -879,7 +879,7 @@ export default function LoanTable({
 //                       onChange={(e) =>
 //                         updateLoan(idx, "anchor_margin", Number(e.target.value))
 //                       }
-//                       className="w-full px-1 py-0.5 border rounded focus:ring-2 focus:ring-purple-400 text-center focus:bg-orange-100"
+//                       className="w-full px-1 py-0.5 border rounded focus:ring-2 focus:ring-purple-400 text-center focus:bg-[var(--hm-gold-50)]"
 //                     />
 //                   </td>
 
@@ -888,7 +888,7 @@ export default function LoanTable({
 //                     <select
 //                       value={loan.grace_type_id ?? 1}
 //                       onChange={(e) => updateLoan(idx, "grace_type_id", Number(e.target.value))}
-//                       className="w-full px-1 py-0.5 border rounded focus:ring-2 focus:ring-purple-400 text-center focus:bg-orange-100"
+//                       className="w-full px-1 py-0.5 border rounded focus:ring-2 focus:ring-purple-400 text-center focus:bg-[var(--hm-gold-50)]"
 //                     >
 //                       {graceTypes.map((g) => (
 //                         <option key={g.id} value={g.id}>
@@ -907,7 +907,7 @@ export default function LoanTable({
 //                       onChange={(e) =>
 //                         updateLoan(idx, "grace_months", Number(e.target.value))
 //                       }
-//                       className="w-full px-1 py-0.5 border rounded focus:ring-2 focus:ring-purple-400 text-center focus:bg-orange-100"
+//                       className="w-full px-1 py-0.5 border rounded focus:ring-2 focus:ring-purple-400 text-center focus:bg-[var(--hm-gold-50)]"
 //                     />
 //                   </td>
 //                   {/* תאריך סיום */}
@@ -940,7 +940,7 @@ export default function LoanTable({
 //                       onChange={(e) =>
 //                         updateLoan(idx, "months", Number(e.target.value))
 //                       }
-//                       className="w-full px-1 py-0.5 border rounded text-center focus:ring-2 focus:ring-purple-400 before:focus:bg-orange-100 focus:bg-orange-100 "
+//                       className="w-full px-1 py-0.5 border rounded text-center focus:ring-2 focus:ring-purple-400 before:focus:bg-[var(--hm-gold-50)] focus:bg-[var(--hm-gold-50)] "
 //                     />
 //                   </td>
 
@@ -953,7 +953,7 @@ export default function LoanTable({
 //                       onChange={(e) =>
 //                         updateLoan(idx, "rate", Number(e.target.value))
 //                       }
-//                       className="w-full px-1 py-0.5 border rounded text-center focus:ring-2 focus:ring-purple-400 focus:bg-orange-100"
+//                       className="w-full px-1 py-0.5 border rounded text-center focus:ring-2 focus:ring-purple-400 focus:bg-[var(--hm-gold-50)]"
 //                     />
 //                   </td>
 
@@ -973,7 +973,7 @@ export default function LoanTable({
 //                           setActiveLoan(loan);
 //                           setIsAmortizationOpen(true);
 //                         }}
-//                         className="w-[65px] px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-xs"
+//                         className="w-[65px] px-2 py-1 bg-[var(--hm-gold-600)] text-white rounded hover:bg-[var(--hm-gold-700)] text-xs"
 //                       >
 //                         לוח
 //                       </button>

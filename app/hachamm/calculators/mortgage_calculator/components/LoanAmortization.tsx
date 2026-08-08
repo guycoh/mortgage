@@ -34,7 +34,7 @@ export default function LoanAmortization({
         </button>
 
         {/* כותרת */}
-        <div className="bg-blue-600 text-white text-center py-3 rounded-t-2xl">
+        <div className="bg-[var(--hm-gold-600)] text-white text-center py-3 rounded-t-2xl">
           <h2 className="text-xl font-bold">לוח סילוקין — {loan.id}</h2>
         </div>
 

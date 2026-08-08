@@ -50,30 +50,22 @@ export default function EqualPrincipalCalculator() {
   const spitzerMonthlyLast = spitzerPayments.at(-1)?.total || 0
 
   return (
- <div className="flex flex-col items-center bg-linear-to-b from-[#f8fafc] to-[#e6eff3] min-h-screen py-10 px-4">
+ <div className="hm-page flex-col items-center">
   {/* מחשבון */}
   <div className="relative w-full max-w-225 flex flex-col items-center">
     {/* גוף התיבה */}
-    <div
-      className="relative w-full rounded-xl overflow-hidden"
-      style={{
-        background: "linear-gradient(180deg, #1d75a1 0%, #15516f 100%)",
-        boxShadow:
-          "0 20px 30px rgba(0,0,0,0.3), inset 0 2px 8px rgba(255,255,255,0.15)",
-      }}
-    >
-      {/* קצה עליון */}
-      <div className="absolute top-0 left-0 w-full h-[12px] bg-white/20"></div>
+    <div className="hm-device w-full">
+      <div className="hm-device-gloss" />
 
       {/* תוכן המחשבון */}
-      <div className="flex flex-col items-center space-y-4 text-white p-6">
-        <h1 className="text-2xl font-bold text-center mb-4 text-white drop-shadow-lg">
+      <div className="relative flex flex-col items-center space-y-4 p-5 sm:p-6">
+        <h1 className="text-xl sm:text-2xl font-bold text-center mb-2 drop-shadow-lg">
           מחשבון השוואה: קרן שווה מול שפיצר
         </h1>
 
         <form className="grid gap-4 grid-cols-1 sm:grid-cols-3 w-full">
           <div>
-            <label className="block mb-1 font-medium text-white">סכום ההלוואה</label>
+            <label className="block mb-1 font-medium">סכום ההלוואה</label>
             <input
               type="text"
               inputMode="numeric"
@@ -83,26 +75,26 @@ export default function EqualPrincipalCalculator() {
                 const numericValue = parseInt(raw) || 0;
                 setAmount(numericValue);
               }}
-              className="w-full rounded-md p-2 text-gray-900 text-sm bg-white/95 shadow-inner focus:outline-none focus:ring-2 focus:ring-main focus:bg-orange-50"
+              className="hm-field text-sm"
             />
           </div>
           <div>
-            <label className="block mb-1 font-medium text-white">מספר חודשים</label>
+            <label className="block mb-1 font-medium">מספר חודשים</label>
             <input
               type="number"
               value={months}
               onChange={(e) => setMonths(+e.target.value)}
-              className="w-full rounded-md p-2 text-gray-900 text-sm bg-white/95 shadow-inner focus:outline-none focus:ring-2 focus:ring-main focus:bg-orange-50"
+              className="hm-field text-sm"
             />
           </div>
           <div>
-            <label className="block mb-1 font-medium text-white">ריבית שנתית (%)</label>
+            <label className="block mb-1 font-medium">ריבית שנתית (%)</label>
             <input
               type="number"
               step="0.01"
               value={annualRate}
               onChange={(e) => setAnnualRate(+e.target.value)}
-              className="w-full rounded-md p-2 text-gray-900 text-sm bg-white/95 shadow-inner focus:outline-none focus:ring-2 focus:ring-main focus:bg-orange-50"
+              className="hm-field text-sm"
             />
 
              </div>
@@ -110,14 +102,14 @@ export default function EqualPrincipalCalculator() {
 
         {/* תוצאות */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm w-full">
-          <div className="space-y-1 bg-white/10 p-4 rounded-lg shadow-inner">
-            <h2 className="text-white font-bold text-lg">קרן שווה</h2>
+          <div className="space-y-1 bg-[rgba(255,250,226,0.12)] p-4 rounded-lg shadow-inner">
+            <h2 className="font-bold text-lg">קרן שווה</h2>
             <p><strong>סה"כ ריבית:</strong> {totalEqualInterest.toLocaleString('he-IL', { maximumFractionDigits: 2 })} ₪</p>
             <p><strong>תשלום ראשון:</strong> {equalMonthlyFirst.toLocaleString('he-IL', { maximumFractionDigits: 2 })} ₪</p>
             <p><strong>תשלום אחרון:</strong> {equalMonthlyLast.toLocaleString('he-IL', { maximumFractionDigits: 2 })} ₪</p>
           </div>
-          <div className="space-y-1 bg-white/10 p-4 rounded-lg shadow-inner">
-            <h2 className="text-white font-bold text-lg">שפיצר</h2>
+          <div className="space-y-1 bg-[rgba(255,250,226,0.12)] p-4 rounded-lg shadow-inner">
+            <h2 className="font-bold text-lg">שפיצר</h2>
             <p><strong>סה"כ ריבית:</strong> {totalSpitzerInterest.toLocaleString('he-IL', { maximumFractionDigits: 2 })} ₪</p>
             <p><strong>תשלום ראשון:</strong> {spitzerMonthlyFirst.toLocaleString('he-IL', { maximumFractionDigits: 2 })} ₪</p>
             <p><strong>תשלום אחרון:</strong> {spitzerMonthlyLast.toLocaleString('he-IL', { maximumFractionDigits: 2 })} ₪</p>
@@ -125,25 +117,32 @@ export default function EqualPrincipalCalculator() {
         </div>
       </div>
 
-      {/* קצה תחתון */}
-      <div className="absolute bottom-0 left-0 w-full h-3.5 bg-black/20 blur-[2px]"></div>
+      <div className="hm-device-shade" />
     </div>
 
     {/* בסיס/שולחן */}
-    <div className="mt-4 w-full h-3 bg-linear-to-b from-[#a9b7bf] to-[#6c7b84] rounded-b-xl shadow-md"></div>
+    <div className="hm-device-base mt-4 w-full h-3 rounded-b-xl shadow-md"></div>
 
     {/* צל רך מתחת */}
     <div className="mt-2 w-4/5 h-5 bg-black/20 blur-2xl rounded-full"></div>
   </div>
 
   {/* גרפים */}
-  <section className="mt-12 w-full max-w-225">
-    <div className="bg-gray-50 rounded-2xl shadow-md p-6">
-      <h2 className="text-xl font-bold text-main mb-2">גרף תשלומים - קרן שווה</h2>
-      <EqualPrincipalGraph payments={equalPrincipalPayments} />
+  <section className="mt-10 w-full max-w-225">
+    <div className="rounded-2xl bg-[var(--hm-paper)] p-4 shadow-md ring-1 ring-[var(--hm-gold-100)] sm:p-6">
+      <h2 className="mb-2 text-lg font-bold text-[var(--hm-gold-700)] sm:text-xl">
+        גרף תשלומים - קרן שווה
+      </h2>
+      <div className="hm-scroll-x">
+        <EqualPrincipalGraph payments={equalPrincipalPayments} />
+      </div>
 
-      <h2 className="text-xl font-bold text-main mt-8 mb-2">גרף תשלומים - שפיצר</h2>
-      <EqualPrincipalGraph payments={spitzerPayments} />
+      <h2 className="mt-8 mb-2 text-lg font-bold text-[var(--hm-gold-700)] sm:text-xl">
+        גרף תשלומים - שפיצר
+      </h2>
+      <div className="hm-scroll-x">
+        <EqualPrincipalGraph payments={spitzerPayments} />
+      </div>
     </div>
   </section>
 </div>

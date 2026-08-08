@@ -126,7 +126,7 @@ export default function ReverseMortgageLoanComparison({
         <label className="font-bold">סכום משכנתא מבוקשת</label>
         <input
           type="number"
-          className="w-full mt-2 rounded-md p-3 border focus:ring-2 focus:ring-orange-300"
+          className="hm-field mt-2 border border-[var(--hm-gold-200)]"
           value={loanAmount}
           max={maxLoan}
           onChange={e => setLoanAmount(Math.min(Number(e.target.value) || 0, maxLoan))}
@@ -157,7 +157,7 @@ export default function ReverseMortgageLoanComparison({
 function ResultCard({ title, data, onOpen, tableTitle, isGrace = false }: any) {
   return (
     <div className="rounded-xl bg-gray-100 p-4 space-y-2">
-      <h3 className="font-bold text-lg text-blue-900">{title}</h3>
+      <h3 className="font-bold text-lg text-[var(--hm-gold-700)]">{title}</h3>
 
       <Row
         label={isGrace ? "החזר חודשי התחלתי" : "החזר חודשי שוטף"}
@@ -186,7 +186,7 @@ function ResultCard({ title, data, onOpen, tableTitle, isGrace = false }: any) {
       <div className="flex justify-center mt-3">
         <button
           onClick={onOpen}
-          className="px-6 py-2 rounded-xl bg-[#1d75a1] text-white font-bold shadow-md hover:bg-blue-800 transition"
+          className="px-6 py-2 rounded-xl bg-[var(--hm-gold-700)] text-[#fffaea] font-bold shadow-md hover:bg-[var(--hm-gold-800)] transition"
         >
           {tableTitle}
         </button>
@@ -502,7 +502,7 @@ function Row({ label, value }: any) {
 // p-3
 // border
 // focus:ring-2
-// focus:ring-orange-300
+// focus:ring-[var(--hm-gold-400)]
 // "
 
 // value={loanAmount}
@@ -579,7 +579,7 @@ function Row({ label, value }: any) {
 // <h3 className="
 // font-bold
 // text-lg
-// text-blue-900
+// text-[var(--hm-gold-700)]
 // ">
 
 // {title}
@@ -639,11 +639,11 @@ function Row({ label, value }: any) {
 // px-6
 // py-2
 // rounded-xl
-// bg-blue-900
+// bg-[var(--hm-gold-800)]
 // text-white
 // font-bold
 // shadow-md
-// hover:bg-blue-800
+// hover:bg-[var(--hm-gold-800)]
 // transition
 // "
 

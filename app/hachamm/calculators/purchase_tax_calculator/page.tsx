@@ -1,7 +1,9 @@
-"use client"
+"use client";
 import { useState } from "react";
-//import CustomButton from "../../components/CustomButton";
-import CustomButton from "@/app/home/components/CustomButton";
+import { Calculator, RotateCcw } from "lucide-react";
+import { HmButton } from "../../components/HmButton";
+import { HmFigure } from "../../components/HmFigure";
+import { HmReveal } from "../../components/HmReveal";
 
 const PurchaseTaxForm = () => {
   const [propertyPrice, setPropertyPrice] = useState<number | "">("");
@@ -76,22 +78,14 @@ const PurchaseTaxForm = () => {
   };
 
   return (
- <div className="flex justify-center items-start font-open-sans font-normal   min-h-screen bg-linear-to-b from-[#f8fafc] to-[#e6eff3] pt-6 pb-6 mt-40 px-2">
+ <div className="hm-page font-open-sans font-normal">
   <div className="relative w-full max-w-112.5">
-    {/* גוף התיבה - רקע טורקיז עם תלת מימד */}
-    <div
-      className="relative rounded-xl overflow-hidden p-5 sm:p-6"
-      style={{
-        background: "linear-gradient(180deg, #1d75a1 0%, #15516f 100%)",
-        boxShadow:
-          "0 20px 30px rgba(0,0,0,0.3), inset 0 2px 8px rgba(255,255,255,0.15)",
-      }}
-    >
-      {/* פס עליון מואר */}
-      <div className="absolute top-0 left-0 w-full h-2.5 bg-white/20"></div>
+    {/* גוף המחשבון */}
+    <div className="hm-device p-5 sm:p-6">
+      <div className="hm-device-gloss" />
 
       {/* תוכן המחשבון */}
-      <div className="flex flex-col items-center justify-start h-full space-y-4 text-white">
+      <div className="relative flex flex-col items-center justify-start h-full space-y-4">
         <h2 className="text-2xl sm:text-3xl font-extrabold tracking-wide text-center drop-shadow-lg mb-2">
           מחשבון מס רכישה
         </h2>
@@ -101,7 +95,7 @@ const PurchaseTaxForm = () => {
           type="text"
           inputMode="numeric"
           placeholder="מחיר הדירה (₪)"
-          className="w-full rounded-md p-3 text-gray-900 text-base bg-white shadow-inner focus:bg-orange-100 focus:ring-2 focus:ring-orange-300 focus:outline-none transition"
+          className="hm-field text-base"
           value={
             propertyPrice !== "" ? formatNumber(propertyPrice.toString()) : ""
           }
@@ -109,14 +103,13 @@ const PurchaseTaxForm = () => {
         />
 
         {/* דירה יחידה */}
-        <div className="w-full flex justify-start gap-6 text-sm">
+        <div className="w-full flex flex-wrap items-center justify-start gap-x-6 gap-y-2 text-sm">
           <p>האם זאת דירה יחידה ?</p>
           <label className="flex items-center gap-2">
             <input
               type="radio"
               checked={isSingleHome}
               onChange={() => setIsSingleHome(true)}
-              className="accent-blue-600"
             />
             כן
           </label>
@@ -125,36 +118,33 @@ const PurchaseTaxForm = () => {
               type="radio"
               checked={!isSingleHome}
               onChange={() => setIsSingleHome(false)}
-              className="accent-blue-600"
             />
             לא
           </label>
         </div>
 
-        {/* כפתורים עם תלת מימד מתקדם */}
-        <div className="flex w-full justify-between gap-3">
-        
-        <CustomButton 
-        text="חשב מס"
-        size="md" 
-        onClick={calculateTax}
-      />
-        
-        <CustomButton 
-        text="נקה טופס" 
-        size="md" 
-        onClick={resetForm} 
-      />
-        
+        {/* כפתורים */}
+        <div className="grid w-full grid-cols-2 gap-3">
+          <HmButton onClick={calculateTax} fullWidth icon={<Calculator className="h-[18px] w-[18px]" />}>
+            חשב מס
+          </HmButton>
+          <HmButton
+            onClick={resetForm}
+            variant="ghost"
+            fullWidth
+            icon={<RotateCcw className="h-[18px] w-[18px]" />}
+          >
+            נקה טופס
+          </HmButton>
         </div>
 
         {/* תוצאה */}
-        {totalTax !== null && (
-          <div className="w-full bg-white rounded-xl p-4 mt-3 shadow-inner">
+        <HmReveal show={totalTax !== null}>
+          <div className="hm-panel mt-3 p-4">
             {taxBreakdown.map((step, idx) => (
               <div
                 key={idx}
-                className="flex flex-col sm:flex-row justify-between items-center mb-3 p-3 bg-gray-100 rounded-md shadow-sm text-gray-800"
+                className="hm-row mb-3 grid grid-cols-2 items-center gap-x-3 gap-y-1 p-3 sm:grid-cols-4"
               >
                 <span className="text-sm font-medium">
                   מ: ₪{step.from.toLocaleString()}
@@ -165,27 +155,31 @@ const PurchaseTaxForm = () => {
                 <span className="text-sm font-medium">
                   שיעור מס: {(step.rate * 100).toFixed(1)}%
                 </span>
-                <span className="text-sm font-bold text-gray-900">
-                  תשלום: ₪{step.amount.toLocaleString()}
+                <span className="text-sm font-bold">
+                  תשלום: ₪{Math.round(step.amount).toLocaleString()}
                 </span>
               </div>
             ))}
-            <div className="mt-3 font-bold text-center text-gray-900 text-base">
-              סך הכל מס רכישה: ₪{totalTax.toLocaleString()}
+            <div className="mt-4 flex flex-col items-center gap-1 border-t border-[var(--hm-gold-100)] pt-3">
+              <span className="text-[12px] font-semibold tracking-[0.14em] text-[var(--hm-ink-faint)]">
+                סך הכל מס רכישה
+              </span>
+              <span className="hm-figure text-2xl">
+                <HmFigure value={totalTax ?? 0} />
+              </span>
             </div>
           </div>
-        )}
+        </HmReveal>
       </div>
 
-      {/* פס תחתון עם הצללה */}
-      <div className="absolute bottom-0 left-0 w-full h-3.5 bg-black/20 blur-[2px]"></div>
+      <div className="hm-device-shade" />
     </div>
 
     {/* בסיס / שולחן */}
-    <div className="absolute -bottom-4.5 left-1/2 -translate-x-1/2 w-full max-w-112.5 h-2.5 bg-linear-to-b from-[#a9b7bf] to-[#6c7b84] rounded-b-xl shadow-md"></div>
+    <div className="hm-device-base absolute -bottom-4.5 left-1/2 -translate-x-1/2 w-full h-2.5 rounded-b-xl shadow-md"></div>
 
     {/* צל רך מתחת */}
-    <div className="absolute -bottom-7.5 left-1/2 -translate-x-1/2 w-95 h-5 bg-black/20 blur-2xl rounded-full"></div>
+    <div className="absolute -bottom-7.5 left-1/2 -translate-x-1/2 w-[85%] h-5 bg-black/20 blur-2xl rounded-full"></div>
   </div>
 </div>
 

@@ -1,6 +1,9 @@
 "use client"
 
 import { useState } from 'react';
+import { RotateCcw } from 'lucide-react';
+import { HmButton } from '../../components/HmButton';
+import { HmFigure } from '../../components/HmFigure';
 
 interface MonthlyData {
   month: number;
@@ -60,23 +63,15 @@ export default function LoanCalculator() {
   };
 
   return (
-<div className="flex justify-center items-start min-h-screen bg-gradient-to-b from-[#f8fafc] to-[#e6eff3] pt-10 pb-20 px-2">
+<div className="hm-page">
   <div className="relative w-full max-w-[500px]">
 
     {/* ===== קוביית המחשבון ===== */}
-    <div
-      className="relative rounded-2xl overflow-hidden p-6 sm:p-8 z-10"
-      style={{
-        background: "linear-gradient(180deg, #1d75a1 0%, #15516f 100%)",
-        boxShadow:
-          "0 18px 28px rgba(0,0,0,0.3), inset 0 2px 8px rgba(255,255,255,0.15)",
-      }}
-    >
-      {/* פס עליון מבריק */}
-      <div className="absolute top-0 left-0 w-full h-[10px] bg-white/20"></div>
+    <div className="hm-device z-10 p-5 sm:p-8">
+      <div className="hm-device-gloss" />
 
       {/* תוכן המחשבון */}
-      <div className="flex flex-col items-center space-y-5 text-white">
+      <div className="relative flex flex-col items-center space-y-5">
         <h2 className="text-2xl sm:text-3xl font-extrabold text-center drop-shadow-lg">
           מחשבון הלוואה
         </h2>
@@ -85,14 +80,14 @@ export default function LoanCalculator() {
         <div className="w-full space-y-4">
           {/* סכום ההלוואה */}
           <div>
-            <label className="block text-sm mb-1 text-slate-100">
+            <label className="block text-sm mb-1 opacity-90">
               סכום ההלוואה (₪)
             </label>
             <input
               type="text"
               inputMode="numeric"
               placeholder="לדוגמה: 350,000"
-              className="w-full rounded-md p-3 text-gray-900 bg-white shadow-[inset_0_3px_5px_rgba(0,0,0,0.2),0_3px_6px_rgba(0,0,0,0.25)] focus:bg-orange-50 focus:ring-2 focus:ring-orange-200 outline-none transition-all"
+              className="hm-field"
               value={amount === "" ? "" : amount.toLocaleString()}
               onChange={(e) => {
                 const raw = e.target.value.replace(/,/g, "");
@@ -125,18 +120,20 @@ export default function LoanCalculator() {
               dir="ltr" // שומר על כיוון שמאל→ימין גם בתוך RTL
               value={interest}
               onChange={(e) => setInterest(Number(e.target.value))}
-              className="w-full h-2 bg-white/40 rounded-lg appearance-none cursor-pointer accent-orange-400
-                        [&::-webkit-slider-thumb]:appearance-none 
-                        [&::-webkit-slider-thumb]:w-4 
-                        [&::-webkit-slider-thumb]:h-4 
-                        [&::-webkit-slider-thumb]:rounded-full 
-                        [&::-webkit-slider-thumb]:bg-orange-400 
+              className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-[rgba(255,250,226,0.35)]
+                        [&::-webkit-slider-thumb]:appearance-none
+                        [&::-webkit-slider-thumb]:w-5
+                        [&::-webkit-slider-thumb]:h-5
+                        [&::-webkit-slider-thumb]:rounded-full
+                        [&::-webkit-slider-thumb]:bg-[var(--hm-gold-200)]
+                        [&::-webkit-slider-thumb]:border-2
+                        [&::-webkit-slider-thumb]:border-[#fffaea]
                         [&::-webkit-slider-thumb]:shadow-md
                         [&::-webkit-slider-runnable-track]:rounded-lg"
             />
 
             {/* תצוגת אחוז בצד ימין */}
-            <span className="w-12 text-center font-bold text-white">
+            <span className="w-12 text-center font-bold">
               {Number(interest).toFixed(1)}%
             </span>
           </div>
@@ -144,13 +141,13 @@ export default function LoanCalculator() {
 
           {/* חודשי הלוואה */}
           <div>
-            <label className="block text-sm mb-1 text-slate-100">
+            <label className="block text-sm mb-1 opacity-90">
               מספר חודשי הלוואה
             </label>
             <input
               type="number"
               placeholder="לדוגמה: 240"
-              className="w-full rounded-md p-3 text-gray-900 bg-white shadow-[inset_0_3px_5px_rgba(0,0,0,0.2),0_3px_6px_rgba(0,0,0,0.25)] focus:bg-orange-50 focus:ring-2 focus:ring-orange-200 outline-none transition-all"
+              className="hm-field"
               value={months}
               onChange={(e) =>
                 setMonths(e.target.value === "" ? "" : Number(e.target.value))
@@ -162,64 +159,44 @@ export default function LoanCalculator() {
         {/* כפתורים */}
  
 
-        <button
-            onClick={resetForm}
-            className="w-full py-3 rounded-md bg-white text-blue-900 font-bold transition-all duration-200 ease-out focus:outline-none"
-            style={{
-              boxShadow:
-                "0 -3px 8px rgba(255,255,255,0.8), 0 6px 12px rgba(0,0,0,0.2), inset 0 4px 8px rgba(0,0,0,0.1), inset 0 -4px 8px rgba(255,255,255,0.7)",
-              border: "1px solid rgba(0,0,0,0.05)",
-              background:
-                "linear-gradient(180deg, #ffffff 0%, #f6f8fb 40%, #eef3fb 100%)",
-              transform: "translateY(0)",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.boxShadow =
-                "0 -5px 12px rgba(255,255,255,0.9), 0 12px 24px rgba(0,0,0,0.25), inset 0 6px 12px rgba(0,0,0,0.1), inset 0 -6px 12px rgba(255,255,255,0.8)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.boxShadow =
-                "0 -3px 8px rgba(255,255,255,0.8), 0 6px 12px rgba(0,0,0,0.2), inset 0 4px 8px rgba(0,0,0,0.1), inset 0 -4px 8px rgba(255,255,255,0.7)";
-            }}
-            onMouseDown={(e) => {
-              e.currentTarget.style.boxShadow =
-                "inset 0 6px 10px rgba(0,0,0,0.2), inset 0 -4px 6px rgba(255,255,255,0.6)";
-              e.currentTarget.style.transform = "translateY(1px)";
-            }}
-            onMouseUp={(e) => {
-              e.currentTarget.style.boxShadow =
-                "0 -3px 8px rgba(255,255,255,0.8), 0 6px 12px rgba(0,0,0,0.2), inset 0 4px 8px rgba(0,0,0,0.1), inset 0 -4px 8px rgba(255,255,255,0.7)";
-              e.currentTarget.style.transform = "translateY(0)";
-            }}
-          >
-            נקה
-          </button>
+        <HmButton
+          onClick={resetForm}
+          variant="ghost"
+          fullWidth
+          icon={<RotateCcw className="h-[18px] w-[18px]" />}
+        >
+          נקה
+        </HmButton>
 
           {/* <div className="flex w-full justify-between gap-3 mt-4">
           
           <button
             onClick={resetForm}
-            className="flex-1 py-3 rounded-md bg-white text-blue-900 font-bold shadow-[inset_0_4px_6px_rgba(0,0,0,0.15),0_4px_8px_rgba(0,0,0,0.25)] hover:shadow-[inset_0_2px_3px_rgba(0,0,0,0.1),0_6px_10px_rgba(0,0,0,0.35)] active:translate-y-[1px] transition-all"
+            className="flex-1 py-3 rounded-md bg-white text-[var(--hm-gold-700)] font-bold shadow-[inset_0_4px_6px_rgba(0,0,0,0.15),0_4px_8px_rgba(0,0,0,0.25)] hover:shadow-[inset_0_2px_3px_rgba(0,0,0,0.1),0_6px_10px_rgba(0,0,0,0.35)] active:translate-y-[1px] transition-all"
           >
             נקה
           </button>
         </div> */}
 
         {/* תוצאה */}
-        <div className="w-full bg-white rounded-xl p-4 mt-3 shadow-inner text-gray-900 text-center">
-          <p className="text-lg font-medium">תשלום חודשי מוערך:</p>
-          <p className="text-3xl font-bold text-blue-900 mt-1">
-            ₪{monthlyPayment.toFixed(2)}
+        <div className="hm-panel mt-3 p-4 text-center">
+          <p className="text-[12px] font-semibold tracking-[0.14em] text-[var(--hm-ink-faint)]">
+            תשלום חודשי מוערך
+          </p>
+          <p className="hm-figure mt-1.5 text-3xl">
+            <HmFigure value={monthlyPayment} decimals={0} />
           </p>
         </div>
 
       </div>
+      <div className="hm-device-shade" />
     </div>
 
     {/* ===== בסיס / שולחן ===== */}
     <div className="relative w-full h-[50px] mt-[-10px] z-0">
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-[500px] h-[10px] bg-gradient-to-b from-[#a9b7bf] to-[#6c7b84] rounded-b-2xl shadow-md"></div>
-      <div className="absolute top-10 left-1/2 -translate-x-1/2 w-[400px] h-[20px] bg-black/20 blur-2xl rounded-full"></div>
+      <div className="hm-device-base absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-[500px] h-[10px] rounded-b-2xl shadow-md"></div>
+      {/* w-[85%] ולא רוחב קבוע — 400px גלש מעבר למסך של 390px */}
+      <div className="absolute top-10 left-1/2 -translate-x-1/2 w-[85%] max-w-[400px] h-[20px] bg-black/20 blur-2xl rounded-full"></div>
     </div>
 
     {/* ===== טבלת סילוקין ===== */}
@@ -328,14 +305,14 @@ export default function LoanCalculator() {
 //   };
 
 //   return (
-//  <div className="flex justify-center items-start min-h-screen bg-gradient-to-b from-[#f8fafc] to-[#e6eff3] pt-10 pb-20 px-2">
+//  <div className="flex justify-center items-start min-h-screen bg-gradient-to-b from-[var(--hm-paper)] to-[var(--hm-bone-100)] pt-10 pb-20 px-2">
 //   <div className="relative w-full max-w-[500px]">
 
 //     {/* ===== קוביית המחשבון ===== */}
 //     <div
 //       className="relative rounded-2xl overflow-hidden p-6 sm:p-8 z-10"
 //       style={{
-//         background: "linear-gradient(180deg, #1d75a1 0%, #15516f 100%)",
+//         background: "linear-gradient(180deg, var(--hm-gold-700) 0%, var(--hm-gold-800) 100%)",
 //         boxShadow:
 //           "0 18px 28px rgba(0,0,0,0.3), inset 0 2px 8px rgba(255,255,255,0.15)",
 //       }}
@@ -353,14 +330,14 @@ export default function LoanCalculator() {
 //         <div className="w-full space-y-4">
 //           {/* סכום ההלוואה */}
 //           <div>
-//             <label className="block text-sm mb-1 text-slate-100">
+//             <label className="block text-sm mb-1 opacity-90">
 //               סכום ההלוואה (₪)
 //             </label>
 //             <input
 //               type="text"
 //               inputMode="numeric"
 //               placeholder="לדוגמה: 350,000"
-//               className="w-full rounded-md p-3 text-gray-900 bg-white shadow-[inset_0_3px_5px_rgba(0,0,0,0.2),0_3px_6px_rgba(0,0,0,0.25)] focus:bg-orange-50 focus:ring-2 focus:ring-orange-200 outline-none transition-all"
+//               className="hm-field"
 //               value={amount === "" ? "" : amount.toLocaleString()}
 //               onChange={(e) => {
 //                 const raw = e.target.value.replace(/,/g, "");
@@ -378,14 +355,14 @@ export default function LoanCalculator() {
 
 //           {/* ריבית שנתית */}
 //           <div>
-//             <label className="block text-sm mb-1 text-slate-100">
+//             <label className="block text-sm mb-1 opacity-90">
 //               ריבית שנתית (%)
 //             </label>
 //             <input
 //               type="text"
 //               inputMode="decimal"
 //               placeholder="לדוגמה: 4.8"
-//               className="w-full rounded-md p-3 text-gray-900 bg-white shadow-[inset_0_3px_5px_rgba(0,0,0,0.2),0_3px_6px_rgba(0,0,0,0.25)] focus:bg-orange-50 focus:ring-2 focus:ring-orange-200 outline-none transition-all"
+//               className="hm-field"
 //               value={interest === "" ? "" : interest.toString()}
 //               onChange={(e) => {
 //                 const raw = e.target.value.replace(",", ".");
@@ -398,13 +375,13 @@ export default function LoanCalculator() {
 
 //           {/* חודשי הלוואה */}
 //           <div>
-//             <label className="block text-sm mb-1 text-slate-100">
+//             <label className="block text-sm mb-1 opacity-90">
 //               מספר חודשי הלוואה
 //             </label>
 //             <input
 //               type="number"
 //               placeholder="לדוגמה: 240"
-//               className="w-full rounded-md p-3 text-gray-900 bg-white shadow-[inset_0_3px_5px_rgba(0,0,0,0.2),0_3px_6px_rgba(0,0,0,0.25)] focus:bg-orange-50 focus:ring-2 focus:ring-orange-200 outline-none transition-all"
+//               className="hm-field"
 //               value={months}
 //               onChange={(e) =>
 //                 setMonths(e.target.value === "" ? "" : Number(e.target.value))
@@ -417,13 +394,13 @@ export default function LoanCalculator() {
 //         <div className="flex w-full justify-between gap-3 mt-4">
 //           <button
 //             onClick={() => {}}
-//             className="flex-1 py-3 rounded-md bg-white text-blue-900 font-bold shadow-[inset_0_4px_6px_rgba(0,0,0,0.15),0_4px_8px_rgba(0,0,0,0.25)] hover:shadow-[inset_0_2px_3px_rgba(0,0,0,0.1),0_6px_10px_rgba(0,0,0,0.35)] active:translate-y-[1px] transition-all"
+//             className="flex-1 py-3 rounded-md bg-white text-[var(--hm-gold-700)] font-bold shadow-[inset_0_4px_6px_rgba(0,0,0,0.15),0_4px_8px_rgba(0,0,0,0.25)] hover:shadow-[inset_0_2px_3px_rgba(0,0,0,0.1),0_6px_10px_rgba(0,0,0,0.35)] active:translate-y-[1px] transition-all"
 //           >
 //             חשב
 //           </button>
 //           <button
 //             onClick={resetForm}
-//             className="flex-1 py-3 rounded-md bg-white text-blue-900 font-bold shadow-[inset_0_4px_6px_rgba(0,0,0,0.15),0_4px_8px_rgba(0,0,0,0.25)] hover:shadow-[inset_0_2px_3px_rgba(0,0,0,0.1),0_6px_10px_rgba(0,0,0,0.35)] active:translate-y-[1px] transition-all"
+//             className="flex-1 py-3 rounded-md bg-white text-[var(--hm-gold-700)] font-bold shadow-[inset_0_4px_6px_rgba(0,0,0,0.15),0_4px_8px_rgba(0,0,0,0.25)] hover:shadow-[inset_0_2px_3px_rgba(0,0,0,0.1),0_6px_10px_rgba(0,0,0,0.35)] active:translate-y-[1px] transition-all"
 //           >
 //             נקה
 //           </button>
@@ -432,7 +409,7 @@ export default function LoanCalculator() {
 //         {/* תוצאה */}
 //         <div className="w-full bg-white rounded-xl p-4 mt-3 shadow-inner text-gray-900 text-center">
 //           <p className="text-lg font-medium">תשלום חודשי מוערך:</p>
-//           <p className="text-3xl font-bold text-blue-900 mt-1">
+//           <p className="text-3xl font-bold text-[var(--hm-gold-700)] mt-1">
 //             ₪{monthlyPayment.toFixed(2)}
 //           </p>
 //         </div>
@@ -448,7 +425,7 @@ export default function LoanCalculator() {
 //  {/* ===== בסיס/שולחן מתחת לקובייה ===== */}
 //     <div className="relative w-full h-[50px] mt-[-10px] z-0">
 //       {/* בסיס/שולחן */}
-//       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-[500px] h-[10px] bg-gradient-to-b from-[#a9b7bf] to-[#6c7b84] rounded-b-2xl shadow-md"></div>
+//       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-[500px] h-[10px] bg-gradient-to-b from-[#cfc3a0] to-[#8a7c58] rounded-b-2xl shadow-md"></div>
 //       {/* צל רך מתחת */}
 //       <div className="absolute top-10 left-1/2 -translate-x-1/2 w-[400px] h-[20px] bg-black/20 blur-2xl rounded-full"></div>
 //     </div>

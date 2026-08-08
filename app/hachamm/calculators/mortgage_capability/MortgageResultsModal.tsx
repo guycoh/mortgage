@@ -42,24 +42,24 @@ const MortgageResultsModal: FC<MortgageResultsModalProps> = ({ isOpen, onClose, 
           ×
         </button>
 
-        <h2 className="text-xl font-bold text-[#1d75a1] mb-6 text-right">תוצאות חישוב משכנתא</h2>
+        <h2 className="text-xl font-bold text-[var(--hm-gold-700)] mb-6 text-right">תוצאות חישוב משכנתא</h2>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-right text-gray-800">
           {/* טור ראשון - עיקרי */}
           <div className="space-y-3">           
          
             <div className="bg-green-50 p-4 rounded-xl shadow space-y-2">
-              <p className="text-lg text-[#1d75a1] font-bold border-t pt-2">
+              <p className="text-lg text-[var(--hm-gold-700)] font-bold border-t pt-2">
                <strong>משכנתא מקסימלית סופית:</strong> ₪{Math.round(data.finalMortgage).toLocaleString()}
               </p>
-              <p className="text-lg text-[#1d75a1] font-bold border-t pt-2">
+              <p className="text-lg text-[var(--hm-gold-700)] font-bold border-t pt-2">
                <strong>דירה בשווי</strong> ₪{Math.round(data.finalMortgage/(data.maxFinancePercent/100)).toLocaleString()}
               </p>
-              <p className="text-lg text-[#1d75a1] font-bold border-t pt-2" >
+              <p className="text-lg text-[var(--hm-gold-700)] font-bold border-t pt-2" >
                <strong> הון עצמי נדרש לעסקה:</strong>
                 ₪{Math.round((data.finalMortgage / (data.maxFinancePercent / 100)) - data.finalMortgage).toLocaleString()}
               </p>
-              <p className="text-lg text-[#1d75a1] font-bold border-t pt-2" >
+              <p className="text-lg text-[var(--hm-gold-700)] font-bold border-t pt-2" >
                 תשלום חודשי עבור משכנתא זו: ₪
                 {Math.round(
                     (data.finalMortgage * ((data.annualInterest / 100) / 12)) /
@@ -67,11 +67,11 @@ const MortgageResultsModal: FC<MortgageResultsModalProps> = ({ isOpen, onClose, 
                 ).toLocaleString()}
                 </p>
 
-              <p className="text-lg text-[#1d75a1] font-bold border-t pt-2" >
+              <p className="text-lg text-[var(--hm-gold-700)] font-bold border-t pt-2" >
                <strong>לפי ריבית:</strong>
                {data.annualInterest}%
               </p>
-              <p className="text-lg text-[#1d75a1] font-bold border-t pt-2" >
+              <p className="text-lg text-[var(--hm-gold-700)] font-bold border-t pt-2" >
                <strong>מספר חודשי הלוואה:</strong>
                {data.loanMonths}
               </p>
@@ -83,7 +83,7 @@ const MortgageResultsModal: FC<MortgageResultsModalProps> = ({ isOpen, onClose, 
 
           {/* טור שני - נתוני עזר */}
           <div className="text-sm text-gray-600 space-y-2">
-            <h3 className="text-[#1d75a1] font-bold text-base mb-2">נתוני עזר</h3>
+            <h3 className="text-[var(--hm-gold-700)] font-bold text-base mb-2">נתוני עזר</h3>
             <p>סה"כ הכנסות: ₪{data.totalIncome.toLocaleString()}</p>
             <p>סה"כ הלוואות מעל 18 חודשים: {data.loansCount}</p>
             <p>הכנסה פנויה: ₪{Math.round(data.disposableIncome).toLocaleString()}</p>
@@ -102,7 +102,7 @@ const MortgageResultsModal: FC<MortgageResultsModalProps> = ({ isOpen, onClose, 
         <div className="mt-8 text-center">
           <button
             onClick={onClose}
-            className="bg-[#1d75a1] text-white px-6 py-2 rounded-full hover:bg-[#155d80] transition"
+            className="bg-[var(--hm-gold-700)] text-white px-6 py-2 rounded-full hover:bg-[var(--hm-gold-800)] transition"
           >
             סגור
           </button>

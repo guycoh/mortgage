@@ -32,7 +32,7 @@ export default function SimulatorPage() {
   const [compareMixId, setCompareMixId] = useState<string | null>(null);
 
   const inputBaseStyle = 
-    "text-sm font-semibold text-gray-900 border border-gray-300 rounded-none px-3 py-1.5 focus:ring-1 focus:ring-[#1d75a1] focus:border-[#1d75a1] outline-none bg-white";
+    "text-sm font-semibold text-gray-900 border border-gray-300 rounded-none px-3 py-1.5 focus:ring-1 focus:ring-[var(--hm-gold-600)] focus:border-[var(--hm-gold-600)] outline-none bg-white";
 
   const defaultLoan = (mixId: string): Loan => ({
     id: crypto.randomUUID(),
@@ -118,7 +118,11 @@ export default function SimulatorPage() {
   };
 
   return (
-    <div className="w-full min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8" dir="rtl" ref={containerRef}>
+    <div
+      className="w-full min-h-screen bg-gradient-to-b from-[var(--hm-paper)] to-[var(--hm-bone-100)] py-6 px-3 sm:px-6 lg:px-8"
+      dir="rtl"
+      ref={containerRef}
+    >
       <div className="max-w-7xl mx-auto">
         
         {/* כותרת הדף ממורכזת לחלוטין */}
@@ -135,7 +139,7 @@ export default function SimulatorPage() {
             {/* 1. מדד מחירים צפוי */}
             <div className="w-full">
               <label className="text-xs font-bold text-gray-700 mb-1 flex items-center gap-1">
-                <Percent size={14} className="text-[#1d75a1]" />
+                <Percent size={14} className="text-[var(--hm-gold-700)]" />
                 מדד מחירים צפוי שנתי:
               </label>
               <div className="relative shadow-sm">
@@ -183,7 +187,7 @@ export default function SimulatorPage() {
               <button
                 onClick={duplicateMix}
                 disabled={!activeMixId}
-                className="h-9 w-full bg-[#1d75a1] text-white font-bold text-sm hover:bg-[#155b7e] transition shadow-sm flex items-center justify-center gap-1.5 rounded-none disabled:opacity-50 disabled:cursor-not-allowed"
+                className="h-9 w-full bg-[var(--hm-gold-700)] text-white font-bold text-sm hover:bg-[var(--hm-gold-800)] transition shadow-sm flex items-center justify-center gap-1.5 rounded-none disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Copy size={15} />
                 שכפל תמהיל פעיל
@@ -216,7 +220,7 @@ export default function SimulatorPage() {
                 onClick={() => setActiveMixId(m.id)}
                 className={`group relative py-2 px-5 text-sm font-bold transition-all duration-150 whitespace-nowrap border-t border-x -mb-px text-center cursor-pointer flex items-center gap-2 rounded-none ${
                   isActive
-                    ? "bg-[#1d75a1] border-[#1d75a1] text-white"
+                    ? "bg-[var(--hm-gold-700)] border-[var(--hm-gold-600)] text-white"
                     : "bg-gray-100 text-gray-600 hover:text-gray-900 hover:bg-gray-200/70 border-transparent"
                 }`}
                 style={{ width: "auto" }}
@@ -234,7 +238,7 @@ export default function SimulatorPage() {
                     }
                     onBlur={() => setEditingId(null)}
                     onKeyDown={(e) => e.key === "Enter" && setEditingId(null)}
-                    className="px-1.5 py-0.5 text-xs text-black border focus:outline-none focus:ring-1 focus:ring-[#1d75a1] rounded-none font-medium"
+                    className="px-1.5 py-0.5 text-xs text-black border focus:outline-none focus:ring-1 focus:ring-[var(--hm-gold-600)] rounded-none font-medium"
                   />
                 ) : (
                   <span>{m.mix_name}</span>

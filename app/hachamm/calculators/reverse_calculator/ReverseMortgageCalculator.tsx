@@ -2,8 +2,11 @@
 
 import { useState } from "react";
 //import CustomButton from "../../components/CustomButton";
+import { Calculator, RotateCcw } from "lucide-react";
 import ReverseMortgageLoanComparison from "./ReverseMortgageLoanComparison";
-import CustomButton from "@/app/home/components/CustomButton";
+import { HmButton } from "../../components/HmButton";
+import { HmFigure } from "../../components/HmFigure";
+import { HmReveal } from "../../components/HmReveal";
 
 
 type Result = {
@@ -70,16 +73,10 @@ export default function ReverseMortgageCalculator() {
   return (
     <div className="relative w-full max-w-xl md:max-w-5xl">
       {/* גוף מחשבון */}
-      <div
-        className="relative rounded-xl overflow-hidden p-5 sm:p-6"
-        style={{
-          background: "linear-gradient(180deg,#1d75a1 0%,#15516f 100%)",
-          boxShadow: "0 20px 30px rgba(0,0,0,0.3), inset 0 2px 8px rgba(255,255,255,0.15)"
-        }}
-      >
-        <div className="absolute top-0 left-0 w-full h-2.5 bg-white/20" />
+      <div className="hm-device p-5 sm:p-6">
+        <div className="hm-device-gloss" />
 
-        <div className="flex flex-col items-center space-y-4 text-white">
+        <div className="relative flex flex-col items-center space-y-4">
           <h2 className="text-2xl sm:text-3xl font-extrabold tracking-wide drop-shadow-lg text-center">
             משכנתא הפוכה
           </h2>
@@ -93,7 +90,7 @@ export default function ReverseMortgageCalculator() {
                   type="text"
                   inputMode="numeric"
                   placeholder="₪ שווי נכס"
-                  className="w-full rounded-md p-3 text-gray-900 bg-white shadow-inner focus:bg-orange-100 focus:ring-2 focus:ring-orange-300 outline-none"
+                  className="hm-field"
                   value={propertyValue ? formatNumber(propertyValue) : ""}
                   onChange={e => setPropertyValue(e.target.value.replace(/,/g, ""))}
                 />
@@ -107,7 +104,7 @@ export default function ReverseMortgageCalculator() {
                 type="number"
                 maxLength={3}
                 placeholder="גיל"
-                className="w-full rounded-md p-3 text-gray-900 bg-white shadow-inner focus:bg-orange-100 focus:ring-2 focus:ring-orange-300 outline-none"
+                className="hm-field"
                 value={age1}
                 onChange={e => setAge1(e.target.value.slice(0, 3))}
               />
@@ -122,7 +119,7 @@ export default function ReverseMortgageCalculator() {
                 type="number"
                 maxLength={3}
                 placeholder="גיל"
-                className="w-full rounded-md p-3 text-gray-900 bg-white shadow-inner focus:bg-orange-100 focus:ring-2 focus:ring-orange-300 outline-none"
+                className="hm-field"
                 value={age2}
                 onChange={e => setAge2(e.target.value.slice(0, 3))}
               />
@@ -142,7 +139,7 @@ export default function ReverseMortgageCalculator() {
               <input
                 type="number"
                 placeholder="360"
-                className="w-full rounded-md p-3 text-gray-900 bg-white shadow-inner focus:bg-orange-100 focus:ring-2 focus:ring-orange-300 outline-none"
+                className="hm-field"
                 value={months}
                 onChange={e => setMonths(e.target.value)}
               />
@@ -155,7 +152,7 @@ export default function ReverseMortgageCalculator() {
                 type="number"
                 step="0.01"
                 placeholder="0"
-                className="w-full rounded-md p-3 text-gray-900 bg-white shadow-inner focus:bg-orange-100 focus:ring-2 focus:ring-orange-300 outline-none"
+                className="hm-field"
                 value={interestRate}
                 onChange={e => setInterestRate(e.target.value)}
               />
@@ -167,7 +164,7 @@ export default function ReverseMortgageCalculator() {
               <input
                 type="number"
                 placeholder="0"
-                className="w-full rounded-md p-3 text-gray-900 bg-white shadow-inner focus:bg-orange-100 focus:ring-2 focus:ring-orange-300 outline-none"
+                className="hm-field"
                 value={indexRate}
                 onChange={e => setIndexRate(e.target.value)}
               />
@@ -175,21 +172,35 @@ export default function ReverseMortgageCalculator() {
           </div>
 
           {/* כפתורי מחשבון */}
-          <div className="flex flex-wrap justify-center items-center gap-3">
-            <CustomButton text="חשב" size="md" onClick={calculate} />
-            <CustomButton text="נקה טופס" size="md" onClick={handleClear} />
+          <div className="grid w-full grid-cols-2 items-center gap-3">
+            <HmButton onClick={calculate} fullWidth icon={<Calculator className="h-[18px] w-[18px]" />}>
+              חשב
+            </HmButton>
+            <HmButton
+              onClick={handleClear}
+              variant="ghost"
+              fullWidth
+              icon={<RotateCcw className="h-[18px] w-[18px]" />}
+            >
+              נקה טופס
+            </HmButton>
           </div>
 
-          {result && (
-            <div className="w-full bg-white rounded-xl p-4 mt-3 shadow-inner text-gray-900">
-              <div className="bg-gray-100 rounded-md p-3 mb-2 text-center">
-                אחוז מימון: <b>{result.percent}%</b>
+          <HmReveal show={!!result}>
+            <div className="hm-panel mt-3 p-4">
+              <div className="hm-row mb-3 p-3 text-center">
+                אחוז מימון: <b>{result?.percent}%</b>
               </div>
-              <div className="text-center font-bold text-xl">
-                משכנתא מקסימלית:<br />₪{result.loan.toLocaleString()}
+              <div className="flex flex-col items-center gap-1">
+                <span className="text-[12px] font-semibold tracking-[0.14em] text-[var(--hm-ink-faint)]">
+                  משכנתא מקסימלית
+                </span>
+                <span className="hm-figure text-2xl">
+                  <HmFigure value={result?.loan ?? 0} />
+                </span>
               </div>
             </div>
-          )}
+          </HmReveal>
 
           {result && (
             <ReverseMortgageLoanComparison
@@ -201,11 +212,11 @@ export default function ReverseMortgageCalculator() {
           )}
         </div>
 
-        <div className="absolute bottom-0 left-0 w-full h-3.5 bg-black/20 blur-[2px]" />
+        <div className="hm-device-shade" />
       </div>
 
-      <div className="absolute -bottom-4.5 left-1/2 -translate-x-1/2 w-full h-2.5 bg-linear-to-b from-[#a9b7bf] to-[#6c7b84] rounded-b-xl shadow-md" />
-      <div className="absolute -bottom-7.5 left-1/2 -translate-x-1/2 w-95 h-5 bg-black/20 blur-2xl rounded-full" />
+      <div className="hm-device-base absolute -bottom-4.5 left-1/2 -translate-x-1/2 w-full h-2.5 rounded-b-xl shadow-md" />
+      <div className="absolute -bottom-7.5 left-1/2 -translate-x-1/2 w-[85%] h-5 bg-black/20 blur-2xl rounded-full" />
     </div>
   );
 }

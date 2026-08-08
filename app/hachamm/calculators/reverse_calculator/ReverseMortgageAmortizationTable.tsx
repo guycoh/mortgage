@@ -102,7 +102,7 @@ export default function ReverseMortgageAmortizationTable({
 
   return (
     <div className="w-full">
-      <div className="mb-4 bg-gray-100 rounded-xl p-3 text-center font-bold text-blue-900">
+      <div className="mb-4 bg-gray-100 rounded-xl p-3 text-center font-bold text-[var(--hm-gold-700)]">
         {type === "balloon" ? "בלון מלא - דחיית קרן וריבית" : "גרייס - תשלום ריבית בלבד"}
       </div>
 
@@ -134,7 +134,7 @@ export default function ReverseMortgageAmortizationTable({
                 <td className="p-3 font-bold text-orange-600">
                   {row.month === 0 ? "-" : `₪${Math.round(row.payment).toLocaleString()}`}
                 </td>
-                <td className="p-3 font-bold text-blue-900">
+                <td className="p-3 font-bold text-[var(--hm-gold-700)]">
                   ₪{Math.round(row.endBalance).toLocaleString()}
                 </td>
               </tr>
@@ -281,7 +281,7 @@ export default function ReverseMortgageAmortizationTable({
 
 // <h3 className="
 // font-bold
-// text-blue-900
+// text-[var(--hm-gold-700)]
 // mb-3
 // ">
 
@@ -351,7 +351,7 @@ export default function ReverseMortgageAmortizationTable({
 
 // <h3 className="
 // font-bold
-// text-blue-900
+// text-[var(--hm-gold-700)]
 // mb-3
 // ">
 
@@ -440,7 +440,7 @@ export default function ReverseMortgageAmortizationTable({
 
 //     //   {/* ================== בלון ================== */}
 //     //   <div className="bg-white rounded-xl p-4 shadow-inner">
-//     //     <h3 className="text-lg font-bold text-blue-900 mb-3">
+//     //     <h3 className="text-lg font-bold text-[var(--hm-gold-700)] mb-3">
 //     //       לוח סילוקין - בלון מלא
 //     //     </h3>
 
@@ -469,7 +469,7 @@ export default function ReverseMortgageAmortizationTable({
 
 //     //   {/* ================== גרייס ================== */}
 //     //   <div className="bg-white rounded-xl p-4 shadow-inner">
-//     //     <h3 className="text-lg font-bold text-blue-900 mb-3">
+//     //     <h3 className="text-lg font-bold text-[var(--hm-gold-700)] mb-3">
 //     //       לוח סילוקין - גרייס (ריבית בלבד)
 //     //     </h3>
 

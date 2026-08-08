@@ -34,10 +34,10 @@ export default function CustomButton({
       className={`relative top-0 left-0 m-0 flex items-center justify-center bg-white rounded-[30px] group cursor-pointer border-none p-0 select-none outline-none disabled:opacity-50 disabled:cursor-not-allowed ${sizeStyles[size]}`}
     >
       {/* הדיב הפנימי עם האפקטים השקופים והטקסט המודגש */}
-      <div className="flex h-full w-full items-center justify-center rounded-[30px] border-b border-t border-white/10 bg-transparent text-[#1d75a1] tracking-[1px] font-bold z-1 transition-all duration-600 ease-in-out
+      <div className="flex h-full w-full items-center justify-center rounded-[30px] border-b border-t border-white/10 bg-transparent text-[color:var(--btn-accent,#1d75a1)] tracking-[1px] font-bold z-1 transition-all duration-600 ease-in-out
         shadow-[4px_4px_6px_0_rgba(255,255,255,0.5),-4px_-4px_6px_0_rgba(116,125,136,0.5),inset_-4px_-4px_6px_0_rgba(255,255,255,0.2),inset_4px_4px_6px_0_rgba(0,0,0,0.4)]
         group-hover:tracking-[4px] group-hover:text-[#4a4a4a] group-hover:bg-[#FFFFF0]
-        group-disabled:hover:tracking-[1px] group-disabled:hover:text-[#1d75a1] group-disabled:hover:bg-transparent">
+        group-disabled:hover:tracking-[1px] group-disabled:hover:text-[color:var(--btn-accent,#1d75a1)] group-disabled:hover:bg-transparent">
         {text}
       </div>
     </button>
