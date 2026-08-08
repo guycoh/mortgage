@@ -24,7 +24,16 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-export default async function BoardPage() {
+export default async function BoardPage({
+  searchParams,
+}: {
+  /** ?tool=reverse opens straight on משכנתא הפוכה, so a Fireberry button can
+   *  point at the reverse calculator for a client rather than landing on the
+   *  ledger and asking the advisor to switch. The other two routes that render
+   *  this component already honour it; this one was the odd one out. */
+  searchParams: Promise<{ tool?: string }>;
+}) {
+  const { tool } = await searchParams;
   const session = readCookieSession((await cookies()).get(FB_COOKIE)?.value);
   if (!session) redirect("/simulator/denied?r=expired");
   const leadId = session.leadId;
@@ -47,5 +56,12 @@ export default async function BoardPage() {
   // locked: this session was granted one lead. The picker would navigate to
   // /aa102test/<id>, which is unauthenticated and takes its id from the URL —
   // a door out of the very scoping the cookie exists to enforce.
-  return <Simulator lead={lead} endpoint="/api/simulator/mixes" locked />;
+  return (
+    <Simulator
+      lead={lead}
+      endpoint="/api/simulator/mixes"
+      locked
+      initialTool={tool === "reverse" ? "reverse" : "mix"}
+    />
+  );
 }

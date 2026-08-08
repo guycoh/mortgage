@@ -81,21 +81,44 @@
   gap: 22px;
   padding-inline: 22px;
 }
+/* WHOSE FIGURES. Pinned at the start of the bar with a rule after it, so the
+   parameters can sit centred in what is left rather than hugging one edge of
+   a very wide well. */
+.lgr-rm-who {
+  display: flex;
+  align-self: center;
+  align-items: center;
+  gap: 11px;
+  flex: none;
+  padding-inline: 6px 20px;
+  border-inline-end: 1px solid var(--line-2);
+}
+.lgr-rm-who-ico {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  border-radius: 11px;
+  background: var(--card-3);
+  color: var(--lgr-4);
+  transition: background var(--t) var(--ease), color var(--t) var(--ease);
+}
+/* Green only when something actually arrived from the card — the tone is the
+   claim, so it must not be made before the data lands. */
+.lgr-rm-who[data-live] .lgr-rm-who-ico { background: var(--pos-tint); color: var(--pos); }
+.lgr-rm-who-t { font-size: 13.5px; font-weight: 700; letter-spacing: -0.012em; color: var(--ink); }
+.lgr-rm-who-s { margin-top: 1px; font-size: 11.5px; font-weight: 600; color: var(--lgr-4); white-space: nowrap; }
+.lgr-rm-who[data-live] .lgr-rm-who-s { color: var(--pos); }
+
+/* The parameters take the room between the client block and the reset, and
+   centre in it. */
+.lgr-rm-params { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: center; flex: 1; gap: 10px 0; }
+
 .lgr-rm-grp:first-child { padding-inline-start: 8px; }
 /* Full-height now that the groups stretch — a rule that stops short of the
    content it divides is a tick mark, not a divider. */
 .lgr-rm-grp + .lgr-rm-grp { border-inline-start: 1px solid var(--line-2); }
-/* A group pushed to the far end has the width of the bar between it and its
-   neighbour; a rule drawn against it would separate nothing. */
-.lgr-rm-grp[data-end="true"] {
-  margin-inline-start: auto;
-  /* two controls, no label above them — they centre on the bar instead */
-  align-self: center;
-  align-items: center;
-  gap: 14px;
-  border-inline-start: 0;
-  padding-inline-end: 4px;
-}
 /* The arrow points at the value, not at the label above it. */
 .lgr-rm-read > svg { margin-top: 22px; }
 
@@ -120,25 +143,45 @@
 /* THE VALUE IS THE FIELD. The box only exists while you are pointing at it or
    typing in it — negative margin so the resting figure lines up with the label
    above it rather than sitting 6px in from it. */
+/* 1fr / value / 1fr. The two flanks are always equal, so whatever the ₪ or the
+   "30 שנ׳" beside a figure weighs, the figure itself sits under the middle of
+   its label. */
 .lgr-rm-a-well {
-  display: inline-flex;
+  display: inline-grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: baseline;
-  justify-content: center;
-  gap: 5px;
   padding: 4px 10px 5px;
   border-radius: 10px;
   background: transparent;
   box-shadow: 0 0 0 1px transparent;
   transition: background var(--t) var(--ease), box-shadow 120ms var(--ease);
 }
+.lgr-rm-a-well > .lgr-rm-a-fix:first-child { justify-self: end; padding-inline-end: 5px; }
+.lgr-rm-a-well > .lgr-rm-a-fix:last-child { justify-self: start; padding-inline-start: 5px; }
+/* AN UNANSWERED FIELD. A dashed rule under it, drawn as a background so it
+   costs no layout and cannot shift the row — the one affordance on a bar whose
+   fields are otherwise chrome-free. It goes the moment a value lands. */
+.lgr-rm-a-well[data-empty] {
+  background-image: repeating-linear-gradient(90deg, var(--edge) 0 4px, transparent 4px 7px);
+  background-size: 100% 1.5px;
+  background-position: bottom center;
+  background-repeat: no-repeat;
+}
 /* White on a grey well — the field lifts out of the surface it sits in. */
-.lgr-rm-a-well:hover { background: #fff; box-shadow: 0 0 0 1px var(--line-2); }
+.lgr-rm-a-well:hover { background-color: #fff; box-shadow: 0 0 0 1px var(--line-2); }
 .lgr-rm-a-well:focus-within {
-  background: #fff;
+  background-color: #fff;
+  background-image: none;
   box-shadow: 0 0 0 1px var(--line-2), 0 0 0 3px var(--focus-ring-strong);
 }
 .lgr-rm-a-in {
-  min-width: 0;
+  /* The box is exactly its text. `size` is a character count against the
+     font's AVERAGE advance, and tabular digits with -0.025em tracking are not
+     that — so a size-7 field was noticeably wider than the seven digits in it,
+     and the text floated inside its own box. `size` stays as the fallback for
+     anything that has not shipped field-sizing. */
+  field-sizing: content;
+  min-width: 1.5ch;
   padding: 0;
   border: 0;
   background: transparent;
@@ -190,19 +233,10 @@
 }
 .lgr-rm-read b[data-empty] { color: var(--lgr-placeholder); font-weight: 400; }
 
-/* "These numbers came off the client's card" — a statement, not a control. */
-.lgr-rm-src {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11.5px;
-  font-weight: 600;
-  color: var(--pos);
-  white-space: nowrap;
-}
-
 /* Tertiary: it undoes, it does not act. Text until you point at it. */
 .lgr-rm-reset {
+  align-self: center;
+  flex: none;
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -277,19 +311,28 @@
   background: #fff;
   box-shadow: 0 0 0 1px var(--line-2), 0 0 0 3px var(--focus-ring-strong);
 }
-.lgr-rm-hero-cur { font-size: 27px; font-weight: 500; color: var(--lgr-4); }
+.lgr-rm-hero-cur { font-size: 22px; font-weight: 500; color: var(--lgr-4); }
 .lgr-rm-hero-in {
-  min-width: 0;
+  /* Same reason as .lgr-rm-a-in: sized by `size`, the box ran ~120px wider
+     than "840,000" and the left-aligned digits sat that far in from the
+     card's start edge — so the figure no longer lined up with the label above
+     it or the ratio below it. */
+  field-sizing: content;
+  min-width: 1.5ch;
   padding: 0;
   border: 0;
   background: transparent;
   outline: none;
   font-family: var(--num);
   font-variant-numeric: tabular-nums lining-nums;
-  font-size: 56px;
+  /* 56 was sized against a 7-figure maximum and, at ₪1,340,577, it ran most of
+     the way across the card and shouted. 46 still clears the next largest
+     figure on the page (the 31px track headline) by half again, which is all
+     a hierarchy needs. */
+  font-size: 46px;
   font-weight: 700;
-  letter-spacing: -0.045em;
-  line-height: 1.02;
+  letter-spacing: -0.04em;
+  line-height: 1.05;
   color: var(--ink);
   direction: ltr;
   text-align: left;
@@ -322,7 +365,7 @@
   gap: 8px;
   margin-top: 2px;
   font-family: var(--num);
-  font-size: 38px;
+  font-size: 32px;
   font-weight: 600;
   letter-spacing: -0.03em;
   line-height: 1.5;
@@ -436,9 +479,11 @@
    body below stays white, because that is where the two are compared and
    figures on tinted ground are figures you cannot line up by eye. */
 .lgr-rm-cmp thead th {
-  padding: 18px 18px 16px;
+  /* one line now that the mechanics sentence is gone — the head is the mark,
+     the name and the tag, and nothing else */
+  padding: 15px 18px;
   text-align: start;
-  vertical-align: top;
+  vertical-align: middle;
   border-bottom: 1px solid color-mix(in srgb, var(--tone) 22%, var(--line-2));
   background: linear-gradient(180deg, color-mix(in srgb, var(--tone) 9%, #fff), color-mix(in srgb, var(--tone) 3%, #fff));
   box-shadow: inset 0 4px 0 var(--tone);
@@ -482,14 +527,6 @@
   letter-spacing: -0.005em;
   white-space: nowrap;
 }
-.lgr-rm-cmp-say {
-  max-width: 40ch;
-  margin-top: 7px;
-  font-size: 12.5px;
-  font-weight: 400;
-  line-height: 1.5;
-  color: var(--lgr-3);
-}
 
 /* --- the rows --- */
 .lgr-rm-cmp tbody th {
@@ -522,7 +559,7 @@
    nothing else in the block comes near it. */
 .lgr-rm-cmp-hero td { padding-top: 16px; padding-bottom: 16px; }
 .lgr-rm-cmp-hero th { color: var(--ink); font-weight: 700; font-size: 13px; }
-.lgr-rm-cmp-fig { font-size: 33px; font-weight: 700; letter-spacing: -0.042em; line-height: 1.05; }
+.lgr-rm-cmp-fig { font-size: 31px; font-weight: 700; letter-spacing: -0.04em; line-height: 1.05; }
 .lgr-rm-cmp-note { display: block; margin-top: 6px; font-size: 11.5px; color: var(--lgr-3); }
 
 /* the cost of the credit, then what settles it — one rule between the two */
@@ -615,10 +652,9 @@
    360px; the head sheds its tag and its sentence on the way down. */
 
 @media (max-width: 900px) {
-  .lgr-rm-hero-in { font-size: 44px; }
-  .lgr-rm-hero-cur { font-size: 22px; }
+  .lgr-rm-hero-in { font-size: 38px; }
+  .lgr-rm-hero-cur { font-size: 19px; }
   .lgr-rm-cmp-lab { width: 150px; }
-  .lgr-rm-cmp-say { display: none; }
   .lgr-rm-cmp thead th,
   .lgr-rm-cmp tbody th,
   .lgr-rm-cmp tbody td,
@@ -632,14 +668,15 @@
   .lgr-rm-grp:first-child { padding-inline-start: 4px; }
   /* the groups stack, so the rules between them would run the wrong way */
   .lgr-rm-grp + .lgr-rm-grp { border-inline-start: 0; }
-  .lgr-rm-grp[data-end="true"] { margin-inline-start: 0; padding-inline: 4px; }
+  .lgr-rm-who { padding-inline: 4px 14px; }
+  .lgr-rm-params { justify-content: flex-start; }
   .lgr-rm-a-in { font-size: 18px; }
   .lgr-rm-a[data-big] .lgr-rm-a-in { font-size: 22px; }
   .lgr-rm-read b { font-size: 20px; }
 
   .lgr-rm-hero { padding: 16px; }
-  .lgr-rm-hero-in { font-size: 34px; }
-  .lgr-rm-hero-cur { font-size: 18px; }
+  .lgr-rm-hero-in { font-size: 31px; }
+  .lgr-rm-hero-cur { font-size: 17px; }
   .lgr-rm-hero-well { margin-inline: -8px; padding-inline: 8px; }
   .lgr-rm-quick { width: 100%; }
   .lgr-rm-quick .lgr-btn { flex: 1; }

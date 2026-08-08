@@ -414,36 +414,70 @@
    Built to the lead picker's 40px, because they are the same kind of object:
    things that name where you are rather than perform a step. Violet, because
    rule 4 — the identity hue is what says "mortgage", and both tools price one. */
-/* A MACHINED SEGMENTED CONTROL, not a pill. Same anatomy as every control on
-   the page: 10px radius, hairline border, the sunken card-3 track the schedule
-   modal's שנתי/חודשי toggle already uses — so it reads as part of the
-   instrument's chassis rather than as a floating capsule. The active segment
-   is the system's one solid violet, and it TRAVELS (Motion layoutId in
-   ToolSwitch) rather than blinking from one side to the other.
+/* THE BAND. Application chrome, not a control inside the page: white, ruled
+   off the canvas, tabs at the start and whoever the board belongs to at the
+   far end. The page's own title lives underneath it, which is the order a
+   product with more than one tool reads in — where am I, then what is this.
 
-   Hover is the system's hover: ink darkens, a quiet wash appears, nothing
-   surfaces or scales. The travelling fill is the event; hover just answers. */
-.lgr-switch {
-  display: inline-flex;
+   The state is carried by TWO objects that MOVE rather than blink: a tinted
+   field and the rule under it, both Motion layoutId on one spring (see
+   ToolSwitch). The rule is what makes a tab read as the current PAGE rather
+   than as a pressed button. */
+.lgr-nav {
+  display: flex;
   align-items: stretch;
-  gap: 3px;
-  padding: 3px;
+  flex-wrap: wrap;
+  overflow: hidden;
   border: 1px solid var(--line-2);
-  border-radius: var(--r-sm);
-  background: var(--card-3);
-  box-shadow: inset 0 1px 2px rgba(23, 23, 30, 0.05);
+  border-radius: var(--r);
+  background: #fff;
+  box-shadow: var(--shadow);
 }
-.lgr-switch-item {
+/* THE BRAND, at the head of the bar. Its own rule after it, so the emblem and
+   the tabs read as two things rather than as a first tab that happens to be a
+   picture. */
+.lgr-brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex: none;
+  padding-inline: 15px 18px;
+  border-inline-end: 1px solid var(--line);
+}
+.lgr-brand-name {
+  font-family: var(--display);
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+  white-space: nowrap;
+}
+/* No shadow. The mark sits on the bar itself now rather than on a tile, and a
+   drop shadow under a glyph on white is a smudge, not depth. */
+
+.lgr-nav-tabs { display: flex; align-items: stretch; min-width: 0; }
+/* Fenced off exactly like the brand at the other end, so the bar reads as
+   three zones: the product, the tools, the client. Two constants bracketing
+   the thing you switch. */
+.lgr-nav-end {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-inline-start: auto;
+  padding: 7px 12px;
+  border-inline-start: 1px solid var(--line);
+}
+
+.lgr-nav-tab {
   position: relative;
   display: inline-flex;
   align-items: center;
-  height: 34px;
-  padding: 0 15px;
+  height: 54px;
+  padding: 0 20px;
   border: 0;
-  border-radius: 7px;
   background: transparent;
   font-family: var(--ui);
-  font-size: 13.5px;
+  font-size: 14px;
   font-weight: 600;
   letter-spacing: -0.01em;
   color: var(--lgr-2);
@@ -451,26 +485,66 @@
   cursor: pointer;
   /* The ink crosses over while the fill is still travelling, which is what
      makes the two labels trade places rather than blink. */
-  transition: color 160ms var(--ease), background 160ms var(--ease);
+  transition: color 180ms var(--ease), background 180ms var(--ease);
 }
-.lgr-switch-item:hover:not([data-on="true"]) { color: var(--ink); background: rgba(28, 28, 30, 0.045); }
-.lgr-switch-item[data-on="true"] { color: #fff; }
-.lgr-switch-item:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring-strong); }
-/* The travelling fill. Same face as .lgr-btn-primary — the one solid violet in
-   the system — so "filled" means the same thing here as everywhere else. */
-.lgr-switch-pill {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  border-radius: 7px;
-  background: var(--primary);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.26), 0 1px 2px rgba(68, 60, 176, 0.32);
-}
-.lgr-switch-in { position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 7px; }
-.lgr-switch-ico { flex: none; opacity: 0.9; }
+/* One hairline between neighbours, never before the first. It sits on the
+   border box, so the tint — inset to the padding box — never covers it. */
+.lgr-nav-tab + .lgr-nav-tab { border-inline-start: 1px solid var(--line); }
+.lgr-nav-tab:hover:not([data-on="true"]) { color: var(--ink); background: var(--card-2); }
+.lgr-nav-tab[data-on="true"] { color: var(--primary-deep); font-weight: 700; }
+.lgr-nav-tab:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--focus-ring-strong); }
 
+.lgr-nav-tint { position: absolute; inset: 0; z-index: 0; background: var(--primary-tint); }
+.lgr-nav-rule {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 1;
+  height: 3px;
+  background: var(--primary);
+  border-start-start-radius: 3px;
+  border-start-end-radius: 3px;
+}
+.lgr-nav-in { position: relative; z-index: 2; display: inline-flex; align-items: center; gap: 8px; }
+/* The mark carries its tab's own state, so it dims with the label rather than
+   staying lit on a tab you are not on. */
+.lgr-nav-ico { display: grid; place-items: center; flex: none; color: var(--lgr-4); transition: color 180ms var(--ease); }
+.lgr-nav-tab:hover .lgr-nav-ico { color: var(--lgr-2); }
+.lgr-nav-tab[data-on="true"] .lgr-nav-ico { color: var(--primary); }
+
+/* THE UNSAVED DOT. The save button's own violet, 7px, a breath off the label.
+   It is state, not identity — it appears only on a tab you are not standing
+   on, and visiting the tab is what dismisses it. */
+.lgr-nav-dot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  margin-inline-start: 1px;
+  border-radius: 99px;
+  background: var(--primary);
+  box-shadow: 0 0 0 2.5px var(--primary-tint);
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 620px) {
+  .lgr-brand { padding-inline: 11px 12px; gap: 9px; }
+  .lgr-brand-name { font-size: 15px; }
+  .lgr-nav-tab { height: 46px; padding: 0 13px; font-size: 13px; }
+  .lgr-nav-in { gap: 6px; }
+  .lgr-nav-end { width: 100%; border-top: 1px solid var(--line); border-inline-start: 0; padding: 8px 10px; }
+}
 @media (prefers-reduced-motion: reduce) {
-  .lgr-switch-item { transition: none; }
+  .lgr-nav-tab, .lgr-nav-ico { transition: none; }
 }
 
 /* THE SAVE BUTTON. Primary shape, and a fixed minimum width so the four
@@ -1175,8 +1249,14 @@
    Tinted at 4% of the family so the band belongs to the rows beneath it
    without becoming a second header. Its cells are the table's own cells, so a
    family subtotal lands in the same column as the rows it totals. */
+/* A SUBTOTAL, so it is ruled ABOVE — the line closes the column of figures it
+   sums, the same way the grand total's ink rule closes the whole sheet. As a
+   section HEADER this row wanted its rule underneath; it sits at the foot of
+   its group now, and a sum with a line under it and nothing over it reads as
+   the start of the next thing. */
 .lgr-groupbar > td {
-  padding: 7px 5px;
+  padding: 8px 5px;
+  border-top: 1.5px solid color-mix(in srgb, var(--fam) 45%, var(--line-2));
   border-bottom: 1px solid var(--line-2);
   background: color-mix(in srgb, var(--fam) 4%, #fff);
 }

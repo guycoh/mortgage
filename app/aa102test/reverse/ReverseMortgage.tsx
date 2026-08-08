@@ -43,6 +43,7 @@ import {
   Info,
   ListChecks,
   Percent,
+  PencilSimpleLine,
   TrendUp,
   UserCircleCheck,
   WarningCircle,
@@ -187,8 +188,16 @@ function Assume({
         {label}
         {hint && <i>{hint}</i>}
       </span>
-      <span className="lgr-rm-a-well" dir="ltr">
-        {prefix && <span className="lgr-rm-a-fix">{prefix}</span>}
+      {/* An answered field is plain text; an unanswered one carries a dashed
+          rule, which is what says "this is yours to fill in" on a bar whose
+          fields otherwise have no chrome at all. */}
+      {/* THREE CELLS, ALWAYS — even when a side is empty. The well is a grid of
+          1fr / content / 1fr, so the two flanks are equal by construction and
+          the figure lands dead centre under its own label. Rendered as a flex
+          row it was the [value + suffix] PAIR that centred, which pushed 360
+          left of the word above it by half the width of "30 שנ׳". */}
+      <span className="lgr-rm-a-well" data-empty={chars ? undefined : "true"} dir="ltr">
+        <span className="lgr-rm-a-fix">{prefix}</span>
         <input
           {...input}
           className="lgr-rm-a-in"
@@ -198,7 +207,7 @@ function Assume({
           inputMode="numeric"
           onFocus={(e) => e.currentTarget.select()}
         />
-        {suffix && <span className="lgr-rm-a-fix">{suffix}</span>}
+        <span className="lgr-rm-a-fix">{suffix}</span>
       </span>
     </label>
   );
@@ -327,7 +336,25 @@ export default function ReverseMortgage({
       {/* Secondary by construction: it sits on the canvas with no card, no
           field borders and muted labels, so the eye lands on the hero below
           it. Groups are separated by one hairline, in the toolbar's idiom. */}
-      <motion.section {...enter(1)} className="lgr-rm-assume" aria-label="נתוני הבסיס">
+      <motion.section {...enter(1)} className="lgr-rm-assume" aria-label="נתוני הלקוח">
+        {/* WHOSE NUMBERS THESE ARE, and where they came from. On a board opened
+            from a client card these arrive filled in, and a pre-filled figure
+            that looks typed is a figure nobody rechecks — so the bar says so
+            out loud instead of hiding it in a chip at the far end. With
+            nothing pulled it says the other true thing: type them. */}
+        <div className="lgr-rm-who" data-live={fromCard || undefined}>
+          <span className="lgr-rm-who-ico" aria-hidden>
+            {fromCard ? <UserCircleCheck size={19} weight="fill" /> : <PencilSimpleLine size={17} weight="bold" />}
+          </span>
+          <div className="min-w-0">
+            <div className="lgr-rm-who-t">נתוני הלקוח</div>
+            <div className="lgr-rm-who-s" title={fromCard ? "שווי הנכס וגילאי הלווים נקראו מכרטיס הלקוח ב־Fireberry" : undefined}>
+              {fromCard ? "נטענו מכרטיס Fireberry" : "הזינו ידנית"}
+            </div>
+          </div>
+        </div>
+
+        <div className="lgr-rm-params">
         <div className="lgr-rm-grp">
           <Assume
             label="שווי הנכס"
@@ -420,21 +447,12 @@ export default function ReverseMortgage({
             aria-label="מדד שנתי משוער באחוזים"
           />
         </div>
-
-        <div className="lgr-rm-grp" data-end="true">
-          {/* Where these numbers came from. Stated once, quietly, because a
-              pre-filled figure that looks typed is a figure nobody rechecks. */}
-          {fromCard && (
-            <span className="lgr-rm-src" title="שווי הנכס וגילאי הלווים נקראו מכרטיס הלקוח ב־Fireberry">
-              <UserCircleCheck size={14} weight="fill" />
-              נטען מכרטיס הלקוח
-            </span>
-          )}
-          <button className="lgr-rm-reset" onClick={reset} title="חזרה לערכי ברירת המחדל">
-            <ArrowCounterClockwise size={13} weight="bold" />
-            נקה
-          </button>
         </div>
+
+        <button className="lgr-rm-reset" onClick={reset} title="חזרה לערכי ברירת המחדל">
+          <ArrowCounterClockwise size={13} weight="bold" />
+          נקה
+        </button>
       </motion.section>
 
       {/* A rule that failed. It earns its tint — it is the one thing on the
@@ -566,6 +584,12 @@ export default function ReverseMortgage({
                   {(["balloon", "grace"] as const).map((kind) => {
                     const p = PRODUCT[kind];
                     return (
+                      // The mechanics sentence used to live here in grey under
+                      // the name. Two of them, side by side, were the first
+                      // thing the eye hit on a block whose job is comparing
+                      // figures — and they said what the tag and the rows
+                      // below already say. It survives where it is actually
+                      // useful: under the title of the schedule modal.
                       <th key={kind} scope="col" style={{ ["--tone" as string]: p.tone.color, ["--tone-text" as string]: p.tone.text }}>
                         <div className="lgr-rm-cmp-name">
                           <span className="lgr-rm-cmp-ico" aria-hidden>
@@ -574,7 +598,6 @@ export default function ReverseMortgage({
                           {p.name}
                           <span className="lgr-rm-cmp-tag">{p.tag}</span>
                         </div>
-                        <p className="lgr-rm-cmp-say">{p.say}</p>
                       </th>
                     );
                   })}
