@@ -11,10 +11,11 @@
 //
 // ?lead=3 was the old shape and still works; the redirect is done here on the
 // server rather than in an effect, so a legacy link never paints a blank board
-// first. ?tool=reverse opens on משכנתא הפוכה and survives that redirect.
+// first. ?tool= picks the instrument and survives that redirect.
 
 import { redirect } from "next/navigation";
 import Simulator from "./Simulator";
+import { parseTool } from "./lib/tools";
 
 export default async function Aa102TestPage({
   searchParams,
@@ -22,10 +23,12 @@ export default async function Aa102TestPage({
   searchParams: Promise<{ lead?: string; tool?: string }>;
 }) {
   const { lead, tool } = await searchParams;
-  const reverse = tool === "reverse";
+  const initialTool = parseTool(tool);
 
   const id = Number(lead);
-  if (Number.isFinite(id) && id > 0) redirect(`/aa102test/${id}${reverse ? "?tool=reverse" : ""}`);
+  if (Number.isFinite(id) && id > 0) {
+    redirect(`/aa102test/${id}${initialTool === "mix" ? "" : `?tool=${initialTool}`}`);
+  }
 
-  return <Simulator lead={null} initialTool={reverse ? "reverse" : "mix"} />;
+  return <Simulator lead={null} initialTool={initialTool} />;
 }

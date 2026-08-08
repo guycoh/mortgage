@@ -25,15 +25,23 @@ import { useRef } from "react";
 import { motion } from "motion/react";
 import { Stack } from "@phosphor-icons/react";
 import ReverseMark from "../reverse/mark";
+import AbilityMark from "../ability/mark";
 import { snap } from "../lib/transitions";
+// The list and the ?tool= parser live in a directive-free module, because the
+// server components that resolve a deep link cannot import from this one.
+import { TOOLS, type Tool } from "../lib/tools";
 
-export type Tool = "mix" | "reverse";
+export type { Tool };
 
-/** In RTL the first item is the rightmost, so this is the order it reads. */
-const ITEMS: { id: Tool; label: string; icon: (on: boolean) => React.ReactNode }[] = [
-  { id: "mix", label: "תמהילים", icon: (on) => <Stack size={17} weight={on ? "fill" : "regular"} /> },
-  { id: "reverse", label: "משכנתא הפוכה", icon: () => <ReverseMark size={17} /> },
-];
+/** In RTL the first item is the rightmost, so this is the order it reads —
+ *  the same order TOOLS declares, checked at build time by the Record. */
+const LABEL: Record<Tool, { label: string; icon: (on: boolean) => React.ReactNode }> = {
+  mix: { label: "תמהילים", icon: (on) => <Stack size={17} weight={on ? "fill" : "regular"} /> },
+  reverse: { label: "משכנתא הפוכה", icon: () => <ReverseMark size={17} /> },
+  ability: { label: "משכנתא חדשה", icon: () => <AbilityMark size={17} /> },
+};
+
+const ITEMS = TOOLS.map((id) => ({ id, ...LABEL[id] }));
 
 /** The fill and its rule travel together. Stiff enough to arrive with the view
  *  it selects, soft enough to carry a little weight on the way. */

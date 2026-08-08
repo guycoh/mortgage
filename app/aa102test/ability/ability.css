@@ -1,0 +1,844 @@
+/* ============================================================================
+   /aa102test — יכולת החזר.
+
+   theme.css is the design system; this file adds only what a third instrument
+   needs. There is not one hard-coded neutral below — every colour, radius,
+   shadow and curve is a token from the sheet the other two tools are built on.
+
+   THE SHAPE OF THE PAGE, and why it is this shape.
+
+   /aa1 laid the same information out as a 3-column strip, a 4-column grid whose
+   COLUMNS were people and whose ROWS were unlabelled (you learned that row two
+   was income by reading a placeholder), and three summary cards of equal weight
+   — one of which quietly held the only conclusion the tool actually reaches.
+   The two ceilings and the monthly payment sat in different cards and were
+   never compared, which is the single comparison the tool exists to make.
+
+   This is the same figures, re-ordered into the sentence an advisor says out
+   loud:
+
+     1. THE DEAL          a recessed well of assumptions. Purpose first, as five
+                          chips that each state their own מימון מקסימלי, because
+                          that rule is the reason the field exists. Then the
+                          asset, the equity and the terms — borderless, chrome
+                          only under the pointer. Inputs recede; results
+                          elevate.
+     2. THE HOUSEHOLD     a ledger. People are ROWS and the four things you know
+                          about a person are COLUMNS with real headers. Its foot
+                          carries the two sums and the one figure everything
+                          downstream is a fraction of: הכנסה פנויה.
+     3. THE VERDICT       one lit surface, one 46px figure — the monthly payment
+                          — and under it the only gauge on the page: the payment
+                          against the 35% and 40% ceilings, which is the answer.
+
+   FOUR TYPE SIZES carry the hierarchy: 46 hero / 24 sums / 16 field / 12.5
+   label. Everything financial is tabular he-IL.
+
+   COLOUR. Violet is the mortgage and the payment, exactly as everywhere else.
+   The verdict uses the status palette and only the status palette — pos inside
+   the recommended ceiling, warn between the two, neg past the maximum — because
+   rule 6 says identity and status never trade jobs, and here the identity of
+   the debt is not in question. Nothing else on the page is coloured.
+
+   Prefixed lgr-ab- so it cannot collide with the ledger or the reverse tool.
+   ========================================================================== */
+
+/* ==================================================== 1. the assumptions well */
+/* A SHALLOW WELL, one step BELOW the canvas. Elevation says "this is an
+   answer"; a recess says "this is what you put in". Two rows: what the money is
+   for, then how much of it there is. */
+
+.lgr-ab-assume {
+  margin-bottom: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--bg-2);
+  box-shadow: inset 0 1px 2px rgba(23, 23, 30, 0.045);
+}
+
+/* --- row one: whose file this is, and what the mortgage is for --- */
+.lgr-ab-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 18px;
+  padding: 11px 14px 12px;
+}
+
+/* WHOSE FIGURES, and where they came from. A pre-filled number that looks typed
+   is a number nobody rechecks, so the bar states its provenance out loud
+   instead of hiding it in a chip at the far end. */
+.lgr-ab-who {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  flex: none;
+  padding-inline: 6px 20px;
+  border-inline-end: 1px solid var(--line-2);
+}
+.lgr-ab-who-ico {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  border-radius: 11px;
+  background: var(--card-3);
+  color: var(--lgr-4);
+  transition: background var(--t) var(--ease), color var(--t) var(--ease);
+}
+/* Green only once something has actually landed — the tone is the claim. */
+.lgr-ab-who[data-live] .lgr-ab-who-ico { background: var(--pos-tint); color: var(--pos); }
+.lgr-ab-who-t { font-size: 13.5px; font-weight: 700; letter-spacing: -0.012em; color: var(--ink); }
+.lgr-ab-who-s { margin-top: 1px; font-size: 11.5px; font-weight: 600; color: var(--lgr-4); white-space: nowrap; }
+.lgr-ab-who[data-live] .lgr-ab-who-s { color: var(--pos); }
+
+/* --- THE PURPOSE, as five chips instead of a dropdown --- */
+/* It is the most consequential control on the page — it alone sets אחוז מימון
+   מקסימלי — and a native select showed one option at a time with its rule
+   printed underneath as a footnote. Five chips show all five rules at once, so
+   choosing between them is a comparison rather than a memory test.
+
+   The fill is a SINGLE OBJECT THAT MOVES (Motion layoutId, same spring as the
+   tool switch overhead). One chip lighting up as another goes out reads as five
+   buttons; a fill with a position reads as one control. */
+.lgr-ab-purpose-wrap { display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1; }
+.lgr-ab-purpose-l {
+  flex: none;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--lgr-3);
+  white-space: nowrap;
+}
+/* The track takes the room the bar has left. Five content-sized chips huddled
+   against the label left a third of the row empty, which read as an alignment
+   accident rather than as a control. */
+.lgr-ab-purpose {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: stretch;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid var(--line-2);
+  border-radius: 13px;
+  background: var(--card-3);
+  box-shadow: inset 0 1px 2px rgba(23, 23, 30, 0.05);
+}
+.lgr-ab-chip {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 7px 13px 8px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  font-family: var(--ui);
+  color: var(--lgr-3);
+  cursor: pointer;
+  transition: color 180ms var(--ease);
+}
+.lgr-ab-chip:hover:not([data-on="true"]) { color: var(--ink); }
+.lgr-ab-chip[data-on="true"] { color: var(--primary-deep); }
+.lgr-ab-chip:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring-strong); }
+/* The travelling face. White with a real contact shadow — it lifts out of the
+   sunken track rather than tinting a piece of it. */
+.lgr-ab-chip-fill {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 0.5px 1px rgba(0, 0, 0, 0.08), 0 2px 5px -2px rgba(0, 0, 0, 0.14),
+    inset 0 0 0 1px var(--primary-line);
+}
+.lgr-ab-chip-in { position: relative; z-index: 1; display: block; }
+.lgr-ab-chip-t {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+/* The rule the chip carries. Muted until it is the chosen one, then it is the
+   figure this whole page is bounded by and it says so in the ink. */
+.lgr-ab-chip-n {
+  display: block;
+  margin-top: 2px;
+  font-family: var(--num);
+  font-variant-numeric: tabular-nums lining-nums;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--lgr-4);
+  transition: color 180ms var(--ease);
+}
+.lgr-ab-chip[data-on="true"] .lgr-ab-chip-n { color: var(--primary); }
+
+/* --- row two: the figures --- */
+.lgr-ab-params {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 10px 0;
+  padding: 12px 14px 14px;
+  border-top: 1px solid var(--line-2);
+}
+/* Top-aligned, so every label in the row sits on one line and every value on
+   the next — centred, the 26px asset figure would drag its 20px neighbours off
+   the baseline and the row of labels would come out ragged. */
+.lgr-ab-grp {
+  display: flex;
+  align-items: flex-start;
+  gap: 22px;
+  padding-inline: 22px;
+}
+.lgr-ab-grp:first-child { padding-inline-start: 8px; }
+.lgr-ab-grp + .lgr-ab-grp { border-inline-start: 1px solid var(--line-2); }
+.lgr-ab-grp[data-end="true"] { margin-inline-start: auto; border-inline-start: 0; padding-inline-end: 4px; }
+
+/* ONE ASSUMPTION. Borderless by default: the value is the interface, and the
+   box only exists while you are pointing at it or typing in it. A row of six of
+   these reads as a sentence of facts rather than as a form standing between you
+   and the result. */
+.lgr-ab-a { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; text-align: center; }
+.lgr-ab-a-l {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 5px;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  color: var(--lgr-3);
+  white-space: nowrap;
+}
+.lgr-ab-a-l i { font-style: normal; font-size: 11px; font-weight: 500; color: var(--lgr-4); }
+
+/* 1fr / value / 1fr, so whatever the ₪ or the "30 שנ׳" beside a figure weighs,
+   the figure itself lands under the middle of its own label. */
+.lgr-ab-a-well {
+  display: inline-grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: baseline;
+  padding: 4px 10px 5px;
+  border-radius: 10px;
+  background: transparent;
+  box-shadow: 0 0 0 1px transparent;
+  transition: background var(--t) var(--ease), box-shadow 120ms var(--ease);
+}
+.lgr-ab-a-well > .lgr-ab-a-fix:first-child { justify-self: end; padding-inline-end: 5px; }
+.lgr-ab-a-well > .lgr-ab-a-fix:last-child { justify-self: start; padding-inline-start: 5px; }
+/* AN UNANSWERED FIELD. A dashed rule drawn as a background, so it costs no
+   layout and cannot shift the row — the one affordance on a bar whose fields
+   otherwise have no chrome at all. */
+.lgr-ab-a-well[data-empty] {
+  background-image: repeating-linear-gradient(90deg, var(--edge) 0 4px, transparent 4px 7px);
+  background-size: 100% 1.5px;
+  background-position: bottom center;
+  background-repeat: no-repeat;
+}
+.lgr-ab-a-well:hover { background-color: #fff; box-shadow: 0 0 0 1px var(--line-2); }
+.lgr-ab-a-well:focus-within {
+  background-color: #fff;
+  background-image: none;
+  box-shadow: 0 0 0 1px var(--line-2), 0 0 0 3px var(--focus-ring-strong);
+}
+.lgr-ab-a-in {
+  /* The box is exactly its text. `size` counts characters against the font's
+     AVERAGE advance, and tabular digits at -0.025em are not that. */
+  field-sizing: content;
+  min-width: 1.5ch;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  outline: none;
+  font-family: var(--num);
+  font-variant-numeric: tabular-nums lining-nums;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+  color: var(--ink);
+  direction: ltr;
+  text-align: center;
+}
+.lgr-ab-a-in::placeholder { font-weight: 400; color: var(--lgr-placeholder); opacity: 1; }
+/* שווי הנכס moves every other figure on the page, so it is the one assumption
+   allowed to be bigger than its neighbours. */
+.lgr-ab-a[data-big] .lgr-ab-a-in { font-size: 26px; font-weight: 700; letter-spacing: -0.035em; }
+.lgr-ab-a[data-big] .lgr-ab-a-fix { font-size: 17px; }
+.lgr-ab-a-in[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+.lgr-ab-a-in[type="number"]::-webkit-outer-spin-button,
+.lgr-ab-a-in[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.lgr-ab-a-fix { font-size: 15px; font-weight: 500; color: var(--lgr-4); }
+.lgr-ab-a-yrs { font-size: 12px; font-weight: 600; color: var(--lgr-4); }
+
+/* DERIVED, AND IT LOOKS IT. An arrow out of the fields it is drawn from, then
+   the same label-over-value anatomy as its neighbours — with no box, because
+   there is nothing here to type. */
+.lgr-ab-read { display: flex; align-items: flex-start; gap: 20px; }
+/* The arrow points at the value, not at the label above it — and it sits
+   closer to the fields it comes out of than to the readings it introduces. */
+.lgr-ab-read > svg { margin-top: 22px; margin-inline-end: -9px; color: var(--lgr-placeholder); flex: none; }
+/* 22px, not the input's 20 and not the asset's 26. A derived figure has to be
+   legible beside the fields it comes out of without out-shouting them — the one
+   number in this row allowed to lead is the one the whole page turns on. */
+.lgr-ab-read-v {
+  display: block;
+  padding-block: 4px 0;
+  font-family: var(--num);
+  font-variant-numeric: tabular-nums lining-nums;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1.2;
+  color: var(--ink);
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+.lgr-ab-read-v[data-empty] { color: var(--lgr-placeholder); font-weight: 400; }
+/* The shortfall hangs under the minimum it is measured against. The slot is
+   reserved whether or not there is a shortfall, so typing into הון עצמי never
+   changes the height of the bar under your hands. */
+.lgr-ab-short {
+  display: block;
+  min-height: 15px;
+  margin-top: 2px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: -0.005em;
+  color: var(--warn);
+  white-space: nowrap;
+}
+
+/* --- THE DEAL, AS ONE BAR --- */
+/* שווי הנכס is the bar's whole length; the dark stretch is the client's own
+   money, the violet stretch is the bank's, and the flag across it is the
+   purpose's rule. The three readouts above state the same facts as figures —
+   this is the version a client sitting across the desk reads in one glance:
+   the dark part has to reach the flag. */
+.lgr-ab-fund {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 22px 12px;
+  border-top: 1px solid var(--line-2);
+}
+.lgr-ab-fund-l { flex: none; font-size: 12.5px; font-weight: 600; color: var(--lgr-3); white-space: nowrap; }
+.lgr-ab-fund-track {
+  position: relative;
+  display: flex;
+  flex: 1;
+  height: 30px;
+  /* room for the flag's label above the bar */
+  margin-top: 14px;
+  border-radius: 8px;
+  background: var(--card-3);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06);
+}
+.lgr-ab-fund-seg {
+  position: relative;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  min-width: 0;
+  transition: width 0.4s var(--ease);
+}
+/* The client's own money — the ink, because it is the part that is already
+   real. Identity colour goes to the debt, exactly as everywhere else. */
+.lgr-ab-fund-seg[data-k="equity"] {
+  background: linear-gradient(180deg, #4a4d55, #3a3d45);
+  border-start-start-radius: 8px;
+  border-end-start-radius: 8px;
+}
+/* The stretch the equity should have covered and does not. It reads as a gap
+   in the bar, not as a third kind of money: the well's own ground, washed
+   warn, hatched so it says "missing" rather than "allocated". */
+.lgr-ab-fund-seg[data-k="gap"] {
+  background: repeating-linear-gradient(-45deg, var(--warn-tint) 0 5px, #fff 5px 9px);
+  box-shadow: inset 0 0 0 1px var(--warn-line);
+}
+.lgr-ab-fund-seg[data-k="loan"] {
+  background: linear-gradient(180deg, #6b64de, var(--primary));
+  border-start-end-radius: 8px;
+  border-end-end-radius: 8px;
+}
+/* One label per segment, in the segment's own light. Clipped by the segment
+   rather than wrapped — JSX already drops it below 16%. */
+.lgr-ab-fund-t {
+  padding-inline: 11px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+  white-space: nowrap;
+}
+.lgr-ab-fund-t b {
+  font-family: var(--num);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: #fff;
+  unicode-bidi: isolate;
+}
+/* THE FLAG — the purpose's rule, drawn through the bar and past its top edge so
+   the label can sit above the money it measures. It turns warn when the equity
+   falls short, because at that moment it is the thing being violated. */
+.lgr-ab-fund-tick {
+  position: absolute;
+  top: -7px;
+  bottom: -3px;
+  width: 2px;
+  translate: 0;
+  background: var(--ink);
+  border-radius: 1px;
+  pointer-events: none;
+}
+.lgr-ab-fund-tick em {
+  position: absolute;
+  top: -14px;
+  inset-inline-start: 50%;
+  translate: 6px 0;
+  font-style: normal;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0;
+  color: var(--lgr-2);
+  white-space: nowrap;
+}
+/* RTL: the label hangs to the tick's left; translate flips with direction. */
+[dir="rtl"] .lgr-ab-fund-tick em,
+.lgr-root .lgr-ab-fund-tick em { translate: -6px 0; inset-inline-start: auto; inset-inline-end: 50%; }
+.lgr-ab-fund-tick[data-short] { background: var(--warn); }
+.lgr-ab-fund-tick[data-short] em { color: var(--warn); }
+
+/* Tertiary: it undoes, it does not act. Text until you point at it. */
+.lgr-ab-reset {
+  align-self: center;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  font-family: var(--ui);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--lgr-4);
+  cursor: pointer;
+  transition: background var(--t) var(--ease), color var(--t) var(--ease);
+}
+.lgr-ab-reset:hover { background: var(--card-3); color: var(--ink); }
+.lgr-ab-reset:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring-strong); }
+
+/* ====================================================== 2. the household sheet */
+/* PEOPLE ARE ROWS. In /aa1 the people were columns and the rows were unlabelled
+   — which row was income and which was loans could only be learned by reading a
+   placeholder inside a box. Four real column headers and three named rows costs
+   nothing and removes the guessing. */
+
+.lgr-ab-sheet { margin-bottom: 20px; overflow: hidden; }
+
+.lgr-ab-tbl { width: 100%; table-layout: fixed; border-collapse: collapse; }
+.lgr-ab-tbl col.lgr-ab-c-who { width: 25%; }
+.lgr-ab-tbl col.lgr-ab-c-age { width: 13%; }
+
+.lgr-ab-tbl thead th {
+  padding: 11px 14px 10px;
+  text-align: start;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: -0.005em;
+  color: #2f323a;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--line-2);
+}
+.lgr-ab-tbl thead th i {
+  font-style: normal;
+  margin-inline-start: 5px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--lgr-4);
+}
+.lgr-ab-tbl tbody td,
+.lgr-ab-tbl tbody th { padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+/* The row header is a name, not a caption — it carries no extra weight of its
+   own, because the block inside it already sets its own. */
+.lgr-ab-tbl tbody th { text-align: start; font-weight: 400; }
+.lgr-ab-tbl tbody tr > * { transition: background var(--t) var(--ease) var(--t-exit-delay); }
+/* Reading across one person's figures is the job — the row you are on says so. */
+.lgr-ab-tbl tbody tr:hover > * { background: var(--card-2); transition-delay: 0ms; }
+.lgr-ab-tbl tbody tr:focus-within > * { background: var(--primary-wash); }
+.lgr-ab-tbl tbody tr:last-child > * { border-bottom: 0; }
+
+/* WHO THIS ROW IS. A glyph in a disc, the name at reading weight, and — for the
+   guarantor — the rule that makes their income count differently. */
+.lgr-ab-name { display: flex; align-items: center; gap: 11px; padding-inline-start: 6px; min-width: 0; }
+.lgr-ab-name-ico {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: 11px;
+  background: var(--primary-tint);
+  color: var(--primary);
+}
+.lgr-ab-tbl tr[data-half] .lgr-ab-name-ico { background: var(--card-3); color: var(--lgr-3); }
+.lgr-ab-name > span:last-child { display: block; min-width: 0; }
+.lgr-ab-name-t { display: block; font-size: 14px; font-weight: 700; letter-spacing: -0.015em; color: var(--ink); }
+.lgr-ab-name-s { display: block; margin-top: 1px; font-size: 11.5px; font-weight: 500; color: var(--lgr-4); }
+
+/* AN EDITABLE FIELD. Bordered and placeholdered, because on a sheet that also
+   prints calculated figures the border IS the difference. Big: 44px tall, 16px
+   tabular — these are the numbers the whole page is built out of. */
+.lgr-ab-in {
+  width: 100%;
+  height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  background: #fff;
+  font-family: var(--num);
+  font-variant-numeric: tabular-nums lining-nums;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+  outline: none;
+  direction: ltr;
+  text-align: right;
+  transition: border-color var(--t) var(--ease), box-shadow 120ms var(--ease);
+}
+.lgr-ab-in::placeholder { font-weight: 400; color: var(--lgr-placeholder); opacity: 1; letter-spacing: 0; }
+.lgr-ab-in:hover { border-color: var(--edge); }
+.lgr-ab-in:focus { border-color: var(--focus); box-shadow: 0 0 0 2px var(--focus-ring-strong); }
+/* The ₪ sits inside the field, quiet, and never moves — money fields are the
+   ones an advisor tabs through fastest, and a mark anchored to the box tells
+   them which column they are in without reading a header.
+   The wrapper is LTR ON PURPOSE. The input inside it is LTR (a figure must
+   never be walked by the bidi algorithm) and right-aligned, so its digits grow
+   towards the box's LEFT edge; a mark placed with `inset-inline-start` under
+   the RTL cell would land on the right — the same edge as the digits — and the
+   two would sit on top of each other the moment a seven-figure income was
+   typed. Made LTR, the mark leads the number and the padding that reserves its
+   room is measured from the same side. */
+.lgr-ab-field { position: relative; display: block; direction: ltr; }
+.lgr-ab-field > .lgr-ab-in { padding-inline-start: 26px; }
+.lgr-ab-cur {
+  position: absolute;
+  inset-inline-start: 12px;
+  top: 50%;
+  translate: 0 -50%;
+  font-family: var(--num);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--lgr-4);
+  pointer-events: none;
+}
+/* NOT APPLICABLE — a stated blank, so an empty cell never reads as a field that
+   failed to render. */
+.lgr-ab-nil { display: block; padding-inline: 12px; font-size: 15px; color: var(--lgr-placeholder); }
+
+/* WHAT ACTUALLY COUNTS. A guarantor's income is halved by the rule, and /aa1
+   halved it invisibly. The cell says what it contributed. */
+/* The slot is reserved whether or not there is anything in it, so typing an
+   income never nudges the two rows above it. */
+.lgr-ab-counted {
+  display: block;
+  height: 15px;
+  margin-top: 4px;
+  padding-inline: 2px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--lgr-4);
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 180ms var(--ease);
+}
+.lgr-ab-counted[data-on] { opacity: 1; }
+/* A bidi isolate swallows the space beside it, so the gap is a margin. */
+.lgr-ab-counted b {
+  margin-inline-start: 5px;
+  font-family: var(--num);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--lgr-2);
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+/* --- the foot: two sums and the figure everything downstream divides by --- */
+.lgr-ab-sums {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px 26px;
+  padding: 13px 16px 15px;
+  border-top: 1.5px solid var(--ink);
+  background: var(--card-2);
+}
+.lgr-ab-sum { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.lgr-ab-sum-l {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  color: var(--lgr-3);
+  white-space: nowrap;
+}
+.lgr-ab-sum-v {
+  font-family: var(--num);
+  font-variant-numeric: tabular-nums lining-nums;
+  font-size: 21px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+  direction: ltr;
+  unicode-bidi: isolate;
+  text-align: right;
+  white-space: nowrap;
+}
+/* הכנסה פנויה is the one the ceilings are a fraction of, so it is a full step
+   larger and the only label here set in full ink. */
+.lgr-ab-sum[data-hero] { align-items: flex-start; }
+.lgr-ab-sum[data-hero] .lgr-ab-sum-l { color: var(--ink); font-weight: 700; }
+.lgr-ab-sum[data-hero] .lgr-ab-sum-v { font-size: 28px; letter-spacing: -0.04em; }
+.lgr-ab-sum-v[data-empty] { color: var(--lgr-placeholder); font-weight: 400; letter-spacing: 0.02em; }
+.lgr-ab-sum-v[data-neg="true"] { color: var(--neg); }
+
+/* ========================================================= 3. the verdict */
+/* THE ONE LIT SURFACE. Everything above it is either recessed or ruled; this is
+   the only block on the page carrying real elevation, because it is the only
+   block that answers the question. */
+
+.lgr-ab-hero {
+  padding: 20px 22px 22px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r);
+  background: #fff;
+  box-shadow: var(--shadow-hover);
+}
+.lgr-ab-hero[data-empty] { box-shadow: var(--shadow); }
+
+.lgr-ab-hero-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px 24px; }
+.lgr-ab-hero-cap { font-size: 13px; font-weight: 700; letter-spacing: -0.005em; color: var(--lgr-2); }
+.lgr-ab-hero-fig {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 3px;
+  font-family: var(--num);
+  font-variant-numeric: tabular-nums lining-nums;
+  font-size: 46px;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1.05;
+  color: var(--ink);
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+.lgr-ab-hero-cur { font-size: 22px; font-weight: 500; color: var(--lgr-4); }
+.lgr-ab-hero-fig[data-empty] { color: var(--lgr-placeholder); font-weight: 600; font-size: 32px; line-height: 1.5; }
+.lgr-ab-hero-fig[data-empty] .lgr-ab-hero-cur { color: inherit; opacity: 0.7; font-size: 19px; }
+/* Inline text, not a flex row: the figures inside it are bidi-isolated and need
+   ordinary word spacing around them. */
+.lgr-ab-hero-sub { margin-top: 10px; font-size: 13px; line-height: 1.6; color: var(--lgr-3); }
+.lgr-ab-hero-sub b { font-weight: 700; color: var(--ink); }
+.lgr-ab-hero-sub .lgr-ab-dot { margin-inline: 8px; color: var(--lgr-placeholder); }
+
+/* nothing entered yet — the block holds the shape it will have with a figure in
+   it, so the first number fills it rather than growing the page */
+.lgr-ab-hero-blank { display: flex; align-items: center; gap: 16px; }
+.lgr-ab-hero-mark {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  flex: none;
+  border-radius: 15px;
+  background: var(--primary-tint);
+  color: var(--primary);
+}
+
+/* THE VERDICT CHIP. The only place on this page a status colour is allowed a
+   fill, because it is the only claim the page makes rather than reports. */
+.lgr-ab-verdict {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 16px 10px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--tone-line);
+  background: var(--tone-tint);
+  color: var(--tone);
+  font-size: 13.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+.lgr-ab-verdict[data-tone="ok"] { --tone: var(--pos); --tone-tint: var(--pos-tint); --tone-line: var(--pos-line); }
+.lgr-ab-verdict[data-tone="warn"] { --tone: var(--warn); --tone-tint: var(--warn-tint); --tone-line: var(--warn-line); }
+.lgr-ab-verdict[data-tone="over"] { --tone: var(--neg); --tone-tint: var(--neg-tint); --tone-line: var(--neg-line); }
+
+/* --- the gauge: the payment against its two ceilings --- */
+/* THE ONE BAR ON THE PAGE. Its full length is the MAXIMUM ceiling, so the track
+   itself is the capacity and the fill is what this mortgage spends of it. The
+   recommended ceiling is a rule across it at 87.5% (35 is seven eighths of 40),
+   and the stretch past that rule carries the warn wash — so "how close to the
+   edge is this" is answered by looking, not by comparing three figures in three
+   cards the way /aa1 asked you to. */
+
+.lgr-ab-gauge { margin-top: 22px; }
+.lgr-ab-track {
+  position: relative;
+  height: 16px;
+  border-radius: 99px;
+  /* start edge is the RIGHT edge in RTL, so the gradient runs to the left */
+  background: linear-gradient(to left, var(--card-3) 0 87.5%, var(--warn-tint) 87.5% 100%);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+}
+.lgr-ab-fill {
+  height: 100%;
+  border-start-end-radius: 99px;
+  border-end-end-radius: 99px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--tone) 82%, #fff), var(--tone));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  transition: width 0.45s var(--ease), background 0.25s var(--ease);
+}
+.lgr-ab-fill[data-tone="ok"] { --tone: var(--pos); }
+.lgr-ab-fill[data-tone="warn"] { --tone: var(--warn); }
+.lgr-ab-fill[data-tone="over"] { --tone: var(--neg); }
+/* The recommended line. Drawn over the fill so it is legible whichever side of
+   it the payment lands on. */
+.lgr-ab-mark {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 87.5%;
+  width: 2px;
+  background: #fff;
+  box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.22);
+}
+
+/* The two ceilings and the ratio, named under the bar they describe. Three
+   cells, so the eye reads them as one strip rather than as loose captions. */
+.lgr-ab-scale {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 28px;
+  margin-top: 12px;
+}
+.lgr-ab-scale-i { display: flex; align-items: baseline; gap: 8px; font-size: 12.5px; font-weight: 600; color: var(--lgr-3); white-space: nowrap; }
+.lgr-ab-scale-i b {
+  font-family: var(--num);
+  font-variant-numeric: tabular-nums lining-nums;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+/* No swatches. A dot beside each ceiling read as a legend for the bar, and the
+   bar's colours are not zones — the wash marks the stretch BETWEEN the two
+   ceilings and the fill's hue is the verdict. A legend that has to be explained
+   is furniture. */
+.lgr-ab-scale-i[data-end="true"] { margin-inline-start: auto; }
+/* יחס החזר is the sentence the whole gauge compresses into. */
+.lgr-ab-ratio { display: flex; align-items: baseline; gap: 9px; font-size: 12.5px; font-weight: 600; color: var(--lgr-3); }
+.lgr-ab-ratio b {
+  font-family: var(--num);
+  font-variant-numeric: tabular-nums lining-nums;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--tone, var(--ink));
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+.lgr-ab-ratio[data-tone="ok"] { --tone: var(--pos); }
+.lgr-ab-ratio[data-tone="warn"] { --tone: var(--warn); }
+.lgr-ab-ratio[data-tone="over"] { --tone: var(--neg); }
+
+/* A rule that failed, or a household whose loans have eaten its income. It
+   earns its tint — it is the one thing on the page that must stop the reader. */
+.lgr-ab-notice {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 16px;
+  padding: 11px 14px;
+  border: 1px solid var(--neg-line);
+  border-radius: var(--r-sm);
+  background: var(--neg-tint);
+  color: var(--neg);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* --------------------------------------------------------------- the footnote */
+
+.lgr-ab-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 18px;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--lgr-4);
+}
+
+/* ------------------------------------------------------------------ narrow */
+/* Desktop-first. The household stays a table down to 620px — three people whose
+   figures cannot be read against each other are not a household — and the
+   assumptions row wraps group by group. */
+
+@media (max-width: 1080px) {
+  .lgr-ab-chip { padding-inline: 9px; }
+  .lgr-ab-chip-t { font-size: 12.5px; }
+  .lgr-ab-grp { gap: 16px; padding-inline: 16px; }
+}
+
+@media (max-width: 900px) {
+  .lgr-ab-purpose-wrap { width: 100%; }
+  .lgr-ab-hero-fig { font-size: 38px; }
+  .lgr-ab-hero-cur { font-size: 19px; }
+  .lgr-ab-sums { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .lgr-ab-sum[data-hero] { grid-column: 1 / -1; }
+}
+
+@media (max-width: 620px) {
+  .lgr-ab-who { padding-inline: 4px 14px; }
+  .lgr-ab-grp { gap: 14px; padding-inline: 10px; }
+  .lgr-ab-grp:first-child { padding-inline-start: 4px; }
+  .lgr-ab-grp + .lgr-ab-grp { border-inline-start: 0; }
+  .lgr-ab-a-in { font-size: 18px; }
+  .lgr-ab-a[data-big] .lgr-ab-a-in { font-size: 22px; }
+  .lgr-ab-read-v { font-size: 20px; }
+  .lgr-ab-purpose { flex-wrap: wrap; }
+  .lgr-ab-chip { flex: 1 0 30%; }
+  .lgr-ab-tbl thead th,
+  .lgr-ab-tbl tbody td { padding-inline: 6px; }
+  .lgr-ab-name { gap: 8px; }
+  .lgr-ab-name-ico { display: none; }
+  .lgr-ab-in { height: 40px; font-size: 14px; padding-inline: 9px; }
+  .lgr-ab-field > .lgr-ab-in { padding-inline-start: 21px; }
+  .lgr-ab-cur { inset-inline-start: 9px; font-size: 11.5px; }
+  .lgr-ab-hero { padding: 16px; }
+  .lgr-ab-hero-fig { font-size: 31px; }
+  .lgr-ab-sums { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lgr-ab-a-well,
+  .lgr-ab-chip,
+  .lgr-ab-chip-n,
+  .lgr-ab-tbl tbody tr { transition: none; }
+  .lgr-ab-fill { transition: none; }
+}

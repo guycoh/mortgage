@@ -13,6 +13,7 @@ import { createClient } from "@supabase/supabase-js";
 // with the lead fixed instead of chosen. Fonts and theme.css travel with the
 // component (see its own imports), so this route declares neither.
 import Simulator from "@/app/aa102test/Simulator";
+import { parseTool } from "@/app/aa102test/lib/tools";
 import { FB_COOKIE, readCookieSession } from "../lib/fblink";
 import { recordEvent } from "../lib/telemetry";
 
@@ -27,10 +28,10 @@ const supabase = createClient(
 export default async function BoardPage({
   searchParams,
 }: {
-  /** ?tool=reverse opens straight on משכנתא הפוכה, so a Fireberry button can
-   *  point at the reverse calculator for a client rather than landing on the
-   *  ledger and asking the advisor to switch. The other two routes that render
-   *  this component already honour it; this one was the odd one out. */
+  /** ?tool=reverse / ?tool=ability opens straight on that instrument, so a
+   *  Fireberry button can point at the reverse calculator or the capacity check
+   *  for a client rather than landing on the ledger and asking the advisor to
+   *  switch. All three routes that render this component honour it. */
   searchParams: Promise<{ tool?: string }>;
 }) {
   const { tool } = await searchParams;
@@ -61,7 +62,7 @@ export default async function BoardPage({
       lead={lead}
       endpoint="/api/simulator/mixes"
       locked
-      initialTool={tool === "reverse" ? "reverse" : "mix"}
+      initialTool={parseTool(tool)}
     />
   );
 }

@@ -7,6 +7,7 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import Simulator from "../Simulator";
+import { parseTool } from "../lib/tools";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -26,8 +27,9 @@ export default async function LeadBoardPage({
   searchParams,
 }: {
   params: Promise<{ leadId: string }>;
-  /** ?tool=reverse opens on משכנתא הפוכה — resolved here so a deep link paints
-   *  the right instrument on the first frame. */
+  /** ?tool= picks the instrument — resolved here so a deep link paints the
+   *  right one on the first frame instead of showing the ledger and swapping
+   *  it out. */
   searchParams: Promise<{ tool?: string }>;
 }) {
   const { leadId } = await params;
@@ -38,5 +40,5 @@ export default async function LeadBoardPage({
   const { data, error } = await supabase.from("leads").select("id, name").eq("id", id).limit(1);
   if (error || !data?.length) notFound();
 
-  return <Simulator lead={data[0]} initialTool={tool === "reverse" ? "reverse" : "mix"} />;
+  return <Simulator lead={data[0]} initialTool={parseTool(tool)} />;
 }

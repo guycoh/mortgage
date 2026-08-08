@@ -48,7 +48,8 @@ import { analyseStatement } from "@/lib/bank-parser/analysis";
 import { useRouter } from "next/navigation";
 import LeadPicker, { type Lead } from "./components/LeadPicker";
 import Ledger from "./components/Ledger";
-import ToolSwitch, { type Tool } from "./components/ToolSwitch";
+import ToolSwitch from "./components/ToolSwitch";
+import { TOOLS, parseTool, type Tool } from "./lib/tools";
 import Logo from "./components/Logo";
 import Charts from "./components/Charts";
 import Compare from "./components/Compare";
@@ -78,27 +79,29 @@ import "@fontsource/assistant/hebrew-700.css";
 import "./theme.css";
 
 /**
- * THE OTHER TOOL, code-split.
+ * THE OTHER TOOLS, code-split.
  *
- * It is a whole second instrument — its own console, two product cards, an
- * ECharts canvas and a 361-row schedule — and most sessions never open it. It
- * loads on the pointer entering its switch button, which is 200ms before the
- * click lands, so by the time the fill has travelled the chunk is already in.
+ * Each is a whole second instrument — משכנתא הפוכה carries its own console, a
+ * comparison table, an ECharts canvas and a 361-row schedule — and most
+ * sessions never open either. They load on the pointer entering their switch
+ * button, which is ~200ms before the click lands, so by the time the fill has
+ * travelled the chunk is already in.
  */
-const ReverseTool = dynamic(() => import("./reverse/ReverseMortgage"), {
-  loading: () => (
-    <div className="lgr-card overflow-hidden">
-      <div className="lgr-head">
-        <div className="lgr-skel h-4 w-40" />
-      </div>
-      <div className="flex flex-col gap-2 p-3">
-        {[0, 1, 2].map((i) => (
-          <div key={i} className="lgr-skel h-10 w-full" style={{ opacity: 1 - i * 0.2 }} />
-        ))}
-      </div>
+const toolSkeleton = () => (
+  <div className="lgr-card overflow-hidden">
+    <div className="lgr-head">
+      <div className="lgr-skel h-4 w-40" />
     </div>
-  ),
-});
+    <div className="flex flex-col gap-2 p-3">
+      {[0, 1, 2].map((i) => (
+        <div key={i} className="lgr-skel h-10 w-full" style={{ opacity: 1 - i * 0.2 }} />
+      ))}
+    </div>
+  </div>
+);
+
+const ReverseTool = dynamic(() => import("./reverse/ReverseMortgage"), { loading: toolSkeleton });
+const AbilityTool = dynamic(() => import("./ability/AbilityCalculator"), { loading: toolSkeleton });
 
 type Mix = {
   id: string;
@@ -304,20 +307,35 @@ export default function Simulator({
 
   /* ------------------------------------------------------------- the tools */
   /**
-   * TWO INSTRUMENTS, ONE SURFACE.
+   * THREE INSTRUMENTS, ONE SURFACE.
    *
-   * משכנתא הפוכה is not another page. The switch in the title row swaps the
-   * body under it and nothing else moves — same route, same lead, no
+   * משכנתא הפוכה and יכולת החזר are not other pages. The switch in the nav band
+   * swaps the body under it and nothing else moves — same route, same lead, no
    * navigation, so the change costs a render and the fill can travel between
-   * the two buttons while it happens.
+   * the buttons while it happens.
    *
    * The address bar is kept in step with a NATIVE pushState rather than the
-   * router: `?tool=reverse` makes the tool linkable and the Back button
-   * behave, without paying for a soft navigation that would re-run the page's
-   * server component and tear the board down.
+   * router: `?tool=reverse` / `?tool=ability` makes the tool linkable and the
+   * Back button behave, without paying for a soft navigation that would re-run
+   * the page's server component and tear the board down.
    */
   const [tool, setTool] = useState<Tool>(initialTool);
-  const dir: -1 | 1 = tool === "reverse" ? -1 : 1;
+  /**
+   * WHICH WAY THE VIEW CAME FROM. With two tools the direction could be read
+   * off the destination alone; with three it is a property of the MOVE, so it
+   * is carried rather than inferred — a mirror ref, because the value has to be
+   * read inside the setter that changes it.
+   */
+  const [dir, setDir] = useState<-1 | 1>(1);
+  const toolRef = useRef<Tool>(initialTool);
+  const goTool = (next: Tool) => {
+    if (next === toolRef.current) return false;
+    // RTL: moving to a later tab means the new surface arrives from the left.
+    setDir(TOOLS.indexOf(next) > TOOLS.indexOf(toolRef.current) ? -1 : 1);
+    toolRef.current = next;
+    setTool(next);
+    return true;
+  };
 
   /** The page-load stagger belongs to the page load. A tool switch moves the
    *  whole view as one object, and blocks that also staggered inside it would
@@ -330,34 +348,39 @@ export default function Simulator({
   const enter: Enter = (i) => (firstPaint.current ? rise(i) : still);
 
   const pickTool = (next: Tool) => {
-    if (next === tool) return;
-    setTool(next);
+    if (!goTool(next)) return;
     try {
       const url = new URL(window.location.href);
-      if (next === "reverse") url.searchParams.set("tool", "reverse");
-      else url.searchParams.delete("tool");
+      // The ledger is the default, so it is the one tool the URL stays silent
+      // about — /aa102test/3 and /aa102test/3?tool=mix would otherwise be two
+      // addresses for one board.
+      if (next === "mix") url.searchParams.delete("tool");
+      else url.searchParams.set("tool", next);
       window.history.pushState(null, "", url);
     } catch {
       /* the tool still switches — only the address bar missed it */
     }
-    // The two tools are different heights and the eye should land on the top
-    // of the new one, not halfway down it.
+    // The tools are different heights and the eye should land on the top of the
+    // new one, not halfway down it.
     if (window.scrollY > 0) window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   useEffect(() => {
-    const onPop = () =>
-      setTool(new URLSearchParams(window.location.search).get("tool") === "reverse" ? "reverse" : "mix");
+    const onPop = () => goTool(parseTool(new URLSearchParams(window.location.search).get("tool")));
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // The pointer-enter preload covers mouse users; this covers everyone else.
-  // One idle-time import, so the switch never lands on a skeleton — the chunk
-  // is a few KB against a board that already shipped ECharts.
+  // One idle-time import each, so a switch never lands on a skeleton — both
+  // chunks together are a fraction of the board that already shipped ECharts.
   useEffect(() => {
     const idle = window.requestIdleCallback ?? ((cb: () => void) => window.setTimeout(cb, 1200));
-    const id = idle(() => void import("./reverse/ReverseMortgage"));
+    const id = idle(() => {
+      void import("./reverse/ReverseMortgage");
+      void import("./ability/AbilityCalculator");
+    });
     return () => (window.cancelIdleCallback ?? window.clearTimeout)(id as number);
   }, []);
 
@@ -741,10 +764,11 @@ export default function Simulator({
               onChange={pickTool}
               onPreload={(t) => {
                 if (t === "reverse") void import("./reverse/ReverseMortgage");
+                else if (t === "ability") void import("./ability/AbilityCalculator");
               }}
-              // The unsaved-dot: crossing to the other tool must not mean
+              // The unsaved-dot: crossing to another tool must not mean
               // forgetting this one has work uncommitted. Only the mix can be
-              // dirty — the reverse tool computes and never saves.
+              // dirty — the other two compute and never save.
               marks={{ mix: dirty }}
             />
 
@@ -785,7 +809,7 @@ export default function Simulator({
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.18, ease: [0.2, 0, 0, 1] }}
           >
-            {tool === "mix" ? "סימולטור תמהילים" : "משכנתא הפוכה"}
+            {tool === "mix" ? "סימולטור תמהילים" : tool === "reverse" ? "משכנתא הפוכה" : "משכנתא חדשה"}
           </motion.h1>
         </motion.header>
 
@@ -802,6 +826,23 @@ export default function Simulator({
                   ? "/api/simulator/reverse-profile"
                   : lead
                     ? `/api/simulator/reverse-profile?lead=${lead.id}`
+                    : null
+              }
+            />
+          </motion.div>
+        ) : tool === "ability" ? (
+          <motion.div key="ability" {...viewIn(dir)}>
+            <AbilityTool
+              enter={enter}
+              // Same two doors as the reverse tool: a Fireberry session is named
+              // by its cookie, the open sandbox names its lead. Either way the
+              // tool can read the client's asset, ages, incomes and existing
+              // repayments — read-only — and open already filled in.
+              profileUrl={
+                locked
+                  ? "/api/simulator/ability-profile"
+                  : lead
+                    ? `/api/simulator/ability-profile?lead=${lead.id}`
                     : null
               }
             />
