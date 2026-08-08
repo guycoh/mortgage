@@ -28,12 +28,12 @@ export default function BusinessCard() {
   ];
   
   const calculators = [
-    { icon: Calculator5, label: "מחשבון מהיר", href: "/home/calculators/simple_calculator" },
-    { icon: Calculator2, label: "מחשבון יכולות", href: "/home/calculators/mortgage_capability" },
-    { icon: Calculator3, label: "מס רכישה", href: "/home/calculators/purchase_tax_calculator" },
-    { icon: ReverseIcon, label: "מחשבון הפוכה", href: "/home/calculators/reverse_calculator" },
-    { icon: Calculator8, label: "קרן שווה", href: "/home/calculators/equal_principal" },
-    { icon: SigmaIcon, label: "מחשבון משכנתא", href: "/home/calculators/mortgage_calculator" },
+    { icon: Calculator5, label: "מחשבון מהיר", href: "/hachamm/calculators/simple_calculator" },
+    { icon: Calculator2, label: "מחשבון יכולות", href: "/hachamm/calculators/mortgage_capability" },
+    { icon: Calculator3, label: "מס רכישה", href: "/hachamm/calculators/purchase_tax_calculator" },
+    { icon: ReverseIcon, label: "מחשבון הפוכה", href: "/hachamm/calculators/reverse_calculator" },
+    { icon: Calculator8, label: "קרן שווה", href: "/hachamm/calculators/equal_principal" },
+    { icon: SigmaIcon, label: "מחשבון משכנתא", href: "/hachamm/calculators/mortgage_calculator" },
   ];
 
   return (
@@ -166,7 +166,7 @@ export default function BusinessCard() {
 
             {/* מדריך יתרות */}
             <Link
-              href="/home/guide/mortgage_balance"
+              href="/hachamm/guide/mortgage_balance"
               className="relative w-24 h-24 md:w-28 md:h-28 rounded-full bg-white shadow-[0_8px_20px_rgba(0,0,0,0.25)] flex items-center justify-center hover:scale-105 active:scale-95 transition-all duration-300 shrink-0"
             >
               <div className="absolute inset-0 rounded-full border-4 border-[#9a8b38]" />
