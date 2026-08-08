@@ -482,37 +482,6 @@ export default function Ledger({
 
                 return (
                   <Fragment key={g.key}>
-                    {/* Group divider — still one table, just legible. Its two
-                        subtotals sit in the real סכום and החזר חודשי cells rather
-                        than floating in a spanned row: hand-tuned widths could
-                        never land on the same pixel as the rows beneath them,
-                        and a ledger whose three levels of total each hang at a
-                        different offset is unreadable at a glance. */}
-                    <tr className="lgr-groupbar" style={famVars}>
-                      <td>
-                        <div className="lgr-groupbar-in">
-                          <span className="lgr-groupbar-title">
-                            {FAM_ICON[g.key]}
-                            {fam.plural}
-                          </span>
-                          <span className="lgr-count">{g.rows.length}</span>
-                        </div>
-                      </td>
-                      <td>
-                        <Money value={g.amount} className="lgr-groupbar-sum" />
-                      </td>
-                      <td>
-                        <span className="lgr-pct-ro lgr-groupbar-sum">
-                          {denom ? `${((g.amount / denom) * 100).toFixed(0)}%` : ""}
-                        </span>
-                      </td>
-                      <td colSpan={7} />
-                      <td>
-                        <Money value={g.monthly} className="lgr-groupbar-sum" style={{ color: fam.text }} />
-                      </td>
-                      <td />
-                    </tr>
-
                     {g.rows.map((loan) => {
                       const res = calculateLoan(loan, annualInflation);
                       const dirty = dirtyOf(loan);
@@ -857,6 +826,44 @@ export default function Ledger({
                         </motion.tr>
                       );
                     })}
+
+                    {/* THE SECTION'S SUBTOTAL, under the rows it totals.
+                        It used to head the group, which meant reading a sum
+                        before the figures it came from and, on a section of
+                        eight rows, meant the sum had scrolled away by the time
+                        you reached the end of them. A total belongs after its
+                        addends — the same order the grand total already sits
+                        in at the foot of the table.
+
+                        Its two figures sit in the real סכום and החזר חודשי
+                        cells rather than floating in a spanned row: hand-tuned
+                        widths could never land on the same pixel as the rows
+                        above them, and a ledger whose three levels of total
+                        each hang at a different offset is unreadable. */}
+                    <tr className="lgr-groupbar" style={famVars}>
+                      <td>
+                        <div className="lgr-groupbar-in">
+                          <span className="lgr-groupbar-title">
+                            {FAM_ICON[g.key]}
+                            {fam.plural}
+                          </span>
+                          <span className="lgr-count">{g.rows.length}</span>
+                        </div>
+                      </td>
+                      <td>
+                        <Money value={g.amount} className="lgr-groupbar-sum" />
+                      </td>
+                      <td>
+                        <span className="lgr-pct-ro lgr-groupbar-sum">
+                          {denom ? `${((g.amount / denom) * 100).toFixed(0)}%` : ""}
+                        </span>
+                      </td>
+                      <td colSpan={7} />
+                      <td>
+                        <Money value={g.monthly} className="lgr-groupbar-sum" style={{ color: fam.text }} />
+                      </td>
+                      <td />
+                    </tr>
                   </Fragment>
                 );
               })}

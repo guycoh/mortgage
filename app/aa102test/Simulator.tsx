@@ -49,6 +49,7 @@ import { useRouter } from "next/navigation";
 import LeadPicker, { type Lead } from "./components/LeadPicker";
 import Ledger from "./components/Ledger";
 import ToolSwitch, { type Tool } from "./components/ToolSwitch";
+import Logo from "./components/Logo";
 import Charts from "./components/Charts";
 import Compare from "./components/Compare";
 import ScheduleModal from "./components/ScheduleModal";
@@ -63,7 +64,7 @@ import {
 } from "./lib/credit";
 import { exportMixToExcel } from "./lib/excel";
 import { track } from "./lib/track.client";
-import { collapse, collapseOut, rise, settle, still, viewIn, type Enter } from "./lib/transitions";
+import { collapse, collapseOut, rise, still, viewIn, type Enter } from "./lib/transitions";
 // ONE TYPEFACE. Inter carries the Latin, the figures and the tabular numerals;
 // Assistant carries the Hebrew, which Inter has no glyphs for. Their x-heights
 // and stroke weights are close enough that "משכנתא 1,240,000" reads as a single
@@ -720,29 +721,34 @@ export default function Simulator({
   return (
     <div className="lgr-root" dir="rtl">
       <div className="mx-auto w-full max-w-[1300px] px-4 py-5 md:px-6 md:py-7">
-        {/* ------------------------------------------------- 1. the title row */}
-        <motion.header {...enter(0)} className="mb-4 flex flex-wrap items-center gap-3">
-          {/* The title IS the tool, and it arrives with the switch's fill.
-              Keyed, but deliberately NOT inside an AnimatePresence: mode="wait"
-              would hold the old word for its exit and only then start the new
-              one, which left the row with no title at all for a third of a
-              second — and, worse, with no title-shaped hole either, so the
-              picker slid across and back. Replacing the element outright keeps
-              the row's geometry honest from the first frame; only the ink
-              fades. The picker is layout-animated because the two names are
-              different widths and a chip that teleports 40px is the one thing
-              that would give away that anything was replaced. */}
-          <motion.h1
-            key={tool}
-            className="lgr-display text-[30px]"
-            initial={{ opacity: 0, y: 7 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.18, ease: [0.2, 0, 0, 1] }}
-          >
-            {tool === "mix" ? "סימולטור תמהילים" : "משכנתא הפוכה"}
-          </motion.h1>
+        {/* --------------------------------------- 1. the chrome, then the title */}
+        {/* A band of tabs above the page rather than a control inside it: which
+            instrument you are on is a property of the app, not of the sheet.
+            The client rides at the far end of the same bar, because that is the
+            other thing that is true of every view underneath it. */}
+        <motion.header {...enter(0)} className="mb-5">
+          <nav className="lgr-nav">
+            {/* The mark, at the start of the bar. It is the only thing on this
+                page that is allowed to be shiny — an app's own emblem is the
+                one place a gloss is a signature rather than decoration. */}
+            <div className="lgr-brand">
+              <Logo size={34} />
+              <span className="lgr-brand-name">מורגי</span>
+            </div>
 
-          <motion.div layout transition={settle} className="flex items-center gap-3">
+            <ToolSwitch
+              value={tool}
+              onChange={pickTool}
+              onPreload={(t) => {
+                if (t === "reverse") void import("./reverse/ReverseMortgage");
+              }}
+              // The unsaved-dot: crossing to the other tool must not mean
+              // forgetting this one has work uncommitted. Only the mix can be
+              // dirty — the reverse tool computes and never saves.
+              marks={{ mix: dirty }}
+            />
+
+            <div className="lgr-nav-end">
           {locked ? (
             // Same picker, no way out of it: the client is stated, not chosen.
             <span className="lgr-picker" data-static="" title="הליד שאליו משויך התמהיל">
@@ -763,25 +769,24 @@ export default function Simulator({
               }}
             />
           )}
-          </motion.div>
+            </div>
+          </nav>
 
-          {/* WHICH INSTRUMENT. Both are always here and the filled one is where
-              you are — see ToolSwitch for why the fill travels rather than
-              blinks. It sits at the row's far end, opposite the title it
-              governs.
-
-              On a locked board too: the switch swaps the body of THIS page and
-              navigates nowhere, so it opens no door out of the cookie's
-              scoping — and a Fireberry session is exactly where the reverse
-              tool can pre-fill itself from the client's card. */}
-          <ToolSwitch
-            className="ms-auto"
-            value={tool}
-            onChange={pickTool}
-            onPreload={(t) => {
-              if (t === "reverse") void import("./reverse/ReverseMortgage");
-            }}
-          />
+          {/* The title is the tool, and it changes with the tab. Keyed, but
+              deliberately NOT inside an AnimatePresence: mode="wait" would hold
+              the old word for its exit and only then start the new one, leaving
+              the row with no title at all for a third of a second. Replacing
+              the element outright keeps the geometry honest from the first
+              frame; only the ink fades. */}
+          <motion.h1
+            key={tool}
+            className="lgr-display mt-5 text-[30px]"
+            initial={{ opacity: 0, y: 7 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.18, ease: [0.2, 0, 0, 1] }}
+          >
+            {tool === "mix" ? "סימולטור תמהילים" : "משכנתא הפוכה"}
+          </motion.h1>
         </motion.header>
 
         <AnimatePresence mode="wait" initial={false}>
