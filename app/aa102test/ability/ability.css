@@ -43,18 +43,15 @@
    Prefixed lgr-ab- so it cannot collide with the ledger or the reverse tool.
    ========================================================================== */
 
-/* ==================================================== 1. the assumptions well */
-/* A SHALLOW WELL, one step BELOW the canvas. Elevation says "this is an
-   answer"; a recess says "this is what you put in". Two rows: what the money is
-   for, then how much of it there is. */
+/* ======================================================== 1. the deal card */
+/* Three rows that read as one sentence: whose numbers and what for; then the
+   EQUATION — the two figures you type, the operator between them, and the
+   mortgage they produce, all at one size; then the same three numbers as a
+   bar. The first build put these inputs in a recessed grey well at the
+   smallest size on the page — "inputs recede" taken one step too far, since
+   these two inputs are the deal itself. */
 
-.lgr-ab-assume {
-  margin-bottom: 16px;
-  border: 1px solid var(--line);
-  border-radius: var(--r);
-  background: var(--bg-2);
-  box-shadow: inset 0 1px 2px rgba(23, 23, 30, 0.045);
-}
+.lgr-ab-deal { margin-bottom: 16px; overflow: hidden; }
 
 /* --- row one: whose file this is, and what the mortgage is for --- */
 .lgr-ab-top {
@@ -62,7 +59,9 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 12px 18px;
-  padding: 11px 14px 12px;
+  padding: 11px 14px 11px;
+  border-bottom: 1px solid var(--line);
+  background: var(--card-2);
 }
 
 /* WHOSE FIGURES, and where they came from. A pre-filled number that looks typed
@@ -176,27 +175,126 @@
 }
 .lgr-ab-chip[data-on="true"] .lgr-ab-chip-n { color: var(--primary); }
 
-/* --- row two: the figures --- */
-.lgr-ab-params {
+/* --- row two: the equation --- */
+/* Top-aligned so every label sits on one line and every figure on the next;
+   the operators are dropped to the figures' own line. */
+.lgr-ab-eq {
   display: flex;
   flex-wrap: wrap;
-  align-items: stretch;
-  gap: 10px 0;
-  padding: 12px 14px 14px;
-  border-top: 1px solid var(--line-2);
-}
-/* Top-aligned, so every label in the row sits on one line and every value on
-   the next — centred, the 26px asset figure would drag its 20px neighbours off
-   the baseline and the row of labels would come out ragged. */
-.lgr-ab-grp {
-  display: flex;
   align-items: flex-start;
-  gap: 22px;
-  padding-inline: 22px;
+  gap: 12px 18px;
+  padding: 16px 22px 12px;
 }
-.lgr-ab-grp:first-child { padding-inline-start: 8px; }
-.lgr-ab-grp + .lgr-ab-grp { border-inline-start: 1px solid var(--line-2); }
-.lgr-ab-grp[data-end="true"] { margin-inline-start: auto; border-inline-start: 0; padding-inline-end: 4px; }
+
+/* ONE MEMBER of the equation: label over figure over a reserved caption line —
+   so answering a field never moves the row. */
+.lgr-ab-term { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-width: 0; }
+.lgr-ab-term-l {
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  color: var(--lgr-3);
+  white-space: nowrap;
+}
+/* The result's label carries the ink — it is the figure the section exists to
+   produce, and its name should be found first. */
+.lgr-ab-term[data-out="true"] .lgr-ab-term-l { color: var(--ink); font-weight: 700; }
+
+/* THE FIELD IS THE FIGURE. Chrome only under the pointer or the caret, exactly
+   like the reverse tool's hero — negative margin so the resting figure aligns
+   with its label rather than sitting 10px in from it. */
+.lgr-ab-term-well {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  margin-inline: -10px;
+  padding: 2px 10px 3px;
+  border-radius: 10px;
+  background: transparent;
+  box-shadow: 0 0 0 1px transparent;
+  transition: background var(--t) var(--ease), box-shadow 120ms var(--ease);
+}
+.lgr-ab-term-well:hover { background: var(--card-3); }
+.lgr-ab-term-well:focus-within {
+  background: #fff;
+  background-image: none;
+  box-shadow: 0 0 0 1px var(--line-2), 0 0 0 3px var(--focus-ring-strong);
+}
+/* Unanswered: a dashed rule under the figure line — the one affordance on
+   fields that otherwise have no chrome at all. */
+.lgr-ab-term-well[data-empty] {
+  background-image: repeating-linear-gradient(90deg, var(--edge) 0 4px, transparent 4px 7px);
+  background-size: calc(100% - 20px) 1.5px;
+  background-position: bottom 1px center;
+  background-repeat: no-repeat;
+}
+.lgr-ab-term-in {
+  field-sizing: content;
+  min-width: 2ch;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  outline: none;
+  font-family: var(--num);
+  font-variant-numeric: tabular-nums lining-nums;
+  font-size: 27px;
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1.15;
+  color: var(--ink);
+  direction: ltr;
+  text-align: left;
+}
+.lgr-ab-term-in::placeholder { font-weight: 400; color: var(--lgr-placeholder); opacity: 1; }
+.lgr-ab-term-cur { font-size: 16px; font-weight: 500; color: var(--lgr-4); }
+
+/* THE RESULT — same size, no well: output is stated, not typed. Violet-deep,
+   because the figure IS the mortgage and that is its ink everywhere here. */
+.lgr-ab-term-v {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  padding: 2px 0 3px;
+  font-family: var(--num);
+  font-variant-numeric: tabular-nums lining-nums;
+  font-size: 27px;
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1.15;
+  color: var(--primary-deep);
+  unicode-bidi: isolate;
+  white-space: nowrap;
+}
+.lgr-ab-term-v[data-empty] { color: var(--lgr-placeholder); font-weight: 400; }
+.lgr-ab-term-v[data-empty] .lgr-ab-term-cur { color: inherit; opacity: 0.7; }
+
+/* The reserved caption line. Quiet fact by default, warn when it is the
+   shortfall speaking. */
+.lgr-ab-term-c {
+  display: block;
+  min-height: 16px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--lgr-4);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.lgr-ab-term-c[data-warn="true"] { color: var(--warn); font-weight: 700; }
+
+/* The operators — on the figures' line, in the quietest ink that still reads.
+   Their top margin is the label line's height plus its gap. */
+.lgr-ab-eq-op {
+  margin-top: 21px;
+  font-family: var(--num);
+  font-size: 23px;
+  font-weight: 400;
+  line-height: 1.3;
+  color: var(--lgr-placeholder);
+  user-select: none;
+}
+
+/* The rule between the equation and the terms priced on top of it. */
+.lgr-ab-eq-sep { align-self: stretch; width: 1px; margin-inline: 8px; background: var(--line); }
 
 /* ONE ASSUMPTION. Borderless by default: the value is the interface, and the
    box only exists while you are pointing at it or typing in it. A row of six of
@@ -239,7 +337,8 @@
   background-position: bottom center;
   background-repeat: no-repeat;
 }
-.lgr-ab-a-well:hover { background-color: #fff; box-shadow: 0 0 0 1px var(--line-2); }
+/* On the deal card's white ground the hover surface is a tint, not white. */
+.lgr-ab-a-well:hover { background-color: var(--card-3); }
 .lgr-ab-a-well:focus-within {
   background-color: #fff;
   background-image: none;
@@ -275,44 +374,6 @@
 .lgr-ab-a-fix { font-size: 15px; font-weight: 500; color: var(--lgr-4); }
 .lgr-ab-a-yrs { font-size: 12px; font-weight: 600; color: var(--lgr-4); }
 
-/* DERIVED, AND IT LOOKS IT. An arrow out of the fields it is drawn from, then
-   the same label-over-value anatomy as its neighbours — with no box, because
-   there is nothing here to type. */
-.lgr-ab-read { display: flex; align-items: flex-start; gap: 20px; }
-/* The arrow points at the value, not at the label above it — and it sits
-   closer to the fields it comes out of than to the readings it introduces. */
-.lgr-ab-read > svg { margin-top: 22px; margin-inline-end: -9px; color: var(--lgr-placeholder); flex: none; }
-/* 22px, not the input's 20 and not the asset's 26. A derived figure has to be
-   legible beside the fields it comes out of without out-shouting them — the one
-   number in this row allowed to lead is the one the whole page turns on. */
-.lgr-ab-read-v {
-  display: block;
-  padding-block: 4px 0;
-  font-family: var(--num);
-  font-variant-numeric: tabular-nums lining-nums;
-  font-size: 22px;
-  font-weight: 700;
-  letter-spacing: -0.035em;
-  line-height: 1.2;
-  color: var(--ink);
-  direction: ltr;
-  unicode-bidi: isolate;
-}
-.lgr-ab-read-v[data-empty] { color: var(--lgr-placeholder); font-weight: 400; }
-/* The shortfall hangs under the minimum it is measured against. The slot is
-   reserved whether or not there is a shortfall, so typing into הון עצמי never
-   changes the height of the bar under your hands. */
-.lgr-ab-short {
-  display: block;
-  min-height: 15px;
-  margin-top: 2px;
-  font-size: 11.5px;
-  font-weight: 700;
-  letter-spacing: -0.005em;
-  color: var(--warn);
-  white-space: nowrap;
-}
-
 /* --- THE DEAL, AS ONE BAR --- */
 /* שווי הנכס is the bar's whole length; the dark stretch is the client's own
    money, the violet stretch is the bank's, and the flag across it is the
@@ -323,8 +384,8 @@
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 14px 22px 12px;
-  border-top: 1px solid var(--line-2);
+  padding: 12px 22px 14px;
+  border-top: 1px solid var(--line);
 }
 .lgr-ab-fund-l { flex: none; font-size: 12.5px; font-weight: 600; color: var(--lgr-3); white-space: nowrap; }
 .lgr-ab-fund-track {
@@ -570,46 +631,97 @@
   unicode-bidi: isolate;
 }
 
-/* --- the foot: two sums and the figure everything downstream divides by --- */
-.lgr-ab-sums {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 4px 26px;
-  padding: 13px 16px 15px;
-  border-top: 1.5px solid var(--ink);
-  background: var(--card-2);
+/* --- the totals row: sums UNDER the columns they add up --- */
+.lgr-ab-tf th,
+.lgr-ab-tf td {
+  padding: 10px 8px 12px;
+  border-top: 1px solid var(--line-2);
+  vertical-align: top;
 }
-.lgr-ab-sum { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-.lgr-ab-sum-l {
-  display: flex;
-  align-items: center;
-  gap: 7px;
+.lgr-ab-tf th {
+  padding-inline-start: 14px;
+  text-align: start;
   font-size: 12.5px;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: -0.005em;
-  color: var(--lgr-3);
+  color: var(--lgr-2);
   white-space: nowrap;
 }
-.lgr-ab-sum-v {
+/* Label over figure, both on the column's own end edge — the same edge the
+   inputs above align their digits to, so the total sits under its column. */
+.lgr-ab-tf-l {
+  display: block;
+  padding-inline-end: 12px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--lgr-4);
+  text-align: end;
+  white-space: nowrap;
+}
+.lgr-ab-tf-v {
+  display: block;
+  margin-top: 2px;
+  padding-inline-end: 12px;
   font-family: var(--num);
   font-variant-numeric: tabular-nums lining-nums;
-  font-size: 21px;
+  font-size: 19px;
   font-weight: 600;
-  line-height: 1;
-  letter-spacing: -0.03em;
+  line-height: 1.1;
+  letter-spacing: -0.025em;
   color: var(--ink);
   direction: ltr;
   unicode-bidi: isolate;
   text-align: right;
   white-space: nowrap;
 }
-/* הכנסה פנויה is the one the ceilings are a fraction of, so it is a full step
-   larger and the only label here set in full ink. */
-.lgr-ab-sum[data-hero] { align-items: flex-start; }
-.lgr-ab-sum[data-hero] .lgr-ab-sum-l { color: var(--ink); font-weight: 700; }
-.lgr-ab-sum[data-hero] .lgr-ab-sum-v { font-size: 28px; letter-spacing: -0.04em; }
-.lgr-ab-sum-v[data-empty] { color: var(--lgr-placeholder); font-weight: 400; letter-spacing: 0.02em; }
-.lgr-ab-sum-v[data-neg="true"] { color: var(--neg); }
+.lgr-ab-tf-v[data-empty] { color: var(--lgr-placeholder); font-weight: 400; letter-spacing: 0.02em; }
+
+/* --- THE RESULT BAND — the ledger closes --- */
+/* Double-ruled off the totals, full width, one figure. הכנסה פנויה is what
+   every ceiling downstream is a fraction of, so it gets the close-of-ledger
+   treatment: name in full ink, the formula said quietly beside it, the figure
+   at a size only the verdict's hero beats. */
+.lgr-ab-free {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 13px 16px 15px;
+  border-top: 1.5px solid var(--ink);
+  background: var(--card-2);
+}
+.lgr-ab-free-l {
+  flex: none;
+  font-family: var(--display);
+  font-size: 14.5px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.lgr-ab-free-f {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--lgr-4);
+  white-space: nowrap;
+}
+.lgr-ab-free-v {
+  margin-inline-start: auto;
+  font-family: var(--num);
+  font-variant-numeric: tabular-nums lining-nums;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: var(--ink);
+  direction: ltr;
+  unicode-bidi: isolate;
+  white-space: nowrap;
+}
+.lgr-ab-free-v[data-empty] { color: var(--lgr-placeholder); font-weight: 400; letter-spacing: 0.02em; }
+.lgr-ab-free[data-neg] .lgr-ab-free-v { color: var(--neg); }
 
 /* ========================================================= 3. the verdict */
 /* THE ONE LIT SURFACE. Everything above it is either recessed or ruled; this is
@@ -802,25 +914,27 @@
 @media (max-width: 1080px) {
   .lgr-ab-chip { padding-inline: 9px; }
   .lgr-ab-chip-t { font-size: 12.5px; }
-  .lgr-ab-grp { gap: 16px; padding-inline: 16px; }
+  .lgr-ab-eq { gap: 12px 14px; padding-inline: 16px; }
+  .lgr-ab-term-in,
+  .lgr-ab-term-v { font-size: 23px; }
 }
 
 @media (max-width: 900px) {
   .lgr-ab-purpose-wrap { width: 100%; }
   .lgr-ab-hero-fig { font-size: 38px; }
   .lgr-ab-hero-cur { font-size: 19px; }
-  .lgr-ab-sums { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .lgr-ab-sum[data-hero] { grid-column: 1 / -1; }
+  /* the terms and the reset drop to their own line; the equation keeps its
+     three members and two operators together */
+  .lgr-ab-eq-sep { display: none; }
 }
 
 @media (max-width: 620px) {
   .lgr-ab-who { padding-inline: 4px 14px; }
-  .lgr-ab-grp { gap: 14px; padding-inline: 10px; }
-  .lgr-ab-grp:first-child { padding-inline-start: 4px; }
-  .lgr-ab-grp + .lgr-ab-grp { border-inline-start: 0; }
+  .lgr-ab-eq { padding-inline: 12px; }
+  .lgr-ab-term-in,
+  .lgr-ab-term-v { font-size: 20px; }
+  .lgr-ab-eq-op { margin-top: 20px; font-size: 19px; }
   .lgr-ab-a-in { font-size: 18px; }
-  .lgr-ab-a[data-big] .lgr-ab-a-in { font-size: 22px; }
-  .lgr-ab-read-v { font-size: 20px; }
   .lgr-ab-purpose { flex-wrap: wrap; }
   .lgr-ab-chip { flex: 1 0 30%; }
   .lgr-ab-tbl thead th,
@@ -832,7 +946,8 @@
   .lgr-ab-cur { inset-inline-start: 9px; font-size: 11.5px; }
   .lgr-ab-hero { padding: 16px; }
   .lgr-ab-hero-fig { font-size: 31px; }
-  .lgr-ab-sums { grid-template-columns: minmax(0, 1fr); }
+  .lgr-ab-free { flex-wrap: wrap; }
+  .lgr-ab-free-f { order: 3; flex-basis: 100%; white-space: normal; }
 }
 
 @media (prefers-reduced-motion: reduce) {

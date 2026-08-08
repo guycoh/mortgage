@@ -43,7 +43,6 @@ import { motion } from "motion/react";
 import NumberFlow, { NumberFlowGroup } from "@number-flow/react";
 import {
   ArrowCounterClockwise,
-  ArrowLeft,
   ChartLineDown,
   CheckCircle,
   Info,
@@ -371,8 +370,14 @@ export default function AbilityCalculator({
 
   return (
     <>
-      {/* ------------------------------------------- 1. the assumptions well */}
-      <motion.section {...enter(1)} className="lgr-ab-assume" aria-label="נתוני העסקה">
+      {/* ------------------------------------------------- 1. the deal card */}
+      {/* Three rows that read as one sentence. WHO and FOR WHAT on top; then
+          THE EQUATION — שווי הנכס minus הון עצמי equals משכנתא מבוקשת, written
+          out at full size with real operators between the figures, because that
+          subtraction IS this section and the first build hid its result three
+          screens down; then the same three numbers as a BAR, with the purpose's
+          minimum flagged across it. Figures, then picture, of one fact. */}
+      <motion.section {...enter(1)} className="lgr-card lgr-ab-deal" aria-label="נתוני העסקה">
         <div className="lgr-ab-top">
           {/* WHOSE NUMBERS THESE ARE, and where they came from. A pre-filled
               figure that looks typed is a figure nobody rechecks — so the bar
@@ -437,102 +442,117 @@ export default function AbilityCalculator({
           </div>
         </div>
 
-        <div className="lgr-ab-params">
-          <div className="lgr-ab-grp">
-            <Assume
-              label="שווי הנכס"
-              big
-              width={150}
-              prefix="₪"
-              // "—", not "0": a grey zero in a money field still reads as a
-              // stated amount, and this field has not been answered yet.
-              placeholder="—"
-              value={grouped(assetValue)}
-              onChange={(e) => setAssetValue(digits(e.target.value))}
-              aria-label="שווי הנכס בשקלים"
-            />
-            <Assume
-              label="הון עצמי"
-              width={130}
-              prefix="₪"
-              placeholder="—"
-              value={grouped(equity)}
-              onChange={(e) => setEquity(digits(e.target.value))}
-              aria-label="הון עצמי בשקלים"
-            />
+        {/* THE EQUATION. Two figures you type, one you get, with the arithmetic
+            written between them — the largest type in the section belongs to
+            the inputs that drive everything, which is the exact opposite of the
+            first build, where the two most important fields on the page were
+            the smallest things on it. Every member reserves its caption line,
+            so answering a field never moves the row. */}
+        <div className="lgr-ab-eq" role="group" aria-label="חישוב המשכנתא המבוקשת">
+          <label className="lgr-ab-term">
+            <span className="lgr-ab-term-l">שווי הנכס</span>
+            <span className="lgr-ab-term-well" data-empty={assetValue ? undefined : "true"} dir="ltr">
+              <span className="lgr-ab-term-cur">₪</span>
+              <input
+                className="lgr-ab-term-in"
+                inputMode="numeric"
+                // "—", not "0": a grey zero in a money field still reads as a
+                // stated amount, and this field has not been answered yet.
+                placeholder="—"
+                size={Math.max(3, grouped(assetValue).length)}
+                value={grouped(assetValue)}
+                onChange={(e) => setAssetValue(digits(e.target.value))}
+                onFocus={(e) => e.currentTarget.select()}
+                aria-label="שווי הנכס בשקלים"
+              />
+            </span>
+            <span className="lgr-ab-term-c" />
+          </label>
 
-            {/* DERIVED, and it looks it: an arrow out of the two fields these
-                are drawn from, and then the same label-over-value stack as
-                every other item in the row — with no box, because there is
-                nothing here to type. */}
-            <div className="lgr-ab-read">
-              <ArrowLeft size={14} weight="bold" aria-hidden />
-              {/* Needs BOTH figures. With an asset and no equity the ratio is
-                  arithmetically 0.0% and reads as a stated fact about a field
-                  nobody has answered yet — /aa1 gated it the same way. */}
-              <span className="lgr-ab-a">
-                <span className="lgr-ab-a-l">אחוז הון עצמי</span>
-                <b className="lgr-ab-read-v" data-empty={a.asset > 0 && a.equity > 0 ? undefined : "true"}>
-                  {a.asset > 0 && a.equity > 0 ? `${a.equityPercent.toFixed(1)}%` : "—"}
-                </b>
+          <span className="lgr-ab-eq-op" aria-hidden>
+            −
+          </span>
+
+          <label className="lgr-ab-term">
+            <span className="lgr-ab-term-l">הון עצמי</span>
+            <span className="lgr-ab-term-well" data-empty={equity ? undefined : "true"} dir="ltr">
+              <span className="lgr-ab-term-cur">₪</span>
+              <input
+                className="lgr-ab-term-in"
+                inputMode="numeric"
+                placeholder="—"
+                size={Math.max(3, grouped(equity).length)}
+                value={grouped(equity)}
+                onChange={(e) => setEquity(digits(e.target.value))}
+                onFocus={(e) => e.currentTarget.select()}
+                aria-label="הון עצמי בשקלים"
+              />
+            </span>
+            {/* The purpose's rule, under the field it binds — and the shortfall
+                in warn when the equity misses it. One line, always reserved. */}
+            <span className="lgr-ab-term-c" data-warn={a.asset > 0 && a.equityGap > 0 ? "true" : undefined}>
+              {a.asset > 0
+                ? a.equityGap > 0
+                  ? `מינימום ${a.minEquityPercent}% · חסר ₪${fmt(a.equityGap)}`
+                  : `מינימום ${a.minEquityPercent}% · ₪${fmt(a.minEquity)}`
+                : ""}
+            </span>
+          </label>
+
+          <span className="lgr-ab-eq-op" aria-hidden>
+            =
+          </span>
+
+          {/* THE RESULT, in the mortgage's own ink. Output, not input: no well,
+              no border — a stated figure, at the same size as the fields it is
+              subtracted from, so the sentence reads at one weight. */}
+          <div className="lgr-ab-term" data-out="true">
+            <span className="lgr-ab-term-l">משכנתא מבוקשת</span>
+            <span className="lgr-ab-term-v" dir="ltr" data-empty={a.requested > 0 ? undefined : "true"}>
+              {a.requested > 0 ? <Amt value={a.requested} cur="lgr-ab-term-cur" /> : <><span className="lgr-ab-term-cur">₪</span>—</>}
+            </span>
+            <span className="lgr-ab-term-c">
+              {a.requested > 0 && a.asset > 0 ? `${((a.requested / a.asset) * 100).toFixed(1)}% מימון · עד ${a.maxLtv}%` : ""}
+            </span>
+          </div>
+
+          <span className="lgr-ab-eq-sep" aria-hidden />
+
+          <Assume
+            label="תקופה"
+            hint="חודשים"
+            width={46}
+            type="number"
+            min={1}
+            max={MAX_MONTHS}
+            step={12}
+            placeholder={DEFAULTS.months}
+            value={months}
+            onChange={(e) => setMonths(e.target.value)}
+            aria-label="תקופת המשכנתא בחודשים"
+            suffix={
+              <span dir="rtl" className="lgr-ab-a-yrs">
+                {years % 1 === 0 ? `${years} שנ׳` : `${years.toFixed(1)} שנ׳`}
               </span>
-              <span className="lgr-ab-a">
-                <span className="lgr-ab-a-l">
-                  הון עצמי מינימלי<i>{a.minEquityPercent}%</i>
-                </span>
-                <b className="lgr-ab-read-v" data-empty={a.asset > 0 ? undefined : "true"}>
-                  {a.asset > 0 ? <Amt value={a.minEquity} /> : "—"}
-                </b>
-                {/* THE SHORTFALL. /aa1 printed "השלמת הון עצמי ₪0" forever; a
-                    stated zero is a claim, and there is nothing to claim when
-                    the equity clears the rule. The slot is reserved either way
-                    so typing never changes the height of the row. */}
-                <span className="lgr-ab-short">
-                  {a.equityGap > 0 ? `חסר ₪${fmt(a.equityGap)}` : ""}
-                </span>
-              </span>
-            </div>
-          </div>
+            }
+          />
+          <Assume
+            label="ריבית שנתית"
+            width={48}
+            type="number"
+            step="0.01"
+            min={0}
+            placeholder="0"
+            suffix="%"
+            value={interest}
+            onChange={(e) => setInterest(e.target.value)}
+            aria-label="ריבית שנתית באחוזים"
+          />
 
-          <div className="lgr-ab-grp">
-            <Assume
-              label="תקופה"
-              hint="חודשים"
-              width={46}
-              type="number"
-              min={1}
-              max={MAX_MONTHS}
-              step={12}
-              placeholder={DEFAULTS.months}
-              value={months}
-              onChange={(e) => setMonths(e.target.value)}
-              aria-label="תקופת המשכנתא בחודשים"
-              suffix={
-                <span dir="rtl" className="lgr-ab-a-yrs">
-                  {years % 1 === 0 ? `${years} שנ׳` : `${years.toFixed(1)} שנ׳`}
-                </span>
-              }
-            />
-            <Assume
-              label="ריבית שנתית"
-              width={48}
-              type="number"
-              step="0.01"
-              min={0}
-              placeholder="0"
-              suffix="%"
-              value={interest}
-              onChange={(e) => setInterest(e.target.value)}
-              aria-label="ריבית שנתית באחוזים"
-            />
-          </div>
-
-          <div className="lgr-ab-grp" data-end="true">
-            <button className="lgr-ab-reset" onClick={reset} title="חזרה לערכי ברירת המחדל">
-              <ArrowCounterClockwise size={13} weight="bold" />
-              נקה
-            </button>
-          </div>
+          <button className="lgr-ab-reset ms-auto" onClick={reset} title="חזרה לערכי ברירת המחדל">
+            <ArrowCounterClockwise size={13} weight="bold" />
+            נקה
+          </button>
         </div>
 
         {/* THE DEAL, AS ONE BAR. שווי הנכס split into what the client brings and
@@ -590,6 +610,7 @@ export default function AbilityCalculator({
           <span className="lgr-sub ms-auto">סכומים חודשיים, נטו</span>
         </header>
 
+        <NumberFlowGroup>
         <table className="lgr-ab-tbl">
           <caption className="sr-only">הכנסות והתחייבויות חודשיות של בני משק הבית</caption>
           <colgroup>
@@ -734,38 +755,47 @@ export default function AbilityCalculator({
               </td>
             </tr>
           </tbody>
+
+          {/* THE TOTALS, IN THE COLUMNS THEY SUM. The first build printed them
+              in a loose grid under the table, so סה״כ הכנסה floated somewhere
+              between the columns it was adding up — a ledger's totals belong
+              under its rules. Income spans its two columns; the loans total
+              sits under the loans column; nothing is invented for גיל. */}
+          <tfoot>
+            <tr className="lgr-ab-tf">
+              <th scope="row">סה״כ חודשי</th>
+              <td />
+              <td colSpan={2}>
+                <span className="lgr-ab-tf-l">הכנסה מוכרת</span>
+                <span className="lgr-ab-tf-v" data-empty={a.totalIncome > 0 ? undefined : "true"}>
+                  {a.totalIncome > 0 ? <Amt value={a.totalIncome} /> : "—"}
+                </span>
+              </td>
+              <td>
+                <span className="lgr-ab-tf-l">החזרי הלוואות</span>
+                <span className="lgr-ab-tf-v" data-empty={a.totalLoans > 0 ? undefined : "true"}>
+                  {a.totalLoans > 0 ? <Amt value={a.totalLoans} /> : "—"}
+                </span>
+              </td>
+            </tr>
+          </tfoot>
         </table>
 
-        {/* The two sums, and the figure every ceiling below is a fraction of.
-            One NumberFlowGroup: an edit that moves all three moves them in one
-            breath rather than as three staggered events. */}
-        <NumberFlowGroup>
-        <div className="lgr-ab-sums">
-          <div className="lgr-ab-sum">
-            <span className="lgr-ab-sum-l">סה״כ הכנסה מוכרת</span>
-            <span className="lgr-ab-sum-v" data-empty={a.totalIncome > 0 ? undefined : "true"}>
-              {a.totalIncome > 0 ? <Amt value={a.totalIncome} /> : "—"}
-            </span>
-          </div>
-          <div className="lgr-ab-sum">
-            <span className="lgr-ab-sum-l">החזרי הלוואות</span>
-            <span className="lgr-ab-sum-v" data-empty={a.totalLoans > 0 ? undefined : "true"}>
-              {a.totalLoans > 0 ? <Amt value={a.totalLoans} /> : "—"}
-            </span>
-          </div>
-          {/* Stated as soon as EITHER side of the subtraction has been answered:
-              a sheet with repayments and no income has a free income, and it is
-              negative — which is exactly the case worth showing. */}
-          <div className="lgr-ab-sum" data-hero="true">
-            <span className="lgr-ab-sum-l">הכנסה פנויה</span>
-            <span
-              className="lgr-ab-sum-v"
-              data-empty={a.totalIncome > 0 || a.totalLoans > 0 ? undefined : "true"}
-              data-neg={a.freeIncome < 0 || undefined}
-            >
-              {a.totalIncome > 0 || a.totalLoans > 0 ? <Amt value={a.freeIncome} /> : "—"}
-            </span>
-          </div>
+        {/* THE RESULT BAND — the one figure everything below divides by, double-
+            ruled off the totals the way a ledger closes. Stated as soon as
+            EITHER side of the subtraction is answered: a sheet with repayments
+            and no income has a free income, and it is negative — which is
+            exactly the case worth showing. NumberFlowGroup spans the totals and
+            the result, so one edit moves all three figures in one breath. */}
+        <div className="lgr-ab-free" data-neg={a.freeIncome < 0 || undefined}>
+          <span className="lgr-ab-free-l">הכנסה פנויה</span>
+          <span className="lgr-ab-free-f">הכנסה מוכרת פחות החזרי הלוואות — הבסיס לתקרות ההחזר</span>
+          <span
+            className="lgr-ab-free-v"
+            data-empty={a.totalIncome > 0 || a.totalLoans > 0 ? undefined : "true"}
+          >
+            {a.totalIncome > 0 || a.totalLoans > 0 ? <Amt value={a.freeIncome} /> : "—"}
+          </span>
         </div>
         </NumberFlowGroup>
       </motion.section>
@@ -780,14 +810,19 @@ export default function AbilityCalculator({
                 <div className="lgr-ab-hero-fig" dir="ltr">
                   <Amt value={a.monthlyPayment} cur="lgr-ab-hero-cur" />
                 </div>
-                {/* ONE SENTENCE, and it never repeats a figure the well above
-                    already states. The requested mortgage is derived and shown
-                    nowhere else, so this is where it lives. */}
+                {/* ONE SENTENCE — the whole deal, restated under its price.
+                    The figures live in the equation above too, but a verdict
+                    that gets read aloud (or screenshotted) has to stand on its
+                    own: the loan, the term, the rate, the schedule. */}
                 <div className="lgr-ab-hero-sub">
-                  על משכנתא מבוקשת של{" "}
+                  משכנתא של{" "}
                   <b dir="ltr" style={{ unicodeBidi: "isolate" }}>
                     ₪{fmt(a.requested)}
                   </b>
+                  <span className="lgr-ab-dot">·</span>
+                  {years % 1 === 0 ? years : years.toFixed(1)} שנים
+                  <span className="lgr-ab-dot">·</span>
+                  ריבית {a.rate}%
                   <span className="lgr-ab-dot">·</span>
                   לוח שפיצר
                 </div>
