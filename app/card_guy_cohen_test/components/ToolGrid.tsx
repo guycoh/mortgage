@@ -10,7 +10,7 @@ export function ToolGrid() {
       <div className="mb-2.5 flex items-center gap-3">
         <h2
           id="glc-tools-title"
-          className="glc-display text-[18px] font-semibold leading-none tracking-[-0.01em] text-[var(--glc-ink)]"
+          className="glc-display text-[20px] font-bold leading-none text-[var(--glc-ink)]"
         >
           מחשבונים
         </h2>
@@ -29,10 +29,10 @@ export function ToolGrid() {
               <Icon className="h-[18px] w-[18px]" />
             </span>
             <span className="min-w-0 flex-1 text-start">
-              <span className="block truncate text-[13px] font-bold leading-tight text-[var(--glc-ink)]">
+              <span className="block truncate text-[14px] font-bold leading-tight text-[var(--glc-ink)]">
                 {label}
               </span>
-              <span className="mt-0.5 block truncate text-[11px] leading-tight text-[var(--glc-ink-faint)]">
+              <span className="mt-0.5 block truncate text-[11.5px] leading-tight text-[var(--glc-ink-faint)]">
                 {hint}
               </span>
             </span>

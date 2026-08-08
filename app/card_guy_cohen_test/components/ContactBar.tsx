@@ -29,7 +29,7 @@ export function ContactBar() {
           <span className="glc-disc grid h-10 w-10 place-items-center rounded-full">
             <Icon className="h-[19px] w-[19px]" />
           </span>
-          <span className="text-[12.5px] font-semibold leading-none text-[var(--glc-ink-soft)]">
+          <span className="text-[13.5px] font-semibold leading-none text-[var(--glc-ink-soft)]">
             {label}
           </span>
         </motion.a>

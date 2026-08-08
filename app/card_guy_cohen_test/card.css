@@ -44,7 +44,7 @@
 }
 
 .glc-display {
-  font-family: var(--glc-font-display), ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--glc-font-display), "Times New Roman", serif;
   font-feature-settings: "kern" 1;
 }
 
@@ -98,39 +98,31 @@
     radial-gradient(46% 40% at 92% 84%, rgba(120, 96, 34, 0.18), rgba(120, 96, 34, 0) 72%);
 }
 
-/* The plate has no edges — it fades out on all four sides so the gold
-   melts into the paper instead of stopping on a line.
-   Two nested masks rather than one element with mask-composite: nesting
-   multiplies the masks in every engine, where `mask-composite: intersect`
-   degrades to a union (a cross-shaped plate) wherever it isn't supported. */
-.glc-fade-x {
-  -webkit-mask-image: linear-gradient(
-    to right,
-    transparent 0%,
-    #000 5%,
-    #000 95%,
-    transparent 100%
-  );
-  mask-image: linear-gradient(to right, transparent 0%, #000 5%, #000 95%, transparent 100%);
-}
+/* How the plate meets the paper.
+   Masking it out was wrong: fading pigment to transparent over white left a
+   grey haze where the dark tones thinned, and feathered left/right edges
+   read as a printing fault. The plate keeps a defined edge — what changes
+   is that the edge is now *finished* rather than cut.
 
-.glc-fade-y {
-  -webkit-mask-image: linear-gradient(
-    to bottom,
-    transparent 0%,
-    #000 6%,
-    #000 67%,
-    rgba(0, 0, 0, 0.45) 87%,
-    transparent 100%
-  );
-  mask-image: linear-gradient(
-    to bottom,
-    transparent 0%,
-    #000 6%,
-    #000 67%,
-    rgba(0, 0, 0, 0.45) 87%,
-    transparent 100%
-  );
+   The hem lifts the last few percent of the pigment toward warm light, so
+   the boundary is the brightest part of the plate rather than the darkest,
+   the way a gilt edge catches light. Paired with a soft warm shadow cast
+   onto the paper below, the plate sits on the stock instead of being
+   pasted onto it. */
+.glc-plate-hem {
+  background-image: linear-gradient(
+      to bottom,
+      rgba(255, 250, 226, 0.2) 0%,
+      rgba(255, 250, 226, 0.05) 4%,
+      rgba(255, 250, 226, 0) 9%
+    ),
+    linear-gradient(
+      to top,
+      rgba(255, 250, 226, 0.26) 0%,
+      rgba(255, 250, 226, 0.1) 5%,
+      rgba(255, 250, 226, 0.02) 14%,
+      rgba(255, 250, 226, 0) 26%
+    );
 }
 
 /* the primary action — same pigment, tightened to a small surface */

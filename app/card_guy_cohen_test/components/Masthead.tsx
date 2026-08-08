@@ -14,15 +14,12 @@ export function Masthead() {
   return (
     <motion.section
       variants={rise}
-      className="relative isolate flex max-h-[44svh] shrink-0 grow flex-col justify-center px-[var(--glc-gutter)] pt-[clamp(10px,2svh,20px)] pb-[clamp(44px,6.2svh,54px)] text-center"
+      className="glc-grain relative isolate flex max-h-[44svh] shrink-0 grow flex-col justify-center overflow-hidden rounded-b-[34px] px-[var(--glc-gutter)] pt-[clamp(10px,2svh,20px)] pb-[clamp(44px,6.2svh,54px)] text-center shadow-[0_16px_34px_-22px_rgba(66,55,17,0.5)]"
     >
-      <div aria-hidden className="glc-fade-x absolute inset-0">
-        <div className="glc-fade-y glc-grain absolute inset-0">
-          <div className="glc-plate absolute inset-0" />
-          <div className="glc-engrave absolute inset-0 opacity-35" />
-          <div className="glc-bloom absolute inset-0" />
-        </div>
-      </div>
+      <div aria-hidden className="glc-plate absolute inset-0" />
+      <div aria-hidden className="glc-engrave absolute inset-0 opacity-35" />
+      <div aria-hidden className="glc-bloom absolute inset-0" />
+      <div aria-hidden className="glc-plate-hem absolute inset-0" />
 
       <div className="relative">
         <motion.div
@@ -47,7 +44,7 @@ export function Masthead() {
 
         <motion.h1
           variants={rise}
-          className="glc-display glc-press mt-[clamp(11px,1.8svh,15px)] text-[clamp(35px,10vw,44px)] font-semibold leading-none tracking-[-0.015em] text-[#fffaea]"
+          className="glc-display glc-press mt-[clamp(11px,1.8svh,15px)] text-[clamp(38px,11vw,48px)] font-bold leading-none tracking-[0.005em] text-[#fffaea]"
         >
           {person.full}
         </motion.h1>
@@ -60,7 +57,7 @@ export function Masthead() {
             aria-hidden
             className="h-px w-9 bg-gradient-to-l from-transparent to-[rgba(217,202,134,0.7)]"
           />
-          <p className="text-[13px] font-semibold tracking-[0.22em] text-[#f8efcd]">
+          <p className="text-[14px] font-semibold tracking-[0.2em] text-[#f8efcd]">
             {person.role}
           </p>
           <span

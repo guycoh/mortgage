@@ -43,7 +43,7 @@ export function ShareSheet({
           <div aria-hidden className="mx-auto mt-3 h-1 w-10 rounded-full bg-[var(--glc-bone-200)]" />
 
           <div className="px-[var(--glc-gutter)] pt-4">
-            <Drawer.Title className="glc-display text-center text-[22px] font-semibold tracking-[-0.015em] text-[var(--glc-ink)]">
+            <Drawer.Title className="glc-display text-center text-[24px] font-bold text-[var(--glc-ink)]">
               שיתוף הכרטיס
             </Drawer.Title>
             <p className="mt-1.5 text-center text-[13px] text-[var(--glc-ink-faint)]">

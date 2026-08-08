@@ -24,12 +24,12 @@ export function LocationRow() {
         <span className="block text-[10.5px] font-semibold tracking-[0.2em] text-[var(--glc-gold-600)]">
           המשרד
         </span>
-        <span className="mt-0.5 block truncate text-[15px] font-bold leading-tight text-[var(--glc-ink)]">
+        <span className="mt-0.5 block truncate text-[16px] font-bold leading-tight text-[var(--glc-ink)]">
           {person.street}, {person.city}
         </span>
       </span>
 
-      <span className="flex shrink-0 items-center gap-0.5 text-[12px] font-semibold text-[var(--glc-ink-faint)]">
+      <span className="flex shrink-0 items-center gap-0.5 text-[12.5px] font-semibold text-[var(--glc-ink-faint)]">
         ניווט
         <ChevronLeft aria-hidden className="h-4 w-4 text-[var(--glc-gold-300)]" />
       </span>
