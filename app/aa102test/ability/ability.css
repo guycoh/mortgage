@@ -372,7 +372,8 @@
 .lgr-ab-a-in[type="number"]::-webkit-outer-spin-button,
 .lgr-ab-a-in[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .lgr-ab-a-fix { font-size: 15px; font-weight: 500; color: var(--lgr-4); }
-.lgr-ab-a-yrs { font-size: 12px; font-weight: 600; color: var(--lgr-4); }
+/* nowrap: "30 שנ׳" has a space in it, and on a tight bar it took the licence. */
+.lgr-ab-a-yrs { font-size: 12px; font-weight: 600; color: var(--lgr-4); white-space: nowrap; }
 
 /* --- THE DEAL, AS ONE BAR --- */
 /* שווי הנכס is the bar's whole length; the dark stretch is the client's own
@@ -472,6 +473,28 @@
 .lgr-root .lgr-ab-fund-tick em { translate: -6px 0; inset-inline-start: auto; inset-inline-end: 50%; }
 .lgr-ab-fund-tick[data-short] { background: var(--warn); }
 .lgr-ab-fund-tick[data-short] em { color: var(--warn); }
+
+/* The strip's figures restated under the bar — a narrow-screen affordance,
+   dormant wherever the in-segment labels have the room to speak for
+   themselves. Styled here, shown by the 620px block. */
+.lgr-ab-fund-cap { display: none; flex-wrap: wrap; gap: 4px 16px; font-size: 11.5px; font-weight: 600; color: var(--lgr-3); }
+.lgr-ab-fund-cap > span { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.lgr-ab-fund-cap > span::before { content: ""; width: 8px; height: 8px; border-radius: 3px; flex: none; }
+.lgr-ab-fund-cap > span[data-k="equity"]::before { background: #3a3d45; }
+.lgr-ab-fund-cap > span[data-k="loan"]::before { background: var(--primary); }
+.lgr-ab-fund-cap > span[data-k="gap"] { color: var(--warn); }
+.lgr-ab-fund-cap > span[data-k="gap"]::before {
+  background: repeating-linear-gradient(-45deg, var(--warn-tint) 0 3px, #fff 3px 5px);
+  box-shadow: inset 0 0 0 1px var(--warn-line);
+}
+.lgr-ab-fund-cap b {
+  font-family: var(--num);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--ink);
+  unicode-bidi: isolate;
+}
+.lgr-ab-fund-cap > span[data-k="gap"] b { color: var(--warn); }
 
 /* Tertiary: it undoes, it does not act. Text until you point at it. */
 .lgr-ab-reset {
@@ -967,21 +990,97 @@
 }
 
 @media (max-width: 620px) {
-  .lgr-ab-who { padding-inline: 4px 14px; }
-  .lgr-ab-eq { padding-inline: 12px; }
+  /* --- the deal card. The who-block takes its own line; the purpose stacks
+     its label over a 2-up grid of chips — five nowrap chips sharing one 390px
+     row were overlapping each other's text, which is the one thing a control
+     must never do. --- */
+  .lgr-ab-top { padding: 10px 12px; }
+  .lgr-ab-who { border-inline-end: 0; padding-inline: 2px; }
+  /* flex-basis 100%, not the inherited basis-0: the wrap must take its own
+     row, not split one with the client block. */
+  .lgr-ab-purpose-wrap { flex: 1 1 100%; flex-direction: column; align-items: stretch; gap: 7px; }
+  .lgr-ab-purpose-l { padding-inline-start: 2px; }
+  .lgr-ab-purpose { display: grid; grid-template-columns: 1fr 1fr; }
+  .lgr-ab-chip { padding-block: 8px 9px; }
+
+  /* --- THE EQUATION BECOMES A GRID. Two typed figures side by side, the
+     result full-width under them, then the terms — the written-out operators
+     go, because at this width they stranded on lines of their own, and an
+     "=" floating alone says less than the captions every member already
+     carries. The captions may wrap; reserving one line each. --- */
+  .lgr-ab-eq { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 14px 14px 12px; }
+  .lgr-ab-eq-op,
+  .lgr-ab-eq-sep { display: none; }
+  .lgr-ab-term[data-out="true"] { grid-column: 1 / -1; padding-top: 10px; border-top: 1px dashed var(--line-2); }
   .lgr-ab-term-in,
-  .lgr-ab-term-v { font-size: 20px; }
-  .lgr-ab-eq-op { margin-top: 20px; font-size: 19px; }
+  .lgr-ab-term-v { font-size: 22px; }
+  .lgr-ab-term-c { white-space: normal; }
+  /* the terms sit flush start like the equation members above them */
+  .lgr-ab-a { align-items: flex-start; text-align: start; }
+  .lgr-ab-a-l { justify-content: flex-start; }
+  .lgr-ab-a-well { margin-inline-start: -10px; }
   .lgr-ab-a-in { font-size: 18px; }
-  .lgr-ab-purpose { flex-wrap: wrap; }
-  .lgr-ab-chip { flex: 1 0 30%; }
-  .lgr-ab-tbl thead th,
-  .lgr-ab-tbl tbody td { padding-inline: 6px; }
-  .lgr-ab-name { gap: 8px; }
-  .lgr-ab-name-ico { display: none; }
-  .lgr-ab-in { height: 40px; font-size: 14px; padding-inline: 9px; }
-  .lgr-ab-field > .lgr-ab-in { padding-inline-start: 21px; }
-  .lgr-ab-cur { inset-inline-start: 9px; font-size: 11.5px; }
+  .lgr-ab-reset { grid-column: 1 / -1; justify-self: end; }
+
+  /* --- the funding strip: label above, bar, figures below. The in-segment
+     labels clipped mid-figure at this width, and a truncated amount reads as
+     a wrong amount. --- */
+  .lgr-ab-fund { flex-direction: column; align-items: stretch; gap: 2px; padding: 12px 14px 14px; }
+  /* flex:none — the base `flex: 1` was sizing the ROW layout's width; in a
+     column it becomes a zero height-basis and the bar vanishes. */
+  .lgr-ab-fund-track { flex: none; margin-top: 18px; }
+  .lgr-ab-fund-t { display: none; }
+  .lgr-ab-fund-cap { display: flex; margin-top: 9px; }
+
+  /* --- THE SHEET BECOMES PERSON-CARDS. Six columns at 390px meant headers
+     overlapping headers and inputs four digits wide. Each row is a block now:
+     the name on its own line, the fields 2-up beneath it, each stating its
+     own small label (data-l) because the column heads are gone. Cells whose
+     only content is a stated blank are furniture here and go. --- */
+  .lgr-ab-tbl,
+  .lgr-ab-tbl tbody,
+  .lgr-ab-tbl tfoot { display: block; }
+  .lgr-ab-tbl colgroup,
+  .lgr-ab-tbl thead { display: none; }
+  .lgr-ab-tbl tbody tr { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; padding: 12px 14px 14px; border-bottom: 1px solid var(--line); }
+  .lgr-ab-tbl tbody tr:last-child { border-bottom: 0; }
+  .lgr-ab-tbl tbody tr > * { padding: 0; border-bottom: 0; }
+  .lgr-ab-tbl tbody th[scope="row"] { grid-column: 1 / -1; }
+  .lgr-ab-name { padding-inline-start: 0; }
+  .lgr-ab-tbl tbody td::before {
+    content: attr(data-l);
+    display: block;
+    margin-bottom: 4px;
+    font-family: var(--ui);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--lgr-4);
+  }
+  .lgr-ab-tbl tbody td:has(> .lgr-ab-nil) { display: none; }
+  .lgr-ab-calc { justify-content: flex-start; padding-inline: 0; }
+  /* per-cell washes paint a patchwork on a grid row — the row carries them */
+  .lgr-ab-tbl tbody tr:hover > *,
+  .lgr-ab-tbl tbody tr:focus-within > * { background: transparent; }
+  .lgr-ab-tbl tbody tr:focus-within { background: var(--primary-wash); }
+  .lgr-ab-in { height: 42px; font-size: 15px; }
+
+  /* the totals keep exactly the two cells that hold figures */
+  .lgr-ab-tf { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; padding: 11px 14px 13px; border-top: 1px solid var(--line-2); }
+  .lgr-ab-tf th,
+  .lgr-ab-tf td { border-top: 0; padding: 0; }
+  .lgr-ab-tf th { grid-column: 1 / -1; padding-inline-start: 0; }
+  .lgr-ab-tf td:empty { display: none; }
+  .lgr-ab-tf td::before {
+    content: attr(data-l);
+    display: block;
+    margin-bottom: 3px;
+    font-family: var(--ui);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--lgr-4);
+  }
+  .lgr-ab-tf-v { padding-inline-end: 0; text-align: right; }
+
   .lgr-ab-hero { padding: 16px; }
   .lgr-ab-hero-fig { font-size: 31px; }
   .lgr-ab-free { flex-wrap: wrap; }

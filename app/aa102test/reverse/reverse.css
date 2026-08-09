@@ -53,23 +53,35 @@
    third the size of the hero's. Grouped by what they are — the asset, the
    people, the terms — with the toolbar's own hairline between groups. */
 
-/* A SHALLOW WELL, not a card. The bar floated bare on the canvas and, with an
-   empty form, read as loose text nobody had finished laying out. It is a
-   recessed surface now — one step BELOW the page rather than above it, which
-   is the honest signal: these are the things you put in, and the hero above
-   them is the thing that comes out. Elevation says results; a well says
-   inputs. */
+/* A FLAT WHITE SHEET with one violet thread. The grey well earned its keep
+   against a bare canvas, but it read heavy — a slab of tint with hairline
+   fences inside it. This is the quieter statement of the same hierarchy: flat
+   white, hairline edge, NO shadow of any kind, so the hero below — which does
+   carry elevation — is still unmistakably the thing that comes out. The 3px
+   rule down the start edge is the product's ink marking whose figures these
+   are; it is the exact grammar the verdict card uses for its tone. Inside,
+   nothing is fenced: the who-block and the groups are separated by air and by
+   the label line, which is what a sheet of labelled facts needs. */
 .lgr-rm-assume {
+  position: relative;
+  overflow: hidden;
   display: flex;
   flex-wrap: wrap;
   align-items: stretch;
   gap: 10px 0;
   margin-bottom: 16px;
-  padding: 13px 14px;
-  border: 1px solid var(--line);
+  padding: 14px 16px;
+  border: 1px solid var(--line-2);
   border-radius: var(--r);
-  background: var(--bg-2);
-  box-shadow: inset 0 1px 2px rgba(23, 23, 30, 0.045);
+  background: #fff;
+}
+.lgr-rm-assume::before {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: 3px;
+  background: var(--primary);
 }
 /* TOP-ALIGNED, so every label in the bar sits on one line and every value on
    the next. Centred, the taller items (שווי הנכס at 26px, גיל קובע at 24)
@@ -81,17 +93,16 @@
   gap: 22px;
   padding-inline: 22px;
 }
-/* WHOSE FIGURES. Pinned at the start of the bar with a rule after it, so the
-   parameters can sit centred in what is left rather than hugging one edge of
-   a very wide well. */
+/* WHOSE FIGURES. Pinned at the start of the bar, beside the accent thread —
+   no fence after it: the icon disc, the bold title and 24px of air are
+   already three statements that a new region begins. */
 .lgr-rm-who {
   display: flex;
   align-self: center;
   align-items: center;
   gap: 11px;
   flex: none;
-  padding-inline: 6px 20px;
-  border-inline-end: 1px solid var(--line-2);
+  padding-inline: 8px 24px;
 }
 .lgr-rm-who-ico {
   display: grid;
@@ -116,9 +127,9 @@
 .lgr-rm-params { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: center; flex: 1; gap: 10px 0; }
 
 .lgr-rm-grp:first-child { padding-inline-start: 8px; }
-/* Full-height now that the groups stretch — a rule that stops short of the
-   content it divides is a tick mark, not a divider. */
-.lgr-rm-grp + .lgr-rm-grp { border-inline-start: 1px solid var(--line-2); }
+/* No rules between groups: 44px of air divides the asset from the people from
+   the terms, and every value already sits under a label that names it. On a
+   white sheet the fences were the loudest thing in the bar. */
 /* The arrow points at the value, not at the label above it. */
 .lgr-rm-read > svg { margin-top: 22px; }
 
@@ -167,8 +178,8 @@
   background-position: bottom center;
   background-repeat: no-repeat;
 }
-/* White on a grey well — the field lifts out of the surface it sits in. */
-.lgr-rm-a-well:hover { background-color: #fff; box-shadow: 0 0 0 1px var(--line-2); }
+/* A tint on a white sheet — the same lift the deal card's fields use. */
+.lgr-rm-a-well:hover { background-color: var(--card-3); }
 .lgr-rm-a-well:focus-within {
   background-color: #fff;
   background-image: none;
@@ -211,7 +222,8 @@
 .lgr-rm-a-in[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 
 .lgr-rm-a-fix { font-size: 15px; font-weight: 500; color: var(--lgr-4); }
-.lgr-rm-a-yrs { font-size: 12px; font-weight: 600; color: var(--lgr-4); }
+/* nowrap: "30 שנ׳" has a space in it, and on a tight bar it took the licence. */
+.lgr-rm-a-yrs { font-size: 12px; font-weight: 600; color: var(--lgr-4); white-space: nowrap; }
 
 /* DERIVED, AND IT LOOKS IT. An arrow out of the two ages it is drawn from, and
    then the same label-over-value anatomy as its neighbours — with no box,
@@ -278,19 +290,23 @@
    also the control: type in it, or drag the track welded underneath it. */
 
 .lgr-rm-hero {
-  padding: 20px 22px 22px;
+  padding: 18px 22px 19px;
   border: 1px solid var(--line-2);
   border-radius: var(--r);
   background: #fff;
   /* one step above every other surface here — elevation is what marks it */
   box-shadow: var(--shadow-hover);
 }
-.lgr-rm-hero[data-empty] { box-shadow: var(--shadow); }
+/* Empty, the card has one line to say — it should stand exactly one line tall.
+   The full-height slab with a dash in the corner read as a rendering accident. */
+.lgr-rm-hero[data-empty] { box-shadow: var(--shadow); padding-block: 14px 15px; }
 
-/* The chips sit at the number's own height rather than at the top of the
-   block: a 56px figure leaves a lot of room beside it, and a control cluster
-   pinned to the ceiling of that room reads as unrelated to it. */
-.lgr-rm-hero-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px 24px; }
+/* FIGURE · TRACK · PRESETS, one centred row. The figure block and the chips
+   are content-sized; the slider takes every pixel between them, which is the
+   stretch that used to be dead card. Everything hangs off one vertical
+   centre, so the thumb sits level with the number it moves. */
+.lgr-rm-hero-top { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 30px; }
+.lgr-rm-hero-blk { flex: none; min-width: 0; max-width: 100%; }
 .lgr-rm-hero-cap { font-size: 13px; font-weight: 700; letter-spacing: -0.005em; color: var(--lgr-2); }
 
 /* Same chrome-on-demand rule as the assumptions, at hero scale: the number is
@@ -343,37 +359,37 @@
 .lgr-rm-hero-sub { margin-top: 9px; font-size: 13px; line-height: 1.5; color: var(--lgr-3); }
 .lgr-rm-hero-sub b { font-weight: 700; color: var(--ink); }
 
-/* nothing entered yet — the hero holds its own shape and states what it wants */
-.lgr-rm-hero-blank { display: flex; align-items: center; gap: 16px; }
+/* Nothing entered yet — one quiet line, not a slab. The mark, the caption and
+   the dash sit on a single row at reading scale; the card grows into its full
+   instrument-row shape the moment there is an instrument to show. */
+.lgr-rm-hero-blank { display: flex; align-items: center; gap: 14px; }
 .lgr-rm-hero-mark {
   display: grid;
   place-items: center;
-  width: 52px;
-  height: 52px;
+  width: 40px;
+  height: 40px;
   flex: none;
-  border-radius: 15px;
+  border-radius: 12px;
   background: var(--primary-tint);
   color: var(--primary);
 }
-/* The figure's own LINE, in the placeholder ink, so the block does not change
-   height when a number finally arrives in it — but the dash itself is set
-   smaller: an em dash at 56px is a 75px horizontal bar and reads as a loading
-   skeleton rather than as an empty value. */
+/* The dash is set well under figure scale: an em dash at 56px is a 75px
+   horizontal bar and reads as a loading skeleton rather than an empty value. */
 .lgr-rm-hero-idle {
   display: flex;
   align-items: baseline;
-  gap: 8px;
-  margin-top: 2px;
+  gap: 7px;
+  margin-top: 1px;
   font-family: var(--num);
-  font-size: 32px;
+  font-size: 24px;
   font-weight: 600;
   letter-spacing: -0.03em;
-  line-height: 1.5;
+  line-height: 1.25;
   color: var(--lgr-placeholder);
 }
 .lgr-rm-hero-idle .lgr-rm-hero-cur { color: inherit; opacity: 0.7; }
 
-.lgr-rm-quick { display: flex; align-items: center; gap: 6px; }
+.lgr-rm-quick { display: flex; align-items: center; gap: 6px; flex: none; }
 /* The share you are on is stated on the chip, so the track's position is
    readable without measuring it against itself. */
 .lgr-rm-quick .lgr-btn[data-on] {
@@ -382,8 +398,11 @@
   color: var(--primary-deep);
 }
 
-/* --- the track, welded to the figure it sets --- */
-.lgr-rm-track { margin-top: 20px; }
+/* --- the track, welded BESIDE the figure it sets --- */
+/* flex-basis 320px with grow: on a full row it is the whole middle; when the
+   row cannot hold all three organs it takes a line of its own before the
+   chips do. The ends labels ride under it inside the same item. */
+.lgr-rm-track { flex: 1 1 320px; min-width: 240px; align-self: center; }
 
 /* RTL, like everything else here: zero sits at the start edge — the right —
    and the fill grows the way the language reads. */
@@ -666,8 +685,6 @@
   .lgr-rm-assume { gap: 12px 0; padding: 12px 10px; }
   .lgr-rm-grp { gap: 16px; padding-inline: 10px; }
   .lgr-rm-grp:first-child { padding-inline-start: 4px; }
-  /* the groups stack, so the rules between them would run the wrong way */
-  .lgr-rm-grp + .lgr-rm-grp { border-inline-start: 0; }
   .lgr-rm-who { padding-inline: 4px 14px; }
   .lgr-rm-params { justify-content: flex-start; }
   .lgr-rm-a-in { font-size: 18px; }

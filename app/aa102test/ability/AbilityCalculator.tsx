@@ -57,6 +57,7 @@ import {
   XCircle,
 } from "@phosphor-icons/react";
 import { fmt } from "../components/Money";
+import { readProfile } from "../lib/profile-cache";
 import { rise, snap, type Enter } from "../lib/transitions";
 import AbilityMark from "./mark";
 import {
@@ -273,22 +274,24 @@ export default function AbilityCalculator({
   /**
    * THE CARD FILLS THE FORM, never the other way round.
    *
-   * One GET on open. Each field is filled only if it is still empty — an
-   * advisor who started typing before the answer landed keeps every keystroke
-   * (functional setState reads the value as it is NOW, not as it was when the
-   * fetch left). Read-only against Fireberry, and a failure of any kind just
-   * leaves the tool blank, which is what it was before this existed.
+   * One GET per sitting, not per mount — the read goes through the shared
+   * profile cache, so switching tools and back does not re-ask Fireberry, and
+   * the ToolSwitch's preload can have the answer waiting before this view
+   * exists. Each field is filled only if it is still empty — an advisor who
+   * started typing before the answer landed keeps every keystroke (functional
+   * setState reads the value as it is NOW, not as it was when the fetch left).
+   * Read-only against Fireberry, and a failure of any kind just leaves the
+   * tool blank, which is what it was before this existed.
    */
   useEffect(() => {
     if (!profileUrl) return;
     let cancelled = false;
-    fetch(profileUrl)
-      .then((r) => r.json())
-      .then((d: Record<string, number | null | boolean>) => {
+    readProfile<Record<string, number | null | boolean>>(profileUrl)
+      .then((d) => {
         if (cancelled || !d) return;
         let landed = false;
-        const put = (v: unknown, set: (f: (prev: string) => string) => void) => {
-          const n = typeof v === "number" && Number.isFinite(v) && v > 0 ? Math.round(v) : null;
+        const put = (v: unknown, set: (f: (prev: string) => string) => void, min = 1) => {
+          const n = typeof v === "number" && Number.isFinite(v) && v >= min ? Math.round(v) : null;
           if (n === null) return;
           set((prev) => {
             if (prev) return prev;
@@ -296,7 +299,9 @@ export default function AbilityCalculator({
             return String(n);
           });
         };
-        put(d.propertyValue, setAssetValue);
+        // ₪100,000 floor on the asset: real cards carry junk (a live one held
+        // שווי הנכס 34,455), and a junk asset silently prices the whole page.
+        put(d.propertyValue, setAssetValue, 100000);
         put(d.age1, setMainAge);
         put(d.age2, setSecondAge);
         put(d.income1, setMainIncome);
@@ -622,6 +627,22 @@ export default function AbilityCalculator({
                   <em>מינימום {a.minEquityPercent}%</em>
                 </i>
               </div>
+              {/* The same figures, UNDER the bar — shown only on screens too
+                  narrow for the in-segment labels, where a clipped "הון עצמי ·
+                  ₪600,0…" was worse than no label at all. */}
+              <div className="lgr-ab-fund-cap" aria-hidden>
+                <span data-k="equity">
+                  הון עצמי <b dir="ltr">₪{fmt(a.equity)}</b>
+                </span>
+                {gapPct > 0 && (
+                  <span data-k="gap">
+                    חסר <b dir="ltr">₪{fmt(a.equityGap)}</b>
+                  </span>
+                )}
+                <span data-k="loan">
+                  משכנתא <b dir="ltr">₪{fmt(a.requested)}</b>
+                </span>
+              </div>
             </div>
           );
         })()}
@@ -685,7 +706,11 @@ export default function AbilityCalculator({
                   </span>
                 </span>
               </th>
-              <td>
+              {/* data-l is the cell's own small label — invisible here, where
+                  the column heads name the columns, and the whole caption
+                  system on narrow screens, where the sheet becomes stacked
+                  person-cards and the heads are gone. */}
+              <td data-l="גיל">
                 <input
                   className="lgr-ab-in"
                   inputMode="numeric"
@@ -696,16 +721,16 @@ export default function AbilityCalculator({
                   aria-label="גיל בן זוג ראשי"
                 />
               </td>
-              <td>
+              <td data-l="הכנסה חודשית">
                 <Field value={mainIncome} onChange={setMainIncome} ariaLabel="הכנסה חודשית, בן זוג ראשי" />
               </td>
-              <td>
+              <td data-l="הכנסה נוספת">
                 <Field value={mainExtra} onChange={setMainExtra} ariaLabel="הכנסה חודשית נוספת, בן זוג ראשי" />
               </td>
-              <td>
+              <td data-l="סה״כ מוכר">
                 <Counted value={a.mainTotal} />
               </td>
-              <td>
+              <td data-l="החזר הלוואות">
                 <Field value={loans} onChange={setLoans} ariaLabel="החזר חודשי על הלוואות קיימות" />
               </td>
             </tr>
@@ -722,7 +747,7 @@ export default function AbilityCalculator({
                   </span>
                 </span>
               </th>
-              <td>
+              <td data-l="גיל">
                 <input
                   className="lgr-ab-in"
                   inputMode="numeric"
@@ -733,16 +758,16 @@ export default function AbilityCalculator({
                   aria-label="גיל בן זוג משני"
                 />
               </td>
-              <td>
+              <td data-l="הכנסה חודשית">
                 <Field value={secondIncome} onChange={setSecondIncome} ariaLabel="הכנסה חודשית, בן זוג משני" />
               </td>
-              <td>
+              <td data-l="הכנסה נוספת">
                 <Field value={secondExtra} onChange={setSecondExtra} ariaLabel="הכנסה חודשית נוספת, בן זוג משני" />
               </td>
-              <td>
+              <td data-l="סה״כ מוכר">
                 <Counted value={a.secondTotal} />
               </td>
-              <td>
+              <td data-l="החזר הלוואות">
                 <span className="lgr-ab-nil" title="החזרי ההלוואות נרשמים במרוכז בשורת בן הזוג הראשי">
                   —
                 </span>
@@ -763,7 +788,7 @@ export default function AbilityCalculator({
                   </span>
                 </span>
               </th>
-              <td>
+              <td data-l="גיל">
                 <input
                   className="lgr-ab-in"
                   inputMode="numeric"
@@ -774,10 +799,10 @@ export default function AbilityCalculator({
                   aria-label="גיל הערב"
                 />
               </td>
-              <td>
+              <td data-l="הכנסה חודשית">
                 <Field value={guarantorIncome} onChange={setGuarantorIncome} ariaLabel="הכנסה חודשית של הערב" />
               </td>
-              <td>
+              <td data-l="הכנסה נוספת">
                 <span className="lgr-ab-nil">—</span>
               </td>
               {/* The halving lands HERE, in the same column as everyone else's
@@ -785,10 +810,10 @@ export default function AbilityCalculator({
                   to be a note hanging off the income field, in a place no other
                   row had anything, and it made this row taller than its
                   neighbours for the privilege. */}
-              <td>
+              <td data-l="סה״כ מוכר">
                 <Counted value={a.guarantorCounted} half={a.guarantorRaw > 0} />
               </td>
-              <td>
+              <td data-l="החזר הלוואות">
                 <span className="lgr-ab-nil" title="החזרי ההלוואות נרשמים במרוכז בשורת בן הזוג הראשי">
                   —
                 </span>
@@ -807,12 +832,12 @@ export default function AbilityCalculator({
               <td />
               <td />
               <td />
-              <td>
+              <td data-l="סה״כ מוכר">
                 <span className="lgr-ab-tf-v" data-empty={a.totalIncome > 0 ? undefined : "true"}>
                   {a.totalIncome > 0 ? <Amt value={a.totalIncome} /> : "—"}
                 </span>
               </td>
-              <td>
+              <td data-l="החזר הלוואות">
                 <span className="lgr-ab-tf-v" data-empty={a.totalLoans > 0 ? undefined : "true"}>
                   {a.totalLoans > 0 ? <Amt value={a.totalLoans} /> : "—"}
                 </span>

@@ -50,6 +50,7 @@ import {
 } from "@phosphor-icons/react";
 import Btn from "../components/Btn";
 import { fmt } from "../components/Money";
+import { readProfile } from "../lib/profile-cache";
 import { rise, type Enter } from "../lib/transitions";
 import ReverseMark from "./mark";
 import ReverseScheduleModal, { type Tone } from "./ReverseScheduleModal";
@@ -243,21 +244,27 @@ export default function ReverseMortgage({
   /**
    * THE CARD FILLS THE FORM, never the other way round.
    *
-   * One GET on open. Each field is filled only if it is still empty — an
-   * advisor who started typing before the answer landed keeps every keystroke
-   * (functional setState reads the value as it is NOW, not as it was when the
-   * fetch left). Read-only against Fireberry, and a failure of any kind just
-   * leaves the tool blank, which is what it was before this existed.
+   * One GET per sitting, not per mount — the read goes through the shared
+   * profile cache, so switching tools and back does not re-ask Fireberry, and
+   * the ToolSwitch's preload can have the answer waiting before this view
+   * exists. Each field is filled only if it is still empty — an advisor who
+   * started typing before the answer landed keeps every keystroke (functional
+   * setState reads the value as it is NOW, not as it was when the fetch left).
+   * Read-only against Fireberry, and a failure of any kind just leaves the
+   * tool blank, which is what it was before this existed.
    */
   useEffect(() => {
     if (!profileUrl) return;
     let cancelled = false;
-    fetch(profileUrl)
-      .then((r) => r.json())
-      .then((d: { propertyValue?: number | null; age1?: number | null; age2?: number | null }) => {
+    readProfile<{ propertyValue?: number | null; age1?: number | null; age2?: number | null }>(profileUrl)
+      .then((d) => {
         if (cancelled || !d) return;
         let landed = false;
-        if (d.propertyValue && d.propertyValue > 0) {
+        // ₪100,000 floor: real cards carry junk (a live one held שווי הנכס
+        // 34,455 — someone's monthly figure in the wrong field), and a junk
+        // asset silently prices the whole page. Same spirit as the 0<age<130
+        // guard; typing any value by hand remains unrestricted.
+        if (d.propertyValue && d.propertyValue >= 100000) {
           setPropertyValue((v) => (v ? v : ((landed = true), String(Math.round(d.propertyValue!)))));
         }
         if (d.age1 && d.age1 > 0) setAge1((v) => (v ? v : ((landed = true), String(d.age1))));
@@ -468,66 +475,55 @@ export default function ReverseMortgage({
       {/* The one number this page exists to produce, and the control that sets
           it, are the same object. It opens at the maximum — so on first read
           the hero IS משכנתא מקסימלית — and renames itself the moment you take
-          less than all of it. */}
+          less than all of it.
+
+          ONE ROW, THREE ORGANS: the figure, the track, the presets — because
+          the first layout put the figure in one corner, the chips in the
+          other, and seven hundred pixels of card between them, with the
+          slider on a second storey underneath. The slider IS the middle now:
+          the same object read left off the number and grabbed in the empty
+          stretch, so the card is exactly as tall as its control. */}
       <motion.section {...enter(2)} className="lgr-rm-hero" data-empty={!el.ok || undefined}>
         {el.ok ? (
-          <>
-            <div className="lgr-rm-hero-top">
-              <div className="min-w-0">
-                <div className="lgr-rm-hero-cap">{atMax ? "משכנתא מקסימלית" : "הסכום המבוקש"}</div>
-                <div className="lgr-rm-hero-well" dir="ltr">
-                  <span className="lgr-rm-hero-cur">₪</span>
-                  {/* `size` rather than a fixed width: the field hugs its own
-                      digits, so the hover and focus surfaces wrap the number
-                      instead of trailing 200px of empty box after it. */}
-                  <input
-                    className="lgr-rm-hero-in"
-                    inputMode="numeric"
-                    size={Math.max(1, grouped(String(Math.round(amount))).length)}
-                    value={grouped(String(Math.round(amount)))}
-                    onChange={(e) => setAsk(Math.min(Number(digits(e.target.value)) || 0, maxLoan))}
-                    onFocus={(e) => e.currentTarget.select()}
-                    aria-label="סכום המשכנתא המבוקשת"
-                  />
-                </div>
-                {/* ONE SENTENCE, and it never says the same word twice. The
-                    property's value is stated in the bar above and the maximum
-                    is the hero itself while you are at it — so at the maximum
-                    this is only the ratio, and below it, only the distance. */}
-                <div className="lgr-rm-hero-sub">
-                  {atMax ? (
-                    <>
-                      <b>{el.percent}%</b> משווי הנכס
-                    </>
-                  ) : (
-                    <>
-                      <b>{Math.round(pctOfMax)}%</b> מהמקסימום · עד{" "}
-                      <Fig value={maxLoan} size={13} weight={700} color="var(--lgr-2)" />
-                    </>
-                  )}
-                </div>
+          <div className="lgr-rm-hero-top">
+            <div className="lgr-rm-hero-blk">
+              <div className="lgr-rm-hero-cap">{atMax ? "משכנתא מקסימלית" : "הסכום המבוקש"}</div>
+              <div className="lgr-rm-hero-well" dir="ltr">
+                <span className="lgr-rm-hero-cur">₪</span>
+                {/* `size` rather than a fixed width: the field hugs its own
+                    digits, so the hover and focus surfaces wrap the number
+                    instead of trailing 200px of empty box after it. */}
+                <input
+                  className="lgr-rm-hero-in"
+                  inputMode="numeric"
+                  size={Math.max(1, grouped(String(Math.round(amount))).length)}
+                  value={grouped(String(Math.round(amount)))}
+                  onChange={(e) => setAsk(Math.min(Number(digits(e.target.value)) || 0, maxLoan))}
+                  onFocus={(e) => e.currentTarget.select()}
+                  aria-label="סכום המשכנתא המבוקשת"
+                />
               </div>
-
-              <div className="lgr-rm-quick">
-                {[0.5, 0.75, 1].map((f) => {
-                  const v = Math.round(maxLoan * f);
-                  return (
-                    <Btn
-                      key={f}
-                      className="lgr-btn lgr-btn-sm"
-                      onClick={() => setAsk(v)}
-                      data-on={Math.round(amount) === v || undefined}
-                    >
-                      {f === 1 ? "מקסימום" : `${f * 100}%`}
-                    </Btn>
-                  );
-                })}
+              {/* ONE SENTENCE, and it never says the same word twice. The
+                  property's value is stated in the bar above and the maximum
+                  is the hero itself while you are at it — so at the maximum
+                  this is only the ratio, and below it, only the distance. */}
+              <div className="lgr-rm-hero-sub">
+                {atMax ? (
+                  <>
+                    <b>{el.percent}%</b> משווי הנכס
+                  </>
+                ) : (
+                  <>
+                    <b>{Math.round(pctOfMax)}%</b> מהמקסימום · עד{" "}
+                    <Fig value={maxLoan} size={13} weight={700} color="var(--lgr-2)" />
+                  </>
+                )}
               </div>
             </div>
 
-            {/* THE ONE BAR ON THE PAGE. It used to be two: this, and a gauge of
-                the eligible share of the property. They measured almost the
-                same thing; the property share is a sentence now. */}
+            {/* THE ONE BAR ON THE PAGE. It used to be two: this, and a gauge
+                of the eligible share of the property. They measured almost
+                the same thing; the property share is a sentence now. */}
             <div className="lgr-rm-track">
               <input
                 type="range"
@@ -546,7 +542,23 @@ export default function ReverseMortgage({
                 <span>₪{fmt(maxLoan)}</span>
               </div>
             </div>
-          </>
+
+            <div className="lgr-rm-quick">
+              {[0.5, 0.75, 1].map((f) => {
+                const v = Math.round(maxLoan * f);
+                return (
+                  <Btn
+                    key={f}
+                    className="lgr-btn lgr-btn-sm"
+                    onClick={() => setAsk(v)}
+                    data-on={Math.round(amount) === v || undefined}
+                  >
+                    {f === 1 ? "מקסימום" : `${f * 100}%`}
+                  </Btn>
+                );
+              })}
+            </div>
+          </div>
         ) : (
           /* Nothing entered yet. The hero holds the exact shape it will have
              once it has a figure — same cap, same 56px line — so typing the

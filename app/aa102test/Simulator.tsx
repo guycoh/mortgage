@@ -50,6 +50,7 @@ import LeadPicker, { type Lead } from "./components/LeadPicker";
 import Ledger from "./components/Ledger";
 import ToolSwitch from "./components/ToolSwitch";
 import { TOOLS, parseTool, type Tool } from "./lib/tools";
+import { warmProfile } from "./lib/profile-cache";
 import Logo from "./components/Logo";
 import Charts from "./components/Charts";
 import Compare from "./components/Compare";
@@ -371,6 +372,19 @@ export default function Simulator({
     return () => window.removeEventListener("popstate", onPop);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /**
+   * WHERE A TOOL READS ITS CLIENT FROM — one resolver for the props below and
+   * the preload hook, because two copies of this ternary is how a fifth tool
+   * ends up prefilling from the wrong door. A Fireberry session is named by
+   * its cookie; the open sandbox names its lead. No client, no URL.
+   */
+  const profileUrlFor = (t: Tool): string | null => {
+    const api =
+      t === "reverse" ? "/api/simulator/reverse-profile" : t === "ability" ? "/api/simulator/ability-profile" : null;
+    if (!api) return null;
+    return locked ? api : lead ? `${api}?lead=${lead.id}` : null;
+  };
 
   // The pointer-enter preload covers mouse users; this covers everyone else.
   // One idle-time import each, so a switch never lands on a skeleton — both
@@ -763,8 +777,12 @@ export default function Simulator({
               value={tool}
               onChange={pickTool}
               onPreload={(t) => {
+                // The chunk AND the data: by the time the fill has travelled,
+                // the view exists and its prefill is already in hand.
                 if (t === "reverse") void import("./reverse/ReverseMortgage");
                 else if (t === "ability") void import("./ability/AbilityCalculator");
+                const url = profileUrlFor(t);
+                if (url) warmProfile(url);
               }}
               // The unsaved-dot: crossing to another tool must not mean
               // forgetting this one has work uncommitted. Only the mix can be
@@ -821,13 +839,7 @@ export default function Simulator({
               // A Fireberry session is named by its cookie; the open sandbox
               // names its lead. Either way the tool can ask for the client's
               // שווי נכס and ages — read-only — and open already filled in.
-              profileUrl={
-                locked
-                  ? "/api/simulator/reverse-profile"
-                  : lead
-                    ? `/api/simulator/reverse-profile?lead=${lead.id}`
-                    : null
-              }
+              profileUrl={profileUrlFor("reverse")}
             />
           </motion.div>
         ) : tool === "ability" ? (
@@ -838,13 +850,7 @@ export default function Simulator({
               // by its cookie, the open sandbox names its lead. Either way the
               // tool can read the client's asset, ages, incomes and existing
               // repayments — read-only — and open already filled in.
-              profileUrl={
-                locked
-                  ? "/api/simulator/ability-profile"
-                  : lead
-                    ? `/api/simulator/ability-profile?lead=${lead.id}`
-                    : null
-              }
+              profileUrl={profileUrlFor("ability")}
             />
           </motion.div>
         ) : (
