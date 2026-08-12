@@ -17,7 +17,7 @@ import DataTable from "./ui/DataTable";
 import VisitDrawer from "./ui/VisitDrawer";
 import ActionDrawer from "./ui/ActionDrawer";
 import { Badge, Segmented, SegmentedItem } from "./ui/kit";
-import { Awaiting, Dial, Empty, Legend, Panel, Readout, Trail, ViewFade, Who } from "./ui/parts";
+import { Dial, Empty, Legend, Panel, Readout, StandingBy, Trail, ViewFade, Who } from "./ui/parts";
 import { ACTION, OUTCOME, SERIES } from "./lib/tokens";
 import {
   bankLabel,
@@ -118,7 +118,13 @@ const KIND_TABS = [
  * The screen the console opens on: what people are doing with the simulator —
  * reports in, spreadsheets out — as a list first and a clock second.
  */
-export function Work({ data }: { data: Dashboard }) {
+export function Work({
+  data,
+  sources,
+}: {
+  data: Dashboard;
+  sources: { supabase: boolean; file: boolean };
+}) {
   const [picked, setPicked] = useState<Action | null>(null);
   const [kind, setKind] = useState<(typeof KIND_TABS)[number]["key"]>("all");
 
@@ -234,9 +240,10 @@ export function Work({ data }: { data: Dashboard }) {
             onPick={setPicked}
           />
         ) : (
-          <Empty
-            title="עוד לא נעשתה פעולה"
-            body="כל דוח שייגרר לבורד וכל קובץ אקסל שייוצא יופיעו כאן, על ציר הזמן, לפי הנציג שביצע אותם."
+          <StandingBy
+            days={data.days}
+            connected={sources.supabase}
+            lastEventAt={data.lastEventAt}
           />
         )}
       </Panel>
@@ -645,4 +652,3 @@ export function Health({
   );
 }
 
-export { Awaiting };

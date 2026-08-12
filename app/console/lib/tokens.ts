@@ -96,9 +96,8 @@ export const INK = {
   plane: "#EEF1F5",
 } as const;
 
-export const FONT_UI =
-  '"IBM Plex Sans Hebrew", "IBM Plex Sans", system-ui, sans-serif';
-export const FONT_MONO = '"IBM Plex Mono", ui-monospace, monospace';
+export const FONT_UI = '"Rubik Variable", "Rubik", system-ui, sans-serif';
+export const FONT_MONO = '"JetBrains Mono Variable", ui-monospace, monospace';
 
 /** Shared ECharts text/grid defaults so every chart reads as one instrument. */
 export const AXIS_LABEL = {

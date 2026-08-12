@@ -4,7 +4,7 @@
 
 import NumberFlow from "@number-flow/react";
 import { motion } from "motion/react";
-import { Radar } from "lucide-react";
+import { Scope, ScopeLive } from "./marks";
 import { chipColor, initials } from "../lib/labels";
 import { Badge, Card, CardContent, CardHeader, CardTitle, CardDescription, CardAction } from "./kit";
 
@@ -147,53 +147,78 @@ export function Trail({ steps }: { steps: { label: string; ok: boolean }[] }) {
 
 export function Empty({ title, body }: { title?: string; body: string }) {
   return (
-    <div className="grid place-items-center gap-2 px-5 py-12 text-center">
-      <div className="grid size-11 place-items-center rounded-xl bg-cns-muted text-cns-mutedfg">
-        <Radar className="size-5" strokeWidth={1.6} />
+    <div className="flex items-center gap-3 px-4 py-8">
+      <Scope size={18} className="flex-none text-cns-mutedfg/70" />
+      <div className="min-w-0">
+        {title ? (
+          <div className="font-[family-name:var(--cns-mono)] text-[10px] tracking-[0.14em] text-cns-mutedfg uppercase">
+            {title}
+          </div>
+        ) : null}
+        <p className="text-[12.5px] leading-relaxed text-cns-mutedfg">{body}</p>
       </div>
-      {title ? <h3 className="text-[13.5px] font-semibold text-cns-fg">{title}</h3> : null}
-      <p className="max-w-[380px] text-[12.5px] leading-relaxed text-cns-mutedfg">{body}</p>
     </div>
   );
 }
 
 /**
- * The first-run screen. The console has just been wired to a table that has
- * never had a row in it, and the honest thing to say is "nothing has happened
- * yet" — not "no data", which reads like a fault.
+ * Standing by.
+ *
+ * NOT a centred "no data" card — that shape is the same on every product ever
+ * shipped and it reads as a fault. What a control room looks like before
+ * traffic is the instrument itself: the lanes ruled, the clock running, the
+ * sweep going round, and a plain statement of what it is listening for. The
+ * furniture around this panel — the readout, the table, its headers — stays on
+ * screen showing zeros, so the empty console is the same console.
  */
-export function Awaiting({ days }: { days: number }) {
+export function StandingBy({
+  days,
+  connected,
+  lastEventAt,
+}: {
+  days: number;
+  connected: boolean;
+  lastEventAt?: string | null;
+}) {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-    >
-      <Card className="items-center gap-3.5 px-10 py-14 text-center">
-        <div
-          className="cns-scope relative grid size-24 place-items-center rounded-full text-cns-accent"
-          style={{
-            background:
-              "radial-gradient(circle at center, rgba(31,99,214,0.10) 0%, rgba(31,99,214,0) 70%)",
-          }}
-          aria-hidden
-        >
-          <Radar className="size-7" strokeWidth={1.5} />
+    <div className="cns-standby relative overflow-hidden rounded-lg border border-cns-line bg-cns-muted/35">
+      {/* Lane rules and hour rules: the grid is drawn even with nothing on it,
+          the way a plotter leaves its paper ruled. */}
+      <div className="cns-standby-grid absolute inset-0" aria-hidden />
+      <div className="cns-standby-sweep absolute inset-y-0 w-[38%]" aria-hidden />
+
+      <div className="relative flex items-center gap-5 px-6 py-9">
+        <div className="flex-none text-cns-accent">
+          <ScopeLive size={54} />
         </div>
-        <h2 className="text-[19px] font-semibold text-cns-fg">המוקד מאזין</h2>
-        <p className="max-w-[460px] text-[13px] leading-[1.7] text-cns-mutedfg">
-          לא נרשמה פעילות ב־{days} הימים האחרונים. מרגע שיועץ ייכנס לבורד דרך
-          פיירברי, כל ייבוא דוח, ייצוא אקסל ושמירת תמהיל יופיעו כאן.
-        </p>
-        <div className="mt-1 flex flex-wrap justify-center gap-1.5">
-          {["כניסה מפיירברי", "ייבוא דוח", "ייצוא אקסל", "שמירת תמהיל"].map((t) => (
-            <Badge key={t} variant="outline">
-              {t}
-            </Badge>
+        <div className="min-w-0">
+          <div className="font-[family-name:var(--cns-mono)] text-[10px] tracking-[0.2em] text-cns-accent uppercase">
+            standing by
+          </div>
+          <h2 className="mt-1 text-[17px] font-semibold text-cns-fg">
+            המוקד מחובר ומאזין
+          </h2>
+          <p className="mt-1 max-w-[440px] text-[12.5px] leading-relaxed text-cns-mutedfg">
+            לא נרשמה פעילות ב־{days} הימים האחרונים. הרשומה הראשונה תופיע כאן
+            ברגע שיועץ ייכנס לבורד דרך פיירברי.
+          </p>
+        </div>
+
+        <dl className="ms-auto hidden shrink-0 grid-cols-[auto_auto] gap-x-5 gap-y-1.5 self-center rounded-lg border border-cns-line bg-cns-card/80 px-4 py-3 font-[family-name:var(--cns-mono)] text-[10.5px] backdrop-blur-[2px] lg:grid">
+          {[
+            ["מקור", connected ? "supabase · live" : "—"],
+            ["חלון", `${days}d`],
+            ["אירוע אחרון", lastEventAt ? "—" : "none"],
+            ["מאזין ל", "import · export · save"],
+          ].map(([k, v]) => (
+            <div key={k} className="contents">
+              <dt className="tracking-[0.12em] text-cns-mutedfg/80 uppercase">{k}</dt>
+              <dd className="m-0 text-cns-fg2">{v}</dd>
+            </div>
           ))}
-        </div>
-      </Card>
-    </motion.div>
+        </dl>
+      </div>
+    </div>
   );
 }
 

@@ -2,14 +2,10 @@
 // protocol, which is also why there is nothing here for a script to probe. The
 // card says what it is and nothing about what is behind it.
 
-import "@fontsource/ibm-plex-sans-hebrew/400.css";
-import "@fontsource/ibm-plex-sans-hebrew/500.css";
-import "@fontsource/ibm-plex-sans-hebrew/600.css";
-import "@fontsource/ibm-plex-sans-hebrew/hebrew-400.css";
-import "@fontsource/ibm-plex-sans-hebrew/hebrew-500.css";
-import "@fontsource/ibm-plex-sans-hebrew/hebrew-600.css";
-import "@fontsource/ibm-plex-mono/400.css";
-import "@fontsource/ibm-plex-mono/500.css";
+import { Scope } from "./ui/marks";
+
+import "@fontsource-variable/rubik";
+import "@fontsource-variable/jetbrains-mono";
 import "./theme.css";
 import "./console.css";
 
@@ -26,11 +22,7 @@ export default function Login({ error }: { error?: string }) {
     <div className="cns cns-plane grid min-h-screen place-items-center px-5 py-[8vh]" dir="rtl">
       <div className="w-[372px] overflow-hidden rounded-2xl border border-cns-line bg-cns-card px-8 pt-8 pb-7 shadow-[0_28px_60px_-32px_rgba(12,22,34,0.45)]">
         <div className="mb-4 grid size-9 place-items-center rounded-[11px] bg-cns-primary text-white">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-            <path d="M3 17.5 8.5 11l4 4.2L21 6" strokeLinecap="round" strokeLinejoin="round" />
-            <circle cx="8.5" cy="11" r="1.7" fill="currentColor" stroke="none" />
-            <circle cx="12.5" cy="15.2" r="1.7" fill="currentColor" stroke="none" />
-          </svg>
+          <Scope size={19} />
         </div>
 
         <h1 className="text-[21px] font-semibold tracking-tight">מוקד הסימולטור</h1>

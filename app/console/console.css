@@ -177,32 +177,53 @@
   opacity: 0.7;
 }
 
-/* ---------------------------------------------------- the awaiting scope */
+/* ------------------------------------------------------- standing by ---
+   The idle instrument: ruled lanes, a running sweep, nothing plotted. */
 
-.cns-scope::before,
-.cns-scope::after {
-  content: "";
-  position: absolute;
-  inset: 14px;
-  border-radius: 999px;
-  border: 1px solid var(--cns-accent);
-  opacity: 0;
-  animation: cns-sonar 3.4s ease-out infinite;
+.cns-standby {
+  min-height: 148px;
 }
-.cns-scope::after {
-  animation-delay: 1.7s;
+
+/* Lane rules across, hour rules down — the paper stays ruled even when the
+   pen has not moved. */
+.cns-standby-grid {
+  background-image: repeating-linear-gradient(
+      to bottom,
+      var(--cns-line) 0 1px,
+      transparent 1px 37px
+    ),
+    repeating-linear-gradient(to right, var(--cns-line) 0 1px, transparent 1px 8.5%);
+  opacity: 0.65;
 }
-@keyframes cns-sonar {
-  0% {
-    transform: scale(0.55);
-    opacity: 0.5;
+
+/* One pass every seven seconds: slow enough to read as patience rather than
+   as a loading spinner. */
+.cns-standby-sweep {
+  background: linear-gradient(
+    to left,
+    rgba(31, 99, 214, 0) 0%,
+    rgba(31, 99, 214, 0.07) 55%,
+    rgba(31, 99, 214, 0.16) 92%,
+    rgba(31, 99, 214, 0.3) 100%
+  );
+  animation: cns-pass 7s linear infinite;
+}
+@keyframes cns-pass {
+  from {
+    transform: translateX(-160%);
   }
-  70% {
-    opacity: 0.08;
+  to {
+    transform: translateX(100%);
   }
-  100% {
-    transform: scale(1.35);
-    opacity: 0;
+}
+
+/* The scope's own arm, going round. */
+.cns-sweep {
+  animation: cns-spin 7s linear infinite;
+}
+@keyframes cns-spin {
+  to {
+    transform: rotate(360deg);
   }
 }
 

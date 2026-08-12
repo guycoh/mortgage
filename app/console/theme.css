@@ -36,6 +36,10 @@
 
   --cns-radius: 0.625rem;
 
-  --cns-ui: "IBM Plex Sans Hebrew", "IBM Plex Sans", system-ui, sans-serif;
-  --cns-mono: "IBM Plex Mono", ui-monospace, monospace;
+  /* Rubik has a Hebrew cut drawn alongside the Latin and a real weight axis,
+     so headings can be genuinely heavy without faux-bolding. JetBrains Mono
+     carries every figure — it has the tallest x-height and the clearest zero
+     of the monos on hand, which is what a readout needs. */
+  --cns-ui: "Rubik Variable", "Rubik", system-ui, sans-serif;
+  --cns-mono: "JetBrains Mono Variable", ui-monospace, monospace;
 }

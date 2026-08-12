@@ -18,22 +18,16 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { LogOut, Search } from "lucide-react";
+import { Scope } from "./ui/marks";
 import type { Dashboard } from "./aggregate";
 import { Activity, Health, Overview, People, Work } from "./Views";
 import Palette, { type PaletteAction } from "./ui/Palette";
-import { Awaiting } from "./ui/parts";
 import { Button, Segmented, SegmentedItem, TooltipProvider } from "./ui/kit";
 import { ago } from "./lib/time";
 import { num } from "./lib/labels";
 
-import "@fontsource/ibm-plex-sans-hebrew/400.css";
-import "@fontsource/ibm-plex-sans-hebrew/500.css";
-import "@fontsource/ibm-plex-sans-hebrew/600.css";
-import "@fontsource/ibm-plex-sans-hebrew/hebrew-400.css";
-import "@fontsource/ibm-plex-sans-hebrew/hebrew-500.css";
-import "@fontsource/ibm-plex-sans-hebrew/hebrew-600.css";
-import "@fontsource/ibm-plex-mono/400.css";
-import "@fontsource/ibm-plex-mono/500.css";
+import "@fontsource-variable/rubik";
+import "@fontsource-variable/jetbrains-mono";
 import "./theme.css";
 import "./console.css";
 
@@ -73,16 +67,6 @@ const VIEWS: { key: ViewKey; label: string; title: string; hint: string }[] = [
 ];
 
 const RANGES = [7, 30, 90];
-
-function Mark() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <path d="M3 17.5 8.5 11l4 4.2L21 6" strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx="8.5" cy="11" r="1.7" fill="currentColor" stroke="none" />
-      <circle cx="12.5" cy="15.2" r="1.7" fill="currentColor" stroke="none" />
-    </svg>
-  );
-}
 
 export default function Console({
   data,
@@ -158,7 +142,7 @@ export default function Console({
           <aside className="sticky top-0 flex h-screen flex-col border-s border-cns-line bg-cns-card px-3 py-5">
             <div className="flex items-center gap-2.5 px-2 pb-5">
               <span className="grid size-8 flex-none place-items-center rounded-[9px] bg-cns-primary text-white">
-                <Mark />
+                <Scope size={18} />
               </span>
               <span className="min-w-0">
                 <span className="block truncate text-[14px] leading-tight font-semibold tracking-tight">
@@ -291,10 +275,8 @@ export default function Console({
             </div>
 
             <div className="flex flex-col gap-3.5 px-6">
-              {data.empty ? (
-                <Awaiting days={data.days} />
-              ) : view === "work" ? (
-                <Work data={data} />
+              {view === "work" ? (
+                <Work data={data} sources={sources} />
               ) : view === "activity" ? (
                 <Activity data={data} />
               ) : view === "overview" ? (
