@@ -1,11 +1,12 @@
-// Login for /adminoam. POST with form fields `user` + `pass`; a correct pair
-// mints a signed, httpOnly, 30-day cookie scoped to /adminoam and redirects
-// to the panel. A wrong pair goes back to the login form with a flag — after
-// a deliberate pause, so guessing costs time.
+// Sign-in for /console. POST with form fields `user` + `pass`; a correct pair
+// mints a signed, httpOnly, 30-day cookie scoped to /console and redirects to
+// the panel. A wrong pair goes back to the form with a flag — after a
+// deliberate pause, so guessing costs time.
 //
 // The signing secret is SIMULATOR_ADMIN_KEY; the credentials live only as
 // ADMIN_USER + ADMIN_PASS_HASH (scrypt salt:hash). Nothing here echoes what
-// was wrong.
+// was wrong: a bad username and a bad password come back identically, so the
+// form cannot be used to discover which names exist.
 
 import { NextRequest, NextResponse } from "next/server";
 import {
@@ -25,7 +26,7 @@ function ipOf(req: NextRequest): string {
 
 export async function POST(req: NextRequest) {
   const back = (flag: string) =>
-    NextResponse.redirect(new URL(`/adminoam?e=${flag}`, req.url), 303);
+    NextResponse.redirect(new URL(`/console?e=${flag}`, req.url), 303);
 
   const secret = process.env.SIMULATOR_ADMIN_KEY;
   if (!secret) return back("cfg");
@@ -53,22 +54,22 @@ export async function POST(req: NextRequest) {
   }
 
   failures.delete(ip);
-  const res = NextResponse.redirect(new URL("/adminoam", req.url), 303);
+  const res = NextResponse.redirect(new URL("/console", req.url), 303);
   res.cookies.set(ADMIN_COOKIE, mintAdminCookie(secret), {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
-    path: "/adminoam",
+    path: "/console",
     maxAge: 30 * 24 * 60 * 60,
   });
   return res;
 }
 
-/** Log out: drop the cookie, land back on the login form. */
+/** Sign out: drop the cookie, land back on the form. */
 export async function GET(req: NextRequest) {
-  const res = NextResponse.redirect(new URL("/adminoam", req.url), 303);
+  const res = NextResponse.redirect(new URL("/console", req.url), 303);
   if (req.nextUrl.searchParams.get("logout") !== null) {
-    res.cookies.set(ADMIN_COOKIE, "", { path: "/adminoam", maxAge: 0 });
+    res.cookies.set(ADMIN_COOKIE, "", { path: "/console", maxAge: 0 });
   }
   return res;
 }
