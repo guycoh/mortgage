@@ -12,7 +12,8 @@ import type { Visit } from "../aggregate";
 import { OUTCOME } from "../lib/tokens";
 import { duration, num } from "../lib/labels";
 import { stamp, zoned } from "../lib/time";
-import { Pill, Who } from "./parts";
+import { Badge } from "./kit";
+import { Who } from "./parts";
 
 export default function VisitDrawer({
   visit,
@@ -70,17 +71,17 @@ export default function VisitDrawer({
               <h2 style={{ fontSize: 19, margin: "2px 0 8px" }}>{visit.lead}</h2>
               <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                 <Who name={visit.operator} />
-                <Pill
-                  tone={
+                <Badge
+                  variant={
                     visit.outcome === "failed"
                       ? "bad"
                       : visit.outcome === "saved"
                         ? "good"
-                        : "mute"
+                        : "secondary"
                   }
                 >
                   {OUTCOME[visit.outcome].label}
-                </Pill>
+                </Badge>
               </div>
             </header>
 

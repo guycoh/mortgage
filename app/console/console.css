@@ -1,62 +1,51 @@
 /* ============================================================================
-   מוקד — the simulator's control console.
+   מוקד — what Tailwind cannot express.
    ----------------------------------------------------------------------------
-   A light instrument panel, not a cockpit: cool blue-grey plane, white cards
-   floating on it, hairline rules instead of boxes, and every figure set in a
-   monospaced face so columns of numbers line up like a readout.
+   Cards, tables, buttons, inputs and badges are shadcn components styled with
+   `cns-*` utilities (app/console/ui/kit.tsx). What is left here is the handful
+   of things a utility class genuinely cannot do:
 
-   Two faces do all the work. IBM Plex Sans Hebrew carries language — it has a
-   real Hebrew cut drawn alongside the Latin, so mixed lines don't fall apart.
-   IBM Plex Mono carries data — timestamps, ids, table figures, axis ticks.
-   The split is the whole typographic idea: prose in the sans, readings in the
-   mono, and you can tell at a glance which is which.
+     · the ECharts tooltip, whose markup is an HTML string built inside a chart
+       formatter, far outside React's reach
+     · the sonar rings, the ruler and the connector thread — decorative shapes
+       built from pseudo-elements
+     · cmdk's internal element hooks
+     · one numeric helper used often enough to earn a name
 
-   Scoped under .cns so nothing here can leak into the rest of the app (whose
-   Tailwind theme never mapped shadcn's tokens — see the board's notes).
+   Everything in this file is scoped under `.cns` or a `cns-` prefix. Nothing
+   here can reach another page.
    ========================================================================== */
 
 .cns {
-  /* ---- plane & ink ---- */
-  --plane: #eef1f5;
-  --surface: #ffffff;
-  --surface-sunk: #f7f9fc;
-  --ink: #0c1622;
-  --ink-2: #48566a;
-  --ink-3: #8493a6;
-  --ink-4: #a9b5c4;
-  --rule: #e6ebf2;
-  --rule-strong: #d5dde8;
-  --ring: rgba(12, 22, 34, 0.07);
+  font-family: var(--cns-ui);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
 
-  /* ---- series (validated order — never cycle past four) ---- */
-  --s-imports: #1f63d6;
-  --s-entries: #e2701f;
-  --s-saves: #0e9b84;
-  --s-analyses: #8a5cf0;
+.cns ::selection {
+  background: #cfe0fb;
+}
 
-  /* ---- state (always beside a word) ---- */
-  --good: #1e8e4f;
-  --warn: #c98a0e;
-  --bad: #c2372f;
-  --good-wash: #eaf5ef;
-  --warn-wash: #fdf4e3;
-  --bad-wash: #fbeceb;
+/* Every figure that belongs to a column: same width per digit, so numbers
+   stack. Deliberately NOT applied to the big stat figures — equal-width digits
+   make a lone 121 look gappy at display size. */
+.cns-num,
+.cns .cns-num {
+  font-family: var(--cns-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "zero" 1;
+  /* Isolated as LTR because a figure is not a Hebrew sentence. Without this the
+     bidi algorithm drags a leading ₪ to the far side of its own number and
+     "₪2,260,934" renders as "2,260,934₪". `isolate` keeps the run from
+     disturbing the RTL text around it. */
+  direction: ltr;
+  unicode-bidi: isolate;
+}
 
-  --accent: var(--s-imports);
-  --accent-wash: #eef3fd;
-
-  /* ---- elevation ---- */
-  --lift-1: 0 1px 2px rgba(12, 22, 34, 0.04), 0 0 0 1px var(--ring);
-  --lift-2: 0 10px 30px -18px rgba(12, 22, 34, 0.35), 0 0 0 1px var(--ring);
-  --lift-3: 0 28px 60px -32px rgba(12, 22, 34, 0.45), 0 0 0 1px var(--ring);
-
-  --ui: "IBM Plex Sans Hebrew", "IBM Plex Sans", system-ui, sans-serif;
-  --mono: "IBM Plex Mono", ui-monospace, monospace;
-
-  min-height: 100vh;
-  background-color: var(--plane);
-  /* Graph paper, almost subliminal: 1px rules every 28px. It gives the plane a
-     sense of being a surface you measure things on rather than empty space. */
+/* The plane: graph paper, almost subliminal. It gives the background a sense
+   of being a surface you measure things on rather than empty space. */
+.cns-plane {
+  background-color: var(--cns-bg);
   background-image: linear-gradient(
       to right,
       rgba(12, 22, 34, 0.022) 1px,
@@ -64,212 +53,43 @@
     ),
     linear-gradient(to bottom, rgba(12, 22, 34, 0.022) 1px, transparent 1px);
   background-size: 28px 28px;
-  color: var(--ink);
-  font-family: var(--ui);
-  font-size: 14px;
-  line-height: 1.55;
-  -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
 }
 
-.cns *,
-.cns *::before,
-.cns *::after {
-  box-sizing: border-box;
+/* A measured edge under the masthead instead of a plain border. */
+.cns-rule {
+  height: 9px;
+  border-bottom: 1px solid var(--cns-line2);
+  background-image: repeating-linear-gradient(
+    to right,
+    var(--cns-line2) 0 1px,
+    transparent 1px 24px
+  );
+  background-position: bottom;
+  background-size: 24px 4px;
+  background-repeat: repeat-x;
+  opacity: 0.7;
 }
 
-.cns h1,
-.cns h2,
-.cns h3 {
-  margin: 0;
-  font-weight: 600;
-  letter-spacing: -0.015em;
-}
+/* ------------------------------------------------------ live status dot */
 
-.cns ::selection {
-  background: #cfe0fb;
-}
-
-/* Every figure that belongs to a column. */
-.cns .num {
-  font-family: var(--mono);
-  font-variant-numeric: tabular-nums;
-  font-feature-settings: "zero" 1;
-}
-
-/* ============================================================ shell */
-
-.cns-shell {
-  display: grid;
-  grid-template-columns: 252px minmax(0, 1fr);
-  align-items: start;
-  min-height: 100vh;
-}
-
-/* ---------------------------------------------------------- sidebar */
-
-.cns-rail {
-  position: sticky;
-  top: 0;
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  background: var(--surface);
-  border-inline-start: 1px solid var(--rule);
-  padding: 20px 14px 14px;
-  z-index: 20;
-}
-
-.cns-brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 0 8px 16px;
-}
-.cns-brand-mark {
-  width: 32px;
-  height: 32px;
-  border-radius: 9px;
-  background: var(--ink);
-  color: #fff;
-  display: grid;
-  place-items: center;
-  flex: none;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
-}
-.cns-brand-name {
-  display: block;
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  line-height: 1.15;
-}
-.cns-brand-sub {
-  display: block;
-  font-family: var(--mono);
-  font-size: 9.5px;
-  letter-spacing: 0.14em;
-  color: var(--ink-4);
-  text-transform: uppercase;
-}
-
-.cns-rail-label {
-  font-family: var(--mono);
-  font-size: 9.5px;
-  letter-spacing: 0.16em;
-  color: var(--ink-4);
-  text-transform: uppercase;
-  padding: 14px 8px 7px;
-}
-
-.cns-nav {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.cns-nav button {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  padding: 8px 10px;
-  border: 0;
-  border-radius: 9px;
-  background: transparent;
-  font: inherit;
-  font-size: 13.5px;
-  color: var(--ink-2);
-  cursor: pointer;
-  text-align: start;
-  transition: background 0.16s ease, color 0.16s ease;
-}
-.cns-nav button:hover {
-  background: var(--surface-sunk);
-  color: var(--ink);
-}
-.cns-nav button svg {
-  flex: none;
-  color: var(--ink-3);
-  transition: color 0.16s ease;
-}
-.cns-nav button:hover svg {
-  color: var(--ink-2);
-}
-.cns-nav button[data-on] {
-  background: var(--accent-wash);
-  color: var(--accent);
-  font-weight: 600;
-}
-.cns-nav button[data-on] svg {
-  color: var(--accent);
-}
-/* The active marker sits on the content-facing edge, so the rail reads as a
-   tab strip attached to the page rather than a list with a highlight. */
-.cns-nav button[data-on]::after {
-  content: "";
-  position: absolute;
-  inset-inline-end: -14px;
-  top: 8px;
-  bottom: 8px;
-  width: 2px;
-  border-radius: 2px;
-  background: var(--accent);
-}
-.cns-nav-count {
-  margin-inline-start: auto;
-  font-family: var(--mono);
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-  color: var(--ink-4);
-}
-.cns-nav button[data-on] .cns-nav-count {
-  color: var(--accent);
-}
-.cns-nav-count[data-bad] {
-  color: var(--bad);
-}
-
-.cns-rail-foot {
-  margin-top: auto;
-  padding-top: 12px;
-  border-top: 1px solid var(--rule);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.cns-store {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  border-radius: 9px;
-  background: var(--surface-sunk);
-  font-size: 11.5px;
-  color: var(--ink-2);
-}
 .cns-dot {
   width: 7px;
   height: 7px;
   border-radius: 99px;
   flex: none;
-  background: var(--ink-4);
+  background: var(--cns-mutedfg);
 }
 .cns-dot[data-tone="good"] {
-  background: var(--good);
-  box-shadow: 0 0 0 3px rgba(30, 142, 79, 0.14);
+  background: var(--cns-good);
 }
 .cns-dot[data-tone="warn"] {
-  background: var(--warn);
-  box-shadow: 0 0 0 3px rgba(201, 138, 14, 0.16);
+  background: var(--cns-warn);
 }
 .cns-dot[data-tone="bad"] {
-  background: var(--bad);
-  box-shadow: 0 0 0 3px rgba(194, 55, 47, 0.14);
+  background: var(--cns-bad);
 }
 /* A slow breath on the live dot — the one animated thing in the rail, so it
-   reads as "receiving" rather than decoration. */
+   reads as "receiving" rather than as decoration. */
 .cns-dot[data-live] {
   animation: cns-pulse 2.6s ease-in-out infinite;
 }
@@ -283,339 +103,15 @@
   }
 }
 
-.cns-signout {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  border-radius: 9px;
-  font-size: 12.5px;
-  color: var(--ink-3);
-  text-decoration: none;
-  transition: background 0.16s, color 0.16s;
-}
-.cns-signout:hover {
-  background: var(--bad-wash);
-  color: var(--bad);
-}
+/* ------------------------------------------------------- chart tooltip */
+/* Built as an HTML string inside the ECharts formatter, so it can never be a
+   React component and never inherits a utility class. */
 
-/* ---------------------------------------------------------- main */
-
-.cns-main {
-  min-width: 0;
-  padding: 0 0 56px;
-}
-
-.cns-mast {
-  position: sticky;
-  top: 0;
-  z-index: 15;
-  padding: 18px clamp(20px, 3vw, 34px) 0;
-  background: linear-gradient(
-    to bottom,
-    var(--plane) 62%,
-    rgba(238, 241, 245, 0)
-  );
-  backdrop-filter: blur(3px);
-}
-.cns-mast-row {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 20px;
-}
-.cns-mast h1 {
-  font-size: 25px;
-  line-height: 1.2;
-}
-.cns-mast-sub {
-  margin: 3px 0 0;
-  font-size: 12.5px;
-  color: var(--ink-3);
-}
-.cns-mast-tools {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: none;
-}
-
-/* The ruler under the masthead: a measured edge instead of a plain border. */
-.cns-rule {
-  height: 9px;
-  margin: 14px 0 18px;
-  border-bottom: 1px solid var(--rule-strong);
-  background-image: repeating-linear-gradient(
-    to right,
-    var(--rule-strong) 0 1px,
-    transparent 1px 24px
-  );
-  background-position: bottom;
-  background-size: 24px 4px;
-  background-repeat: repeat-x;
-  opacity: 0.85;
-}
-
-.cns-body {
-  padding: 0 clamp(20px, 3vw, 34px);
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-/* ------------------------------------------------------- controls */
-
-.cns-seg {
-  display: inline-flex;
-  padding: 3px;
-  gap: 2px;
-  background: var(--surface);
-  border-radius: 10px;
-  box-shadow: var(--lift-1);
-}
-.cns-seg a,
-.cns-seg button {
-  padding: 5px 12px;
-  border: 0;
-  border-radius: 7px;
-  background: transparent;
-  font: inherit;
-  font-size: 12.5px;
-  font-weight: 500;
-  color: var(--ink-3);
-  text-decoration: none;
-  cursor: pointer;
-  transition: background 0.16s, color 0.16s;
-  white-space: nowrap;
-}
-.cns-seg a:hover,
-.cns-seg button:hover {
-  color: var(--ink);
-  background: var(--surface-sunk);
-}
-.cns-seg a[data-on],
-.cns-seg button[data-on] {
-  background: var(--ink);
-  color: #fff;
-  font-weight: 600;
-}
-
-.cns-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  height: 32px;
-  padding: 0 12px;
-  border: 0;
-  border-radius: 9px;
-  background: var(--surface);
-  box-shadow: var(--lift-1);
-  font: inherit;
-  font-size: 12.5px;
-  color: var(--ink-2);
-  cursor: pointer;
-  transition: color 0.16s, box-shadow 0.16s, background 0.16s;
-}
-.cns-btn:hover {
-  color: var(--ink);
-  box-shadow: var(--lift-2);
-}
-.cns-btn kbd {
-  font-family: var(--mono);
-  font-size: 10px;
-  color: var(--ink-4);
-  background: var(--surface-sunk);
-  border-radius: 5px;
-  padding: 1px 5px;
-}
-
-/* ------------------------------------------------------------ card */
-
-.cns-card {
-  background: var(--surface);
-  border-radius: 14px;
-  box-shadow: var(--lift-1);
-  padding: 16px 18px 14px;
-  min-width: 0;
-}
-.cns-card[data-flush] {
-  padding: 16px 0 0;
-}
-.cns-card-head {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  margin-bottom: 12px;
-}
-.cns-card[data-flush] > .cns-card-head {
-  padding: 0 18px;
-}
-.cns-card-head h2 {
-  font-size: 14.5px;
-  font-weight: 600;
-}
-.cns-card-head p {
-  margin: 0;
-  font-size: 11.5px;
-  color: var(--ink-3);
-}
-.cns-card-head-tools {
-  margin-inline-start: auto;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.cns-grid-2 {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 16px;
-}
-.cns-grid-32 {
-  display: grid;
-  grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr);
-  gap: 16px;
-}
-
-/* ------------------------------------------------------- stat tiles */
-
-.cns-stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(158px, 1fr));
-  gap: 10px;
-}
-.cns-stat {
-  position: relative;
-  background: var(--surface);
-  border-radius: 12px;
-  box-shadow: var(--lift-1);
-  padding: 13px 15px 12px;
-  overflow: hidden;
-  transition: box-shadow 0.2s ease, transform 0.2s ease;
-}
-.cns-stat:hover {
-  box-shadow: var(--lift-2);
-  transform: translateY(-1px);
-}
-/* A hairline of the series colour along the tile's top edge — identity without
-   tinting the whole card. */
-.cns-stat::before {
-  content: "";
-  position: absolute;
-  inset-inline: 0;
-  top: 0;
-  height: 2px;
-  background: var(--tone, transparent);
-  opacity: 0.9;
-}
-.cns-stat-label {
-  display: block;
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--ink-3);
-  letter-spacing: 0.01em;
-  margin-bottom: 2px;
-}
-/* Proportional figures here on purpose: tabular digits make a lone 121 look
-   gappy at display size. The mono/tabular pairing belongs in columns. */
-.cns-stat-value {
-  display: block;
-  font-size: 27px;
-  font-weight: 600;
-  letter-spacing: -0.03em;
-  line-height: 1.1;
-  color: var(--ink);
-}
-.cns-stat-value[data-tone="bad"] {
-  color: var(--bad);
-}
-.cns-stat-value[data-tone="good"] {
-  color: var(--good);
-}
-.cns-stat-hint {
-  display: block;
-  margin-top: 2px;
-  font-size: 11px;
-  color: var(--ink-4);
-}
-.cns-stat-spark {
-  position: absolute;
-  inset-inline-end: 0;
-  bottom: 0;
-  width: 76px;
-  height: 30px;
-  opacity: 0.5;
-  pointer-events: none;
-}
-
-/* ------------------------------------------------------------ chart */
-
-.cns-chart {
-  min-width: 0;
-  width: 100%;
-}
-.cns-legend {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 14px;
-  padding: 2px 0 10px;
-}
-.cns-legend span {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11.5px;
-  color: var(--ink-2);
-}
-.cns-legend i {
-  width: 9px;
-  height: 9px;
-  border-radius: 3px;
-  background: currentColor;
-  flex: none;
-}
-/* The swatch is the mark, not a generic square — so the key matches what is
-   actually on the chart. */
-.cns-legend i[data-shape="tick"] {
-  width: 4px;
-  height: 13px;
-  border-radius: 2px;
-}
-.cns-legend i[data-shape="dot"] {
-  width: 10px;
-  height: 10px;
-  border-radius: 99px;
-}
-.cns-legend i[data-shape="diamond"] {
-  width: 8px;
-  height: 8px;
-  border-radius: 1.5px;
-  transform: rotate(45deg);
-}
-.cns-legend button {
-  border: 0;
-  background: none;
-  font: inherit;
-  cursor: pointer;
-  padding: 2px 0;
-  color: inherit;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11.5px;
-  transition: opacity 0.15s;
-}
-.cns-legend button[data-off] {
-  opacity: 0.35;
-}
-
-/* The tooltip is rendered as HTML by ECharts; these classes style its body. */
 .cns-tip {
-  font-family: var(--ui);
-  min-width: 168px;
+  font-family: var(--cns-ui);
+  min-width: 170px;
   padding: 9px 11px 10px;
-  color: #0c1622;
+  color: var(--cns-fg);
 }
 .cns-tip-h {
   font-size: 12.5px;
@@ -623,9 +119,9 @@
   margin-bottom: 2px;
 }
 .cns-tip-s {
-  font-family: "IBM Plex Mono", monospace;
+  font-family: var(--cns-mono);
   font-size: 10.5px;
-  color: #8493a6;
+  color: var(--cns-mutedfg);
   margin-bottom: 7px;
 }
 .cns-tip-row {
@@ -634,12 +130,14 @@
   gap: 8px;
   font-size: 12px;
   padding: 1.5px 0;
+  color: var(--cns-fg2);
 }
 .cns-tip-row b {
   margin-inline-start: auto;
-  font-family: "IBM Plex Mono", monospace;
+  font-family: var(--cns-mono);
   font-variant-numeric: tabular-nums;
   font-weight: 600;
+  color: var(--cns-fg);
 }
 .cns-tip-sw {
   width: 8px;
@@ -650,513 +148,48 @@
 .cns-tip-trail {
   margin-top: 8px;
   padding-top: 7px;
-  border-top: 1px solid #eef1f5;
+  border-top: 1px solid var(--cns-line);
   display: flex;
   flex-wrap: wrap;
   gap: 3px;
-  max-width: 280px;
+  max-width: 300px;
 }
 .cns-tip-step {
   font-size: 10.5px;
   padding: 1px 6px;
   border-radius: 99px;
-  background: #f2f5f9;
-  color: #48566a;
+  background: var(--cns-muted);
+  color: var(--cns-fg2);
 }
 .cns-tip-step[data-bad] {
-  background: #fbeceb;
-  color: #c2372f;
+  background: rgba(194, 55, 47, 0.1);
+  color: var(--cns-bad);
 }
 
-/* ------------------------------------------------- funnel & rank bars */
+/* --------------------------------------------------------- trail chips */
+/* The arrow between two steps is a generated character, not a rendered node —
+   it must not be selectable or read aloud as content. */
 
-.cns-funnel {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 13px;
-}
-.cns-funnel-head {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  font-size: 12.5px;
-  color: var(--ink-2);
-  margin-bottom: 5px;
-}
-.cns-funnel-head b {
-  margin-inline-start: auto;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--ink);
-}
-.cns-funnel-track {
-  height: 9px;
-  border-radius: 5px;
-  background: var(--surface-sunk);
-  overflow: hidden;
-}
-.cns-funnel-fill {
-  height: 100%;
-  border-radius: 5px;
-}
-.cns-funnel-step {
-  margin-top: 4px;
-  font-size: 10.5px;
-  color: var(--ink-4);
-}
-.cns-funnel-step[data-weak] {
-  color: var(--warn);
-}
-
-.cns-ranks {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 9px;
-}
-.cns-ranks li {
-  display: grid;
-  grid-template-columns: 104px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 12px;
-}
-.cns-rank-label {
-  font-size: 12.5px;
-  color: var(--ink-2);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.cns-rank-track {
-  height: 8px;
-  border-radius: 4px;
-  background: var(--surface-sunk);
-  overflow: hidden;
-}
-.cns-rank-fill {
-  height: 100%;
-  border-radius: 4px;
-}
-.cns-ranks b {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--ink);
-  min-width: 34px;
-  text-align: end;
-}
-.cns-ranks b em {
-  font-style: normal;
-  font-size: 10.5px;
-  color: var(--ink-4);
-  margin-inline-start: 2px;
-}
-
-/* ------------------------------------------------------------ table */
-
-.cns-tools {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 18px 12px;
-}
-.cns-search {
-  position: relative;
-  flex: 1;
-  min-width: 0;
-  max-width: 320px;
-}
-.cns-search svg {
-  position: absolute;
-  inset-inline-start: 10px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--ink-4);
-  pointer-events: none;
-}
-.cns-search input {
-  width: 100%;
-  height: 32px;
-  padding-inline: 32px 12px;
-  border: 1px solid var(--rule);
-  border-radius: 9px;
-  background: var(--surface-sunk);
-  font: inherit;
-  font-size: 12.5px;
-  color: var(--ink);
-  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
-}
-.cns-search input::placeholder {
-  color: var(--ink-4);
-}
-.cns-search input:focus {
-  outline: none;
-  background: var(--surface);
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(31, 99, 214, 0.12);
-}
-
-.cns-tbl-wrap {
-  overflow: auto;
-  max-height: var(--tbl-max, 520px);
-  border-top: 1px solid var(--rule);
-}
-.cns-tbl {
-  width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
-  font-size: 12.5px;
-}
-.cns-tbl th {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  background: var(--surface);
-  text-align: start;
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  color: var(--ink-3);
-  text-transform: uppercase;
-  padding: 9px 14px;
-  border-bottom: 1px solid var(--rule);
-  white-space: nowrap;
-  user-select: none;
-}
-.cns-tbl th[data-sortable] {
-  cursor: pointer;
-  transition: color 0.15s;
-}
-.cns-tbl th[data-sortable]:hover {
-  color: var(--ink);
-}
-.cns-sort {
-  display: inline-block;
-  width: 10px;
-  margin-inline-start: 3px;
-  color: var(--accent);
-}
-.cns-tbl td {
-  padding: 9px 14px;
-  border-bottom: 1px solid var(--rule);
-  white-space: nowrap;
-  color: var(--ink-2);
-  max-width: 300px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.cns-tbl td[data-strong] {
-  color: var(--ink);
-  font-weight: 500;
-}
-.cns-tbl tbody tr {
-  transition: background 0.12s;
-}
-.cns-tbl tbody tr:hover td {
-  background: var(--surface-sunk);
-}
-.cns-tbl tbody tr[data-click] {
-  cursor: pointer;
-}
-.cns-tbl tbody tr:last-child td {
-  border-bottom: 0;
-}
-
-.cns-foot {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 18px;
-  border-top: 1px solid var(--rule);
-  font-size: 11.5px;
-  color: var(--ink-3);
-}
-.cns-pager {
-  margin-inline-start: auto;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-.cns-pager button {
-  width: 26px;
-  height: 26px;
-  border: 0;
-  border-radius: 7px;
-  background: var(--surface-sunk);
-  color: var(--ink-2);
-  cursor: pointer;
-  display: grid;
-  place-items: center;
-  transition: background 0.15s, color 0.15s;
-}
-.cns-pager button:hover:not(:disabled) {
-  background: var(--accent-wash);
-  color: var(--accent);
-}
-.cns-pager button:disabled {
-  opacity: 0.35;
-  cursor: default;
-}
-
-/* ------------------------------------------------------------ atoms */
-
-.cns-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 1px 8px;
-  border-radius: 99px;
-  font-size: 11px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-.cns-pill[data-tone="good"] {
-  color: var(--good);
-  background: var(--good-wash);
-}
-.cns-pill[data-tone="bad"] {
-  color: var(--bad);
-  background: var(--bad-wash);
-}
-.cns-pill[data-tone="warn"] {
-  color: var(--warn);
-  background: var(--warn-wash);
-}
-.cns-pill[data-tone="mute"] {
-  color: var(--ink-3);
-  background: var(--surface-sunk);
-}
-
-.cns-trail {
-  display: inline-flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 3px;
-  white-space: normal;
-}
-.cns-step {
-  padding: 1px 8px;
-  border-radius: 99px;
-  background: var(--surface-sunk);
-  font-size: 11px;
-  color: var(--ink-2);
-  border: 1px solid var(--rule);
-}
-.cns-step[data-bad] {
-  color: var(--bad);
-  background: var(--bad-wash);
-  border-color: #f2d7d5;
-}
 .cns-step + .cns-step::before {
   content: "←";
-  color: var(--ink-4);
+  color: var(--cns-mutedfg);
   margin-inline-end: 5px;
-}
-.cns-tbl td:has(.cns-trail) {
-  white-space: normal;
-  max-width: 520px;
+  opacity: 0.7;
 }
 
-.cns-who {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.cns-av {
-  width: 24px;
-  height: 24px;
-  border-radius: 8px;
-  display: grid;
-  place-items: center;
-  font-size: 10.5px;
-  font-weight: 600;
-  color: #fff;
-  flex: none;
-  letter-spacing: 0;
-}
+/* ---------------------------------------------------- the awaiting scope */
 
-/* ------------------------------------------------------------- feed */
-
-.cns-feed {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  max-height: 340px;
-  overflow-y: auto;
-  border-top: 1px solid var(--rule);
-}
-.cns-feed li {
-  display: grid;
-  grid-template-columns: 74px 8px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 18px;
-  border-bottom: 1px solid var(--rule);
-  font-size: 12.5px;
-}
-.cns-feed li:last-child {
-  border-bottom: 0;
-}
-.cns-feed li:hover {
-  background: var(--surface-sunk);
-}
-.cns-feed-when {
-  font-size: 10.5px;
-  color: var(--ink-4);
-  white-space: nowrap;
-}
-.cns-feed-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 9px;
-  background: var(--accent);
-  opacity: 0.65;
-}
-.cns-feed-dot[data-bad] {
-  background: var(--bad);
-  opacity: 1;
-}
-.cns-feed-line {
-  color: var(--ink-2);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.cns-feed-stamp {
-  font-size: 10.5px;
-  color: var(--ink-4);
-  white-space: nowrap;
-}
-
-/* ------------------------------------------------------------ health */
-
-.cns-health {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-.cns-health-row {
-  display: grid;
-  grid-template-columns: 8px minmax(0, 1fr);
-  gap: 11px;
-  align-items: start;
-}
-.cns-health-row > span:first-child {
-  margin-top: 6px;
-}
-.cns-health-row b {
-  display: block;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--ink);
-  margin-bottom: 2px;
-}
-.cns-health-row span {
-  font-size: 11.5px;
-  color: var(--ink-3);
-  line-height: 1.55;
-}
-
-/* -------------------------------------------------------------- flag */
-
-/* A configuration problem worth saying out loud, without shouting. */
-.cns-flag {
-  display: grid;
-  grid-template-columns: 8px minmax(0, 1fr);
-  gap: 11px;
-  align-items: start;
-  background: var(--warn-wash);
-  border-radius: 12px;
-  padding: 11px 14px;
-  font-size: 12.5px;
-  color: #7a5406;
-  line-height: 1.6;
-}
-.cns-flag > .cns-dot {
-  margin-top: 7px;
-}
-.cns-flag b {
-  font-weight: 600;
-}
-.cns-flag code {
-  font-family: var(--mono);
-  font-size: 11.5px;
-  background: rgba(122, 84, 6, 0.09);
-  border-radius: 4px;
-  padding: 0 4px;
-}
-
-/* --------------------------------------------------------- empty */
-
-.cns-empty {
-  display: grid;
-  place-items: center;
-  gap: 10px;
-  padding: 46px 20px;
-  text-align: center;
-}
-.cns-empty-mark {
-  width: 44px;
-  height: 44px;
-  border-radius: 13px;
-  display: grid;
-  place-items: center;
-  background: var(--surface-sunk);
-  color: var(--ink-4);
-}
-.cns-empty h3 {
-  font-size: 14px;
-  font-weight: 600;
-}
-.cns-empty p {
-  margin: 0;
-  max-width: 380px;
-  font-size: 12.5px;
-  color: var(--ink-3);
-  line-height: 1.6;
-}
-
-/* The first-run state: the console is wired but nothing has happened yet. */
-.cns-await {
-  background: var(--surface);
-  border-radius: 16px;
-  box-shadow: var(--lift-2);
-  padding: 54px 40px 48px;
-  display: grid;
-  place-items: center;
-  gap: 14px;
-  text-align: center;
-}
-.cns-await-scope {
-  position: relative;
-  width: 96px;
-  height: 96px;
-  border-radius: 999px;
-  display: grid;
-  place-items: center;
-  color: var(--accent);
-  background: radial-gradient(
-    circle at center,
-    var(--accent-wash) 0%,
-    rgba(238, 243, 253, 0) 70%
-  );
-}
-/* Two rings breathing outward: the panel is listening, not broken. */
-.cns-await-scope::before,
-.cns-await-scope::after {
+.cns-scope::before,
+.cns-scope::after {
   content: "";
   position: absolute;
   inset: 14px;
   border-radius: 999px;
-  border: 1px solid var(--accent);
+  border: 1px solid var(--cns-accent);
   opacity: 0;
   animation: cns-sonar 3.4s ease-out infinite;
 }
-.cns-await-scope::after {
+.cns-scope::after {
   animation-delay: 1.7s;
 }
 @keyframes cns-sonar {
@@ -1172,25 +205,25 @@
     opacity: 0;
   }
 }
-.cns-await h2 {
-  font-size: 19px;
+
+/* ------------------------------------------------------------- thread */
+/* The vertical line joining one step of a visit to the next. */
+
+.cns-thread-rail::after {
+  content: "";
+  position: absolute;
+  top: 12px;
+  bottom: -6px;
+  width: 1px;
+  background: var(--cns-line2);
 }
-.cns-await p {
-  margin: 0;
-  max-width: 460px;
-  font-size: 13px;
-  color: var(--ink-3);
-  line-height: 1.7;
-}
-.cns-await-list {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 6px;
-  margin-top: 4px;
+.cns-thread-row:last-child .cns-thread-rail::after {
+  display: none;
 }
 
-/* --------------------------------------------------------- drawer */
+/* ------------------------------------------------------------ drawer */
+/* Fixed-position furniture: the scrim and the sliding panel are positioned
+   against the viewport, so they live here rather than in a utility soup. */
 
 .cns-scrim {
   position: fixed;
@@ -1204,7 +237,7 @@
   inset-block: 0;
   inset-inline-start: 0;
   width: min(460px, 92vw);
-  background: var(--surface);
+  background: var(--cns-card);
   box-shadow: 0 0 80px -20px rgba(12, 22, 34, 0.5);
   z-index: 61;
   display: flex;
@@ -1212,8 +245,9 @@
   overflow: hidden;
 }
 .cns-drawer-head {
+  position: relative;
   padding: 20px 22px 16px;
-  border-bottom: 1px solid var(--rule);
+  border-bottom: 1px solid var(--cns-line);
 }
 .cns-drawer-body {
   padding: 18px 22px 26px;
@@ -1230,38 +264,33 @@
   height: 30px;
   border: 0;
   border-radius: 9px;
-  background: var(--surface-sunk);
-  color: var(--ink-3);
+  background: var(--cns-muted);
+  color: var(--cns-mutedfg);
   cursor: pointer;
   display: grid;
   place-items: center;
   transition: background 0.15s, color 0.15s;
 }
 .cns-drawer-close:hover {
-  background: var(--bad-wash);
-  color: var(--bad);
+  background: rgba(194, 55, 47, 0.1);
+  color: var(--cns-bad);
 }
 
 .cns-def {
   display: grid;
-  grid-template-columns: 92px minmax(0, 1fr);
-  gap: 5px 12px;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 6px 12px;
   font-size: 12.5px;
 }
 .cns-def dt {
-  color: var(--ink-3);
+  color: var(--cns-mutedfg);
 }
 .cns-def dd {
   margin: 0;
-  color: var(--ink);
+  color: var(--cns-fg);
 }
 
-/* The session trail, drawn as a vertical thread. */
-.cns-thread {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-}
+/* The trail of one visit, drawn as a vertical thread. */
 .cns-thread-row {
   display: grid;
   grid-template-columns: 20px minmax(0, 1fr);
@@ -1278,20 +307,12 @@
   width: 9px;
   height: 9px;
   border-radius: 99px;
-  background: var(--accent);
-  box-shadow: 0 0 0 3px var(--surface);
+  background: var(--cns-accent);
+  box-shadow: 0 0 0 3px var(--cns-card);
   z-index: 1;
 }
 .cns-thread-rail[data-bad] i {
-  background: var(--bad);
-}
-.cns-thread-row:not(:last-child) .cns-thread-rail::after {
-  content: "";
-  position: absolute;
-  top: 12px;
-  bottom: -6px;
-  width: 1px;
-  background: var(--rule-strong);
+  background: var(--cns-bad);
 }
 .cns-thread-body {
   padding-bottom: 14px;
@@ -1301,15 +322,15 @@
   display: block;
   font-size: 12.5px;
   font-weight: 500;
-  color: var(--ink);
+  color: var(--cns-fg);
 }
 .cns-thread-body span {
-  font-family: var(--mono);
+  font-family: var(--cns-mono);
   font-size: 10.5px;
-  color: var(--ink-4);
+  color: var(--cns-mutedfg);
 }
 
-/* ---------------------------------------------------------- palette */
+/* -------------------------------------------------------------- cmdk */
 
 .cns-cmdk-scrim {
   position: fixed;
@@ -1323,40 +344,44 @@
 }
 .cns-cmdk {
   width: min(520px, 92vw);
-  background: var(--surface);
-  border-radius: 15px;
-  box-shadow: var(--lift-3);
+  background: var(--cns-card);
+  border-radius: 14px;
+  border: 1px solid var(--cns-line);
+  box-shadow: 0 28px 60px -32px rgba(12, 22, 34, 0.55);
   overflow: hidden;
-  font-family: var(--ui);
+  font-family: var(--cns-ui);
 }
 .cns-cmdk input {
   width: 100%;
   height: 50px;
   padding: 0 18px;
   border: 0;
-  border-bottom: 1px solid var(--rule);
+  border-bottom: 1px solid var(--cns-line);
   font: inherit;
   font-size: 14.5px;
-  color: var(--ink);
+  color: var(--cns-fg);
   background: transparent;
 }
 .cns-cmdk input:focus {
   outline: none;
 }
 .cns-cmdk input::placeholder {
-  color: var(--ink-4);
+  color: var(--cns-mutedfg);
 }
+
+/* cmdk renders its own elements and exposes them only through attributes. */
+
 .cns-cmdk [cmdk-list] {
   max-height: 320px;
   overflow-y: auto;
   padding: 6px;
 }
 .cns-cmdk [cmdk-group-heading] {
-  font-family: var(--mono);
+  font-family: var(--cns-mono);
   font-size: 9.5px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--ink-4);
+  color: var(--cns-mutedfg);
   padding: 9px 10px 5px;
 }
 .cns-cmdk [cmdk-item] {
@@ -1364,167 +389,20 @@
   align-items: center;
   gap: 10px;
   padding: 9px 10px;
-  border-radius: 9px;
+  border-radius: 8px;
   font-size: 13.5px;
-  color: var(--ink-2);
+  color: var(--cns-fg2);
   cursor: pointer;
 }
 .cns-cmdk [cmdk-item][data-selected="true"] {
-  background: var(--accent-wash);
-  color: var(--accent);
+  background: rgba(31, 99, 214, 0.08);
+  color: var(--cns-accent);
 }
 .cns-cmdk [cmdk-empty] {
   padding: 24px 10px;
   text-align: center;
   font-size: 12.5px;
-  color: var(--ink-4);
-}
-
-/* ---------------------------------------------------- pending nav */
-
-/* Range changes are a server round-trip. Rather than tear the page down to a
-   skeleton, hold the current render and dim it — no layout jump, and the eye
-   keeps its place. */
-.cns-main[data-pending] {
-  opacity: 0.52;
-  transition: opacity 0.18s ease 0.09s;
-  pointer-events: none;
-}
-
-/* ============================================================ sign-in */
-
-.cns-gate {
-  min-height: 100vh;
-  display: grid;
-  grid-template-columns: 1fr;
-  place-items: center;
-  padding: 8vh 20px;
-}
-.cns-gate-card {
-  width: 372px;
-  background: var(--surface);
-  border-radius: 18px;
-  box-shadow: var(--lift-3);
-  padding: 32px 32px 26px;
-  position: relative;
-  overflow: hidden;
-}
-/* A thin instrument scale across the top of the card. */
-.cns-gate-card::before {
-  content: "";
-  position: absolute;
-  inset-inline: 0;
-  top: 0;
-  height: 3px;
-  background: linear-gradient(
-    to left,
-    var(--s-imports),
-    var(--s-analyses) 45%,
-    var(--s-saves)
-  );
-}
-.cns-gate-mark {
-  width: 38px;
-  height: 38px;
-  border-radius: 11px;
-  background: var(--ink);
-  color: #fff;
-  display: grid;
-  place-items: center;
-  margin-bottom: 16px;
-}
-.cns-gate h1 {
-  font-size: 21px;
-  margin-bottom: 3px;
-}
-.cns-gate-sub {
-  margin: 0 0 22px;
-  font-size: 12.5px;
-  color: var(--ink-3);
-}
-.cns-gate form {
-  display: flex;
-  flex-direction: column;
-  gap: 13px;
-}
-.cns-gate label {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-.cns-gate label span {
-  font-family: var(--mono);
-  font-size: 9.5px;
-  font-weight: 500;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--ink-3);
-}
-.cns-gate input {
-  height: 42px;
-  border: 1px solid var(--rule-strong);
-  border-radius: 10px;
-  padding: 0 13px;
-  font: inherit;
-  font-size: 14px;
-  background: var(--surface-sunk);
-  color: var(--ink);
-  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
-}
-.cns-gate input:focus {
-  outline: none;
-  background: var(--surface);
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(31, 99, 214, 0.13);
-}
-.cns-gate button {
-  height: 44px;
-  margin-top: 4px;
-  border: 0;
-  border-radius: 11px;
-  background: var(--ink);
-  color: #fff;
-  font: inherit;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.16s, transform 0.1s;
-}
-.cns-gate button:hover {
-  background: #1b2a3d;
-}
-.cns-gate button:active {
-  transform: translateY(1px);
-}
-.cns-gate-err {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 12.5px;
-  font-weight: 500;
-  color: var(--bad);
-  background: var(--bad-wash);
-  border-radius: 10px;
-  padding: 9px 12px;
-}
-.cns-gate-foot {
-  margin: 20px 0 0;
-  padding-top: 14px;
-  border-top: 1px solid var(--rule);
-  font-family: var(--mono);
-  font-size: 10px;
-  letter-spacing: 0.06em;
-  color: var(--ink-4);
-  text-align: center;
-}
-
-/* ------------------------------------------------------------ misc */
-
-.cns-note {
-  font-size: 11.5px;
-  color: var(--ink-4);
-  text-align: center;
-  padding: 6px 0 0;
+  color: var(--cns-mutedfg);
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -1,0 +1,41 @@
+/* The console's palette, in one block.
+   ---------------------------------------------------------------------------
+   Declared on :root rather than on .cns because Radix portals (tooltips,
+   menus, dialogs) render at the end of <body>, outside the console's own
+   subtree — scoped here they would resolve to nothing and paint transparent.
+   The names are console-specific, so living at the root costs nothing.
+
+   app/globals.css turns each of these into a Tailwind utility (bg-cns-card,
+   border-cns-line, …). Change a value here and the whole panel follows. */
+
+:root {
+  /* surfaces */
+  --cns-bg: #eef1f5; /* the plane everything sits on */
+  --cns-card: #ffffff;
+  --cns-muted: #f5f7fa; /* sunken rows, table stripes, inert chips */
+
+  /* ink */
+  --cns-fg: #0c1622;
+  --cns-fg2: #46536a;
+  --cns-mutedfg: #7d8ba0;
+
+  /* lines */
+  --cns-line: #e6eaf1;
+  --cns-line2: #d3dae5;
+
+  /* interaction */
+  --cns-primary: #0c1622;
+  --cns-primaryfg: #ffffff;
+  --cns-accent: #1f63d6;
+  --cns-ring: #1f63d6;
+
+  /* state — always paired with a word, never colour alone */
+  --cns-good: #1e8e4f;
+  --cns-warn: #c98a0e;
+  --cns-bad: #c2372f;
+
+  --cns-radius: 0.625rem;
+
+  --cns-ui: "IBM Plex Sans Hebrew", "IBM Plex Sans", system-ui, sans-serif;
+  --cns-mono: "IBM Plex Mono", ui-monospace, monospace;
+}

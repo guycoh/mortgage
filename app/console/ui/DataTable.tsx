@@ -1,14 +1,14 @@
 "use client";
 
-// One table for the whole console: sort, search, page, export.
+// One table for the whole console: sort, search, filter, page, export.
 //
-// TanStack Table is headless — it owns the row model and nothing else, so the
-// markup below is ours and inherits the panel's type scale instead of fighting
-// a component library's. Search is a plain substring match across the rendered
-// text of every column, which is what someone actually means when they type a
-// client's name into a monitoring panel.
+// TanStack Table owns the row model and nothing else; the markup is shadcn's
+// Table, so the type scale, borders and hover states are the same ones every
+// other surface here uses. Search is a plain substring match over the rendered
+// text of every column, which is what someone means when they type a client's
+// name into a monitoring panel.
 
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import {
   flexRender,
   getCoreRowModel,
@@ -19,23 +19,24 @@ import {
   type ColumnDef,
   type SortingState,
 } from "@tanstack/react-table";
-
-function IconSearch() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <circle cx="11" cy="11" r="7" />
-      <path d="m20 20-3.6-3.6" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function Chevron({ dir }: { dir: "start" | "end" }) {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d={dir === "start" ? "m14 6-6 6 6 6" : "m10 6 6 6-6 6"} strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
+import {
+  ArrowDown,
+  ArrowUp,
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  Search,
+} from "lucide-react";
+import {
+  Button,
+  Input,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "./kit";
 
 /** Flatten a row to the words a person would search for. */
 function haystack(row: unknown): string {
@@ -56,12 +57,12 @@ function haystack(row: unknown): string {
 }
 
 /**
- * Export what the table currently holds — the filter and the sort included,
- * because "export" means "this, in a spreadsheet", not "everything".
+ * Export what the table currently holds — filter and sort included, because
+ * "export" means "this, in a spreadsheet", not "everything".
  *
- * Values are pulled through the column model rather than off the raw object,
- * so a column defined by an accessor function exports the same number it
- * shows instead of an empty cell.
+ * Values come through the column model rather than off the raw object, so a
+ * column defined by an accessor function exports the number it displays
+ * instead of an empty cell.
  */
 function toCsv(table: ReturnType<typeof useReactTable<any>>): string {
   const cell = (v: unknown) => {
@@ -77,7 +78,7 @@ function toCsv(table: ReturnType<typeof useReactTable<any>>): string {
   for (const row of table.getSortedRowModel().rows) {
     lines.push(cols.map((c) => cell(row.getValue(c.id))).join(","));
   }
-  // A BOM so Excel opens Hebrew as UTF-8 instead of mojibake — this file is
+  // A BOM so Excel opens Hebrew as UTF-8 rather than mojibake — this file is
   // going to be opened in Excel roughly always.
   return "﻿" + lines.join("\n");
 }
@@ -90,7 +91,9 @@ export default function DataTable<T>({
   pageSize = 12,
   onRowClick,
   csvName,
-  maxHeight,
+  maxHeight = 560,
+  toolbar,
+  groupBy,
 }: {
   data: T[];
   columns: ColumnDef<T, any>[];
@@ -100,6 +103,15 @@ export default function DataTable<T>({
   onRowClick?: (row: T) => void;
   csvName?: string;
   maxHeight?: number;
+  /** Filters the parent owns — they sit in the same row as the search box. */
+  toolbar?: React.ReactNode;
+  /**
+   * Turns the table into a journal: whenever this key changes between two
+   * consecutive rows, a labelled rule is drawn across the table. A log of
+   * things that happened wants to be read in days, not as an undifferentiated
+   * run of 200 rows.
+   */
+  groupBy?: (row: T) => string;
 }) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [query, setQuery] = useState("");
@@ -137,13 +149,13 @@ export default function DataTable<T>({
   const pages = table.getPageCount();
 
   return (
-    <>
-      {searchPlaceholder || csvName ? (
-        <div className="cns-tools">
+    <div className="flex min-w-0 flex-col">
+      {searchPlaceholder || toolbar || csvName ? (
+        <div className="flex flex-wrap items-center gap-2 border-b border-cns-line px-4 pb-3">
           {searchPlaceholder ? (
-            <div className="cns-search">
-              <IconSearch />
-              <input
+            <div className="relative w-full max-w-[260px]">
+              <Search className="pointer-events-none absolute inset-inline-start-2.5 top-1/2 size-3.5 -translate-y-1/2 text-cns-mutedfg" />
+              <Input
                 value={query}
                 onChange={(e) => {
                   setQuery(e.target.value);
@@ -151,96 +163,126 @@ export default function DataTable<T>({
                 }}
                 placeholder={searchPlaceholder}
                 spellCheck={false}
+                className="ps-8"
               />
             </div>
           ) : null}
+          {toolbar}
           {csvName ? (
-            <button type="button" className="cns-btn" onClick={download} style={{ marginInlineStart: "auto" }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-                <path d="M12 4v11m0 0 4-4m-4 4-4-4" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M4 19h16" strokeLinecap="round" />
-              </svg>
+            <Button variant="ghost" size="sm" onClick={download}>
+              <Download />
               CSV
-            </button>
+            </Button>
           ) : null}
+          <span className="cns-num ms-auto text-[11px] text-cns-mutedfg">
+            {filtered.length}
+          </span>
         </div>
       ) : null}
 
       {!data.length ? (
         empty
       ) : !rows.length ? (
-        <div className="cns-empty" style={{ padding: "34px 10px" }}>
-          <p>אין תוצאות ל״{query}״</p>
+        <div className="px-4 py-12 text-center text-[12.5px] text-cns-mutedfg">
+          אין תוצאות ל״{query}״
         </div>
       ) : (
-        <div
-          className="cns-tbl-wrap"
-          style={maxHeight ? ({ "--tbl-max": `${maxHeight}px` } as React.CSSProperties) : undefined}
-        >
-          <table className="cns-tbl">
-            <thead>
+        <div className="min-w-0 overflow-auto" style={{ maxHeight }}>
+          <Table>
+            <TableHeader>
               {table.getHeaderGroups().map((hg) => (
-                <tr key={hg.id}>
+                <TableRow key={hg.id} className="hover:bg-transparent">
                   {hg.headers.map((h) => {
                     const sortable = h.column.getCanSort();
                     const dir = h.column.getIsSorted();
                     return (
-                      <th
+                      <TableHead
                         key={h.id}
+                        aria-sort={
+                          dir === "asc" ? "ascending" : dir === "desc" ? "descending" : undefined
+                        }
+                        className={sortable ? "cursor-pointer hover:text-cns-fg" : undefined}
                         onClick={sortable ? h.column.getToggleSortingHandler() : undefined}
-                        data-sortable={sortable || undefined}
-                        aria-sort={dir === "asc" ? "ascending" : dir === "desc" ? "descending" : undefined}
                       >
-                        {flexRender(h.column.columnDef.header, h.getContext())}
-                        <span className="cns-sort">{dir === "asc" ? "↑" : dir === "desc" ? "↓" : ""}</span>
-                      </th>
+                        <span className="inline-flex items-center gap-1">
+                          {flexRender(h.column.columnDef.header, h.getContext())}
+                          {dir === "asc" ? (
+                            <ArrowUp className="size-3 text-cns-accent" />
+                          ) : dir === "desc" ? (
+                            <ArrowDown className="size-3 text-cns-accent" />
+                          ) : null}
+                        </span>
+                      </TableHead>
                     );
                   })}
-                </tr>
+                </TableRow>
               ))}
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr
-                  key={r.id}
-                  data-click={onRowClick ? "" : undefined}
-                  onClick={onRowClick ? () => onRowClick(r.original) : undefined}
-                >
-                  {r.getVisibleCells().map((c) => (
-                    <td key={c.id}>{flexRender(c.column.columnDef.cell, c.getContext())}</td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+            </TableHeader>
+            <TableBody>
+              {rows.map((r, i) => {
+                const group = groupBy?.(r.original);
+                const newGroup = group != null && group !== (i > 0 ? groupBy?.(rows[i - 1].original) : null);
+                return (
+                  <Fragment key={r.id}>
+                    {newGroup ? (
+                      <tr aria-hidden className="bg-cns-muted/60">
+                        <td
+                          colSpan={r.getVisibleCells().length}
+                          className="border-y border-cns-line px-3 py-1 font-[family-name:var(--cns-mono)] text-[10px] tracking-[0.12em] text-cns-mutedfg uppercase"
+                        >
+                          {group}
+                        </td>
+                      </tr>
+                    ) : null}
+                    <TableRow
+                      className={onRowClick ? "cursor-pointer" : undefined}
+                      onClick={onRowClick ? () => onRowClick(r.original) : undefined}
+                    >
+                      {r.getVisibleCells().map((c) => (
+                        <TableCell key={c.id}>
+                          {flexRender(c.column.columnDef.cell, c.getContext())}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  </Fragment>
+                );
+              })}
+            </TableBody>
+          </Table>
         </div>
       )}
 
       {pages > 1 ? (
-        <div className="cns-foot">
-          <span className="num">
-            {page * pageSize + 1}–{Math.min((page + 1) * pageSize, filtered.length)} מתוך {filtered.length}
+        <div className="flex items-center gap-2 border-t border-cns-line px-4 py-2.5 text-[11.5px] text-cns-mutedfg">
+          <span className="cns-num">
+            {page * pageSize + 1}–{Math.min((page + 1) * pageSize, filtered.length)} מתוך{" "}
+            {filtered.length}
           </span>
-          <div className="cns-pager">
-            <button
-              type="button"
+          <div className="ms-auto flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon-xs"
               onClick={() => table.previousPage()}
               disabled={!table.getCanPreviousPage()}
               aria-label="הקודם"
             >
-              <Chevron dir="end" />
-            </button>
-            <button
-              type="button"
+              <ChevronRight />
+            </Button>
+            <span className="cns-num px-1">
+              {page + 1}/{pages}
+            </span>
+            <Button
+              variant="ghost"
+              size="icon-xs"
               onClick={() => table.nextPage()}
               disabled={!table.getCanNextPage()}
               aria-label="הבא"
             >
-              <Chevron dir="start" />
-            </button>
+              <ChevronLeft />
+            </Button>
           </div>
         </div>
       ) : null}
-    </>
+    </div>
   );
 }

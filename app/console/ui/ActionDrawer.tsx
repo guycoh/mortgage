@@ -12,6 +12,7 @@ import type { Action } from "../aggregate";
 import { ACTION } from "../lib/tokens";
 import { bankLabel, KIND_LABEL, ms, nis, num } from "../lib/labels";
 import { stamp, zoned } from "../lib/time";
+import { Badge } from "./kit";
 import { Who } from "./parts";
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
@@ -87,11 +88,7 @@ export default function ActionDrawer({
               <h2 style={{ fontSize: 19, margin: "2px 0 10px" }}>{action.lead}</h2>
               <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                 <Who name={action.operator} />
-                <span
-                  className="cns-pill"
-                  data-tone={action.kind === "failed" ? "bad" : "mute"}
-                  style={{ gap: 6 }}
-                >
+                <Badge variant={action.kind === "failed" ? "bad" : "secondary"}>
                   <i
                     aria-hidden
                     style={{
@@ -105,7 +102,7 @@ export default function ActionDrawer({
                     }}
                   />
                   {skin.label}
-                </span>
+                </Badge>
               </div>
             </header>
 
@@ -149,10 +146,6 @@ export default function ActionDrawer({
                 ) : null}
               </dl>
 
-              <p style={{ margin: 0, fontSize: 11.5, color: "var(--ink-4)", lineHeight: 1.6 }}>
-                תוכן הדוח עצמו לא נשמר — רק המונים שלמעלה, שם הלקוח ומספר הזהות
-                שהופיעו בו.
-              </p>
             </div>
           </motion.aside>
         </>

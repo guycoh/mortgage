@@ -145,6 +145,37 @@
   font-weight: 400;
 }
 
+/* ── /console design tokens ───────────────────────────────────────────────
+   Additive on purpose: every name below is new, so no existing utility class
+   changes meaning and nothing outside the monitoring console can restyle.
+
+   The app's own shadcn variables (--card, --border, … at the top of this file)
+   are deliberately left unmapped. Mapping them would make `bg-card`,
+   `border-border` and friends start generating for the first time, which would
+   silently repaint every page that already uses those classes.
+
+   `inline` matters here: the utilities emit `var(--cns-…)` rather than a baked
+   value, so the palette can be swapped in one block — see app/console/theme.css
+   for the values. */
+@theme inline {
+  --color-cns-bg: var(--cns-bg);
+  --color-cns-card: var(--cns-card);
+  --color-cns-fg: var(--cns-fg);
+  --color-cns-fg2: var(--cns-fg2);
+  --color-cns-muted: var(--cns-muted);
+  --color-cns-mutedfg: var(--cns-mutedfg);
+  --color-cns-line: var(--cns-line);
+  --color-cns-line2: var(--cns-line2);
+  --color-cns-ring: var(--cns-ring);
+  --color-cns-primary: var(--cns-primary);
+  --color-cns-primaryfg: var(--cns-primaryfg);
+  --color-cns-accent: var(--cns-accent);
+  --color-cns-good: var(--cns-good);
+  --color-cns-warn: var(--cns-warn);
+  --color-cns-bad: var(--cns-bad);
+  --radius-cns: var(--cns-radius);
+}
+
 @theme {
   --font-shmulik: "ShmulikCLM", serif;
   --font-dorian: "DorianCLM", serif;
