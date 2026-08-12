@@ -12,7 +12,7 @@ import {
 } from "@/app/private/crm/leads/simulators/components/calculate/mixScheduleCalculators";
 import Money from "./Money";
 import type { DeltaRow } from "./CompareChart";
-import type { ImportedLoan } from "../lib/credit";
+import { owedOnly, type ImportedLoan } from "../lib/credit";
 
 // ECharts is a canvas library with no server render — load it in the browser only.
 const CompareChart = dynamic(() => import("./CompareChart"), {
@@ -49,14 +49,17 @@ export default function Compare({
   const compareMix = compareMixId ? mixes.find((m) => m.id === compareMixId) : null;
 
   if (!activeMix) return <div className="lgr-empty">בחרו תמהיל להצגה.</div>;
-  if (!activeMix.loans?.length)
+  if (!owedOnly(activeMix.loans ?? []).length)
     return <div className="lgr-empty">אין נתונים להצגה עבור התמהיל הנוכחי — הזינו סכומים או גררו דוח.</div>;
 
-  const active: MixFullTotals = calculateMixFullTotals(activeMix.loans, annualInflation);
-  const other: MixFullTotals | null =
-    compareMix && compareMix.loans?.length
-      ? calculateMixFullTotals(compareMix.loans, annualInflation)
-      : null;
+  // The client's own debts on both sides. A guarantee is somebody else's loan,
+  // so counting it here would make one mix look dearer than another purely
+  // because a spouse's cousin borrowed money. See isSurety in lib/credit.
+  const active: MixFullTotals = calculateMixFullTotals(owedOnly(activeMix.loans ?? []), annualInflation);
+  const otherRows = compareMix ? owedOnly(compareMix.loans ?? []) : [];
+  const other: MixFullTotals | null = otherRows.length
+    ? calculateMixFullTotals(otherRows, annualInflation)
+    : null;
 
   const valueOf = (t: MixFullTotals | null, field: string) => {
     if (!t) return 0;

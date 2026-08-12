@@ -16,6 +16,27 @@ import type { Loan } from "@/app/private/crm/leads/simulators/components/LoanTab
 /** Which family a row belongs to. */
 export type DebtGroup = "mortgage" | "loan";
 
+/**
+ * A DEBT THE CLIENT GUARANTEES IS NOT A DEBT THE CLIENT PAYS.
+ *
+ * The דוח ריכוז נתונים keeps its own section for them — "עסקאות בהן הלקוח ערב" —
+ * and the parser carries that all the way onto the row. Everything downstream
+ * used to lose it: a guaranteed loan was filed under its family, summed into the
+ * subtotal, the grand total, the rail, the composition chart, the runoff and the
+ * comparison, marked only by a small ערב tag. That is somebody else's balance
+ * and somebody else's monthly repayment presented as the client's, which is the
+ * one number this whole surface exists to state.
+ *
+ * So the split lives here, in one predicate, and every surface that adds money
+ * up goes through it. They are still real exposure — a bank weighs them at
+ * underwriting — so they are shown, and totalled, on their own.
+ */
+export const isSurety = (l: ImportedLoan) => !!l.is_guarantor;
+
+/** The client's own debts — what every total on the page is about. */
+export const owedOnly = (loans: ImportedLoan[]) => loans.filter((l) => !isSurety(l));
+
+
 /** A Loan plus the provenance the UI colour-codes and labels by. */
 export type ImportedLoan = Loan & {
   group?: DebtGroup;

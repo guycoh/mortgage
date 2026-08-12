@@ -35,6 +35,7 @@ import {
 } from "@phosphor-icons/react";
 import { rateHeat, utilisationHeat } from "@/lib/verdicts";
 import Money, { fmt } from "./Money";
+import { lenderLabel } from "../lib/lenders";
 import {
   CATEGORY_LABEL,
   SEVERITY_LABEL,
@@ -320,7 +321,13 @@ function DebtTable({ lines, cols: requested, hl }: { lines: DebtLine[]; cols: Co
                     case "bank":
                       return (
                         <td key={c} className="text-start">
-                          <span className="font-semibold">{l.bank}</span>
+                          {/* The lender, short and with the document's own
+                              wording on hover. A legal name is 30 characters of
+                              which four are "בע\"מ", and this table already
+                              carries up to nine columns. */}
+                          <span className="font-semibold" title={l.bank}>
+                            {lenderLabel(l.bank) || l.bank}
+                          </span>
                           {l.shared && (
                             <span className="lgr-chip !ms-1.5 !h-[17px] !px-1 !text-[9.5px]" title="הופיע ביותר מדוח אחד ונספר פעם אחת">
                               משותף
@@ -977,7 +984,7 @@ export default function AnalysisModal({
                     <tbody>
                       {a.legal.nonPayment.map((n, i) => (
                         <tr key={`${n.id}-${i}`} data-bad>
-                          <td className="text-start font-semibold">{n.source || "—"}</td>
+                          <td className="text-start font-semibold" title={n.source || undefined}>{lenderLabel(n.source) || "—"}</td>
                           <td className="lgr-fig">{n.reportDate || "—"}</td>
                           <td className="text-start" style={{ color: "var(--lgr-3)" }}>{n.description || "—"}</td>
                           <td>{n.prevents ? "כן" : "לא"}</td>
@@ -1094,7 +1101,7 @@ export default function AnalysisModal({
                   <tbody>
                     {a.sources.map((s, i) => (
                       <tr key={`${s.source}-${s.transactionType}-${i}`} data-bad={s.overdue > 0 || undefined}>
-                        <td className="font-semibold">{s.source || "—"}</td>
+                        <td className="font-semibold" title={s.source || undefined}>{lenderLabel(s.source) || "—"}</td>
                         <td style={{ color: "var(--lgr-3)" }}>{s.transactionType}</td>
                         <td style={{ color: "var(--lgr-4)" }}>{s.role === "guarantor" ? "ערב" : "חייב"}</td>
                         <td className="lgr-fig" style={{ color: "var(--lgr-4)" }}>{s.count || "—"}</td>
@@ -1135,7 +1142,7 @@ export default function AnalysisModal({
                   <tbody>
                     {collateral.map((c, i) => (
                       <tr key={`${c.fileId}-${i}`}>
-                        <td className="text-start font-semibold">{c.bank}</td>
+                        <td className="text-start font-semibold" title={c.bank}>{lenderLabel(c.bank) || c.bank}</td>
                         <td className="text-start" style={{ color: "var(--lgr-3)" }}>{c.type || "—"}</td>
                         <td className="lgr-fig">{c.value || "—"}</td>
                         <td className="text-start lgr-fig" style={{ color: "var(--lgr-4)" }}>{c.fileId || "—"}</td>

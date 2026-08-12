@@ -15,7 +15,7 @@ import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { motion } from "motion/react";
 import { Printer, WarningCircle, X } from "@phosphor-icons/react";
-import { BankIcon } from "@/app/aa4test/components/bankIcons";
+import { BankIcon } from "./bankIcons";
 import Money, { fmt } from "./Money";
 import { noteOf, rateHeat } from "@/lib/verdicts";
 import {

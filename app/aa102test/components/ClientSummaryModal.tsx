@@ -24,8 +24,8 @@ import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { motion } from "motion/react";
 import { Printer, WarningCircle, X } from "@phosphor-icons/react";
-import { BankIcon } from "@/app/aa4test/components/bankIcons";
-import { shortBank } from "@/app/aa4test/debtTags";
+import { BankIcon } from "./bankIcons";
+import { lenderLabel } from "../lib/lenders";
 import { rateHeat, utilisationHeat } from "@/lib/verdicts";
 import Money from "./Money";
 import type { Analysis, ClientRow, ClientSection } from "../lib/analysis";
@@ -75,7 +75,7 @@ function LenderRow({ r }: { r: ClientRow }) {
     <li className="lgr-cs-row">
       <BankIcon source={r.bank} size={30} />
       <div className="min-w-0 flex-1">
-        <div className="lgr-cs-bank">{shortBank(r.bank) || r.bank}</div>
+        <div className="lgr-cs-bank">{lenderLabel(r.bank) || r.bank}</div>
         <div className="lgr-cs-meta">
           {bits.join(" · ")}
           {rate && (
@@ -178,7 +178,7 @@ function CardRow({ r }: { r: ClientRow }) {
       <BankIcon source={r.bank} size={30} />
       <div className="min-w-0 flex-1">
         <div className="lgr-cs-bank">
-          {shortBank(r.bank) || r.bank}
+          {lenderLabel(r.bank) || r.bank}
           <span className="lgr-cs-kind">{r.type}</span>
         </div>
         <div className="lgr-cs-meta lgr-cs-meta-wrap">

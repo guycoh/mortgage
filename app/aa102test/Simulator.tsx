@@ -61,6 +61,7 @@ import {
   PATH_LABEL,
   TRACK_HEX,
   mergeReportLoans,
+  owedOnly,
   type ImportedLoan,
   type ImportSummary,
 } from "./lib/credit";
@@ -425,6 +426,18 @@ export default function Simulator({
   // would silently overwrite the alternative being drafted.
   const isPrimaryMix = !!activeMixId && (list[0]?.id === activeMixId || !!activeMix?.is_base);
   const loans = activeMix?.loans ?? [];
+  /**
+   * EVERY FIGURE ON THIS PAGE IS THE CLIENT'S OWN.
+   *
+   * Guarantees stay on the board — imported fact, saved with the mix, editable —
+   * but they are somebody else's balance and somebody else's monthly repayment,
+   * so they are out of the rail, the composition, the runoff, the unified
+   * schedule and the comparison. `Ledger` still receives all of them, because it
+   * is the one surface whose job is to show and edit rows rather than add them
+   * up; it draws them as their own section, broken out below the mix. See
+   * isSurety in lib/credit.
+   */
+  const owed = useMemo(() => owedOnly(loans), [loans]);
   const dirty = mixes !== null && snapshot(mixes) !== saved;
 
   const rebaseline = (ms: Mix[]) => {
@@ -505,26 +518,28 @@ export default function Simulator({
     let amount = 0;
     let monthly = 0;
     let interest = 0;
-    for (const l of loans) {
+    for (const l of owed) {
       const r = calculateLoan(l, annualInflation);
-      amount += Number(l.amount) || 0;
-      monthly += r.monthlyPayment;
+      amount += Math.round(Number(l.amount) || 0);
+      // Rounded per row so the rail's החזר חודשי is the same figure as the
+      // ledger's סה״כ and the export's grand total — see the note in Ledger.
+      monthly += Math.round(r.monthlyPayment);
       interest += r.totalInterest;
     }
     return { amount, monthly, interest };
-  }, [loans, annualInflation]);
+  }, [owed, annualInflation]);
 
   /** The mix's colour signature — share of balance per track, biggest first. */
   const trackSegs = useMemo(() => {
     const per = new Map<number, number>();
-    for (const l of loans) per.set(l.path_id, (per.get(l.path_id) ?? 0) + (Number(l.amount) || 0));
+    for (const l of owed) per.set(l.path_id, (per.get(l.path_id) ?? 0) + (Number(l.amount) || 0));
     const tot = Array.from(per.values()).reduce((s, v) => s + v, 0);
     if (!tot) return [];
     return Array.from(per.entries())
       .filter(([, v]) => v > 0)
       .sort((a, b) => b[1] - a[1])
       .map(([id, v]) => ({ id, pct: (v / tot) * 100 }));
-  }, [loans]);
+  }, [owed]);
 
   /**
    * How the balance splits between the two families. Drawn as a two-tone rule
@@ -535,7 +550,7 @@ export default function Simulator({
   const famSplit = useMemo(() => {
     let mortgage = 0;
     let loan = 0;
-    for (const l of loans) {
+    for (const l of owed) {
       const v = Number(l.amount) || 0;
       if (l.group === "loan") loan += v;
       else mortgage += v;
@@ -543,7 +558,7 @@ export default function Simulator({
     const tot = mortgage + loan;
     if (!tot) return null;
     return { mortgage: (mortgage / tot) * 100, loan: (loan / tot) * 100 };
-  }, [loans]);
+  }, [owed]);
 
   /** Nothing has been entered yet — so the rail states nothing, rather than ₪0. */
   const railEmpty = !totals.amount && !totals.monthly && !totals.interest;
@@ -1213,7 +1228,7 @@ export default function Simulator({
 
         {/* ---------------------------------------------------------- charts */}
         <motion.div {...enter(4)} className="mt-6">
-          <Charts loans={loans} annualInflation={annualInflation} />
+          <Charts loans={owed} annualInflation={annualInflation} />
         </motion.div>
 
         {/* ------------------------------------------------------ comparison */}
@@ -1261,7 +1276,7 @@ export default function Simulator({
         <ScheduleModal
           subject={
             schedFor === "mix"
-              ? { kind: "mix", name: activeMix.mix_name, loans }
+              ? { kind: "mix", name: activeMix.mix_name, loans: owed }
               : { kind: "loan", loan: schedFor }
           }
           annualInflation={annualInflation}

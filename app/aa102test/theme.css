@@ -1274,6 +1274,91 @@
   letter-spacing: -0.025em;
 }
 
+/* --------------------------------------------------------------- בערבות */
+
+/* THE ROWS THAT ARE NOT THE CLIENT'S.
+   A guarantee is real money and a real monthly repayment, but not the client's
+   to repay — so it stays on the board, editable, in its own section after both
+   families, and out of every total. The section reads as an aside rather than
+   as a third family: the same grid, one notch quieter, with the exclusion said
+   in words on the bar rather than implied by a colour. */
+/* :not(:hover) so the row still lights under the pointer — an equal-specificity
+   background here would have beaten .lgr-row:hover on source order alone and
+   quietly killed the hover feedback on exactly these rows. */
+.lgr-row[data-surety]:not(:hover):not(:focus-within) > td { background: #fbfcfe; }
+/* Held at 88%: enough to sit back from the client's own rows without becoming
+   the greyed-out look of a disabled control — every field here still edits. */
+.lgr-row[data-surety] .lgr-cell,
+.lgr-row[data-surety] .lgr-pay,
+.lgr-row[data-surety] .lgr-lender-name { opacity: 0.88; }
+/* The spine keeps the family's colour — a guaranteed mortgage is still a
+   mortgage — but broken, which is this page's existing vocabulary for "this row
+   is qualified" (see the flag notch). Only `background` is overridden, so the
+   spine keeps the base rule's geometry and its hover widening. */
+.lgr-row[data-surety] > td:first-child::after {
+  background: repeating-linear-gradient(180deg, var(--fam) 0 4px, transparent 4px 8px);
+}
+.lgr-groupbar[data-surety] > td { background: #f2f5f8; }
+.lgr-groupbar[data-surety] .lgr-groupbar-title { color: var(--lgr-2); }
+
+/* THE BREAK. A band of the page showing through the card, full bleed across
+   every column — the one thing in this table that is not a row. It is what
+   makes the guarantees read as a separate document appended to the ledger
+   rather than as a third family inside it, and it is why the eye stops before
+   reaching the grand total. */
+.lgr-sec-gap > td {
+  height: 16px;
+  padding: 0;
+  border: 0;
+  border-top: 1px solid var(--line-2);
+  border-bottom: 1px solid var(--line-2);
+  background: var(--bg);
+}
+
+/* The heading that opens the block. The family sections need none — a chip in
+   every row says which one you are in — but this block has to state what it is
+   BEFORE its figures are read, not after them in a subtotal. */
+.lgr-surety-head > td {
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid #dfe5ec;
+  background: #f2f5f8;
+}
+.lgr-surety-head-in {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  color: #55637a;
+}
+.lgr-surety-head-in svg { flex: none; }
+.lgr-surety-head-t {
+  font-family: var(--display);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: #3f4b60;
+}
+/* The label is an inline-flex ROW, so a block child would land beside the words
+   rather than under them. It becomes a column only when it has a sub-line. */
+.lgr-total-label:has(> .lgr-total-sub) {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
+  white-space: nowrap;
+}
+/* The exclusion, restated where the total is actually read. */
+.lgr-total-sub {
+  display: block;
+  margin-top: 1px;
+  font-family: var(--ui);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--lgr-4);
+}
+
 /* ------------------------------------------------------- composition bar */
 /* Segments are lit from the top and separated by a hairline of the page, so a
    4%-wide track still reads as its own block rather than a colour smear. */
@@ -1659,41 +1744,92 @@
    note above .lgr-money. Notes that ARE words (a bank name, "צמוד מדד") must stay
    RTL, which is why this is a modifier and not baked into .lgr-note. */
 .lgr-note-num { direction: ltr; unicode-bidi: isolate; text-align: left; }
-/* THE LENDER, AS A MARK. The bank used to be written out under the amount and
-   the two ran into each other on any six-figure row. A 14px disc says the same
-   thing in a twelfth of the width, and it is recognised faster — the full legal
-   name is on hover, which is the one thing here that needs its pointer events
-   back. Sits on the cell's end edge, below the figure's baseline, and the field
-   reserves room for it so a long number cannot reach it. */
-/* Not .lgr-mark — that is the dropzone's document mark, and it is 62px square
-   with `svg { width: 100% }`, which is exactly what this became when the two
-   shared a name. */
-/* Centred on the field's end edge rather than dropped into its bottom corner —
-   the same placement, and the same 6px inset, as the calendar button in
-   תאריך סיום. One adornment pattern for the whole grid. Inherited `bottom: 0`
-   from .lgr-note put a 14px disc one pixel off the border, which read as
-   sitting on it. */
+/* ------------------------------------------------------------- גוף מימון */
+
+/* THE LENDER, AS A NAME.
+   It used to be a 14px disc parked inside the amount cell, with the legal name
+   on hover. That was the right call while the only lenders that mattered were
+   the five banks anyone recognises by their logo. A real חיווי אשראי is not
+   that: מימון ישיר, כלמוביל, טריא, כאל and מקס hold a third of the rows and none
+   of them has a mark a reader knows, so the disc was a riddle and the answer was
+   a hover away — which on a thirty-row sheet is no answer at all.
+
+   Now it is its own column, and the mark is a bullet in front of its own name.
+   Two lines, both inside the 32px a .lgr-well occupies, so the row does not
+   grow: the name, and under it whatever qualifies it — the kind of body, and
+   whether the client merely guarantees the debt or it was counted once across
+   two reports.
+
+   Not .lgr-mark — that is the dropzone's document mark, 62px square with
+   `svg { width: 100% }`, which is exactly what this became when they shared a
+   name. */
 .lgr-lender {
   display: flex;
-  align-items: center;
-  gap: 4px;
-  top: 0;
-  bottom: 0;
-  height: 16px;
-  margin-block: auto;
-  pointer-events: auto;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+  min-width: 0;
+  /* the column's own inset, so the mark starts where every header does */
+  padding-inline-start: 9px;
+  min-height: 32px;
 }
-.lgr-lender svg { display: block; }
-/* The field reserves the mark's lane, so the figure stops before it rather than
-   merely happening to be short enough today.
-   PHYSICAL `padding-left`, not `padding-inline-end`: the amount input is
-   `direction: ltr` so its numerals never get walked by the bidi algorithm, and
-   in an LTR box the inline end is the RIGHT — the side the number already sits
-   on. The logical property reserved the wrong lane and pushed the figure
-   towards the mark instead of away from it. The note is pinned with `left`
-   for the same reason; the two have to agree. */
-.lgr-well:has(> .lgr-lender) > .lgr-num-in { padding-left: 26px; }
-.lgr-well:has(> .lgr-lender > .lgr-tag) > .lgr-num-in { padding-left: 60px; }
+.lgr-lender-id { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.lgr-lender-id svg { display: block; flex: none; }
+/* One line, always. A lender the registry has not met keeps its tidied legal
+   name, and a long one ellipsizes rather than wrapping the row taller — the
+   full name is on the cell's title either way. */
+.lgr-lender-name {
+  min-width: 0;
+  overflow: hidden;
+  font-family: var(--ui);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: -0.008em;
+  color: var(--ink);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+/* Starts at the cell's inset, under the mark rather than under the name.
+   Indenting it to the name's edge read better on a lender with one thing to say
+   and clipped the moment there were two — "חברת אשראי · משותף" is 79px and the
+   indent left 72. The line is 9.5px in the quietest ink on the page; it is not
+   going to be mistaken for the name whatever column it starts in. */
+.lgr-lender-meta {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+  overflow: hidden;
+}
+/* The tags ride a line that is already the smallest type in the grid, so they
+   lose a point of padding here rather than push the third one off the end.
+   They never shrink: ערב and משותף are yes-or-no facts, and half of one is not
+   a smaller version of it. When all three fit at once only on a wide screen —
+   a guaranteed non-bank debt that also appears in the spouse's report — it is
+   the KIND that gives way, because it is the only one of the three that reads
+   as a word after being cut. */
+.lgr-lender-meta .lgr-tag { flex: none; padding: 1px 5px; }
+.lgr-lender-kind {
+  min-width: 0;
+  overflow: hidden;
+  font-family: var(--ui);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: var(--lgr-4);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+/* A row nobody imported. Said plainly rather than left blank — an empty cell in
+   a column of names reads as a parse failure, and this is the opposite: it is
+   the one row on the sheet whose numbers are the advisor's own. */
+.lgr-lender-none {
+  display: block;
+  padding-inline-start: 9px;
+  font-family: var(--ui);
+  font-size: 12px;
+  color: var(--lgr-4);
+}
 /* The anchor's level belongs under the anchor's NAME, not under the margin field
    at the cell's other end — parked there it read as an annotation of the margin,
    so a row whose margin was blank appeared to have a margin of 2.80%. Pinned to
@@ -1776,6 +1912,72 @@
   background: var(--card-2);
 }
 .lgr-sheet-body { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 14px; }
+/* The ערב switch spans the sheet: it is a sentence, not a field. */
+.lgr-sheet-body-1 { grid-template-columns: 1fr; padding-top: 0; }
+
+/* A switch, not a checkbox: the state is a claim about the row ("the client
+   guarantees this"), and a claim reads better as on/off than as a tick. */
+.lgr-switch {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 9px 10px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  background: var(--card-2);
+  cursor: pointer;
+  transition: border-color var(--t) ease, background var(--t) ease;
+}
+.lgr-switch:hover { border-color: var(--lgr-4); }
+.lgr-switch input { position: absolute; opacity: 0; pointer-events: none; }
+.lgr-switch-track {
+  position: relative;
+  flex: none;
+  width: 30px;
+  height: 17px;
+  margin-top: 1px;
+  border-radius: 999px;
+  background: var(--line-2);
+  transition: background var(--t) var(--ease);
+}
+.lgr-switch-track::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  inset-inline-start: 2px;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.25);
+  transition: transform var(--t) var(--ease);
+}
+/* The knob travels toward the inline END, which in this RTL sheet is the left —
+   a physical translateX would send it the wrong way. */
+.lgr-switch input:checked ~ .lgr-switch-track { background: #64748b; }
+.lgr-switch input:checked ~ .lgr-switch-track::after { transform: translateX(-13px); }
+.lgr-switch input:focus-visible ~ .lgr-switch-track {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(100, 116, 139, 0.35);
+}
+.lgr-switch-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-family: var(--ui);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.3;
+}
+.lgr-switch-text em {
+  font-style: normal;
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--lgr-4);
+}
+.lgr-switch[data-dirty="true"] { border-color: var(--primary); background: var(--primary-tint); }
 .lgr-sheet-foot {
   padding: 9px 14px;
   border-top: 1px solid var(--line);

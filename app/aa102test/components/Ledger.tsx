@@ -25,6 +25,7 @@ import {
   HandCoins,
   Plus,
   Sliders,
+  ShieldWarning,
   Table as TableIcon,
   Trash,
   Warning,
@@ -43,11 +44,13 @@ import {
   FAMILY,
   PATH_SHORT,
   TRACK_HEX,
+  isSurety,
   rateHeat,
   type DebtGroup,
   type ImportedLoan,
 } from "../lib/credit";
 import { addMonths, monthsBetween, parseDate, startOfToday, toIso } from "../lib/dates";
+import { lenderOf } from "../lib/lenders";
 import { freqLabel } from "@/lib/rate-frequency";
 
 const ORDER: DebtGroup[] = ["mortgage", "loan"];
@@ -56,6 +59,36 @@ const FAM_ICON = {
   mortgage: <Bank size={12} weight="fill" className="lgr-fam-ico" />,
   loan: <HandCoins size={12} weight="fill" className="lgr-fam-ico" />,
 } as const;
+
+/** The family's palette as CSS variables, for a row or for its subtotal bar. */
+const famVarsOf = (key: DebtGroup): React.CSSProperties => {
+  const fam = FAMILY[key];
+  return {
+    "--fam": fam.color,
+    "--fam-text": fam.text,
+    "--fam-tint": fam.tint,
+    "--fam-tint-2": fam.tint2,
+    "--fam-line": fam.line,
+    "--fam-wash": fam.wash,
+    "--fam-ring": fam.ring,
+  } as React.CSSProperties;
+};
+
+/**
+ * The guarantee section's bar — slate, not a third family colour and not a
+ * warning colour. The two families are identity; this is a different KIND of
+ * fact about the board, and a red or amber bar would read as "this debt is in
+ * trouble" rather than "this debt is not the client's".
+ */
+const SURETY_VARS = {
+  "--fam": "#64748b",
+  "--fam-text": "#475569",
+  "--fam-tint": "#eef1f5",
+  "--fam-tint-2": "#e2e7ee",
+  "--fam-line": "#d3dae3",
+  "--fam-wash": "#f7f9fb",
+  "--fam-ring": "rgba(100, 116, 139, 0.4)",
+} as React.CSSProperties;
 
 /** Fields whose change we mark with the corner tick. */
 const TRACKED = [
@@ -72,6 +105,7 @@ const TRACKED = [
   "change_frequency",
   "anchor_interval",
   "source_anchor",
+  "is_guarantor",
 ] as const;
 
 type Baseline = Record<string, ImportedLoan>;
@@ -255,27 +289,45 @@ export default function Ledger({
   // which is what the base mix means by default.
   const famOf = (l: ImportedLoan): DebtGroup => (l.group === "loan" ? "loan" : "mortgage");
 
-  const groups = useMemo(
-    () =>
-      ORDER.map((key) => {
-        const rows = loans.filter((l) => famOf(l) === key);
-        return {
-          key,
-          rows,
-          amount: rows.reduce((s, l) => s + (Number(l.amount) || 0), 0),
-          monthly: rows.reduce((s, l) => s + calculateLoan(l, annualInflation).monthlyPayment, 0),
-        };
-      }),
-    [loans, annualInflation]
-  );
+  /**
+   * THREE SECTIONS, TWO OF WHICH ARE THE CLIENT'S.
+   *
+   * Guarantees are still rows on this board — they are imported fact, they are
+   * saved with the mix, and an advisor has to be able to correct one. What they
+   * are not is part of any total: see isSurety in lib/credit. So they get a
+   * section of their own, last, whose subtotal is stated and then left out of
+   * סה"כ — the same shape the Excel export takes, so the sheet and the screen
+   * can never quote different numbers at each other.
+   */
+  const sections = useMemo(() => {
+    // ROUNDED PER ROW, then added — because that is what the reader does. Every
+    // row prints its payment through Money, which rounds, so a subtotal that
+    // sums the raw values and rounds once at the end can miss the column above
+    // it by a shekel: 13,870 + 20,999 came to 34,868. The Excel export is forced
+    // into the same rule by its SUM() formulas, so this also keeps the sheet and
+    // the screen from quoting different numbers at each other.
+    const of = (rows: ImportedLoan[]) => ({
+      rows,
+      amount: rows.reduce((s, l) => s + Math.round(Number(l.amount) || 0), 0),
+      monthly: rows.reduce((s, l) => s + Math.round(calculateLoan(l, annualInflation).monthlyPayment), 0),
+    });
+    const owed = loans.filter((l) => !isSurety(l));
+    return [
+      ...ORDER.map((key) => ({ key, ...of(owed.filter((l) => famOf(l) === key)) })),
+      { key: "surety" as const, ...of(loans.filter(isSurety)) },
+    ];
+  }, [loans, annualInflation]);
 
-  const grand = useMemo(
-    () => ({
-      amount: loans.reduce((s, l) => s + (Number(l.amount) || 0), 0),
-      monthly: loans.reduce((s, l) => s + calculateLoan(l, annualInflation).monthlyPayment, 0),
-    }),
-    [loans, annualInflation]
-  );
+  /** The client's own — never the guarantees. */
+  const grand = useMemo(() => {
+    const own = sections.filter((s) => s.key !== "surety");
+    return {
+      amount: own.reduce((s, g) => s + g.amount, 0),
+      monthly: own.reduce((s, g) => s + g.monthly, 0),
+    };
+  }, [sections]);
+
+  const surety = sections[sections.length - 1];
 
   /* ------------------------------------------------------------------ אחוז */
   // THE PERCENT HAS TO BE A PERCENT OF SOMETHING THAT HOLDS STILL.
@@ -335,6 +387,18 @@ export default function Ledger({
         </Btn>
       ))}
     </div>
+  );
+
+  /** Add a row from the bottom, so a long list never sends you back up. */
+  const addRow = (
+    <tr className="lgr-addrow">
+      <td colSpan={12}>
+        <div className="lgr-addrow-in">
+          {addBtns()}
+          <span className="lgr-addrow-hint">הוספת שורה ריקה לתמהיל</span>
+        </div>
+      </td>
+    </tr>
   );
 
   const sheetLoan = sheet ? loans.find((l) => l.id === sheet.id) : null;
@@ -410,24 +474,32 @@ export default function Ledger({
         <div>
           <table className="lgr-table">
             <colgroup>
-              {/* Twelve columns summing to 100. תאריך סיום is the one that must
+              {/* Thirteen columns summing to 100. תאריך סיום is the one that must
                   not be squeezed: a ten-character date plus the calendar button
                   is the widest fixed content in the grid, and shaving it is what
                   put the button on top of the digits. It gets 10% here, and the
                   button's space is reserved in padding rather than hoped for —
-                  see .lgr-date-in. */}
+                  see .lgr-date-in.
+
+                  גוף מימון costs 9.5%, and 2.5 of those came back out of סכום:
+                  the lender used to ride inside the amount cell as a 14px disc
+                  with a 26px reserved lane and another 34px for its tags, on a
+                  cell that also had to hold a six-figure number. Giving the
+                  lender its own column hands סכום back to the money. The rest is
+                  half a point each off six columns that were carrying slack. */}
               {[
-                "9.5%", // סוג
-                "11%", // סכום
-                "6%", // אחוז
-                "9%", // מסלול
-                "8%", // לוח סילוקין
-                "12%", // עוגן / מרווח
+                "9%", // סוג
+                "10%", // גוף מימון
+                "9%", // סכום
+                "5.5%", // אחוז
+                "8%", // מסלול
+                "7.5%", // לוח סילוקין
+                "10%", // עוגן / מרווח
                 "5.5%", // ריבית %
-                "8%", // תדירות שינוי
+                "6.5%", // תדירות שינוי
                 "5.5%", // חודשים
                 "10%", // תאריך סיום
-                "9.5%", // החזר חודשי
+                "7.5%", // החזר חודשי
                 "6%", // actions
               ].map((w, i) => (
                 <col key={i} style={{ width: w }} />
@@ -436,6 +508,7 @@ export default function Ledger({
             <thead>
               <tr>
                 <th>סוג</th>
+                <th>גוף מימון</th>
                 <th>סכום</th>
                 {/* the same fact as סכום in the other unit, so it sits beside it
                     rather than at the far edge of the grid */}
@@ -467,22 +540,56 @@ export default function Ledger({
 
             <AnimatePresence initial={false} mode="popLayout">
             <tbody>
-              {groups.map((g) => {
+              {sections.map((g) => {
                 if (!g.rows.length) return null;
-                const fam = FAMILY[g.key];
-                const famVars = {
-                  "--fam": fam.color,
-                  "--fam-text": fam.text,
-                  "--fam-tint": fam.tint,
-                  "--fam-tint-2": fam.tint2,
-                  "--fam-line": fam.line,
-                  "--fam-wash": fam.wash,
-                  "--fam-ring": fam.ring,
-                } as React.CSSProperties;
+                const isSuretySection = g.key === "surety";
 
                 return (
                   <Fragment key={g.key}>
+                    {/* WHERE THE CLIENT'S LEDGER ENDS.
+                        The guarantee block used to run on from the loans as if
+                        it were a third family, and with the grand total below it
+                        the eye had no reason to stop. So the mix is closed first
+                        — its add-row, then a band of the page itself showing
+                        through the card — and the guarantees open afterwards
+                        under a heading of their own. The heading is the word and
+                        nothing else: the bar below it already carries the
+                        "לא נכלל בסה"כ" chip, the grand total says ללא ערבויות,
+                        and every row is tagged ערב, so a sentence here was the
+                        fourth statement of one fact. */}
+                    {isSuretySection && (
+                      <>
+                        {addRow}
+                        <tr className="lgr-sec-gap" aria-hidden>
+                          <td colSpan={13} />
+                        </tr>
+                        <tr className="lgr-surety-head">
+                          <td colSpan={13}>
+                            <div className="lgr-surety-head-in">
+                              <ShieldWarning size={14} weight="fill" />
+                              <span className="lgr-surety-head-t">ערבויות</span>
+                            </div>
+                          </td>
+                        </tr>
+                      </>
+                    )}
                     {g.rows.map((loan) => {
+                      // THE FAMILY IS THE ROW'S, NOT THE SECTION'S. The guarantee
+                      // section holds both families at once — a guaranteed
+                      // mortgage is still a mortgage, and its chip, its spine and
+                      // its rate thresholds all have to say so.
+                      const key = famOf(loan);
+                      const fam = FAMILY[key];
+                      const famVars = {
+                        "--fam": fam.color,
+                        "--fam-text": fam.text,
+                        "--fam-tint": fam.tint,
+                        "--fam-tint-2": fam.tint2,
+                        "--fam-line": fam.line,
+                        "--fam-wash": fam.wash,
+                        "--fam-ring": fam.ring,
+                      } as React.CSSProperties;
+
                       const res = calculateLoan(loan, annualInflation);
                       const dirty = dirtyOf(loan);
                       const amount = Number(loan.amount) || 0;
@@ -493,8 +600,15 @@ export default function Ledger({
                       // an already-elapsed end date is stale data, not a blocker
                       const stale = !!end && end < today;
                       const flag = noTerm ? "err" : stale ? "warn" : undefined;
-                      const share = denom ? (amount / denom) * 100 : 0;
-                      const heat = rateHeat(loan.rate, g.key);
+                      // A guarantee is no share of the mix, because it is not in
+                      // the mix — the column says so rather than quoting a
+                      // percentage of a total this row is not part of.
+                      const share = isSuretySection || !denom ? 0 : (amount / denom) * 100;
+                      const heat = rateHeat(loan.rate, key);
+                      // Who the debt is with. Null on a hand-added row, which is
+                      // exactly the distinction the column is there to draw:
+                      // a named lender means the row is imported fact.
+                      const lender = loan.source_bank ? lenderOf(loan.source_bank) : null;
 
                       return (
                         <motion.tr
@@ -503,6 +617,7 @@ export default function Ledger({
                           className="lgr-row"
                           style={famVars}
                           data-flag={flag}
+                          data-surety={isSuretySection || undefined}
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
                           exit={{ opacity: 0 }}
@@ -512,7 +627,7 @@ export default function Ledger({
                           <td>
                             <Select
                               variant="chip"
-                              value={g.key}
+                              value={key}
                               onChange={(v) => patch(loan.id, { group: v as DebtGroup })}
                               ariaLabel="סוג ההתחייבות"
                               minWidth={148}
@@ -526,6 +641,67 @@ export default function Ledger({
                             <div className="lgr-share mt-0.5" title={`${share.toFixed(1)}% מהתמהיל`}>
                               <span style={{ width: `${Math.min(100, share)}%` }} />
                             </div>
+                          </td>
+
+                          {/* --- גוף מימון: WHERE THE ROW CAME FROM ---
+                              The report names its own sources, one per
+                              transaction block, and until now the only thing on
+                              screen was a 14px disc riding inside the amount
+                              cell with the full legal name on hover. That works
+                              for the five banks an advisor can recognise blind
+                              and for nobody else: a third of the rows in a real
+                              חיווי אשראי come from מימון ישיר, כלמוביל, טריא or
+                              a card company, none of which have a mark anyone
+                              knows, and a hover is not a reading.
+
+                              So the lender is a column, and the mark went back
+                              to being a bullet beside its own name. Under it,
+                              when there is something to say, the kind of body it
+                              is and how the client is attached to the debt —
+                              both facts about provenance, which is what this
+                              column is. Banks say nothing there: "בנק" under
+                              "לאומי" is a line spent on nothing.
+
+                              A row with no lender is a row somebody typed. The
+                              dash says so, which the grid could not before. */}
+                          <td>
+                            {lender ? (
+                              <div className="lgr-lender" title={lender.full}>
+                                <span className="lgr-lender-id">
+                                  <BankIcon source={loan.source_bank} size={18} />
+                                  <span className="lgr-lender-name">{lender.name}</span>
+                                </span>
+                                {(lender.kindLabel || loan.is_guarantor || loan.is_shared) && (
+                                  <span className="lgr-lender-meta">
+                                    {lender.kindLabel && (
+                                      <span className="lgr-lender-kind">{lender.kindLabel}</span>
+                                    )}
+                                    {loan.is_guarantor && (
+                                      <span
+                                        className="lgr-tag"
+                                        style={{ background: FAMILY.loan.tint, color: FAMILY.loan.text }}
+                                        title="הלקוח ערב לחוב הזה — הוא לא מחזיר אותו"
+                                      >
+                                        ערב
+                                      </span>
+                                    )}
+                                    {loan.is_shared && (
+                                      <span
+                                        className="lgr-tag"
+                                        style={{ background: "var(--primary-tint)", color: "var(--primary-deep)" }}
+                                        title="החוב מופיע בשני הדוחות — נספר פעם אחת"
+                                      >
+                                        משותף
+                                      </span>
+                                    )}
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="lgr-lender-none" title="שורה שנוספה ידנית — אין לה מקור בדוח">
+                                —
+                              </span>
+                            )}
                           </td>
 
                           {/* --- סכום --- */}
@@ -542,36 +718,6 @@ export default function Ledger({
                                   patch(loan.id, { amount: Number(e.target.value.replace(/[^\d]/g, "")) || 0 })
                                 }
                               />
-                              {/* WHOSE DEBT IT IS, AS A MARK NOT A NAME.
-                                  "בנק לאומי לישראל בע\"מ" trimmed down to
-                                  "לאומי לישראל" still ran most of the way across
-                                  the cell and met the figure coming the other
-                                  way. The bank is recognised faster from its
-                                  logo than from its name anyway, so it is a 14px
-                                  disc now, on its own row under the field, with
-                                  the full name on hover. */}
-                              {(loan.source_bank || loan.is_guarantor || loan.is_shared) && (
-                                <span className="lgr-note lgr-lender" title={loan.source_bank || undefined}>
-                                  {loan.source_bank && <BankIcon source={loan.source_bank} size={14} />}
-                                  {loan.is_guarantor && (
-                                    <span
-                                      className="lgr-tag"
-                                      style={{ background: FAMILY.loan.tint, color: FAMILY.loan.text }}
-                                    >
-                                      ערב
-                                    </span>
-                                  )}
-                                  {loan.is_shared && (
-                                    <span
-                                      className="lgr-tag"
-                                      style={{ background: "var(--primary-tint)", color: "var(--primary-deep)" }}
-                                      title="החוב מופיע בשני הדוחות — נספר פעם אחת"
-                                    >
-                                      משותף
-                                    </span>
-                                  )}
-                                </span>
-                              )}
                             </div>
                           </td>
 
@@ -685,9 +831,9 @@ export default function Ledger({
                                 data-heat={heat ?? undefined}
                                 title={
                                   heat === "hot"
-                                    ? `ריבית גבוהה ל${FAMILY[g.key].label}`
+                                    ? `ריבית גבוהה ל${fam.label}`
                                     : heat === "warm"
-                                      ? `ריבית גבוהה מהממוצע ל${FAMILY[g.key].label}`
+                                      ? `ריבית גבוהה מהממוצע ל${fam.label}`
                                       : undefined
                                 }
                                 value={loan.rate || ""}
@@ -840,12 +986,26 @@ export default function Ledger({
                         widths could never land on the same pixel as the rows
                         above them, and a ledger whose three levels of total
                         each hang at a different offset is unreadable. */}
-                    <tr className="lgr-groupbar" style={famVars}>
-                      <td>
+                    <tr
+                      className="lgr-groupbar"
+                      data-surety={isSuretySection || undefined}
+                      style={isSuretySection ? SURETY_VARS : famVarsOf(g.key as DebtGroup)}
+                    >
+                      {/* Spans סוג + גוף מימון. A bar names a section rather
+                          than describing one row, so it is not bound to the סוג
+                          column's 9% — and "בערבות · 1 · לא נכלל בסה"כ" is three
+                          things wide. The lender column has nothing to subtotal
+                          anyway: counting distinct lenders here would be a
+                          statistic nobody asked this bar for. */}
+                      <td colSpan={2}>
                         <div className="lgr-groupbar-in">
                           <span className="lgr-groupbar-title">
-                            {FAM_ICON[g.key]}
-                            {fam.plural}
+                            {isSuretySection ? (
+                              <ShieldWarning size={12} weight="fill" className="lgr-fam-ico" />
+                            ) : (
+                              FAM_ICON[g.key as DebtGroup]
+                            )}
+                            {isSuretySection ? "בערבות" : FAMILY[g.key as DebtGroup].plural}
                           </span>
                           <span className="lgr-count">{g.rows.length}</span>
                         </div>
@@ -855,35 +1015,42 @@ export default function Ledger({
                       </td>
                       <td>
                         <span className="lgr-pct-ro lgr-groupbar-sum">
-                          {denom ? `${((g.amount / denom) * 100).toFixed(0)}%` : ""}
+                          {isSuretySection || !denom ? "" : `${((g.amount / denom) * 100).toFixed(0)}%`}
                         </span>
                       </td>
                       <td colSpan={7} />
                       <td>
-                        <Money value={g.monthly} className="lgr-groupbar-sum" style={{ color: fam.text }} />
+                        <Money
+                          value={g.monthly}
+                          className="lgr-groupbar-sum"
+                          style={{ color: isSuretySection ? "var(--lgr-2)" : FAMILY[g.key as DebtGroup].text }}
+                        />
                       </td>
                       <td />
                     </tr>
+                    {isSuretySection && (
+                      <tr className="lgr-sec-gap" aria-hidden>
+                        <td colSpan={13} />
+                      </tr>
+                    )}
                   </Fragment>
                 );
               })}
 
-              {/* add a row from the bottom, so a long list never sends you back up */}
-              <tr className="lgr-addrow">
-                <td colSpan={11}>
-                  <div className="lgr-addrow-in">
-                    {addBtns()}
-                    <span className="lgr-addrow-hint">הוספת שורה ריקה לתמהיל</span>
-                  </div>
-                </td>
-              </tr>
+              {/* With no guarantees the add-row still closes the list, exactly
+                  as before. With them it moves up, above the break — adding a
+                  row to "the mix" belongs with the mix. */}
+              {!surety.rows.length && addRow}
             </tbody>
             </AnimatePresence>
 
             <tfoot>
               <tr>
-                <td>
-                  <span className="lgr-total-label">סה״כ</span>
+                <td colSpan={2}>
+                  <span className="lgr-total-label">
+                    {surety.rows.length ? "סה״כ של הלקוח" : "סה״כ"}
+                    {surety.rows.length > 0 && <em className="lgr-total-sub">ללא ערבויות</em>}
+                  </span>
                 </td>
                 <td>
                   <Money value={grand.amount} className="lgr-total-fig" />
@@ -898,8 +1065,11 @@ export default function Ledger({
                 </td>
                 <td colSpan={7}>
                   <div className="flex flex-wrap items-center gap-1.5 px-1">
-                    {groups
-                      .filter((g) => g.rows.length)
+                    {sections
+                      .filter(
+                        (g): g is { key: DebtGroup; rows: ImportedLoan[]; amount: number; monthly: number } =>
+                          g.key !== "surety" && g.rows.length > 0
+                      )
                       .map((g) => (
                         <span
                           key={g.key}
