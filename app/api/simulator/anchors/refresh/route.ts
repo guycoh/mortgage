@@ -13,11 +13,36 @@ import { refreshFromSources, UNREFRESHABLE } from "@/lib/anchors/sources";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Two callers, two credentials, one door.
+ *
+ * Vercel's scheduler sends `Authorization: Bearer $CRON_SECRET`, and that is not
+ * negotiable — a cron entry cannot carry a custom header. A person verifying a
+ * deploy by hand sends `x-refresh-secret`. Either is sufficient; neither has a
+ * default, so an unconfigured environment refuses rather than opening.
+ */
+function authorized(req: NextRequest): boolean {
+  const cron = process.env.CRON_SECRET;
+  if (cron && req.headers.get("authorization") === `Bearer ${cron}`) return true;
+  const manual = process.env.ANCHOR_REFRESH_SECRET;
+  if (manual && req.headers.get("x-refresh-secret") === manual) return true;
+  return false;
+}
+
+/**
+ * Vercel cron invokes the path with a **GET**. Exporting only POST is how a cron
+ * entry looks perfectly correct in vercel.json and answers 405 every night.
+ */
+export async function GET(req: NextRequest) {
+  return refresh(req);
+}
+
 export async function POST(req: NextRequest) {
-  // A write endpoint on a public route needs a shared secret, not merely to be
-  // hard to guess. Absent the env var it refuses rather than defaulting open.
-  const secret = process.env.ANCHOR_REFRESH_SECRET;
-  if (!secret || req.headers.get("x-refresh-secret") !== secret) {
+  return refresh(req);
+}
+
+async function refresh(req: NextRequest) {
+  if (!authorized(req)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 

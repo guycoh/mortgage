@@ -26,9 +26,10 @@ export interface AnchorRow {
  * How often a family republishes, and when a value stops being "current".
  *
  * Per family, never global: prime moves only on a Bank of Israel decision (eight
- * or so a year, on dates published a year ahead), the bond curves twice a month,
- * מק"ם monthly. A single staleness rule would either cry stale at a perfectly
- * current prime or stay quiet on a bond anchor two cycles behind.
+ * or so a year, on dates published a year ahead), while the bond curves and מק"ם
+ * are monthly averages that appear only after their month has closed. A single
+ * staleness rule would either cry stale at a perfectly current prime or stay
+ * quiet on a bond anchor two cycles behind.
  */
 export interface Freshness {
   /** Human cadence, for the tooltip. */

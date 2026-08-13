@@ -79,8 +79,8 @@ async function readCache(): Promise<AnchorRow[] | null> {
  * Is any family past its own publication cycle?
  *
  * Per family, never global — prime moves on Bank of Israel decisions, the bond
- * curves twice a month, מק"ם monthly. One threshold would either nag about a
- * perfectly current prime or stay quiet on a bond anchor two cycles behind.
+ * curves and מק"ם monthly. One threshold would either nag about a perfectly
+ * current prime or stay quiet on a bond anchor two cycles behind.
  */
 function isStale(rows: AnchorRow[]): boolean {
   const today = Date.now();

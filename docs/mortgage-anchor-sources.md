@@ -3,7 +3,9 @@
 What the "עדכון עוגנים" button resolves, where each number comes from, and — just
 as important — what is **not** verified and therefore never answered.
 
-Last reviewed: **2026-08-13**.
+Last reviewed: **2026-08-14** — every served value re-checked against the live BOI
+feed that day and matching to the digit (prime 5.0% off a 3.5% rate published
+2026-07-12; all 17 zero-curve points at period `2026-07`).
 
 ---
 
@@ -16,9 +18,9 @@ lender:
 | family | Hebrew | applies to | keyed by | publication |
 |---|---|---|---|---|
 | `prime` | ריבית פריים | prime tracks | nothing — one national value | BOI rate + 1.5%, on each rate decision |
-| `bond_linked` | עוגן אג"ח צמוד מדד (ריאלי) | משתנה צמודה | reset period | twice monthly, 11th & 26th |
-| `bond_unlinked` | עוגן אג"ח לא צמוד (נומינלי) | משתנה לא צמודה | reset period | twice monthly, 11th & 26th |
-| `makam` | עוגן מק"ם | משתנה כל שנה, לא צמודה | 12 months | monthly, ~9th |
+| `bond_linked` | עוגן אג"ח צמוד מדד (ריאלי) | משתנה צמודה | reset period | monthly average, published after the month closes |
+| `bond_unlinked` | עוגן אג"ח לא צמוד (נומינלי) | משתנה לא צמודה | reset period | monthly average, published after the month closes |
+| `makam` | עוגן מק"ם | משתנה כל שנה, לא צמודה | 12 months | monthly, with the curve |
 
 Most banks price most variable tracks off Bank of Israel government-bond yield
 data, so keeping a private copy of that curve per bank would be six copies of one
@@ -120,6 +122,15 @@ person who pressed it is not their problem to solve.
 `app/api/simulator/anchors/refresh` does the same on a schedule, so the gate is
 rarely the thing that pays for it.
 
+**The allowance has to span the publication lag, not the publication period.**
+The zero curve is a monthly *average*: July's figure is stamped `2026-07`, stored
+as `2026-07-01`, and does not have a successor until August has closed and been
+published. An allowance of 45 days therefore called our own correct value stale
+about a fortnight out of every month — it marked current rows on the advisor's
+screen and sent every single button press back to the Bank of Israel for a figure
+that did not exist yet, forever, because no fetch could ever satisfy it. The
+allowances are 75 days for every family for that reason.
+
 ## ⚠️ What is still NOT verified
 
 The **source** is now authoritative for all four families. What remains open is
@@ -149,7 +160,7 @@ card companies and anyone whose variable-rate pricing has not been checked.
 
 | bank | prime | משתנה צמודה | משתנה לא צמודה | notes |
 |---|---|---|---|---|
-| מזרחי טפחות | ✅ | `bond_linked` | `bond_unlinked` | anchor floored at 0% |
+| מזרחי טפחות | ✅ | `bond_linked` | `bond_unlinked` | no floor — see "A rule that was removed" |
 | לאומי | ✅ | `bond_linked` | `makam` at 12mo, else `bond_unlinked` | publishes its own tables |
 | הפועלים | ✅ | `bond_linked` | `bond_unlinked` | |
 | דיסקונט | ✅ | `bond_linked` | `bond_unlinked` | |
@@ -171,8 +182,32 @@ To refresh, insert new rows with a later `effective_at`; the resolver always
 takes the newest row at or before today for each `(family, reset_months)`. Old
 rows are kept, which is what makes the table a history rather than a setting.
 
-A future scheduled job should write:
+**The scheduled job exists now.** `vercel.json` runs
+`/api/simulator/anchors/refresh` daily at 05:00 UTC. Daily is not the same as the
+publication cadence and deliberately so: the curve moves monthly and prime on
+about eight unannounced-in-advance-of-the-value decision dates a year, so a job
+that only ran on the cadence would need to know the calendar. Asking every
+morning and writing nothing when nothing moved costs one 4KB request.
 
-- `prime` on every BOI rate decision (dates published a year ahead);
-- `bond_linked` / `bond_unlinked` on the 11th and 26th;
-- `makam` monthly.
+Two things the schedule depends on, both of which have already been the bug:
+
+- **Vercel cron sends `GET`.** The route exports `GET` as well as `POST` for this
+  reason; a `POST`-only route answers 405 every night while `vercel.json` looks
+  perfectly correct.
+- **`CRON_SECRET` must be set in the Vercel project.** A cron entry cannot carry
+  a custom header, so Vercel's own `Authorization: Bearer $CRON_SECRET` is what
+  the route accepts from the scheduler. `ANCHOR_REFRESH_SECRET` still works for a
+  hand-run `POST` with `x-refresh-secret`. Neither has a default: with neither
+  set, the route refuses everything rather than opening.
+
+### The upsert has to be able to land
+
+Both write paths upsert with `onConflict: "family,reset_months,effective_at"`.
+Postgres cannot infer a conflict target from an index built on an *expression*,
+so while the unique index was on `coalesce(reset_months, -1)` every write died
+with `42P10: there is no unique or exclusion constraint matching the ON CONFLICT
+specification` — the scheduled route 500'd, the read path's self-heal logged
+`refresh written but not stored`, and the table only ever held what had been put
+there by hand. The index is now on the plain columns with `NULLS NOT DISTINCT`,
+which keeps prime unique per date without an expression. Changing either side
+without the other silently stops the cache from ever taking a write again.

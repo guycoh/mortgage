@@ -27,19 +27,30 @@ export const FAMILY_LABEL: Record<AnchorFamily, string> = {
 /**
  * When each family stops being current — a property of the SOURCE, not a house
  * rule. Prime holds until the next Bank of Israel decision and those are eight
- * or so a year; the bond curves are republished twice a month; מק"ם monthly.
- * The allowances are deliberately about one cycle wide, so a value flags as old
- * only once its successor should already exist.
+ * or so a year; the bond curves and מק"ם are monthly averages, published after
+ * the month they average has ended.
+ *
+ * Each allowance spans one publication period PLUS the lag before the successor
+ * appears, so a value flags as old only once something newer genuinely exists.
+ * An allowance narrower than the lag does not catch staleness early — it just
+ * accuses the current value of being stale.
  */
 export const FAMILY_FRESHNESS: Record<AnchorFamily, Freshness> = {
   prime: { cadence: "בכל החלטת ריבית של בנק ישראל", maxAgeDays: 75 },
-  // The zero curve is published monthly and stamped with the month, so a value
-  // dated the 1st is current for that whole month and the one after it is not
-  // late until well into the next. 45 days is one cycle plus the lag between a
-  // month ending and its figure appearing.
-  bond_linked: { cadence: "אחת לחודש", maxAgeDays: 45 },
-  bond_unlinked: { cadence: "אחת לחודש", maxAgeDays: 45 },
-  makam: { cadence: "אחת לחודש", maxAgeDays: 45 },
+  // The zero curve is a MONTHLY AVERAGE, stamped with the month it averages and
+  // published only once that month has ended. So the figure dated the 1st of July
+  // is still the newest thing that exists well into September, and its age at the
+  // moment its successor appears is a full month of period plus the publication
+  // lag — not one cycle.
+  //
+  // 45 days was that mistake: it declared our own correct, latest-published value
+  // stale roughly a fortnight out of every month, put a staleness mark on rows
+  // that carried the current number, and sent every button press back to the Bank
+  // of Israel for a value that did not exist yet. 75 spans period + lag and still
+  // catches a curve that is genuinely two publications behind.
+  bond_linked: { cadence: "אחת לחודש", maxAgeDays: 75 },
+  bond_unlinked: { cadence: "אחת לחודש", maxAgeDays: 75 },
+  makam: { cadence: "אחת לחודש", maxAgeDays: 75 },
 };
 
 /**

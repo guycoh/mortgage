@@ -137,15 +137,22 @@ async function fetchZeroCurve(): Promise<AnchorUpsert[]> {
         : "";
     if (!effective_at) continue;
 
+    // The maturity is not zero-padded consistently in the series codes — 01Y and
+    // 7Y both appear — so it is read as a number before it is said in words.
+    // Interpolating "01 שנים" onto a tooltip would be the source's formatting
+    // leaking into an advisor's screen.
+    const years = Number(m[2]);
+    const yearWords = years === 1 ? "שנה" : `${years} שנים`;
+
     out.push({
       family: m[1] === "R" ? "bond_linked" : "bond_unlinked",
-      reset_months: Number(m[2]) * 12,
+      reset_months: years * 12,
       value: Math.round(value * 1000) / 1000,
       effective_at,
       source:
         m[1] === "R"
-          ? `בנק ישראל — עקום אפס ריאלי, ${m[2]} שנים`
-          : `בנק ישראל — עקום אפס נומינלי, ${m[2]} שנים`,
+          ? `בנק ישראל — עקום אפס ריאלי, ${yearWords}`
+          : `בנק ישראל — עקום אפס נומינלי, ${yearWords}`,
       source_url: ZCM_URL,
       verified: true,
     });
@@ -164,11 +171,15 @@ async function fetchZeroCurve(): Promise<AnchorUpsert[]> {
  * unlinked off מק"ם where others use the bond curve — and collapsing the two
  * would lose that distinction even though the number agrees.
  */
-async function fetchMakam(): Promise<AnchorUpsert[]> {
+async function fetchCurveAndMakam(): Promise<AnchorUpsert[]> {
   const curve = await fetchZeroCurve();
   const oneYear = curve.find((r) => r.family === "bond_unlinked" && r.reset_months === 12);
-  if (!oneYear) throw new Error("no 1Y nominal point on the curve");
+  // A curve missing its one-year point is still a curve. מק"ם is the only thing
+  // lost, and dropping the other sixteen maturities over it would turn a small
+  // gap at the short end into a whole failed refresh.
+  if (!oneYear) return curve;
   return [
+    ...curve,
     {
       ...oneYear,
       family: "makam",
@@ -178,15 +189,18 @@ async function fetchMakam(): Promise<AnchorUpsert[]> {
 }
 
 /**
- * `covers` is declared rather than inferred from what came back: one fetch of
- * the curve answers for two families, and a source that returns nothing on a bad
+ * `covers` is declared rather than inferred from what came back: one source can
+ * answer for several families, and a source that returns nothing on a bad
  * afternoon must still count as the thing responsible for them — otherwise a
  * transient failure would silently reclassify a family as unrefreshable.
+ *
+ * The curve and מק"ם share ONE entry because they share one fetch. Splitting them
+ * read better and cost double: both entries ran, both called fetchZeroCurve, and
+ * every refresh pulled the same 4KB from the Bank of Israel twice.
  */
 const SOURCES: { covers: AnchorFamily[]; fetch: () => Promise<AnchorUpsert[]> }[] = [
   { covers: ["prime"], fetch: fetchPrime },
-  { covers: ["bond_linked", "bond_unlinked"], fetch: fetchZeroCurve },
-  { covers: ["makam"], fetch: fetchMakam },
+  { covers: ["bond_linked", "bond_unlinked", "makam"], fetch: fetchCurveAndMakam },
 ];
 
 /** Which families no source can refresh — for the operator, not the UI. Empty. */

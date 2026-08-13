@@ -39,8 +39,21 @@ create table if not exists public.mortgage_anchors (
 
 -- One value per key per date. A correction is an update to that row; a refresh
 -- is a new row on a new date.
+--
+-- The columns are listed PLAINLY, and NULLS NOT DISTINCT does the work that
+-- coalesce(reset_months, -1) used to. That is not a style preference: both write
+-- paths upsert through PostgREST with onConflict="family,reset_months,effective_at",
+-- and Postgres cannot infer an index built on an EXPRESSION from a list of column
+-- names. Against the coalesce form every upsert died with
+--
+--   42P10: there is no unique or exclusion constraint matching the ON CONFLICT
+--
+-- so the cache silently never took a write and the table sat at whatever was last
+-- put in it by hand. NULLS NOT DISTINCT keeps prime (reset_months IS NULL) unique
+-- per date, which is the whole reason the coalesce was there. Requires PG 15+.
 create unique index if not exists mortgage_anchors_key
-  on public.mortgage_anchors (family, coalesce(reset_months, -1), effective_at);
+  on public.mortgage_anchors (family, reset_months, effective_at)
+  nulls not distinct;
 
 create index if not exists mortgage_anchors_lookup
   on public.mortgage_anchors (family, effective_at desc);
@@ -52,22 +65,22 @@ alter table public.mortgage_anchors enable row level security;
 comment on table public.mortgage_anchors is
   'Published variable-rate mortgage anchors, keyed by family and reset period. See docs/mortgage-anchor-sources.md.';
 
--- ---------------------------------------------------------------- seed
--- The same values bundled in lib/anchors/registry.ts, so the table starts where
--- the snapshot left off. Idempotent: re-running changes nothing.
-
-insert into public.mortgage_anchors (family, reset_months, value, effective_at, source, verified) values
-  ('prime',         null, 5.000, '2026-07-06', 'ריבית בנק ישראל 3.5% (החלטה מ־06/07/2026) + 1.5%', true),
-
-  ('bond_linked',     12, 1.650, '2026-07-11', 'טבלת עוגן אג"ח צמוד',    false),
-  ('bond_linked',     30, 1.610, '2026-07-11', 'טבלת עוגן אג"ח צמוד',    false),
-  ('bond_linked',     60, 1.730, '2026-07-11', 'טבלת עוגן אג"ח צמוד',    false),
-  ('bond_linked',     84, 1.740, '2026-07-11', 'טבלת עוגן אג"ח צמוד',    false),
-  ('bond_linked',    120, 1.860, '2026-07-11', 'טבלת עוגן אג"ח צמוד',    false),
-
-  ('bond_unlinked',   24, 3.210, '2026-07-11', 'טבלת עוגן אג"ח לא צמוד', false),
-  ('bond_unlinked',   60, 3.340, '2026-07-11', 'טבלת עוגן אג"ח לא צמוד', false),
-  ('bond_unlinked',   84, 3.480, '2026-07-11', 'טבלת עוגן אג"ח לא צמוד', false),
-
-  ('makam',           12, 3.220, '2026-07-09', 'תשואת מק"ם ל־12 חודשים',  false)
-on conflict (family, coalesce(reset_months, -1), effective_at) do nothing;
+-- ---------------------------------------------------------------- no seed
+-- DELIBERATELY EMPTY. This file used to seed a dozen rows, and they were the old
+-- republished-table values — unverified, sourced 'טבלת עוגן אג"ח צמוד', and dated
+-- 2026-07-11. The real Bank of Israel curve is dated the 1st of its month, so
+-- those seed rows were NEWER than the truth and resolveRow() prefers the newest
+-- row at or before today. Running this file on a fresh environment would have
+-- quietly served 1.730 for a five-year linked track where the curve says 1.702.
+--
+-- An empty table is the correct starting state and needs no seed to be safe:
+--
+--   * lib/anchors/registry.ts carries a dated snapshot of the same curve, and
+--     mergeAnchors() layers the table over it — so the button answers correctly
+--     the moment this file has run, before anything has been written;
+--   * the read path treats a family with nothing cached as stale by definition,
+--     so the first request fills the table from the Bank of Israel;
+--   * the daily cron in vercel.json keeps it filled thereafter.
+--
+-- Two hand-maintained copies of one curve is what put a wrong number in here in
+-- the first place. There is now one copy, and it comes from the source.
