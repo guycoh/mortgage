@@ -88,6 +88,52 @@ function pick(
   return matches.reduce((best, r) => (r.effectiveAt > best.effectiveAt ? r : best));
 }
 
+/**
+ * Read the curve at a maturity between two published points.
+ *
+ * Linear in maturity, which is how the curve is quoted and how a two-and-a-half
+ * year point is read off it. Both neighbours must come from the same publication
+ * date — mixing July's two-year with August's three-year would produce a value
+ * that existed on neither day.
+ */
+function interpolate(
+  rows: AnchorRow[],
+  family: AnchorFamily,
+  months: number,
+  asOf: string
+): AnchorRow | null {
+  const pool = rows.filter(
+    (r) => r.family === family && r.resetMonths !== null && r.effectiveAt <= asOf
+  );
+  if (!pool.length) return null;
+  const newest = pool.reduce((b, r) => (r.effectiveAt > b ? r.effectiveAt : b), "");
+  const curve = pool
+    .filter((r) => r.effectiveAt === newest)
+    .sort((a, b) => (a.resetMonths as number) - (b.resetMonths as number));
+
+  let lo: AnchorRow | null = null;
+  let hi: AnchorRow | null = null;
+  for (const r of curve) {
+    const m = r.resetMonths as number;
+    if (m <= months) lo = r;
+    if (m >= months && !hi) hi = r;
+  }
+  if (!lo || !hi || lo === hi) return null;
+
+  const a = lo.resetMonths as number;
+  const b = hi.resetMonths as number;
+  const t = (months - a) / (b - a);
+  const value = lo.value + (hi.value - lo.value) * t;
+
+  return {
+    ...lo,
+    resetMonths: months,
+    value: Math.round(value * 1000) / 1000,
+    // Said outright, because the number was read rather than published.
+    source: `${lo.source} — נקרא בין ${a / 12} ל־${b / 12} שנים`,
+  };
+}
+
 /** Reset periods a family actually publishes, for the "no such column" message. */
 function publishedPeriods(rows: AnchorRow[], family: AnchorFamily): number[] {
   return Array.from(
@@ -132,7 +178,22 @@ export function resolveRow(
     };
   }
 
-  const hit = pick(available, family, needsPeriod ? row.resetMonths : null, asOf);
+  let hit = pick(available, family, needsPeriod ? row.resetMonths : null, asOf);
+
+  // ON THE CURVE, BETWEEN TWO PUBLISHED POINTS.
+  //
+  // The Bank of Israel samples the zero curve at whole years — 1, 2, 3, 4, 5, 7,
+  // 10, 15, 20 — and "משתנה כל שנתיים וחצי" is one of the commonest tracks sold.
+  // Refusing to price it would fail the row over a gap in the SAMPLING, not a gap
+  // in the data: a zero curve is a continuous function of maturity, and reading
+  // it between two published points is what the curve is for. That is a
+  // different act from inventing a bank rule, and it is marked as what it is.
+  //
+  // Only ever BETWEEN two points. Past the ends of the curve there is nothing to
+  // read between, and extrapolating a yield is a guess — so 30 years still says
+  // INSUFFICIENT_DATA rather than continuing the last slope into the dark.
+  if (!hit && needsPeriod) hit = interpolate(available, family, row.resetMonths as number, asOf);
+
   if (!hit) {
     // A reset period with no published column. Interpolating between the
     // neighbouring columns would be inventing a rate, so it says what it has

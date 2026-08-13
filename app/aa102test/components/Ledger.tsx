@@ -18,7 +18,7 @@
 // resets — it is the difference between a 3% tranche that stays 3% and one that
 // reprices next spring.
 
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
   ArrowCounterClockwise,
@@ -43,6 +43,7 @@ import Money from "./Money";
 import RowSettings from "./RowSettings";
 import Btn from "./Btn";
 import { settle, snap } from "../lib/transitions";
+import Toaster, { type Toast, type ToastTone } from "./Toast";
 import {
   FAMILY,
   PATH_SHORT,
@@ -58,6 +59,24 @@ import { freqLabel } from "@/lib/rate-frequency";
 import type { AnchorResponse } from "@/lib/anchors/types";
 
 const ORDER: DebtGroup[] = ["mortgage", "loan"];
+
+/**
+ * THE SWEEP'S CLOCK.
+ *
+ * Under two seconds, and gone. A mark that lingers stops being feedback and
+ * becomes a state the reader has to dismiss in their head — so the bloom is
+ * fully clear well before anyone would reach to get rid of it.
+ *
+ * The 65ms stagger is the whole trick. Simultaneous is a flash and reads as an
+ * error state; too slow and the reader loses that the rows are one event. At
+ * 65ms four rows resolve in a fifth of a second — fast enough to be one
+ * gesture, slow enough that the eye can follow it down the column.
+ */
+const FLASH_TOTAL_MS = 1900;
+const FLASH_STAGGER_MS = 65;
+
+/** Toast ids only have to be unique within a session, and monotonic for order. */
+let toastSeq = 1;
 
 const FAM_ICON = {
   mortgage: <Bank size={12} weight="fill" className="lgr-fam-ico" />,
@@ -145,8 +164,18 @@ export default function Ledger({
   const [armed, setArmed] = useState<string | null>(null);
   const [sheet, setSheet] = useState<{ id: string; rect: DOMRect } | null>(null);
   const [anchorBusy, setAnchorBusy] = useState(false);
-  /** Transient result line for עדכון עוגנים — cleared on a timer, see below. */
-  const [anchorNote, setAnchorNote] = useState<string | null>(null);
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  /**
+   * THE SWEEP.
+   *
+   * Which rows just changed, and when. `at` is a nonce, not a clock: it keys the
+   * overlay so pressing the button twice replays the light rather than leaving a
+   * finished animation mounted and inert. `ids` is ordered top-to-bottom, and the
+   * index in it is the row's place in the stagger — which is what turns "four
+   * numbers changed" into one legible event travelling down the mix instead of
+   * four unrelated flashes.
+   */
+  const [flash, setFlash] = useState<{ ids: string[]; at: number } | null>(null);
   /* While a percent cell has focus the field shows what was TYPED, not what the
      amount rounds back to — otherwise "2" becomes "2.0" under the caret and the
      next keystroke lands in the wrong place. */
@@ -156,13 +185,23 @@ export default function Ledger({
   const patch = (id: string, next: Partial<ImportedLoan>) =>
     onChange(loans.map((l) => (l.id === id ? { ...l, ...next } : l)));
 
-  // The anchor result is a notification, not a state of the board: it says what
-  // just happened and then stops taking up a line in the header.
+  /** Raise a toast. Three on screen at once is the ceiling; older ones drop. */
+  const toast = (tone: ToastTone, message: string, detail?: string, ttl = 5200) =>
+    setToasts((prev) => [...prev.slice(-2), { id: toastSeq++, tone, message, detail, ttl }]);
+
+  const dismissToast = useCallback(
+    (id: number) => setToasts((prev) => prev.filter((t) => t.id !== id)),
+    []
+  );
+
+  // The sweep unmounts once it has finished. Leaving a completed animation in the
+  // tree costs a compositor layer per row for nothing, and — more to the point —
+  // a `data-flash` that never clears would leave the wells tinted green forever.
   useEffect(() => {
-    if (!anchorNote) return;
-    const t = setTimeout(() => setAnchorNote(null), 5000);
+    if (!flash) return;
+    const t = setTimeout(() => setFlash(null), FLASH_TOTAL_MS + flash.ids.length * FLASH_STAGGER_MS);
     return () => clearTimeout(t);
-  }, [anchorNote]);
+  }, [flash]);
 
   const remove = (id: string) => {
     onChange(loans.filter((l) => l.id !== id));
@@ -454,7 +493,7 @@ export default function Ledger({
   const refreshAnchors = async () => {
     if (anchorBusy) return;
     setAnchorBusy(true);
-    setAnchorNote(null);
+    setFlash(null);
     try {
       const res = await fetch("/api/simulator/anchors", {
         method: "POST",
@@ -477,8 +516,10 @@ export default function Ledger({
       const data: AnchorResponse = await res.json();
 
       const byId = new Map(data.rows.map((r) => [r.rowId, r]));
+      const changed: string[] = [];
       let updated = 0;
       let eligible = 0;
+
 
       const next = loans.map((l) => {
         const r = byId.get(l.id);
@@ -496,6 +537,8 @@ export default function Ledger({
           return { ...l, anchor_asof: r.effectiveAt, anchor_source: r.familyLabel, anchor_note: undefined };
         }
         updated++;
+        // Collected in row order, because the stagger reads down the board.
+        changed.push(l.id);
         const margin = Number(l.anchor_margin);
         const hasMargin = l.anchor_margin !== null && l.anchor_margin !== undefined && Number.isFinite(margin);
         return {
@@ -520,17 +563,39 @@ export default function Ledger({
       });
 
       onChange(next);
-      setAnchorNote(
-        updated === 0
-          ? eligible === 0
-            ? "אין בתמהיל מסלולים הנגזרים מעוגן"
-            : "העוגנים כבר עדכניים"
-          : updated === eligible
-            ? `עודכנו ${updated} עוגנים לפי הפרסום האחרון`
-            : `עודכנו ${updated} מתוך ${eligible} עוגנים`
-      );
+
+      // The light only fires on rows that actually moved. Sweeping a row whose
+      // anchor was already current would be the animation telling a small lie.
+      if (changed.length) setFlash({ ids: changed, at: Date.now() });
+
+      if (updated === 0) {
+        toast(
+          "neutral",
+          eligible === 0 ? "אין בתמהיל מסלולים הנגזרים מעוגן" : "העוגנים כבר עדכניים",
+          eligible === 0 ? "כל השורות בריבית קבועה" : undefined
+        );
+      } else {
+        // The count that did not resolve is the honest half of the sentence, and
+        // it belongs on its own line rather than buried in the headline.
+        const missed = eligible - updated;
+        toast(
+          "pos",
+          updated === eligible
+            ? `עודכנו ${updated} עוגנים`
+            : `עודכנו ${updated} מתוך ${eligible} עוגנים`,
+          // Only what the advisor can act on. How old our cache is, is our
+          // problem — the button's whole promise is that pressing it gives the
+          // current anchor, and reporting our own staleness to the person who
+          // just pressed it makes them audit our plumbing instead of reading
+          // their client's mortgage. Freshness is enforced upstream, in the
+          // refresh route; see docs/mortgage-anchor-sources.md.
+          missed > 0
+            ? `${missed} שורות נותרו ללא שינוי — חסר מידע לזיהוי העוגן`
+            : undefined
+        );
+      }
     } catch {
-      setAnchorNote("לא ניתן היה לקבל עוגנים עדכניים");
+      toast("neg", "לא ניתן היה לקבל עוגנים עדכניים", "השורות נותרו ללא שינוי");
     } finally {
       setAnchorBusy(false);
     }
@@ -557,10 +622,14 @@ export default function Ledger({
         };
       })
     );
-    setAnchorNote("הוחזרו העוגנים מהמסמך");
+    setFlash(null);
+    toast("neutral", "הוחזרו העוגנים מהמסמך", "הריביות חושבו מחדש מהמרווח המקורי");
   };
 
   const refreshed = loans.filter((l) => l.anchor_original !== undefined).length;
+
+  /** A row's place in the sweep, or -1 if it did not change on this run. */
+  const flashOrder = (id: string) => (flash ? flash.ids.indexOf(id) : -1);
 
   /* ------------------------------------------------------------------- ui */
   return (
@@ -632,18 +701,23 @@ export default function Ledger({
               )}
               עדכון עוגנים
             </Btn>
-            {refreshed > 0 && !anchorBusy && (
-              <Btn className="lgr-btn lgr-btn-sm" onClick={restoreAnchors}>
-                <ArrowCounterClockwise size={13} weight="bold" />
-                שחזור
-              </Btn>
-            )}
-            {/* Said once and then gone — see the timer above. */}
-            {anchorNote && (
-              <span className="lgr-anchor-note" role="status">
-                {anchorNote}
-              </span>
-            )}
+            {/* Only once there is something to go back TO. An always-present
+                restore implies the board is in a state that needs undoing. */}
+            <AnimatePresence initial={false}>
+              {refreshed > 0 && !anchorBusy && (
+                <motion.div
+                  initial={{ opacity: 0, x: 6, scale: 0.96 }}
+                  animate={{ opacity: 1, x: 0, scale: 1 }}
+                  exit={{ opacity: 0, x: 6, scale: 0.96, transition: { duration: 0.14 } }}
+                  transition={snap}
+                >
+                  <Btn className="lgr-btn lgr-btn-sm" onClick={restoreAnchors}>
+                    <ArrowCounterClockwise size={13} weight="bold" />
+                    שחזור
+                  </Btn>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         )}
 
@@ -1041,8 +1115,38 @@ export default function Ledger({
                             <div
                               className="lgr-well"
                               data-dirty={dirty.has("anchor") || dirty.has("anchor_margin") || undefined}
+                              // The state the wash rides on. CSS owns the border
+                              // and the ink here, Motion owns the light — the two
+                              // never write the same property. See lib/transitions.
+                              data-flash={flashOrder(loan.id) >= 0 || undefined}
                               title={anchorTip(loan)}
                             >
+                              {/* THE RING.
+                                  It arrives a little larger than the field and
+                                  contracts onto its border, holds, then releases
+                                  outward as it fades — the shape of something
+                                  landing on the box and letting go, which is
+                                  what "this one just changed" looks like. The
+                                  border is the right surface for it: a wash
+                                  behind the digits competes with them, an
+                                  outline traces the thing that changed.
+
+                                  Keyed on the run so a second press replays it
+                                  rather than leaving a finished animation
+                                  mounted. */}
+                              {flashOrder(loan.id) >= 0 && flash && (
+                                <span
+                                  key={`${loan.id}:${flash.at}`}
+                                  className="lgr-flash-halo"
+                                  aria-hidden
+                                  style={
+                                    {
+                                      "--flash-delay": `${flashOrder(loan.id) * FLASH_STAGGER_MS}ms`,
+                                      "--flash-dur": `${FLASH_TOTAL_MS}ms`,
+                                    } as React.CSSProperties
+                                  }
+                                />
+                              )}
                               <div className="lgr-pair">
                                 {numField(loan, "anchor", "ריבית העוגן באחוזים", "0.00")}
                                 {numField(loan, "anchor_margin", "מרווח מהעוגן באחוזים", "0.00")}
@@ -1341,6 +1445,8 @@ export default function Ledger({
           </table>
         </div>
       )}
+
+      <Toaster toasts={toasts} onDismiss={dismissToast} />
 
       {sheet && sheetLoan && (
         <RowSettings

@@ -1896,19 +1896,206 @@ html:has(.lgr-root) {
    quietest thing in the bar. */
 .lgr-anchor-bar { display: flex; align-items: center; gap: 8px; min-width: 0; }
 
+/* THE RING.
+   Drawn OUTSIDE the field — inset -3px, so it surrounds the border rather than
+   sitting on it and there is a hairline of card between the two. That gap is
+   what makes it read as a mark placed around the box instead of the box's own
+   border changing colour.
+
+   Two shadows carry the weight: a tight inner one that reinforces the outline,
+   and a wide soft one that lifts the whole cell off the sheet for the moment it
+   is lit. The element itself never blurs, so the ring stays crisp while the
+   glow does the atmosphere. */
+/* THE HALO.
+   Not a border. A hard green rectangle drawn around the field reads as a
+   validation error and leaves a shape on the page that has to be got rid of;
+   what actually says "this number just refreshed" is light — a soft bloom that
+   comes out of the field and dissolves, leaving nothing behind.
+
+   Drawn UNDER the inputs (z-index 0 against the pair's 1) so it never touches
+   the digits, and blurred so it has no edge of its own at any point in the run.
+   Only opacity and transform animate, so it composites on the GPU and costs a
+   dense grid of numbers nothing.
+
+   CSS keyframes rather than Motion, deliberately. Motion owns the toasts on this
+   page, where springs and layout reflow are the whole point. A one-shot
+   decorative bloom is the opposite case: it wants to run on the compositor, it
+   must survive a throttled tab, and it must not depend on Motion animating
+   transforms with a SPRING by default — which it does, and which silently ate
+   `duration` and `times` here until the keyframes collapsed to their final
+   frame and the mark was gone before it was drawn. */
+.lgr-flash-halo {
+  position: absolute;
+  inset: -7px;
+  z-index: 0;
+  border-radius: 15px;
+  pointer-events: none;
+  /* Two stops doing different jobs: a luminous core that sits just off the
+     field's edge so the digits read against something bright, and a long tail
+     that reaches nothing so the bloom has no boundary at any point in the run.
+     A single stop gave a flat green pill; this gives light. */
+  background:
+    radial-gradient(closest-side, rgba(20, 122, 69, 0.4), rgba(20, 122, 69, 0) 72%),
+    radial-gradient(closest-side, rgba(52, 168, 105, 0.28), rgba(52, 168, 105, 0) 100%);
+  filter: blur(4px);
+  opacity: 0;
+  animation: lgr-flash-halo var(--flash-dur, 1900ms) cubic-bezier(0.22, 1, 0.36, 1)
+    var(--flash-delay, 0ms) both;
+}
+@keyframes lgr-flash-halo {
+  /* Gathers just inside the field... */
+  0% { opacity: 0; transform: scale(0.94); }
+  /* ...blooms to full... */
+  18% { opacity: 1; transform: scale(1); }
+  /* ...holds long enough to be read... */
+  50% { opacity: 0.9; transform: scale(1.02); }
+  /* ...then spreads out and is gone, leaving no shape behind. */
+  100% { opacity: 0; transform: scale(1.12); }
+}
+
+.lgr-pair { position: relative; z-index: 1; }
+
+/* The ink, for as long as the ring is on the cell. CSS owns colour, Motion owns
+   the ring — nothing is animated by both, see lib/transitions. The number is the
+   subject: it goes green and heavy the moment the ring lands, and it takes a
+   full second to come back, so the end of the mark is a fade rather than a cut.
+
+   The faint tint is deliberately almost nothing. The first version washed the
+   whole cell green and the digits had to compete with it; here the fill only
+   separates the changed field from its neighbours, and the ring does the work. */
+.lgr-well[data-flash] .lgr-cell {
+  border-color: var(--pos-line);
+  transition: border-color 0.22s ease-out;
+}
+.lgr-well[data-flash] .lgr-num-in {
+  color: #0d5233;
+  font-weight: 700;
+  transition: color 0.2s ease-out;
+}
+.lgr-well:not([data-flash]) .lgr-cell { transition: border-color 0.9s ease-in; }
+.lgr-well:not([data-flash]) .lgr-num-in { transition: color 1s ease-in; }
+
+@media (prefers-reduced-motion: reduce) {
+  /* The information is "these fields changed", and a static ring carries it.
+     The travel is the part that has to go. */
+  /* The fact is "these fields changed", and the green rim carries it. The
+     bloom is the part that has to go. */
+  .lgr-flash-halo { display: none; }
+}
+
+/* ---------------------------------------------------------------- toasts */
+/* Bottom inline-start — the far corner from the ledger's own numbers, which run
+   down the inline-end side. A toast that covers the column you just changed is
+   a toast that hides its own subject. */
+.lgr-toaster {
+  position: fixed;
+  z-index: 200;
+  inset-block-end: 20px;
+  inset-inline-start: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  pointer-events: none;
+}
+.lgr-toast {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  overflow: hidden;
+  width: min(430px, calc(100vw - 40px));
+  padding: 15px 16px 16px;
+  /* A REAL border, all the way round, not a hairline pretending. This card sits
+     over the ledger rather than in it, and a 1px --line-2 whisper let it read as
+     part of the table underneath. The spine on the start edge is the board's own
+     device for "what kind of thing is this"; the tone lives there and in the
+     icon, never in the text. */
+  border: 1px solid var(--line);
+  border-inline-start: 4px solid var(--tone, var(--lgr-4));
+  border-radius: 13px;
+  background: var(--card);
+  /* Lifted harder than a panel: it has to separate from a dense grid of numbers
+     that is itself on white. */
+  box-shadow:
+    0 1px 2px rgba(16, 24, 40, 0.06),
+    0 12px 28px -8px rgba(16, 24, 40, 0.18);
+  pointer-events: auto;
+}
+.lgr-toast[data-tone="pos"] { --tone: var(--pos); }
+.lgr-toast[data-tone="neutral"] { --tone: #64748b; }
+.lgr-toast[data-tone="neg"] { --tone: var(--neg); }
+
+/* The icon gets a tinted disc, so the tone reads at a glance from across a desk
+   rather than as a 15px glyph the same weight as the text. */
+.lgr-toast-ico {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--tone) 12%, transparent);
+  color: var(--tone);
+}
+.lgr-toast-msg {
+  font-family: var(--ui);
+  font-size: 13.5px;
+  font-weight: 700;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+.lgr-toast-detail {
+  margin-top: 3px;
+  font-family: var(--ui);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.5;
+  color: var(--lgr-3);
+}
+/* Reachable, but not competing with the message. It appears on hover or focus —
+   a dismiss affordance on a thing that dismisses itself is a fallback, not a
+   primary control. */
+.lgr-toast-x {
+  display: grid;
+  place-items: center;
+  flex: none;
+  align-self: flex-start;
+  width: 22px;
+  height: 22px;
+  margin-inline-start: auto;
+  border-radius: 6px;
+  color: var(--lgr-4);
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity 0.14s ease, background 0.14s ease, color 0.14s ease;
+}
+.lgr-toast:hover .lgr-toast-x,
+.lgr-toast-x:focus-visible { opacity: 1; }
+.lgr-toast-x:hover { background: var(--bg-2); color: var(--ink); }
+
+/* The drain. One-shot and tied to the real timer — the only honest way to say
+   "this is leaving, and here is how soon". */
+.lgr-toast-drain {
+  position: absolute;
+  inset-block-end: 0;
+  inset-inline: 0;
+  height: 2.5px;
+  transform-origin: right center;
+  background: var(--tone);
+  opacity: 0.4;
+}
+@media (prefers-reduced-motion: reduce) {
+  .lgr-toast-drain { display: none; }
+}
+
 @keyframes lgr-spin { to { transform: rotate(360deg); } }
 .lgr-spin { animation: lgr-spin 0.7s linear infinite; }
 @media (prefers-reduced-motion: reduce) { .lgr-spin { animation-duration: 2.4s; } }
 
-/* The result line. Quiet by construction — it reports on four cells and then
-   leaves, so it never earns the weight of a heading beside it. */
-.lgr-anchor-note {
-  font-family: var(--ui);
-  font-size: 11.5px;
-  font-weight: 600;
-  color: var(--lgr-3);
-  white-space: nowrap;
-}
 
 /* "0.97 →" — the anchor the document stated, left of the one that replaced it.
    Lighter than a live note: it is history, and the number that matters is in the

@@ -51,7 +51,7 @@ What is actually verified today:
 |---|---|
 | prime = BOI rate + 1.5%, one national value | ✅ verified, and refreshed from BOI |
 | Leumi annual unlinked → מק"ם 12M | ✅ verified from Leumi's own page |
-| every other bank/track → the national bond curve | ⚠️ **a default, not a verified mapping** — carried as `verified: false`, and the advisor's tooltip says המקור טרם אומת מול פרסום הבנק |
+| every other bank/track → the BOI zero curve | ✅ authoritative SOURCE; the per-bank CONVENTION is still open — see below |
 
 The margin is never touched by any of this — it is on the row, from the document.
 
@@ -67,114 +67,79 @@ exact contractual source, for the exact product it governs.
 
 ---
 
-## Values currently bundled
+## Where the numbers come from — all of it, the Bank of Israel
 
-These ship as a dated snapshot in `lib/anchors/registry.ts` and are overridden by
-any fresher row in the `mortgage_anchors` table. Every one carries its own
-`effective_at`, and the UI shows it — a stale anchor that says it is stale is
-usable; one that pretends to be current is not.
+Every family is fetched from BOI directly by `lib/anchors/sources.ts`. Nothing is
+read off a republished table any more.
 
-### `prime` — ריבית פריים
+| family | series | cadence |
+|---|---|---|
+| `prime` | `boi.org.il/PublicApi/GetInterest` → rate + 1.5% | each rate decision |
+| `bond_linked` | `ZC_TSB_ZRD_{n}Y_MA` — real zero curve | monthly |
+| `bond_unlinked` | `ZC_TSB_ZND_{n}Y_MA` — nominal zero curve | monthly |
+| `makam` | the one-year point of the nominal curve | monthly |
 
-| value | effective | source | verified |
-|---|---|---|---|
-| 5.00% | 2026-07-06 | BOI rate 3.5% (decision of 06/07/2026) + 1.5% | ✅ |
+Maturities published: **1, 2, 3, 4, 5, 7, 10, 15, 20 years.**
 
-Verified because it is arithmetic on a published Bank of Israel decision, not a
-reading off a table. The +1.5% spread is fixed by convention across all banks.
+### The endpoint, because it cost an afternoon
 
-### `bond_linked` — עוגן אג"ח צמוד מדד, as of 11/07/2026
+`edge.boi.gov.il` runs **Fusion Edge Server**, which serves *structure* and *data*
+under different prefixes. Every documented SDMX REST data path under `/sdmx/v2/`
+returns 404 — that is not a broken service, it is the wrong prefix:
 
-| reset | value |
-|---|---|
-| 12 months | 1.65% |
-| 30 months | 1.61% |
-| 60 months | 1.73% |
-| 84 months | 1.74% |
-| 120 months | 1.86% |
-
-### `bond_unlinked` — עוגן אג"ח לא צמוד, as of 11/07/2026
-
-| reset | value |
-|---|---|
-| 24 months | 3.21% |
-| 60 months | 3.34% |
-| 84 months | 3.48% |
-
-### `makam` — עוגן מק"ם, as of 2026-07-09
-
-| reset | value |
-|---|---|
-| 12 months | 3.22% |
-
-Defined as the yield on 12-month מק"ם — a short-term bill issued by the Bank of
-Israel — which the lender then adds its margin to.
-
----
-
-## ⚠️ What is NOT verified
-
-**The bond and מק"ם figures above were read from a secondary source**
-(moti.org.il, a mortgage-advisory portal that republishes the tables), not from
-each bank's own מחירון or from the Bank of Israel directly. They are marked
-`verified: false` in the registry, and that flag reaches the tooltip.
-
-Specifically unverified:
-
-- **Per-bank divergence.** The underlying curve is national, but each bank states
-  its own reading date, averaging window and rounding in its price list. A small
-  difference from a given bank's published figure is possible. The registry uses
-  the national table for every bank that is mapped to a bond family, and says so.
-- **Whether every bank's "משתנה צמודה" really prices off the real bond curve** at
-  every reset period. Verified for מזרחי טפחות (whose table this is) and
-  documented for לאומי, which publishes its own equivalents.
-- **The reset periods that do not appear in the tables.** A row resetting every
-  36 months has no published column; the resolver returns `INSUFFICIENT_DATA`
-  rather than interpolating between the 30- and 60-month values. Interpolating
-  would be inventing a rate.
-
-### To promote a value to verified
-
-Replace the source with the bank's own published price list or the Bank of
-Israel series, record the URL and the reading date, and set `verified: true` —
-either in `registry.ts` or, better, as a row in `mortgage_anchors`.
-
-Authoritative sources, in the order they should be preferred:
-
-1. **Bank of Israel** — see below.
-2. **The bank's own published price list** (מחירון / טבלת עוגנים), per bank.
-3. A secondary aggregator — what is bundled now, and the reason nothing here is
-   marked verified except prime.
-
-### Bank of Israel endpoints, as tested on 2026-08-13
-
-**`GET https://boi.org.il/PublicApi/GetInterest`** — ✅ works, no auth, returns:
-
-```json
-{"currentInterest":3.5,"nextInterestDate":"2026-09-01T00:00:00Z","lastPublishedDate":"2026-07-12T08:59:20.943Z"}
+```
+structure  /FusionEdgeServer/sdmx/v2/structure/dataflow/BOI.STATISTICS/all/latest
+data       /FusionEdgeServer/ws/public/sdmxapi/rest/data/BOI.STATISTICS,ZCM,1.0
 ```
 
-This is what `app/api/simulator/anchors/refresh` reads. `lastPublishedDate` is
-the anchor's effective date — stamping the row with *today* instead would make
-an eight-week-old rate look like this morning's. `nextInterestDate` is the date
-the value stops being current, and is why prime's staleness allowance is measured
-in decisions rather than days.
+Ask for `application/vnd.sdmx.data+csv`. The same query as XML is 10MB; as CSV it
+is 4KB. `?lastNObservations=1` returns the current value of every series in the
+flow, so an entire curve costs one request.
 
-**SDMX at `edge.boi.gov.il/FusionEdgeServer/sdmx/v2/…`** — partially confirmed.
-The *structure* endpoint responds (`/structure/dataflow/BOI.STATISTICS/all/latest?format=sdmx-json`,
-43 dataflows). The two that matter:
+Dataflows that matter: **`BR`** (BOI interest rate), **`ZCM`** (zero yield curve
+and inflation expectations).
 
-| dataflow | contents |
-|---|---|
-| `BR` | BOI interest rate |
-| `ZCM` | Inflation expectations and **zero yield curve** — what the bond anchors derive from ("התשואה הנומינלית הנגזרת מאמידת עקום אפס") |
+### Reading between published points
 
-The *data* endpoint form was **not** established — every variant tried returned
-404 or timed out from this network. So nothing in the code reads it, and
-`bond_linked` / `bond_unlinked` / `makam` remain hand-maintained. Establishing
-that URL is the single change that would automate the remaining three families.
+The curve is sampled at whole years, and "משתנה כל שנתיים וחצי" is one of the
+commonest tracks sold. A 30-month reset is read linearly between the 2- and
+3-year points, and the row's source says so. This is reading a continuous curve
+at a maturity it is defined for — not the same act as inventing a bank rule.
 
----
+Past the ends of the curve there is nothing to read between, so a 30-year reset
+returns `INSUFFICIENT_DATA` rather than extrapolating.
+
+### Freshness is enforced, not hoped for
+
+`app/api/simulator/anchors` checks the cache against each family's cadence before
+answering. Past cadence, it refreshes from source and re-reads, then answers. A
+warm cache skips this entirely. The advisor is never told about our cache age —
+the button's promise is the current anchor, and reporting our own plumbing to the
+person who pressed it is not their problem to solve.
+
+`app/api/simulator/anchors/refresh` does the same on a schedule, so the gate is
+rarely the thing that pays for it.
+
+## ⚠️ What is still NOT verified
+
+The **source** is now authoritative for all four families. What remains open is
+**per-bank convention** — which reading of the curve, what averaging window, and
+whether a particular product uses a model-derived series instead:
+
+- **הפועלים** — an 18-month track documented off a different, model-derived
+  dataset than its 3/5/10-year tracks.
+- **הבינלאומי** — documents its anchor off BOI's model-based table used for the
+  forecast total rate, not the plain zero curve.
+- **בנק ירושלים** — per-track averaging, including a calendar average of the
+  5-year nominal curve on its non-linked contract.
+
+`BankRule.overrides` is the slot for these, keyed `"linked:60"` / `"unlinked:12"`.
+Only one is filled: Leumi's annual unlinked off מק"ם, from Leumi's own page.
+
+Because the BOI curve is a **monthly average** and the banks' own anchor tables
+are read on specific dates, a few basis points of difference from a given bank's
+published figure is expected. That is a convention gap, not an error, and closing
+it means entering that bank's convention above.
 
 ## Banks
 

@@ -7,8 +7,8 @@
 // published tables keyed by TRACK — linkage and reset period — and six banks
 // quoting "משתנה צמודה כל 5 שנים" are quoting the same curve. The bank matters
 // for two narrower things: which family a track prices off (Leumi's annual
-// unlinked is מק"ם where others use the nominal bond curve), and bank rules such
-// as Mizrahi's 0% floor.
+// unlinked is מק"ם where others use the nominal bond curve), and any convention
+// of its own — see BankRule.overrides.
 //
 // So: values are keyed by family × reset months, and the bank selects the family.
 // Keying primarily on the bank would have stored six copies of one number and
@@ -33,8 +33,12 @@ export const FAMILY_LABEL: Record<AnchorFamily, string> = {
  */
 export const FAMILY_FRESHNESS: Record<AnchorFamily, Freshness> = {
   prime: { cadence: "בכל החלטת ריבית של בנק ישראל", maxAgeDays: 75 },
-  bond_linked: { cadence: "פעמיים בחודש", maxAgeDays: 25 },
-  bond_unlinked: { cadence: "פעמיים בחודש", maxAgeDays: 25 },
+  // The zero curve is published monthly and stamped with the month, so a value
+  // dated the 1st is current for that whole month and the one after it is not
+  // late until well into the next. 45 days is one cycle plus the lag between a
+  // month ending and its figure appearing.
+  bond_linked: { cadence: "אחת לחודש", maxAgeDays: 45 },
+  bond_unlinked: { cadence: "אחת לחודש", maxAgeDays: 45 },
   makam: { cadence: "אחת לחודש", maxAgeDays: 45 },
 };
 
@@ -83,32 +87,42 @@ export const BANK_RULES: Record<string, BankRule> = {
  * age is known. An anchor that says it is from July is useful; one that implies
  * it is from this morning is not.
  *
- * `verified` is false for everything read off a secondary aggregator rather than
- * off the bank's own price list or the Bank of Israel. That flag reaches the
- * tooltip — see docs/mortgage-anchor-sources.md.
+ * Every entry is Bank of Israel data, so all of it is `verified` — this is the
+ * same curve lib/anchors/sources.ts fetches, frozen at the moment of the last
+ * deploy. It exists so the button still answers correctly if the table has not
+ * been created or the database is unreachable, not as a lesser substitute.
  */
 export const SNAPSHOT: AnchorRow[] = [
   {
     family: "prime",
     resetMonths: null,
     value: 5.0,
-    effectiveAt: "2026-07-06",
-    source: 'ריבית בנק ישראל 3.5% (החלטה מ־06/07/2026) + 1.5%',
+    effectiveAt: "2026-07-12",
+    source: "ריבית בנק ישראל 3.5% + 1.5%",
     verified: true,
   },
 
-  /* עוגן אג"ח צמוד מדד (ריאלי) — 11/07/2026 */
-  { family: "bond_linked", resetMonths: 12, value: 1.65, effectiveAt: "2026-07-11", source: 'טבלת עוגן אג"ח צמוד', verified: false },
-  { family: "bond_linked", resetMonths: 30, value: 1.61, effectiveAt: "2026-07-11", source: 'טבלת עוגן אג"ח צמוד', verified: false },
-  { family: "bond_linked", resetMonths: 60, value: 1.73, effectiveAt: "2026-07-11", source: 'טבלת עוגן אג"ח צמוד', verified: false },
-  { family: "bond_linked", resetMonths: 84, value: 1.74, effectiveAt: "2026-07-11", source: 'טבלת עוגן אג"ח צמוד', verified: false },
-  { family: "bond_linked", resetMonths: 120, value: 1.86, effectiveAt: "2026-07-11", source: 'טבלת עוגן אג"ח צמוד', verified: false },
+  /* עקום אפס ריאלי (צמוד מדד) — בנק ישראל, 07/2026 */
+  { family: "bond_linked", resetMonths: 12, value: 1.688, effectiveAt: "2026-07-01", source: "בנק ישראל — עקום אפס ריאלי", verified: true },
+  { family: "bond_linked", resetMonths: 24, value: 1.626, effectiveAt: "2026-07-01", source: "בנק ישראל — עקום אפס ריאלי", verified: true },
+  { family: "bond_linked", resetMonths: 36, value: 1.626, effectiveAt: "2026-07-01", source: "בנק ישראל — עקום אפס ריאלי", verified: true },
+  { family: "bond_linked", resetMonths: 48, value: 1.657, effectiveAt: "2026-07-01", source: "בנק ישראל — עקום אפס ריאלי", verified: true },
+  { family: "bond_linked", resetMonths: 60, value: 1.702, effectiveAt: "2026-07-01", source: "בנק ישראל — עקום אפס ריאלי", verified: true },
+  { family: "bond_linked", resetMonths: 84, value: 1.811, effectiveAt: "2026-07-01", source: "בנק ישראל — עקום אפס ריאלי", verified: true },
+  { family: "bond_linked", resetMonths: 120, value: 1.992, effectiveAt: "2026-07-01", source: "בנק ישראל — עקום אפס ריאלי", verified: true },
+  { family: "bond_linked", resetMonths: 180, value: 2.16, effectiveAt: "2026-07-01", source: "בנק ישראל — עקום אפס ריאלי", verified: true },
+  { family: "bond_linked", resetMonths: 240, value: 2.249, effectiveAt: "2026-07-01", source: "בנק ישראל — עקום אפס ריאלי", verified: true },
 
-  /* עוגן אג"ח לא צמוד (נומינלי) — 11/07/2026 */
-  { family: "bond_unlinked", resetMonths: 24, value: 3.21, effectiveAt: "2026-07-11", source: 'טבלת עוגן אג"ח לא צמוד', verified: false },
-  { family: "bond_unlinked", resetMonths: 60, value: 3.34, effectiveAt: "2026-07-11", source: 'טבלת עוגן אג"ח לא צמוד', verified: false },
-  { family: "bond_unlinked", resetMonths: 84, value: 3.48, effectiveAt: "2026-07-11", source: 'טבלת עוגן אג"ח לא צמוד', verified: false },
+  /* עקום אפס נומינלי (לא צמוד) — בנק ישראל, 07/2026 */
+  { family: "bond_unlinked", resetMonths: 12, value: 3.243, effectiveAt: "2026-07-01", source: "בנק ישראל — עקום אפס נומינלי", verified: true },
+  { family: "bond_unlinked", resetMonths: 24, value: 3.384, effectiveAt: "2026-07-01", source: "בנק ישראל — עקום אפס נומינלי", verified: true },
+  { family: "bond_unlinked", resetMonths: 36, value: 3.455, effectiveAt: "2026-07-01", source: "בנק ישראל — עקום אפס נומינלי", verified: true },
+  { family: "bond_unlinked", resetMonths: 48, value: 3.492, effectiveAt: "2026-07-01", source: "בנק ישראל — עקום אפס נומינלי", verified: true },
+  { family: "bond_unlinked", resetMonths: 60, value: 3.534, effectiveAt: "2026-07-01", source: "בנק ישראל — עקום אפס נומינלי", verified: true },
+  { family: "bond_unlinked", resetMonths: 84, value: 3.662, effectiveAt: "2026-07-01", source: "בנק ישראל — עקום אפס נומינלי", verified: true },
+  { family: "bond_unlinked", resetMonths: 120, value: 3.882, effectiveAt: "2026-07-01", source: "בנק ישראל — עקום אפס נומינלי", verified: true },
+  { family: "bond_unlinked", resetMonths: 180, value: 4.123, effectiveAt: "2026-07-01", source: "בנק ישראל — עקום אפס נומינלי", verified: true },
 
-  /* עוגן מק"ם — 09/07/2026 */
-  { family: "makam", resetMonths: 12, value: 3.22, effectiveAt: "2026-07-09", source: 'תשואת מק"ם ל־12 חודשים', verified: false },
+  /* מק"ם — הנקודה לשנה על העקום הנומינלי */
+  { family: "makam", resetMonths: 12, value: 3.243, effectiveAt: "2026-07-01", source: 'בנק ישראל — תשואת מק"ם ל־12 חודשים', verified: true },
 ];
