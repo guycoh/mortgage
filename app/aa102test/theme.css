@@ -177,6 +177,32 @@
   background: var(--bg);
 }
 
+/* THE GUTTER IS RESERVED. The three tools are three different heights, so a
+   view change is also a scrollbar change — and a scrollbar that comes and
+   goes re-seats the centred column sideways on every switch, which reads as
+   the whole UI lurching. Reserving the gutter makes the column's position a
+   constant. Scoped by :has because this stylesheet must not legislate for
+   other routes. */
+html:has(.lgr-root) {
+  scrollbar-gutter: stable;
+}
+
+/* THE STAGE — the floor under a view change. mode="wait" holds a gap between
+   the old view's exit and the new one's entry; without a floor the document
+   collapses to the masthead for those frames, the scroll position clamps, and
+   the page appears to jump. The floor keeps the document at roughly viewport
+   height through the swap — the scroll-to-top that happens inside the gap
+   lands on a surface that never moved. */
+.lgr-stage {
+  min-height: calc(100dvh - 240px);
+}
+
+/* The stand-in for a tool whose chunk is still arriving: sized like the
+   instrument, so the content's arrival swaps pixels rather than geometry. */
+.lgr-tool-skel {
+  min-height: calc(100dvh - 280px);
+}
+
 /* ------------------------------------------------------------ typography */
 
 .lgr-fig {
@@ -399,50 +425,50 @@
 .lgr-picker-caret { color: var(--lgr-4); flex: none; transition: transform 200ms var(--ease); }
 .lgr-picker[data-open="true"] .lgr-picker-caret { transform: rotate(180deg); color: var(--primary); }
 
-/* ----------------------------------------------------------- the tool switch */
-/* TWO INSTRUMENTS, ONE CLIENT, ONE SURFACE.
-   סימולטור תמהילים and משכנתא הפוכה are different tools on the same file, so
-   they are not two pages with a link between them: they are two positions of
-   one switch, and both are on screen the whole time. You can always see where
-   you are and what else you could be looking at.
+/* ------------------------------------------------------------ the app shell */
+/* THREE INSTRUMENTS, ONE CLIENT, ONE SURFACE.
+   The tools are not pages with links between them: they are positions of one
+   switch, all on screen the whole time. You can always see where you are and
+   what else you could be looking at.
 
-   The fill is a SINGLE OBJECT THAT MOVES (Motion layoutId, see ToolSwitch) —
-   one lighting up as the other goes out would read as two buttons that happen
-   to be adjacent. A control that slides has a position, which is the whole
-   point of a switch.
+   THE SHELL is application chrome, not a card: a full-bleed white bar fastened
+   to the top of the document and ruled off the canvas by a single hairline —
+   no radius, no shadow, no floating. It scrolls away with the page, because
+   rule 5 holds even for the chrome: this is a document, and a document's
+   masthead goes with it. What separates it from the content is that it is the
+   only white surface that bleeds to the viewport edge while everything below
+   lives inside the 1300px column — which its own contents align to.
 
-   Built to the lead picker's 40px, because they are the same kind of object:
-   things that name where you are rather than perform a step. Violet, because
-   rule 4 — the identity hue is what says "mortgage", and both tools price one. */
-/* THE BAND. Application chrome, not a control inside the page: white, ruled
-   off the canvas, tabs at the start and whoever the board belongs to at the
-   far end. The page's own title lives underneath it, which is the order a
-   product with more than one tool reads in — where am I, then what is this.
-
-   The state is carried by TWO objects that MOVE rather than blink: a tinted
-   field and the rule under it, both Motion layoutId on one spring (see
-   ToolSwitch). The rule is what makes a tab read as the current PAGE rather
-   than as a pressed button. */
-.lgr-nav {
-  display: flex;
-  align-items: stretch;
-  flex-wrap: wrap;
-  overflow: hidden;
-  border: 1px solid var(--line-2);
-  border-radius: var(--r);
+   The row reads brand → tools → client: the two constants bracketing the
+   thing you switch. */
+.lgr-shell {
   background: #fff;
-  box-shadow: var(--shadow);
+  border-bottom: 1px solid var(--line-2);
 }
-/* THE BRAND, at the head of the bar. Its own rule after it, so the emblem and
-   the tabs read as two things rather than as a first tab that happens to be a
-   picture. */
+/* A grid, not a flex row, because the tools are CENTERED ON THE BAR — dead
+   centre of the viewport column, not "whatever is left between the brand and
+   the client". 1fr auto 1fr keeps them there no matter how long the client's
+   name runs on the other side. */
+.lgr-nav {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 14px;
+  max-width: 1300px;
+  margin-inline: auto;
+  min-height: 66px;
+  padding: 10px 16px;
+}
+@media (min-width: 768px) {
+  .lgr-nav { padding-inline: 24px; }
+}
+/* THE BRAND, at the head of the bar. No fence after it — on a flat shell the
+   zones are spaced, not partitioned. */
 .lgr-brand {
   display: flex;
   align-items: center;
   gap: 9px;
-  flex: none;
-  padding-inline: 15px 18px;
-  border-inline-end: 1px solid var(--line);
+  justify-self: start;
 }
 .lgr-brand-name {
   font-family: var(--display);
@@ -455,55 +481,80 @@
 /* No shadow. The mark sits on the bar itself now rather than on a tile, and a
    drop shadow under a glyph on white is a smudge, not depth. */
 
-.lgr-nav-tabs { display: flex; align-items: stretch; min-width: 0; }
-/* Fenced off exactly like the brand at the other end, so the bar reads as
-   three zones: the product, the tools, the client. Two constants bracketing
-   the thing you switch. */
+/* THE TOOLS — three flat, full-height tabs standing directly on the bar: no
+   track, no fills, no container. Selection is stated in ink and a rule: the
+   current tool's label and mark go violet, and a thin underline sits flush on
+   the bar's own bottom hairline — the app-header convention, one object that
+   travels between tabs (Motion layoutId, see ToolSwitch). The tools you are
+   not on are neutral ink with dimmed marks. Between neighbours, a short 1px
+   hairline — grouping without a box. */
+.lgr-nav-tabs {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+  /* Span the shell's full height, through the nav's block padding, so every
+     tab is a bar-height hit area and the rule lands ON the bottom edge. */
+  align-self: stretch;
+  margin-block: -10px;
+}
 .lgr-nav-end {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-inline-start: auto;
-  padding: 7px 12px;
-  border-inline-start: 1px solid var(--line);
+  justify-self: end;
 }
 
 .lgr-nav-tab {
   position: relative;
   display: inline-flex;
   align-items: center;
-  height: 54px;
-  padding: 0 20px;
+  justify-content: center;
+  padding: 0 22px;
   border: 0;
   background: transparent;
   font-family: var(--ui);
   font-size: 14px;
+  /* One weight in both states: a bolder active label would resize itself and
+     nudge its neighbours mid-travel. The violet and the rule carry the
+     selection; the metal does not move. */
   font-weight: 600;
   letter-spacing: -0.01em;
-  color: var(--lgr-2);
+  color: var(--lgr-3);
   white-space: nowrap;
   cursor: pointer;
-  /* The ink crosses over while the fill is still travelling, which is what
+  /* The ink crosses over while the rule is still travelling, which is what
      makes the two labels trade places rather than blink. */
-  transition: color 180ms var(--ease), background 180ms var(--ease);
+  transition: color 180ms var(--ease);
 }
-/* One hairline between neighbours, never before the first. It sits on the
-   border box, so the tint — inset to the padding box — never covers it. */
-.lgr-nav-tab + .lgr-nav-tab { border-inline-start: 1px solid var(--line); }
-.lgr-nav-tab:hover:not([data-on="true"]) { color: var(--ink); background: var(--card-2); }
-.lgr-nav-tab[data-on="true"] { color: var(--primary-deep); font-weight: 700; }
-.lgr-nav-tab:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--focus-ring-strong); }
+/* The separator: a short hairline hung between neighbours, centred on the
+   bar's midline — never full height, so it groups the items without ever
+   drawing a container around them. */
+.lgr-nav-tab + .lgr-nav-tab::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: 0;
+  top: 50%;
+  translate: 0 -50%;
+  width: 1px;
+  height: 16px;
+  background: var(--line-2);
+}
+.lgr-nav-tab:hover:not([data-on="true"]) { color: var(--ink); }
+.lgr-nav-tab[data-on="true"] { color: var(--primary-deep); }
+.lgr-nav-tab:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; border-radius: 8px; }
 
-.lgr-nav-tint { position: absolute; inset: 0; z-index: 0; background: var(--primary-tint); }
+/* THE RULE — 2px of the identity violet, flush on the shell's bottom
+   hairline, inset to sit under the tab's content rather than wall-to-wall.
+   It is what makes a tab read as the current PAGE rather than as a pressed
+   button. */
 .lgr-nav-rule {
   position: absolute;
-  inset-inline: 0;
+  inset-inline: 14px;
   bottom: 0;
   z-index: 1;
-  height: 3px;
+  height: 2px;
+  border-radius: 2px 2px 0 0;
   background: var(--primary);
-  border-start-start-radius: 3px;
-  border-start-end-radius: 3px;
 }
 .lgr-nav-in { position: relative; z-index: 2; display: inline-flex; align-items: center; gap: 8px; }
 /* The mark carries its tab's own state, so it dims with the label rather than
@@ -536,12 +587,20 @@
   border: 0;
 }
 
+/* When brand + tools + client stop fitting one row, the tool row takes a row
+   of its own under the two constants — still centered, still one object. The
+   full-height stretch is undone here: on its own row the rule underlines the
+   tab itself, and the row keeps a stated height for the hit area. */
+@media (max-width: 940px) {
+  .lgr-nav { grid-template-columns: auto auto; justify-content: space-between; row-gap: 0; }
+  .lgr-nav-tabs { grid-column: 1 / -1; grid-row: 2; justify-self: center; align-self: auto; margin-block: 0; }
+  .lgr-nav-tab { height: 46px; }
+}
 @media (max-width: 620px) {
-  .lgr-brand { padding-inline: 11px 12px; gap: 9px; }
   .lgr-brand-name { font-size: 15px; }
-  .lgr-nav-tab { height: 46px; padding: 0 13px; font-size: 13px; }
+  .lgr-nav-tab { height: 42px; padding: 0 14px; font-size: 13px; }
   .lgr-nav-in { gap: 6px; }
-  .lgr-nav-end { width: 100%; border-top: 1px solid var(--line); border-inline-start: 0; padding: 8px 10px; }
+  .lgr-picker-name { max-width: 140px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .lgr-nav-tab, .lgr-nav-ico { transition: none; }

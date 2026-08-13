@@ -90,7 +90,12 @@ import "./theme.css";
  * travelled the chunk is already in.
  */
 const toolSkeleton = () => (
-  <div className="lgr-card overflow-hidden">
+  // Sized like the instrument it stands in for, not like a placeholder: a
+  // skeleton a third of the view's height means the page grows by the
+  // difference the moment the chunk lands, and everything below lurches. The
+  // stand-in holds the space so the content's arrival changes pixels, not
+  // geometry.
+  <div className="lgr-card lgr-tool-skel overflow-hidden">
     <div className="lgr-head">
       <div className="lgr-skel h-4 w-40" />
     </div>
@@ -362,9 +367,18 @@ export default function Simulator({
     } catch {
       /* the tool still switches — only the address bar missed it */
     }
-    // The tools are different heights and the eye should land on the top of the
-    // new one, not halfway down it.
-    if (window.scrollY > 0) window.scrollTo({ top: 0, behavior: "smooth" });
+    // The pointer usually preloaded the chunk on its way in, but a touch (or a
+    // keyboard arrow) clicks without ever hovering — so the import is kicked
+    // here too. Idempotent: if the hover already won, this resolves instantly.
+    if (next === "reverse") void import("./reverse/ReverseMortgage");
+    else if (next === "ability") void import("./ability/AbilityCalculator");
+    const profile = profileUrlFor(next);
+    if (profile) warmProfile(profile);
+    // NO scroll here. Scrolling smoothly while the old view is still fading
+    // and the new one is growing is three movements at once, and the height
+    // collapse mid-swap clamps the smooth scroll into a visible jump. The
+    // scroll-to-top happens in the AnimatePresence gap instead — the one
+    // moment nothing is on stage to see it happen.
   };
 
   useEffect(() => {
@@ -772,80 +786,90 @@ export default function Simulator({
   /* ----------------------------------------------------------------- ui */
   return (
     <div className="lgr-root" dir="rtl">
+      {/* --------------------------------------- 1. the shell, then the title */}
+      {/* The chrome belongs to the application, not to the sheet: a full-bleed
+          bar fastened to the top of the document, ruled off the canvas by a
+          hairline. It scrolls away with the page — rule 5 holds, nothing on
+          this surface sticks. Inside, the row still reads brand → tools →
+          client — the two constants bracketing the thing you switch — aligned
+          to the same 1300px column as the page. */}
+      <motion.header {...enter(0)} className="lgr-shell">
+        <nav className="lgr-nav" aria-label="ניווט ראשי">
+          {/* The mark, at the start of the bar. It is the only thing on this
+              page that is allowed to be shiny — an app's own emblem is the
+              one place a gloss is a signature rather than decoration. */}
+          <div className="lgr-brand">
+            <Logo size={34} />
+            <span className="lgr-brand-name">מורגי</span>
+          </div>
+
+          <ToolSwitch
+            value={tool}
+            onChange={pickTool}
+            onPreload={(t) => {
+              // The chunk AND the data: by the time the fill has travelled,
+              // the view exists and its prefill is already in hand.
+              if (t === "reverse") void import("./reverse/ReverseMortgage");
+              else if (t === "ability") void import("./ability/AbilityCalculator");
+              const url = profileUrlFor(t);
+              if (url) warmProfile(url);
+            }}
+            // The unsaved-dot: crossing to another tool must not mean
+            // forgetting this one has work uncommitted. Only the mix can be
+            // dirty — the other two compute and never save.
+            marks={{ mix: dirty }}
+          />
+
+          <div className="lgr-nav-end">
+            {locked ? (
+              // Same picker, no way out of it: the client is stated, not chosen.
+              <span className="lgr-picker" data-static="" title="הליד שאליו משויך התמהיל">
+                <span className="lgr-avatar">{initialOf(lead?.name)}</span>
+                <span className="lgr-picker-name">{lead?.name || "ללא שם"}</span>
+                {lead && <span className="lgr-picker-id">{lead.id}</span>}
+              </span>
+            ) : (
+              <LeadPicker
+                lead={lead}
+                onPick={(l) => {
+                  if (dirty && !window.confirm("יש שינויים שלא נשמרו. לעבור לליד אחר ולאבד אותם?")) return;
+                  router.push(`/aa102test/${l.id}`);
+                }}
+                onClear={() => {
+                  if (dirty && !window.confirm("יש שינויים שלא נשמרו. לצאת מהליד ולאבד אותם?")) return;
+                  router.push("/aa102test");
+                }}
+              />
+            )}
+          </div>
+        </nav>
+      </motion.header>
+
       <div className="mx-auto w-full max-w-[1300px] px-4 py-5 md:px-6 md:py-7">
-        {/* --------------------------------------- 1. the chrome, then the title */}
-        {/* A band of tabs above the page rather than a control inside it: which
-            instrument you are on is a property of the app, not of the sheet.
-            The client rides at the far end of the same bar, because that is the
-            other thing that is true of every view underneath it. */}
-        <motion.header {...enter(0)} className="mb-5">
-          <nav className="lgr-nav">
-            {/* The mark, at the start of the bar. It is the only thing on this
-                page that is allowed to be shiny — an app's own emblem is the
-                one place a gloss is a signature rather than decoration. */}
-            <div className="lgr-brand">
-              <Logo size={34} />
-              <span className="lgr-brand-name">מורגי</span>
-            </div>
+        {/* The title is the tool, and it changes with the tab. Keyed, but
+            deliberately NOT inside an AnimatePresence: mode="wait" would hold
+            the old word for its exit and only then start the new one, leaving
+            the row with no title at all for a third of a second. Replacing
+            the element outright keeps the geometry honest from the first
+            frame; only the ink fades. */}
+        <motion.h1
+          key={tool}
+          className="lgr-display mb-5 text-[30px]"
+          initial={{ opacity: 0, y: 7 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.18, ease: [0.2, 0, 0, 1] }}
+        >
+          {tool === "mix" ? "סימולטור תמהילים" : tool === "reverse" ? "משכנתא הפוכה" : "משכנתא חדשה"}
+        </motion.h1>
 
-            <ToolSwitch
-              value={tool}
-              onChange={pickTool}
-              onPreload={(t) => {
-                // The chunk AND the data: by the time the fill has travelled,
-                // the view exists and its prefill is already in hand.
-                if (t === "reverse") void import("./reverse/ReverseMortgage");
-                else if (t === "ability") void import("./ability/AbilityCalculator");
-                const url = profileUrlFor(t);
-                if (url) warmProfile(url);
-              }}
-              // The unsaved-dot: crossing to another tool must not mean
-              // forgetting this one has work uncommitted. Only the mix can be
-              // dirty — the other two compute and never save.
-              marks={{ mix: dirty }}
-            />
-
-            <div className="lgr-nav-end">
-          {locked ? (
-            // Same picker, no way out of it: the client is stated, not chosen.
-            <span className="lgr-picker" data-static="" title="הליד שאליו משויך התמהיל">
-              <span className="lgr-avatar">{initialOf(lead?.name)}</span>
-              <span className="lgr-picker-name">{lead?.name || "ללא שם"}</span>
-              {lead && <span className="lgr-picker-id">{lead.id}</span>}
-            </span>
-          ) : (
-            <LeadPicker
-              lead={lead}
-              onPick={(l) => {
-                if (dirty && !window.confirm("יש שינויים שלא נשמרו. לעבור לליד אחר ולאבד אותם?")) return;
-                router.push(`/aa102test/${l.id}`);
-              }}
-              onClear={() => {
-                if (dirty && !window.confirm("יש שינויים שלא נשמרו. לצאת מהליד ולאבד אותם?")) return;
-                router.push("/aa102test");
-              }}
-            />
-          )}
-            </div>
-          </nav>
-
-          {/* The title is the tool, and it changes with the tab. Keyed, but
-              deliberately NOT inside an AnimatePresence: mode="wait" would hold
-              the old word for its exit and only then start the new one, leaving
-              the row with no title at all for a third of a second. Replacing
-              the element outright keeps the geometry honest from the first
-              frame; only the ink fades. */}
-          <motion.h1
-            key={tool}
-            className="lgr-display mt-5 text-[30px]"
-            initial={{ opacity: 0, y: 7 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.18, ease: [0.2, 0, 0, 1] }}
-          >
-            {tool === "mix" ? "סימולטור תמהילים" : tool === "reverse" ? "משכנתא הפוכה" : "משכנתא חדשה"}
-          </motion.h1>
-        </motion.header>
-
+        {/* THE STAGE. A floor under the view change: while mode="wait" holds
+            the gap between an exit and an entry, the page would otherwise
+            collapse to the masthead — the scrollbar vanishes, the centred
+            column re-seats itself, and the whole UI appears to lurch. The
+            stage keeps the document's height through the swap, and the
+            scroll-to-top happens inside the gap, when there is nothing on
+            stage to see it. */}
+        <div className="lgr-stage">
         <AnimatePresence mode="wait" initial={false}>
         {tool === "reverse" ? (
           <motion.div key="reverse" {...viewIn(dir)}>
@@ -1247,6 +1271,7 @@ export default function Simulator({
         </motion.div>
         )}
         </AnimatePresence>
+        </div>
       </div>
 
       {/* ------------------------------------------------------------ toast */}

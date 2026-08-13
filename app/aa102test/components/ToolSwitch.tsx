@@ -6,11 +6,11 @@
 // of tabs above the title, the way a product with more than one tool announces
 // them. Both are always on screen and the filled one is where you are.
 //
-// The state is carried by TWO objects that MOVE rather than blink — a tinted
-// field and the rule under it, both Motion layoutId, both on the same spring.
-// One tab lighting up as another goes out reads as two buttons that happen to
-// be adjacent; a fill that travels reads as one switch with a position, and it
-// is what ties the tab to the surface changing underneath it.
+// The state is carried by ONE object that MOVES rather than blinks — a thin
+// violet underline on a Motion layoutId spring, sliding along the bar's
+// bottom edge. One tab lighting up as another goes out reads as two buttons
+// that happen to be adjacent; a rule that travels reads as one switch with a
+// position, and it is what ties the tab to the surface changing underneath it.
 //
 // A tab can also CARRY STATE for a view you are not looking at: the `marks`
 // prop puts an editor's unsaved-dot on a tab, so crossing to the other tool
@@ -111,10 +111,11 @@ export default function ToolSwitch({
             transition={snap}
           >
             {on && (
-              <>
-                <motion.span layoutId="lgr-nav-tint" className="lgr-nav-tint" transition={TRAVEL} />
-                <motion.span layoutId="lgr-nav-rule" className="lgr-nav-rule" transition={TRAVEL} />
-              </>
+              /* THE RULE — one thin violet underline that travels between
+                 positions on a spring, flush on the bar's bottom hairline.
+                 The identity colour in the ink plus the moving rule is the
+                 whole statement of selection — no fills, no card. */
+              <motion.span layoutId="lgr-nav-rule" className="lgr-nav-rule" transition={TRAVEL} />
             )}
             <span className="lgr-nav-in">
               {/* One step forward as the tab becomes current — keyed on `on`, so
