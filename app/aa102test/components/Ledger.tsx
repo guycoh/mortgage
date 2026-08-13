@@ -338,8 +338,9 @@ export default function Ledger({
       parts.push(
         `${loan.anchor_stale ? "העוגן האחרון שפורסם" : "עוגן עדכני"} · ${loan.anchor_source ?? "מקור"} · נכון ל־${d}/${m}/${y}`
       );
-      // The cadence is what makes the date mean something: "נכון ל־11/07" says
-      // little until you know the table republishes twice a month.
+      // The cadence is what makes the date mean something: "נכון ל־01/07" says
+      // little until you know the curve republishes monthly, and that a figure
+      // dated the 1st is the current one for weeks after.
       if (loan.anchor_cadence) parts.push(`מתעדכן ${loan.anchor_cadence}`);
       if (loan.anchor_verified === false) parts.push("המקור טרם אומת מול פרסום הבנק");
     }
