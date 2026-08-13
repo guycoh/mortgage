@@ -201,11 +201,20 @@ export function matchEnum(lines: Line[], phrases: readonly string[]): string {
  * value lives in the column to the left of the field's label (which itself sits
  * just left of the code). We isolate that column across nearby lines so other
  * fields don't interleave, then look for a known phrase.
+ *
+ * `blockFallback` decides what happens when the cell yields nothing. Searching
+ * the whole transaction block is a good last resort for a field that is always
+ * printed, and a liability for one that is often blank: the block contains the
+ * words "סטטוס העסקה" and five interest tracks, so a blank מטרת האשראי cell
+ * matched "עסק" inside "העסקה" and a blank סוג התשלום matched "ריבית" on a rate
+ * row. That invented a value for 29 of 120 transactions in one report and 13 of
+ * 24 in another. Those two fields pass false and stay honestly empty.
  */
 export function enumByCell(
   lines: Line[],
   code: string,
-  phrases: readonly string[]
+  phrases: readonly string[],
+  blockFallback = true
 ): string {
   let codeLine: Line | null = null;
   let me: CodeHit | null = null;
@@ -220,7 +229,7 @@ export function enumByCell(
       break;
     }
   }
-  if (!codeLine || !me) return matchEnum(lines, phrases);
+  if (!codeLine || !me) return blockFallback ? matchEnum(lines, phrases) : "";
 
   // Left boundary = the nearest code starting to the left (its xStart, so the
   // adjacent value column is included).
@@ -252,7 +261,7 @@ export function enumByCell(
   valToks.sort((a, b) => b.y - a.y || b.x - a.x);
   const hay = normEnum(valToks.map((t) => t.str).join(""));
   for (const p of phrases) if (hay.includes(normEnum(p))) return p;
-  return matchEnum(lines, phrases);
+  return blockFallback ? matchEnum(lines, phrases) : "";
 }
 
 /** Transaction type (201-002) sits in a narrow column; detect it directly. */

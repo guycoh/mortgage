@@ -35,6 +35,17 @@ export interface ExtractedLoan {
   category: LiabilityCategory;
   /** Human mortgage-track label derived from the interest tracks (e.g. "פריים"). */
   trackLabel: string;
+  /**
+   * מטרת האשראי (201-017), verbatim — "" when the report left the cell blank.
+   *
+   * Far coarser than a bank statement's מטרת הלוואה: five values, one of which
+   * ("נדל"ן ושיפוצים") covers both a purchase and a renovation, and no value at
+   * all for כל מטרה. See bank-parser/purpose.ts for what can honestly be made
+   * of it.
+   */
+  purpose: string;
+  /** הלוואת משכנתה מסובסדת ע"י משרד השיכון (remark 201-060) — a הלוואת זכאות. */
+  eligibility: boolean;
   /** תדירות שינוי — derived, because this report has no field for it. */
   changeFrequency: string;
   /** עוגן (201-034) of the dominant track, e.g. "ריבית פריים" ("" when blank). */
@@ -148,6 +159,8 @@ function solveMonths(P: number, r: number, pmt: number): number | null {
 // ---------------------------------------------------------------------------
 
 const MORTGAGE_RE = /משכנת|לדיור/;
+/** Remark 201-060 — "הלוואת משכנתה מסובסדת ע"י משרד השיכון". */
+const SUBSIDISED_RE = /מסובסדת|משרד השיכון/;
 // Only these transaction types feed the consolidation calculator: real loans
 // and mortgages. Revolving facilities (מסגרת אשראי), overdrafts (עו"ש),
 // guarantees (ערבות) and discounting (ניכיון) are intentionally excluded.
@@ -348,6 +361,11 @@ function deriveLoan(t: Transaction, asOf: Date): ExtractedLoan {
     isLoanOrMortgage: isLoanOrMortgage(t),
     category: liabilityCategory(t),
     trackLabel: trackLabel(t.interestTracks),
+    purpose: t.fields["201-017"] ?? "",
+    // The report has no field for זכאות; it says so in a coded remark instead,
+    // and that remark is the only place either document type states it outright
+    // besides Mizrahi's per-part סוג ההלוואה.
+    eligibility: (t.remarks ?? []).some((r) => SUBSIDISED_RE.test(r)),
     changeFrequency: changeFrequency(t.interestTracks),
     anchorName: anchor.name,
     anchorMargin: anchor.margin,

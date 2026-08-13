@@ -35,6 +35,10 @@ export type ImportedLoan = Loan & {
    * about the same thing and both are worth keeping.
    */
   source_anchor?: string;
+  /** מטרת ההלוואה as the source document worded it. */
+  source_purpose?: string;
+  /** The document says this is state money — a הלוואת זכאות. */
+  source_eligibility?: boolean;
 };
 
 /* ------------------------------------------------------------------ paths */

@@ -23,6 +23,7 @@ import {
   TRACK_LABEL,
   type StatementAnalysis,
 } from "@/lib/bank-parser/analysis";
+import { PURPOSE_LABEL } from "@/lib/bank-parser/purpose";
 
 /** Plain words for what a track actually exposes the client to. */
 const TRACK_PLAIN: Record<string, string> = {
@@ -54,6 +55,16 @@ export default function StatementSummaryModal({
 
   const a = analysis;
   const st = a.statement;
+
+  // מטרת ההלוואה, normalised. Several loans in one file usually share it; when
+  // they genuinely differ the header says so rather than picking the first.
+  const eligibility = st.loans.some((l) => l.funding === "eligibility");
+  const purpose = st.loans
+    .filter((l) => l.purposeKind !== "unknown")
+    .map((l) => PURPOSE_LABEL[l.purposeKind])
+    .filter((label, i, all) => all.indexOf(label) === i)
+    .concat(eligibility ? ["זכאות"] : [])
+    .join(" · ");
 
   // One row per track, biggest first — the client's mortgage as they'd describe
   // it, not as the bank booked it. Every verdict on the row (years, late, dear,
@@ -95,8 +106,16 @@ export default function StatementSummaryModal({
               {st.client.name || "סיכום המשכנתא"}
             </h2>
             <div className="mt-0.5 text-[12px]" style={{ color: "var(--lgr-4)" }}>
-              {st.bankLabel}
-              {st.statementDate ? ` · נכון ל-${st.statementDate}` : ""}
+              {/* Purpose in the client's own terms — "רכישת דירה", not the
+                  lender's "לווה פרטי-מגורים". Omitted when unstated rather than
+                  printed as a gap; this page is read by the borrower. */}
+              {[
+                st.bankLabel,
+                purpose,
+                st.statementDate ? `נכון ל-${st.statementDate}` : "",
+              ]
+                .filter(Boolean)
+                .join(" · ")}
             </div>
           </div>
           <div className="lgr-noprint ms-auto flex items-center gap-1.5">

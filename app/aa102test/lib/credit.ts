@@ -56,6 +56,42 @@ export type ImportedLoan = Loan & {
    * about the same thing and both are worth keeping.
    */
   source_anchor?: string;
+  /**
+   * מטרת ההלוואה, in the words of whichever document supplied the row.
+   *
+   * A bank payoff letter states it outright and specifically ("רכישת דירה יד
+   * שניה", "כל מטרה", "הרחבה"). The credit report only has field 201-017, whose
+   * five values merge a purchase with a renovation, so a row imported from it
+   * carries the coarser answer. Both are the lender's claim, not ours.
+   */
+  source_purpose?: string;
+  /** True when the document says this is state money — a הלוואת זכאות. */
+  source_eligibility?: boolean;
+
+  /* --- עדכון עוגנים. Session fields: the save route writes an explicit column
+     whitelist, so none of these need a migration and none of them survive a
+     reload — which is right. A refreshed anchor is a simulation of what the
+     tranche would cost if it repriced today, and the thing worth persisting is
+     the resulting mix, not the provenance of one input to it. --- */
+  /**
+   * The anchor the DOCUMENT stated, kept when the refresh replaced it.
+   *
+   * `undefined` means never refreshed; `null` means refreshed a row that had no
+   * anchor at all. The two are different and the restore has to tell them apart.
+   */
+  anchor_original?: number | null;
+  /** ISO date the refreshed anchor took effect — the "נכון ל־" on the tooltip. */
+  anchor_asof?: string;
+  /** Which published table it came from: "עוגן אג"ח צמוד מדד", "ריבית פריים". */
+  anchor_source?: string;
+  /** False when the value came from a secondary source rather than the bank's own. */
+  anchor_verified?: boolean;
+  /** Older than its family republishes — still the latest published value. */
+  anchor_stale?: boolean;
+  /** How often that family republishes, which is what dates the value. */
+  anchor_cadence?: string;
+  /** Why the refresh declined to price this row. Shown on the עוגן cell's tooltip. */
+  anchor_note?: string;
 };
 
 /* ------------------------------------------------------------------ paths */
@@ -251,6 +287,11 @@ function toLoanRow(src: ExtractedLoan, mixId: string, group: DebtGroup): Importe
     source_bank: src.source,
     source_type: src.type,
     source_track: src.trackLabel,
+    // The report's own words where it printed any. Where it printed none, the
+    // column stays empty rather than showing the normalised guess — a credit
+    // report that does not state a purpose has not stated one.
+    source_purpose: src.purpose,
+    source_eligibility: src.eligibility,
   };
 }
 

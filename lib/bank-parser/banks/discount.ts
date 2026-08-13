@@ -21,6 +21,7 @@ import { date, has, norm, num, pageLines, pct, type Line } from "../text";
 import { clean, one, readFields } from "../fields";
 import type { BankId, BankLoan, BankStatement, BankTranche, Linkage, RateKind } from "../types";
 import { BANK_LABEL } from "../types";
+import { classifyPurpose } from "../purpose";
 
 /** Right column — the loan's terms. */
 const GENERAL = [
@@ -192,6 +193,11 @@ export function parseDiscount(
       linkage,
       amortization: g("שיטת פרעון"),
       purpose: g("מטרת הלוואה"),
+      purposeKind: classifyPurpose(g("מטרת הלוואה")),
+      // This template states the purpose and nothing about where the money came
+      // from, so a זכאות here is indistinguishable from a bank-funded loan.
+      fundingSource: "",
+      funding: "unknown",
       principal,
       indexation,
       accruedInterest: num(g("ריבית צבורה")),
@@ -229,6 +235,8 @@ export function parseDiscount(
     loans.push({
       loanNumber: block.loanNumber,
       purpose: tranche.purpose,
+      purposeKind: tranche.purposeKind,
+      funding: tranche.funding,
       tranches: [tranche],
       printed: {
         balance,

@@ -1222,8 +1222,8 @@ export default function AnalysisModal({
             )}
             {a.warnings.length > 0 && (
               <ul className="mt-2.5 grid gap-1">
-                {a.warnings.map((w) => (
-                  <li key={w} className="flex items-start gap-1.5 text-[11.5px]" style={{ color: "var(--lgr-4)" }}>
+                {a.warnings.map((w, i) => (
+                  <li key={`${i}:${w}`} className="flex items-start gap-1.5 text-[11.5px]" style={{ color: "var(--lgr-4)" }}>
                     <Warning size={12} weight="fill" className="mt-0.5 flex-none" />
                     {w}
                   </li>

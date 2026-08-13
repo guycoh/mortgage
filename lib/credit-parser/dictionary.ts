@@ -134,16 +134,39 @@ export const ENUMS = {
     "60-89 ימים",
     "30-59 ימים",
   ],
+  // The vocabulary these reports actually print, verified across three files
+  // (120 + 24 + 24 transactions). The previous list — "הלוואה לכל מטרה",
+  // "רכישת רכב", "דיור" — is not wording this template uses, so 201-017 came
+  // back empty on 117 of 120 transactions.
+  //
+  // Longest first, because enumByCell returns the first phrase it finds inside
+  // the cell: "עסק" is a prefix of nothing here, but it IS a substring of
+  // "העסקה", so it must never be tested before a phrase that could contain it.
   purpose: [
     "הלוואה לתאגיד או בשיתוף עם תאגיד",
+    'נדל"ן ושיפוצים',
+    "נדלן ושיפוצים",
+    "צריכה פרטית",
     "כרטיס אשראי",
-    "הלוואה לכל מטרה",
-    "רכישת רכב",
-    "דיור",
+    "לא ידוע",
+    "רכב",
+    "עסק",
+    "אחר",
   ],
   currency: ['ש"ח', "אירו", "דולר", 'דולר ארה"ב'],
   frequency: ["תשלום בלון", "חודשי", "רבעוני", "שנתי", "דו חודשי"],
-  paymentType: ["קרן וריבית", "תשלום בלון", "קרן", "ריבית", "בולט"],
+  // "קרן, ריבית והצמדה" must precede "קרן וריבית" and "קרן": the cell match
+  // returns the first phrase it finds inside the value, and both shorter ones
+  // are substrings of it. Read in the old order, 21 linked mortgages in one
+  // report came back as "קרן" — principal-only, which is a different product.
+  paymentType: [
+    "קרן, ריבית והצמדה",
+    "קרן וריבית",
+    "תשלום בלון",
+    "קרן",
+    "ריבית",
+    "בולט",
+  ],
   interestType: ["ללא ריבית", "ריבית משתנה", "ריבית קבועה"],
   collateralType: ["רכב", "נדלִן", "נדלן", "פיקדון", "ניירות ערך", "ערבות"],
 } as const;

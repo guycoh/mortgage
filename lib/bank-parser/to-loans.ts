@@ -15,6 +15,7 @@ import type { Loan } from "@/app/private/crm/leads/simulators/components/LoanTab
 import { freqLabel } from "@/lib/rate-frequency";
 import { monthsBetween, toDate } from "./text";
 import type { BankStatement, BankTranche } from "./types";
+import { PURPOSE_LABEL } from "./purpose";
 
 /**
  * Which of the five canonical tracks this tranche is.
@@ -151,6 +152,11 @@ function toRow(t: BankTranche, mixId: string, st: BankStatement): ImportedLoan {
     source_bank: st.bankLabel,
     source_type: "משכנתה",
     source_track: t.rawTrack || trackLabelOf(t),
+    // The lender's own wording, not the normalised label: on the board an
+    // advisor is reading against the letter in front of them, and "רכישת דירה
+    // יד שניה" is a fact the letter states that "רכישת דירה" rounds off.
+    source_purpose: t.purpose || PURPOSE_LABEL[t.purposeKind],
+    source_eligibility: t.funding === "eligibility",
   } as ImportedLoan & { anchor_margin: number | null; anchor_interval: number | null };
 }
 
