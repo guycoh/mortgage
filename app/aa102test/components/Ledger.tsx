@@ -581,7 +581,7 @@ export default function Ledger({
         toast(
           "pos",
           updated === eligible
-            ? `עודכנו ${updated} עוגנים`
+            ? `עודכנו ${updated} עוגנים לפי בנק ישראל`
             : `עודכנו ${updated} מתוך ${eligible} עוגנים`,
           // Only what the advisor can act on. How old our cache is, is our
           // problem — the button's whole promise is that pressing it gives the
