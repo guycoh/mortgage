@@ -852,25 +852,24 @@ export default function Simulator({
 
       <div className="mx-auto w-full max-w-[1300px] px-4 py-4 md:px-6 md:py-6">
         {/* ----------------------------------------------------- 1. the masthead */}
-        {/* THE PAGE'S NAME AND EVERYTHING YOU CAN DO TO THE WHOLE BOARD, ON ONE
-            LINE.
+        {/* THE PAGE'S NAME, AND THE ONE ACTION THAT COMMITS IT.
 
-            These used to be two stacked objects — a 30px title with 20px under
-            it, then a toolbar row inside the console — and between them they
-            spent about 90px of the first screen holding one input, one select
-            and one button. A page title and the page's own controls are the
-            same rank; putting them on the same baseline says so, and gives the
-            height back to the ledger.
+            It briefly also carried אינפלציה שנתית and השוואה לתמהיל, and they
+            were homeless there. A control belongs beside the thing it changes:
+            the inflation rate is the assumption every figure in the read-out is
+            computed under, so it is a cell IN the read-out; the comparison
+            picker chooses the subject of השוואת תמהילים, so it is in that
+            section's header. Parked up here they were two form controls floating
+            in a title bar, and the comparison one asked you to remember a choice
+            made 1,200px above the thing it governed.
 
-            No border and no fill. This is chrome: the instrument below it is the
-            only object on the page that earns an outline.
-
-            The title stays OUTSIDE the view swap, exactly as it was — keyed, but
-            deliberately not inside an AnimatePresence, because mode="wait" would
-            hold the old word for its exit and leave the row titleless for a
-            third of a second. The controls belong to the mix, so those do leave
-            with it, on a plain dissolve; the row keeps its height either way, so
-            nothing under it moves. */}
+            What is left is a masthead: the name at the start, the commit at the
+            end, nothing in between. The title stays OUTSIDE the view swap —
+            keyed, but deliberately not inside an AnimatePresence, because
+            mode="wait" would hold the old word for its exit and leave the row
+            titleless for a third of a second. Only the mix can be dirty, so only
+            the mix shows a save; the row keeps its height either way, so nothing
+            under it moves. */}
         <div className="lgr-masthead">
           <motion.h1
             key={tool}
@@ -892,44 +891,6 @@ export default function Simulator({
                 exit={{ opacity: 0, transition: { duration: 0.1 } }}
                 transition={{ duration: 0.16, ease: [0.2, 0, 0, 1] }}
               >
-                <label className="lgr-param">
-                  <span className="lgr-param-label">אינפלציה שנתית</span>
-                  <span className="lgr-param-sep" />
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={annualInflation}
-                    onChange={(e) => setAnnualInflation(parseFloat(e.target.value) || 0)}
-                    onFocus={(e) => e.currentTarget.select()}
-                    className="lgr-param-in"
-                    aria-label="אינפלציה שנתית באחוזים"
-                  />
-                  <span className="lgr-param-unit">%</span>
-                </label>
-
-                {list.length > 1 && (
-                  <div style={{ minWidth: 190 }}>
-                    <Select
-                      variant="input"
-                      value={compareMixId ?? ""}
-                      onChange={(v) => setCompareMixId(v ? String(v) : null)}
-                      placeholder="השוואה לתמהיל…"
-                      options={[
-                        { value: "", label: "ללא השוואה" },
-                        ...list
-                          .filter((m) => m.id !== activeMixId)
-                          .map((m) => ({ value: m.id, label: m.mix_name })),
-                      ]}
-                      ariaLabel="תמהיל להשוואה"
-                    />
-                  </div>
-                )}
-
-                {/* What you can change, then what commits it. The rule is the
-                    seam between the two — the same hairline the toolbar drew
-                    between its groups, which now has an actual edge to sit on
-                    rather than an auto-margin that separated nothing. */}
-                <span className="lgr-masthead-sep" aria-hidden />
                 <SaveButton dirty={dirty} saving={saving} justSaved={justSaved} canSave={!!lead} onSave={save} />
               </motion.div>
             )}
@@ -1051,6 +1012,31 @@ export default function Simulator({
                 )}
               </div>
             </div>
+
+            {/* THE ASSUMPTION, IN THE BAND IT GOVERNS.
+                Every figure to the right of this rule is computed at this rate —
+                the הצמדה on an indexed track, and therefore החזר חודשי, סה"כ
+                ריבית and every payment in the ledger. Sitting in a title bar it
+                was a form control with no subject; sitting here it takes the
+                rail's own anatomy — label above, value below — and reads as what
+                it is: the one cell of the read-out you are allowed to type in.
+                Ruled off rather than spaced off, because an input among outputs
+                needs the seam stated. */}
+            <label className="lgr-rail-assume" title="שיעור האינפלציה השנתי שלפיו מחושבת ההצמדה">
+              <span className="lgr-rail-label">אינפלציה שנתית</span>
+              <span className="lgr-rail-assume-well">
+                <input
+                  type="number"
+                  step="0.1"
+                  value={annualInflation}
+                  onChange={(e) => setAnnualInflation(parseFloat(e.target.value) || 0)}
+                  onFocus={(e) => e.currentTarget.select()}
+                  className="lgr-rail-assume-in"
+                  aria-label="אינפלציה שנתית באחוזים"
+                />
+                <span className="lgr-rail-assume-unit">%</span>
+              </span>
+            </label>
           </div>
 
           {/* -------------------------------------------------- the intake band */}
@@ -1301,28 +1287,55 @@ export default function Simulator({
         </div>
         </motion.section>
 
-        {/* --------------------------------------------- 3. the reading, below */}
-        {/* The instrument ends at the totals bar. What follows is what the mix
-            LOOKS like rather than what it is — so these keep their own outlines
-            and a real gap above them, which is now the only place on this page
-            where one card ends and another begins. */}
-        <motion.div {...enter(2)} className="mt-5">
-          <Charts loans={owed} annualInflation={annualInflation} />
-        </motion.div>
+        {/* --------------------------------------------- 3. the verdict, below */}
+        {/* THE COMPARISON COMES BEFORE THE CHARTS.
+            It used to run last, under two ECharts canvases, which put the one
+            question an advisor is in this tool to answer — is this proposal
+            better than that one — at the bottom of a 2,300px page. The charts
+            describe the mix you are looking at; the comparison judges it against
+            the alternative. Judgement first, description after.
 
-        {/* ------------------------------------------------------ comparison */}
-        <motion.section {...enter(3)} className="lgr-card mt-5 overflow-hidden">
-          <header className="lgr-head">
-            <h2 className="lgr-title">השוואת תמהילים</h2>
-            <span className="lgr-sub ms-auto">ערך שלילי = התמהיל הנוכחי זול יותר</span>
-          </header>
+            Its picker lives in its own header now. The old "ערך שלילי = התמהיל
+            הנוכחי זול יותר" caption is gone with it: a legend that teaches you to
+            decode a minus sign is a legend the column should not have needed.
+            Every difference states its direction in a word, an arrow and a
+            colour instead. */}
+        <motion.div {...enter(2)}>
           <Compare
             activeMixId={activeMixId}
             mixes={list}
             annualInflation={annualInflation}
             compareMixId={compareMixId}
+            onDuplicate={duplicateMix}
+            control={
+              list.length > 1 ? (
+                <div style={{ minWidth: 208 }}>
+                  <Select
+                    variant="input"
+                    value={compareMixId ?? ""}
+                    onChange={(v) => setCompareMixId(v ? String(v) : null)}
+                    placeholder="בחרו תמהיל להשוואה…"
+                    options={[
+                      { value: "", label: "ללא השוואה" },
+                      ...list
+                        .filter((m) => m.id !== activeMixId)
+                        .map((m) => ({ value: m.id, label: m.mix_name })),
+                    ]}
+                    ariaLabel="תמהיל להשוואה"
+                  />
+                </div>
+              ) : null
+            }
           />
-        </motion.section>
+        </motion.div>
+
+        {/* ------------------------------------------------------- the charts */}
+        {/* What the mix LOOKS like rather than what it is or how it scores. Last,
+            and keeping its own outline: this is the only place on the page where
+            one card ends and another begins. */}
+        <motion.div {...enter(3)} className="mt-5">
+          <Charts loans={owed} annualInflation={annualInflation} />
+        </motion.div>
         </motion.div>
         )}
         </AnimatePresence>
