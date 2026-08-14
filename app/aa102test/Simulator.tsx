@@ -1062,7 +1062,60 @@ export default function Simulator({
                 transition={collapse}
               >
                 <div className="lgr-wb-intake">
-                  <Bay mixId={activeMixId} reports={reports} onImport={applyImport} onClear={clearImport} />
+                  <Bay
+                    mixId={activeMixId}
+                    reports={reports}
+                    onImport={applyImport}
+                    onClear={clearImport}
+                    // The three readings of the loaded document, on the
+                    // document's own receipt. A credit report and a bank
+                    // statement are alternatives — only one is ever loaded — so
+                    // this is one set of tiles whose wording follows whichever
+                    // arrived, not two duplicated blocks.
+                    readings={
+                      reports.length > 0 ? (
+                        <>
+                          <Btn
+                            className="lgr-btn lgr-btn-sm"
+                            onClick={() => setShowClient(true)}
+                            title={
+                              statement
+                                ? "עמוד אחד להראות ללקוח — מה יש לו, כמה זה עולה בחודש, ומה יעלה לסלק"
+                                : "עמוד אחד להראות ללקוח — מה יש לו, כמה זה עולה בחודש, ומה לשים לב אליו"
+                            }
+                          >
+                            <UserFocus size={14} weight="bold" style={{ color: "var(--pos)" }} />
+                            סיכום ללקוח
+                          </Btn>
+                          <Btn
+                            className="lgr-btn lgr-btn-sm"
+                            onClick={() => setShowAnalysis(true)}
+                            title={
+                              statement
+                                ? "ניתוח המשכנתא — תמהיל, עמלות יציאה, שינויי ריבית וכדאיות מיחזור"
+                                : "ניתוח מלא של חיווי האשראי — פיגורים, הליכים, חשיפות וסיכונים"
+                            }
+                          >
+                            <Stethoscope size={14} weight="bold" style={{ color: "var(--primary)" }} />
+                            {statement ? "ניתוח משכנתא" : "ניתוח חיווי"}
+                          </Btn>
+                          <Btn
+                            className="lgr-btn lgr-btn-sm"
+                            onClick={() => setShowDoc(true)}
+                            disabled={!reports.some((r) => r.file)}
+                            title={
+                              reports.some((r) => r.file)
+                                ? "צפייה במסמך המקורי"
+                                : "המסמך אינו זמין בהפעלה הזו"
+                            }
+                          >
+                            <FilePdf size={14} weight="fill" style={{ color: "var(--neg)" }} />
+                            צפייה במסמך
+                          </Btn>
+                        </>
+                      ) : null
+                    }
+                  />
                 </div>
               </motion.div>
             )}
@@ -1159,56 +1212,15 @@ export default function Simulator({
             תמהיל
           </Btn>
 
-          {/* WHAT YOU DO WITH THE MIX, on the strip that names it — on the far
-              side, in the small button size this row uses, and in two groups
-              divided by a hairline. They are two different subjects: the first
-              group reads the DOCUMENT that filled the board, the second acts on
-              the MIX itself. Six buttons in an undifferentiated line is a row
-              you have to read; two named groups is a row you can aim at. */}
+          {/* WHAT YOU DO TO THE MIX, on the strip that names it.
+              It briefly carried six buttons about two different subjects, and a
+              dropped report pushed the strip onto a second row — a floating band
+              of controls under the tabs, which is the exact shape this redesign
+              set out to remove. The three that read the DOCUMENT moved to the
+              document's own receipt in the band above. What is left is three
+              actions on the named mix, which is inside what a person can hold at
+              one decision point. */}
           <div className="lgr-strip-acts">
-              {/* Once a document is in, its three readings join the strip.
-              A credit report and a bank statement are alternatives — only
-              one is ever loaded — so this is one set of tiles whose wording
-              follows whichever arrived, not two duplicated blocks. */}
-              {reports.length > 0 && (
-              <div className="lgr-act-group">
-              <Btn
-                className="lgr-btn lgr-btn-sm"
-                onClick={() => setShowClient(true)}
-                title={
-                  statement
-                    ? "עמוד אחד להראות ללקוח — מה יש לו, כמה זה עולה בחודש, ומה יעלה לסלק"
-                    : "עמוד אחד להראות ללקוח — מה יש לו, כמה זה עולה בחודש, ומה לשים לב אליו"
-                }
-              >
-                <UserFocus size={14} weight="bold" style={{ color: "var(--pos)" }} />
-                סיכום ללקוח
-              </Btn>
-              <Btn
-                className="lgr-btn lgr-btn-sm"
-                onClick={() => setShowAnalysis(true)}
-                title={
-                  statement
-                    ? "ניתוח המשכנתא — תמהיל, עמלות יציאה, שינויי ריבית וכדאיות מיחזור"
-                    : "ניתוח מלא של חיווי האשראי — פיגורים, הליכים, חשיפות וסיכונים"
-                }
-              >
-                <Stethoscope size={14} weight="bold" style={{ color: "var(--primary)" }} />
-                {statement ? "ניתוח משכנתא" : "ניתוח חיווי"}
-              </Btn>
-              <Btn
-                className="lgr-btn lgr-btn-sm"
-                onClick={() => setShowDoc(true)}
-                disabled={!reports.some((r) => r.file)}
-                title={reports.some((r) => r.file) ? "צפייה במסמך המקורי" : "המסמך אינו זמין בהפעלה הזו"}
-              >
-                <FilePdf size={14} weight="fill" style={{ color: "var(--neg)" }} />
-                צפייה במסמך
-              </Btn>
-              </div>
-              )}
-
-              {/* — what you do to the mix — */}
               <div className="lgr-act-group">
               <Btn
                 className="lgr-btn lgr-btn-sm"
