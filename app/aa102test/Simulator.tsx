@@ -850,22 +850,91 @@ export default function Simulator({
         </nav>
       </motion.header>
 
-      <div className="mx-auto w-full max-w-[1300px] px-4 py-5 md:px-6 md:py-7">
-        {/* The title is the tool, and it changes with the tab. Keyed, but
-            deliberately NOT inside an AnimatePresence: mode="wait" would hold
-            the old word for its exit and only then start the new one, leaving
-            the row with no title at all for a third of a second. Replacing
-            the element outright keeps the geometry honest from the first
-            frame; only the ink fades. */}
-        <motion.h1
-          key={tool}
-          className="lgr-display mb-5 text-[30px]"
-          initial={{ opacity: 0, y: 7 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.18, ease: [0.2, 0, 0, 1] }}
-        >
-          {tool === "mix" ? "סימולטור תמהילים" : tool === "reverse" ? "משכנתא הפוכה" : "משכנתא חדשה"}
-        </motion.h1>
+      <div className="mx-auto w-full max-w-[1300px] px-4 py-4 md:px-6 md:py-6">
+        {/* ----------------------------------------------------- 1. the masthead */}
+        {/* THE PAGE'S NAME AND EVERYTHING YOU CAN DO TO THE WHOLE BOARD, ON ONE
+            LINE.
+
+            These used to be two stacked objects — a 30px title with 20px under
+            it, then a toolbar row inside the console — and between them they
+            spent about 90px of the first screen holding one input, one select
+            and one button. A page title and the page's own controls are the
+            same rank; putting them on the same baseline says so, and gives the
+            height back to the ledger.
+
+            No border and no fill. This is chrome: the instrument below it is the
+            only object on the page that earns an outline.
+
+            The title stays OUTSIDE the view swap, exactly as it was — keyed, but
+            deliberately not inside an AnimatePresence, because mode="wait" would
+            hold the old word for its exit and leave the row titleless for a
+            third of a second. The controls belong to the mix, so those do leave
+            with it, on a plain dissolve; the row keeps its height either way, so
+            nothing under it moves. */}
+        <div className="lgr-masthead">
+          <motion.h1
+            key={tool}
+            className="lgr-masthead-title"
+            initial={{ opacity: 0, y: 7 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.18, ease: [0.2, 0, 0, 1] }}
+          >
+            {tool === "mix" ? "סימולטור תמהילים" : tool === "reverse" ? "משכנתא הפוכה" : "משכנתא חדשה"}
+          </motion.h1>
+
+          <AnimatePresence initial={false}>
+            {tool === "mix" && (
+              <motion.div
+                key="mix-controls"
+                className="lgr-masthead-tools"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0, transition: { duration: 0.1 } }}
+                transition={{ duration: 0.16, ease: [0.2, 0, 0, 1] }}
+              >
+                <label className="lgr-param">
+                  <span className="lgr-param-label">אינפלציה שנתית</span>
+                  <span className="lgr-param-sep" />
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={annualInflation}
+                    onChange={(e) => setAnnualInflation(parseFloat(e.target.value) || 0)}
+                    onFocus={(e) => e.currentTarget.select()}
+                    className="lgr-param-in"
+                    aria-label="אינפלציה שנתית באחוזים"
+                  />
+                  <span className="lgr-param-unit">%</span>
+                </label>
+
+                {list.length > 1 && (
+                  <div style={{ minWidth: 190 }}>
+                    <Select
+                      variant="input"
+                      value={compareMixId ?? ""}
+                      onChange={(v) => setCompareMixId(v ? String(v) : null)}
+                      placeholder="השוואה לתמהיל…"
+                      options={[
+                        { value: "", label: "ללא השוואה" },
+                        ...list
+                          .filter((m) => m.id !== activeMixId)
+                          .map((m) => ({ value: m.id, label: m.mix_name })),
+                      ]}
+                      ariaLabel="תמהיל להשוואה"
+                    />
+                  </div>
+                )}
+
+                {/* What you can change, then what commits it. The rule is the
+                    seam between the two — the same hairline the toolbar drew
+                    between its groups, which now has an actual edge to sit on
+                    rather than an auto-margin that separated nothing. */}
+                <span className="lgr-masthead-sep" aria-hidden />
+                <SaveButton dirty={dirty} saving={saving} justSaved={justSaved} canSave={!!lead} onSave={save} />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
 
         {/* THE STAGE. A floor under the view change: while mode="wait" holds
             the gap between an exit and an entry, the page would otherwise
@@ -900,55 +969,25 @@ export default function Simulator({
         ) : (
         <motion.div key="mix" {...viewIn(dir)}>
 
-        {/* ------------------------------------- 2 + 3. the console: one panel */}
-        {/* Toolbar and KPI slab share an outline, a radius and a shadow, so the
-            controls and the figures they drive read as one instrument rather
-            than two stacked cards. Light on top, dark underneath. */}
-        <motion.section {...enter(1)} className="lgr-console mb-6">
-          <div className="lgr-toolbar">
-            {/* — simulation parameters — */}
-            <div className="lgr-tool-group">
-              <label className="lgr-param">
-                <span className="lgr-param-label">אינפלציה שנתית</span>
-                <span className="lgr-param-sep" />
-                <input
-                  type="number"
-                  step="0.1"
-                  value={annualInflation}
-                  onChange={(e) => setAnnualInflation(parseFloat(e.target.value) || 0)}
-                  onFocus={(e) => e.currentTarget.select()}
-                  className="lgr-param-in"
-                  aria-label="אינפלציה שנתית באחוזים"
-                />
-                <span className="lgr-param-unit">%</span>
-              </label>
+        {/* ------------------------------------------ 2. the workbench: one object */}
+        {/* ONE INSTRUMENT, FROM THE FIGURES TO THE LAST ROW.
+            This was four cards in a column — a console, an intake bay, a tray
+            holding two loose buttons, and a tab strip welded to the table — each
+            with its own outline, its own shadow, and 24px of canvas between
+            them. Four outlines is four objects, and not one of them was the
+            instrument; the instrument was the thing they added up to.
 
-              {list.length > 1 && (
-                <div style={{ minWidth: 190 }}>
-                  <Select
-                    variant="input"
-                    value={compareMixId ?? ""}
-                    onChange={(v) => setCompareMixId(v ? String(v) : null)}
-                    placeholder="השוואה לתמהיל…"
-                    options={[
-                      { value: "", label: "ללא השוואה" },
-                      ...list
-                        .filter((m) => m.id !== activeMixId)
-                        .map((m) => ({ value: m.id, label: m.mix_name })),
-                    ]}
-                    ariaLabel="תמהיל להשוואה"
-                  />
-                </div>
-              )}
-            </div>
+            So they are bands inside a single card now, divided by the same
+            hairline the ledger already divides its own rows with. Reading down:
+            what the mix costs → what you can put into it → which mix, and what
+            you can do to it → the rows themselves. The tray is gone; its two
+            buttons had nowhere to live except beside the actions they belong
+            with, on the strip that names the mix they act on.
 
-            {/* Only the commit stays up here — it is the one control that has to
-                be findable without looking. */}
-            <div className="lgr-tool-group" data-end="true">
-              <SaveButton dirty={dirty} saving={saving} justSaved={justSaved} canSave={!!lead} onSave={save} />
-            </div>
-          </div>
-
+            One shadow for the whole object, and the quiet one — a card this tall
+            wearing the console's raised shadow would read as a slab lying on the
+            page rather than as the page's working surface. */}
+        <motion.section {...enter(1)} className="lgr-workbench mb-5">
           <div className="lgr-rail">
             <div className="lgr-rail-cells">
               {RAIL.map((f) => {
@@ -1013,66 +1052,43 @@ export default function Simulator({
               </div>
             </div>
           </div>
-        </motion.section>
 
-        {/* ------------------------------------- the intake, and the mix views */}
-        {/* The strip stops at its content rather than banding across the page,
-            and the room it gives back carries the two mix-wide views — left
-            edge shared with the export cluster on the strip below, so the two
-            clusters read as one stack rather than as two stray rows. */}
-        <motion.div {...enter(2)} className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-3">
-          {/* THE STRIP BELONGS TO THE BASE MIX ONLY — a scenario you invented
-              has nothing to import into. Switching to one used to delete the
-              strip on the spot, dropping the band from 90px to 56px in a single
-              frame and yanking the whole board up with it.
+          {/* -------------------------------------------------- the intake band */}
+          {/* THE BAY BELONGS TO THE BASE MIX ONLY — a scenario you invented has
+              nothing to import into. It used to float beside a tray of buttons
+              on its own band of canvas; it is a slot cut into the instrument
+              now, on the instrument's own ground, which is what a place-a-
+              document-here actually is.
 
-              It leaves properly now: it takes its own height down with it, so
-              the page below travels the same 34px over 340ms instead of
-              teleporting. `initial={false}` keeps this out of the page-load
-              sequence — rise(2) already handles the first appearance, and this
-              should only ever fire on a tab you chose. */}
+              It still leaves properly, taking its own height down with it so the
+              rows below travel rather than teleport. `initial={false}` keeps
+              this out of the page-load sequence — the workbench's own rise
+              already handles the first appearance, and this should only ever
+              fire on a tab you chose. */}
           <AnimatePresence initial={false}>
             {activeMixId && isPrimaryMix && (
               <motion.div
                 key="bay"
-                className="flex-[1_1_520px] overflow-hidden"
-                initial={{ height: 0, opacity: 0, y: -6, scale: 0.99 }}
-                animate={{ height: "auto", opacity: 1, y: 0, scale: 1 }}
-                exit={{ height: 0, opacity: 0, y: -6, scale: 0.99, transition: collapseOut }}
+                className="overflow-hidden"
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0, transition: collapseOut }}
                 transition={collapse}
-                // Capped while it is an invitation; once reports are in it is a
-                // receipt carrying names and chips and earns the rest of the row.
-                style={{ maxWidth: reports.length ? undefined : 760 }}
               >
-                <Bay mixId={activeMixId} reports={reports} onImport={applyImport} onClear={clearImport} />
+                <div className="lgr-wb-intake">
+                  <Bay mixId={activeMixId} reports={reports} onImport={applyImport} onClear={clearImport} />
+                </div>
               </motion.div>
             )}
           </AnimatePresence>
 
-          {/* The well's own 11px padding and 1px border put the buttons inside
-              it 12px in from its edge; 3px more here lands them at 15px from
-              the page margin — the tab strip's 14px padding plus its border —
-              so this pair sits exactly above the יצוא לאקסל cluster on the
-              strip below and the two read as one stack. */}
-          <div className="lgr-side ms-auto" style={{ marginInlineEnd: 3 }}>
-            <Btn className="lgr-btn" onClick={() => setSchedFor("mix")} disabled={!loans.length}>
-              <ListChecks size={14} weight="bold" />
-              לוח סילוקין מאוחד
-            </Btn>
-            <Btn className="lgr-btn" onClick={duplicateMix} disabled={!activeMix}>
-              <Copy size={14} weight="bold" />
-              שכפל תמהיל
-            </Btn>
-          </div>
-        </motion.div>
-
         {/* -------------------------------------------------------- mix tabs */}
-        {/* BAND 3 — the mix workspace.
-            The selector used to float 12px above the board, so the tab you
-            picked and the table it governed were two separate objects. They are
-            one now: the strip sits flush on the card's top edge and shares its
-            border, and both enter together rather than on staggered delays. */}
-        <motion.div {...enter(3)} className="mb-6">
+        {/* WHICH MIX, AND WHAT YOU DO TO IT — one band, two clusters.
+            The selector was already welded to the board it governs. What is new
+            is the far side: לוח סילוקין מאוחד and שכפל תמהיל used to sit in a
+            tray of their own, one band up, with nothing but canvas tying them to
+            the mix they act on. They are actions on the named mix, so they are
+            on the strip that names it, next to the other three. */}
         <div className="lgr-tabs">
           {list.map((m) => (
             <div key={m.id} className="relative">
@@ -1157,15 +1173,19 @@ export default function Simulator({
             תמהיל
           </Btn>
 
-          {/* WHAT YOU DO WITH THE MIX, on the strip that names it — one
-              cluster on the far side, in the small button size this row uses. */}
-          <div className="ms-auto flex flex-wrap items-center gap-1.5">
+          {/* WHAT YOU DO WITH THE MIX, on the strip that names it — on the far
+              side, in the small button size this row uses, and in two groups
+              divided by a hairline. They are two different subjects: the first
+              group reads the DOCUMENT that filled the board, the second acts on
+              the MIX itself. Six buttons in an undifferentiated line is a row
+              you have to read; two named groups is a row you can aim at. */}
+          <div className="lgr-strip-acts">
               {/* Once a document is in, its three readings join the strip.
               A credit report and a bank statement are alternatives — only
               one is ever loaded — so this is one set of tiles whose wording
               follows whichever arrived, not two duplicated blocks. */}
               {reports.length > 0 && (
-              <>
+              <div className="lgr-act-group">
               <Btn
                 className="lgr-btn lgr-btn-sm"
                 onClick={() => setShowClient(true)}
@@ -1199,8 +1219,29 @@ export default function Simulator({
                 <FilePdf size={14} weight="fill" style={{ color: "var(--neg)" }} />
                 צפייה במסמך
               </Btn>
-              </>
+              </div>
               )}
+
+              {/* — what you do to the mix — */}
+              <div className="lgr-act-group">
+              <Btn
+                className="lgr-btn lgr-btn-sm"
+                onClick={() => setSchedFor("mix")}
+                disabled={!loans.length}
+                title={loans.length ? "לוח סילוקין של כל התמהיל, חודש בחודש" : "אין שורות בתמהיל"}
+              >
+                <ListChecks size={14} weight="bold" />
+                לוח סילוקין מאוחד
+              </Btn>
+              <Btn
+                className="lgr-btn lgr-btn-sm"
+                onClick={duplicateMix}
+                disabled={!activeMix}
+                title="יצירת עותק של התמהיל הזה כנקודת פתיחה להצעה"
+              >
+                <Copy size={14} weight="bold" />
+                שכפל תמהיל
+              </Btn>
               <Btn
               className="lgr-btn lgr-btn-sm lgr-btn-excel"
               onClick={exportExcel}
@@ -1215,13 +1256,18 @@ export default function Simulator({
               )}
               יצוא לאקסל
               </Btn>
+              </div>
           </div>
         </div>
 
+        {/* The import flash marks the rows that just arrived. It was a 3px ring
+            drawn OUTSIDE the board, which had a card edge of its own to sit
+            against; inside the workbench that ring would be sitting on the card
+            it is inside. Inset, it lands on the band's own inner edge. */}
         <div
           ref={boardRef}
           className="lgr-board transition-shadow duration-500"
-          style={flash ? { boxShadow: "0 0 0 3px var(--primary-tint)" } : undefined}
+          style={flash ? { boxShadow: "inset 0 0 0 2px var(--primary-tint-2)" } : undefined}
         >
           {mixes === null ? (
             <div className="lgr-card overflow-hidden">
@@ -1253,15 +1299,19 @@ export default function Simulator({
             )
           )}
         </div>
-        </motion.div>
+        </motion.section>
 
-        {/* ---------------------------------------------------------- charts */}
-        <motion.div {...enter(4)} className="mt-6">
+        {/* --------------------------------------------- 3. the reading, below */}
+        {/* The instrument ends at the totals bar. What follows is what the mix
+            LOOKS like rather than what it is — so these keep their own outlines
+            and a real gap above them, which is now the only place on this page
+            where one card ends and another begins. */}
+        <motion.div {...enter(2)} className="mt-5">
           <Charts loans={owed} annualInflation={annualInflation} />
         </motion.div>
 
         {/* ------------------------------------------------------ comparison */}
-        <motion.section {...enter(5)} className="lgr-card mt-6 overflow-hidden">
+        <motion.section {...enter(3)} className="lgr-card mt-5 overflow-hidden">
           <header className="lgr-head">
             <h2 className="lgr-title">השוואת תמהילים</h2>
             <span className="lgr-sub ms-auto">ערך שלילי = התמהיל הנוכחי זול יותר</span>
