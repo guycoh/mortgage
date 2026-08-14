@@ -474,20 +474,9 @@ html:has(.lgr-root) {
    centre of the viewport column, not "whatever is left between the brand and
    the client". 1fr auto 1fr keeps them there no matter how long the client's
    name runs on the other side. */
-/* BRAND, THEN NAV, THEN THE CLIENT — an application bar, not three islands.
-   The columns were 1fr auto 1fr, which centred the tablist in the viewport and
-   left it floating with 330px of white on one side and 270px on the other,
-   aligned to nothing. It is the app's primary navigation; it belongs on the
-   same edge as everything else on this page, immediately after the mark it
-   belongs to. The one flexible gap now sits between the tools and the client,
-   which is where a top bar's slack belongs.
-
-   The brand and the picker already land exactly on the page column's two edges
-   — measured at 0px delta against the masthead title and the workbench — and
-   that does not change; only the middle stops floating. */
 .lgr-nav {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
   gap: 14px;
   max-width: 1300px;
@@ -528,8 +517,6 @@ html:has(.lgr-root) {
   display: flex;
   align-items: stretch;
   min-width: 0;
-  /* Anchored to the brand rather than centred in the bar. */
-  justify-self: start;
   /* Span the shell's full height, through the nav's block padding, so every
      tab is a bar-height hit area and the rule lands ON the bottom edge. */
   align-self: stretch;
@@ -561,24 +548,23 @@ html:has(.lgr-root) {
   white-space: nowrap;
   cursor: pointer;
   /* The ink crosses over while the rule is still travelling, which is what
-     makes the two labels trade places rather than blink. The ground follows the
-     page's own hover timing, not the slower crossover. */
-  transition: color 180ms var(--ease), background var(--t) var(--ease);
+     makes the two labels trade places rather than blink. */
+  transition: color 180ms var(--ease);
 }
 /* The separator: a short hairline hung between neighbours, centred on the
    bar's midline — never full height, so it groups the items without ever
    drawing a container around them. */
-/* NO SEPARATORS BETWEEN TABS. There was a hairline between each pair, which
-   carved the tablist into three cells like a segmented control — and a rule that
-   TRAVELS is the whole idea of this switch. It reads as one object crossing a
-   track; the track has to be uninterrupted for that to land. Selection is
-   already said three times over by the violet ink, the filled icon and the
-   moving rule, and 44px between labels separates them without furniture. */
-
-/* The hit area is the full 66px of the bar, which is invisible until something
-   marks it. One step of ground on approach — no motion, no lift; the rule is the
-   only thing on this bar allowed to move. */
-.lgr-nav-tab:hover:not([data-on="true"]) { background: var(--card-2); color: var(--ink); }
+.lgr-nav-tab + .lgr-nav-tab::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: 0;
+  top: 50%;
+  translate: 0 -50%;
+  width: 1px;
+  height: 16px;
+  background: var(--line-2);
+}
+.lgr-nav-tab:hover:not([data-on="true"]) { color: var(--ink); }
 .lgr-nav-tab[data-on="true"] { color: var(--primary-deep); }
 .lgr-nav-tab:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; border-radius: 8px; }
 
