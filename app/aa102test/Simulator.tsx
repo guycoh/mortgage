@@ -50,6 +50,7 @@ import LeadPicker, { type Lead } from "./components/LeadPicker";
 import Ledger from "./components/Ledger";
 import ToolSwitch from "./components/ToolSwitch";
 import { TOOLS, parseTool, type Tool } from "./lib/tools";
+import { useNoFieldDrag } from "./lib/no-field-drag";
 import { warmProfile } from "./lib/profile-cache";
 import Logo from "./components/Logo";
 import Charts from "./components/Charts";
@@ -311,6 +312,10 @@ export default function Simulator({
   const [saving, setSaving] = useState(false);
   /** Held for a beat after a save lands, so the button can confirm it. */
   const [justSaved, setJustSaved] = useState(false);
+
+  // Bound once for the whole surface — all three tools and every portalled
+  // modal — so no field anywhere can have its value dragged into another one.
+  useNoFieldDrag();
 
   /* ------------------------------------------------------------- the tools */
   /**
