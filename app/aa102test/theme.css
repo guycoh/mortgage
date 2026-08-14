@@ -295,42 +295,67 @@ html:has(.lgr-root) {
   font-weight: 600;
 }
 
-/* ============================================== the console: toolbar + rail */
-/* The top of the page is ONE object in two materials — a light toolbar sitting
-   directly on a dark KPI slab, sharing a 16px outline and a single shadow. The
-   title row floats above it, and none of it is sticky: this is a document, and
-   a document's masthead scrolls with it.
+/* ================================================================ masthead */
+/* THE PAGE'S NAME AND ITS PAGE-LEVEL CONTROLS, ON ONE LINE.
+   A 30px title with 20px of air under it, and then a toolbar row inside a card
+   holding one input, one select and one button: two objects, ~90px, and neither
+   of them information. They are the same rank — the name of the instrument and
+   the three things you can do to the whole of it — so they share a baseline.
 
-   The dark half is a widget in dark mode on a light page; the light half is the
-   controls that drive it. Reading down: who this is → what you can change →
-   what it costs. */
-
-.lgr-console {
-  border-radius: var(--r);
-  border: 1px solid var(--line-2);
-  background: #fff;
-  /* one step above every other card on the page — the whole header region is
-     now light, so elevation is what marks it as the instrument */
-  box-shadow: var(--shadow-hover);
-  overflow: hidden;
-}
-
-/* --- the toolbar, in three functional groups --- */
-.lgr-toolbar {
+   No border, no fill, no shadow. This is chrome; the workbench below it is the
+   only object on this page that earns an outline. Rule 5 still holds: it is
+   part of the document and scrolls with it. */
+.lgr-masthead {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 12px 24px;
-  padding: 10px 16px;
+  gap: 10px 20px;
+  /* the controls are 36px, and the row keeps that height even while they are
+     dissolving out on a tool switch — so nothing under them moves */
+  min-height: 36px;
+  margin-bottom: 14px;
 }
-/* A hairline between groups, never before the first one. Groups already sit
-   24px apart; the rule is for the eye that needs the seam stated. */
-.lgr-tool-group { display: flex; align-items: center; gap: 8px; }
-.lgr-tool-group + .lgr-tool-group { padding-inline-start: 24px; border-inline-start: 1px solid var(--line); }
-/* A group pushed to the far end has the width of the bar between it and its
-   neighbour — a rule drawn against it would sit in open space, separating
-   nothing. The gap is the separator. */
-.lgr-tool-group[data-end="true"] { margin-inline-start: auto; padding-inline-start: 0; border-inline-start: 0; }
+.lgr-masthead-title {
+  font-family: var(--display);
+  /* 24, not 30. Beside a row of 36px controls a 30px title is not more
+     important, only heavier — and the six pixels are worth more to the ledger. */
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  /* the title takes the room; everything else settles against the far edge */
+  margin-inline-end: auto;
+}
+.lgr-masthead-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* =============================================== the workbench: ONE object */
+/* FROM THE FIGURES TO THE LAST ROW, ONE CARD.
+   This region was four of them stacked — a console, an intake bay, a tray
+   holding two loose buttons, and a tab strip welded to the table — each with
+   its own outline, its own shadow and 24px of canvas between them. Four
+   outlines is four objects, and not one of them was the instrument; the
+   instrument was the thing they added up to.
+
+   Now they are bands inside one card, divided by the same hairline the ledger
+   divides its own rows with. Reading down: what the mix costs → what you can
+   put into it → which mix, and what you can do to it → the rows.
+
+   ONE SHADOW, AND THE QUIET ONE. The console wore the raised shadow to say "this
+   is the instrument" while it was a 150px header. At 1200px that same shadow
+   reads as a slab lying on the page. The card is the whole working surface now,
+   so it sits rather than floats — which is what rule 3 asked for in the first
+   place. */
+.lgr-workbench {
+  border: 1px solid var(--line-2);
+  border-radius: var(--r);
+  background: var(--card);
+  box-shadow: var(--shadow);
+}
 
 /* ONE COMPOSED FIELD — label, number and unit inside a single border, so
    "אינפלציה שנתית 2 %" reads as one parameter rather than a caption that
@@ -614,21 +639,77 @@ html:has(.lgr-root) {
 .lgr-btn-save:disabled { opacity: 0.42; }
 .lgr-btn-save[data-state="saved"]:disabled { opacity: 0.85; }
 
-/* --- the KPI band --- */
-/* LIGHT, NOT DARK. The dark slab read as a widget bolted to the page rather
-   than as the top of it, and it forced every figure on the page to be judged
-   against two different grounds. It is white now, ruled off the toolbar by one
-   hairline, and it keeps its "this is the instrument" standing through the
-   console's slightly deeper elevation rather than through a colour switch.
-   Roughly a third shorter, too: the padding was the only thing making it
-   tall. */
+/* --- the read-out --- */
+/* THE FIRST BAND OF THE WORKBENCH: what the mix costs.
+   White, because this is the instrument's screen — the two control bands under
+   it are the ones that step down a tone. It is the first band, so it draws no
+   rule of its own; every band after it carries its own top hairline, which is
+   what keeps the seam honest when the intake between them collapses away.
+
+   About a quarter shorter than it was, and all of it was slack: `space-between`
+   on a stretched grid cell pushed the label and the figure apart to fill
+   whatever the tallest cell happened to be, the label ran at the browser's
+   default leading, and NumberFlow's spin mask reserved a quarter of an em above
+   and below every digit. None of that was information. */
 .lgr-rail {
-  background: #fff;
-  border-top: 1px solid var(--line);
+  display: flex;
+  align-items: stretch;
+  background: var(--card);
 }
 /* NO DIVIDERS. Four cells that share one anatomy — label above, figure below —
    are already four cells; a rule between them just adds furniture. */
+/* THE ASSUMPTION CELL — the read-out's one input.
+   Same anatomy as the four cells beside it, label above and value below, so it
+   reads as part of the band rather than as a control parked next to it. It is
+   ruled off instead of spaced off, because the seam between what you state and
+   what the machine computes is worth one hairline. Quiet chrome on the well —
+   28px, not the 36px of a toolbar field — but real chrome, because an input
+   nobody can find is a number nobody knows they can change. */
+.lgr-rail-assume {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 3px;
+  flex: none;
+  padding: 10px 16px 11px;
+  border-inline-start: 1px solid var(--line);
+  cursor: text;
+}
+.lgr-rail-assume-well {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  background: var(--card);
+  transition: border-color var(--t) var(--ease), box-shadow 120ms var(--ease);
+}
+.lgr-rail-assume:hover .lgr-rail-assume-well { border-color: var(--edge); }
+.lgr-rail-assume-well:focus-within {
+  border-color: var(--focus);
+  box-shadow: 0 0 0 2px var(--focus-ring-strong);
+}
+.lgr-rail-assume-in {
+  width: 38px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  outline: none;
+  text-align: center;
+  font-family: var(--num);
+  font-variant-numeric: tabular-nums lining-nums;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+.lgr-rail-assume-unit { font-size: 12.5px; font-weight: 600; color: var(--lgr-4); }
+
 .lgr-rail-cells {
+  flex: 1;
+  min-width: 0;
   display: grid;
   /* The three figures had a fractional share they never used, which starved
      the composition and wrapped its legend onto a second line. They are
@@ -636,24 +717,33 @@ html:has(.lgr-root) {
      three tracks on one line. Still fractions rather than `auto`, because
      `auto` let the composition swallow the whole band. */
   grid-template-columns:
-    minmax(0, 0.8fr) minmax(0, 0.8fr) minmax(0, 0.8fr) minmax(340px, 1.6fr);
+    minmax(0, 0.8fr) minmax(0, 0.8fr) minmax(0, 0.8fr) minmax(320px, 1.6fr);
   gap: 4px 26px;
-  padding: 10px 16px 12px;
+  padding: 10px 16px 11px;
 }
 .lgr-rail-cell {
   position: relative;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  gap: 5px;
-  min-height: 42px;
+  /* PACKED, NOT SPREAD. `space-between` made the label-to-figure gap a function
+     of the tallest cell in the row — so the composition cell, which is three
+     elements deep, silently set the leading of the three that are two. */
+  justify-content: flex-start;
+  gap: 3px;
   min-width: 0;
+  /* The height a filled hero cell measures: 12px label at 1.3, the 3px gap, and
+     NumberFlow's 26px box with its mask. Stated as a floor so an empty board's
+     em-dash — which is type, and carries no mask — reads at the same height as
+     the figure that replaces it. Otherwise the whole ledger steps down 8px the
+     moment the first amount is typed. */
+  min-height: 53px;
 }
 .lgr-rail-label {
   display: flex;
   align-items: center;
   gap: 7px;
-  font-size: 12.5px;
+  font-size: 12px;
+  line-height: 1.3;
   font-weight: 600;
   letter-spacing: -0.005em;
   color: #5a5d66;
@@ -662,7 +752,7 @@ html:has(.lgr-root) {
 .lgr-rail-value {
   font-family: var(--num);
   font-variant-numeric: tabular-nums lining-nums;
-  font-size: 21px;
+  font-size: 19px;
   font-weight: 600;
   line-height: 1;
   letter-spacing: -0.03em;
@@ -674,10 +764,16 @@ html:has(.lgr-root) {
      right-aligning it lands the figure on the RTL cell's start edge — under
      the label rather than adrift to its left. */
   text-align: right;
+  /* NumberFlow reserves this much above and below every digit for the fade its
+     spin travels through, and its default 0.25em is drawn for a counter that is
+     the hero of a page. Here it was eight invisible pixels on the tallest cell
+     in the band, which set the height of all four. 0.18em still gives the
+     digits somewhere to arrive from. */
+  --number-flow-mask-height: 0.18em;
 }
 /* THE HERO. החזר חודשי is the number an advisor is solving for, so it is a full
    step larger than its three satellites and the only label set in full ink. */
-.lgr-rail-cell[data-hero="true"] .lgr-rail-value { font-size: 30px; letter-spacing: -0.04em; }
+.lgr-rail-cell[data-hero="true"] .lgr-rail-value { font-size: 26px; letter-spacing: -0.04em; }
 .lgr-rail-cell[data-hero="true"] .lgr-rail-label { color: var(--ink); font-weight: 700; }
 /* EMPTY. Not ₪0 — a stated zero is a claim, and nothing has been claimed yet. */
 .lgr-rail-value[data-empty="true"] { color: var(--lgr-4); font-weight: 400; letter-spacing: 0.02em; }
@@ -1072,27 +1168,237 @@ html:has(.lgr-root) {
 .lgr-tab-x { color: var(--lgr-4); border-radius: 8px; padding: 1px; margin-inline-start: -2px; transition: background var(--t) ease, color var(--t) ease; }
 .lgr-tab-x:hover { color: inherit; background: rgba(127, 127, 127, 0.18); }
 
+/* ------------------------------------------------------- the intake band */
+/* The bay, on the instrument's own ground rather than floating on canvas beside
+   a tray of buttons. It keeps its dashed edge and its gradient — it is still
+   the one surface here that has to read as an opening — but the opening is now
+   cut into something. The band is the padding around it; the hairline is the
+   seam with the read-out above.
+
+   Full width, deliberately: the bay was capped at 760px because it shared a row
+   with the tray. With the row to itself it is a slot the width of the machine,
+   which is the affordance a drop target wants. */
+.lgr-wb-intake {
+  padding: 12px 14px;
+  border-top: 1px solid var(--line);
+}
+/* Once a report is in, the bay becomes its receipt — a card, in a band, inside
+   the workbench. It keeps a hairline so the slot still reads as a slot, and
+   gives up the shadow: a card floating inside a card is the thing this page
+   stopped doing. */
+.lgr-wb-intake > .lgr-card { box-shadow: none; }
+/* THE RECEIPT'S OWN CONTROLS — what you can read out of this document, then what
+   you do to the set of them. Same hairline idiom as everywhere else on this
+   page: the seam between two subjects is one pixel wide. */
+.lgr-receipt-acts {
+  margin-inline-start: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.lgr-receipt-sep {
+  flex: none;
+  width: 1px;
+  height: 20px;
+  margin-inline: 4px;
+  background: var(--line-2);
+}
+
 /* -------------------------------------------------- the workspace header */
-/* The mix selector, welded to the top of the board it selects. No gap, no
-   second shadow — one card with a tab strip for a lid. */
+/* THE MIX SELECTOR AND THE ACTIONS ON IT — one band, no longer a lid.
+   It used to carry the top corners and three sides of a border because it was
+   the top of its own card. Inside the workbench it is a middle band like any
+   other: one hairline above it, and one tone step down from the read-out, so
+   the two control bands read as the operating half of the instrument and the
+   white above and below them as the reading half. */
 .lgr-tabs {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
-  padding: 10px 14px;
-  border: 1px solid var(--line-2);
-  border-bottom: 0;
-  border-start-start-radius: var(--r);
-  border-start-end-radius: var(--r);
+  padding: 9px 14px;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
   background: var(--card-2);
 }
-/* the board keeps its own top hairline as the seam, and loses the corners the
-   strip above is now carrying */
-.lgr-board > .lgr-card {
-  border-start-start-radius: 0;
-  border-start-end-radius: 0;
+/* THE ACTIONS, IN TWO GROUPS. The first reads the DOCUMENT that filled the
+   board, the second acts on the MIX. Six buttons in one undifferentiated line
+   is a row you have to read; two groups with a rule between them is a row you
+   can aim at — the same hairline idiom the masthead uses between its
+   parameters and its commit. */
+.lgr-strip-acts {
+  margin-inline-start: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
 }
+.lgr-act-group { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.lgr-act-group + .lgr-act-group {
+  padding-inline-start: 10px;
+  border-inline-start: 1px solid var(--line-2);
+}
+
+/* the board is the last band: its own hairline above it, and the ledger card
+   inside gives up every edge it used to draw, because the workbench draws them
+   now. Nested cards are the thing this page was made of; this is where that
+   stops. */
+.lgr-board { border-top: 1px solid var(--line); }
+.lgr-board > .lgr-card {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+/* ============================================== השוואת תמהילים — the verdict */
+/* This was a four-column table on one half of the card and an ECharts diverging
+   bar chart on the other. The same row's shekel difference and percentage
+   difference therefore lived in two coordinate spaces 600px apart, and reading
+   one line meant finding its label twice. The magnitude is drawn inside the row
+   now; the chart is gone, and with it the 50/50 split that only existed to hold
+   it. */
+
+/* THE ANSWER, FIRST. A tinted band and one sentence — not a hero tile with a
+   caption under it. The tint is the verdict's own status colour at its lightest
+   step, which is the only colour on this page allowed to say "good" or "bad";
+   the identity violet never does. */
+.lgr-cmp-verdict {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 9px;
+  padding: 11px 16px 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--tint, var(--card-2));
+}
+.lgr-cmp-verdict[data-tone="pos"] { --tint: var(--pos-tint); --tone: var(--pos); }
+.lgr-cmp-verdict[data-tone="neg"] { --tint: var(--neg-tint); --tone: var(--neg); }
+.lgr-cmp-verdict[data-tone="flat"] { --tint: var(--card-2); --tone: var(--lgr-3); }
+/* The arrow is not decoration and not a duplicate of the colour: it is the half
+   of the signal that survives deuteranopia. */
+.lgr-cmp-verdict-ico {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  flex: none;
+  align-self: center;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--tone);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tone) 26%, transparent);
+}
+/* TEXT ON A TINTED GROUND IS TINTED FROM THAT GROUND, never neutral grey: a
+   grey sentence on a green band reads as text that landed there by accident.
+   Both steps are mixed from the tone, which keeps them well clear of 4.5:1 on
+   the 8%-tint they sit on while belonging to it. */
+.lgr-cmp-verdict-line {
+  flex: 1 1 320px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: color-mix(in srgb, var(--tone) 20%, var(--ink));
+}
+/* the figure the sentence turns on, set in the sentence rather than above it */
+.lgr-cmp-verdict-fig { font-size: 19px; color: var(--tone); margin-inline: 2px; }
+.lgr-cmp-verdict-line .lgr-money { color: var(--tone); }
+/* NOT LIKE FOR LIKE. Two mixes of different size cannot be compared on total
+   cost, and the one row that survives the mismatch is named rather than left to
+   be worked out. */
+.lgr-cmp-caveat {
+  flex: 1 1 100%;
+  font-size: 12px;
+  line-height: 1.45;
+  color: color-mix(in srgb, var(--tone) 26%, var(--lgr-3));
+}
+.lgr-cmp-caveat b { color: color-mix(in srgb, var(--tone) 22%, var(--ink)); font-weight: 700; }
+
+/* --- the ledger --- */
+.lgr-cmp-table td { padding: 7px 5px; }
+.lgr-cmp-table thead th[data-side="active"] { color: var(--ink); }
+.lgr-cmp-row > td { transition: background var(--t) var(--ease) var(--t-exit-delay); }
+.lgr-cmp-row:hover > td { background: var(--card-2); transition-delay: 0ms; }
+.lgr-cmp-row:last-child > td { border-bottom: 0; }
+.lgr-cmp-label {
+  padding-inline-start: 14px !important;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--lgr-2);
+}
+/* עלות לשקל is a ratio among six currencies. Saying its unit under its name is
+   cheaper than a legend and lands where the question is asked. */
+.lgr-cmp-label em {
+  display: block;
+  margin-top: 1px;
+  font-size: 10.5px;
+  font-weight: 500;
+  font-style: normal;
+  color: var(--lgr-4);
+}
+
+/* THE DIFFERENCE AND ITS SIZE, IN ONE CELL. The bar is scaled by percentage
+   because the metrics run from ₪13k to ₪2.8M and an absolute scale draws the
+   payment rows as nothing; the shekels are stated beside it, so both units are
+   read in one place instead of across two panels. */
+.lgr-cmp-delta { display: flex; flex-direction: column; gap: 4px; padding-inline: 8px; }
+.lgr-cmp-delta-fig {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--num);
+  font-variant-numeric: tabular-nums lining-nums;
+  font-size: 13.5px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+.lgr-cmp-delta-pct {
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--lgr-4);
+  letter-spacing: 0;
+}
+.lgr-cmp-bar {
+  display: block;
+  /* CAPPED. Left to fill its column this was a 500px slab, which reads as a
+     chart making a measurement rather than as a mark ranking seven rows against
+     each other. 180px is more resolution than seven bars can use, and it keeps
+     the figure — which is the actual number — the loudest thing in the cell. */
+  width: 100%;
+  max-width: 180px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--card-3);
+  overflow: hidden;
+}
+/* SCALED, NOT RESIZED. The bar's length is the datum, so it has to animate when
+   the datum moves — but a width transition is a layout pass per frame, and the
+   two older bars on this page that do it predate the rule. A solid block scaled
+   on one axis is the same picture on the compositor, and the origin is the
+   reading edge so it grows out of the row's start rather than from its middle. */
+.lgr-cmp-bar > span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 2px;
+  transform-origin: right center;
+  transition: transform 0.45s var(--ease);
+}
+
+/* NOTHING TO COMPARE, OR NOTHING PICKED. An empty state that names what is
+   missing and hands over the action that creates it — the picker is in this
+   card's own header, forty pixels away, so this can point at it instead of
+   sending anyone back up the page. */
+.lgr-cmp-blank {
+  display: grid;
+  place-items: center;
+  gap: 10px;
+  padding: 34px 16px 36px;
+  text-align: center;
+}
+.lgr-cmp-blank p { font-size: 13px; line-height: 1.55; color: var(--lgr-3); }
 
 /* ------------------------------------------------------- the ledger table */
 
@@ -1470,25 +1776,11 @@ html:has(.lgr-root) {
   font-size: 9.5px; font-weight: 700; letter-spacing: 0.01em; line-height: 1.6;
 }
 
-/* ------------------------------------------------ the band-2 actions well */
-/* The two mix-wide views used to sit bare at the end of the intake band with
-   nothing behind them, which read as two buttons someone forgot to put away.
-   This is the tray they belong in: a shallow well, one step darker than the
-   page, so the raised buttons have a floor to sit on rather than hovering over
-   the canvas. It shares the bay's 16px radius — one band, two panels, same
-   corner — and stays deliberately quiet, because the dashed violet zone beside
-   it is the thing that should pull the eye. */
-.lgr-side {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 9px 11px;
-  border: 1px solid #e2e4e9;
-  border-radius: var(--r);
-  background: #f2f2f5;
-  box-shadow: inset 0 1px 2px rgba(23, 23, 30, 0.045);
-}
+/* The band-2 actions well is gone. It was a tray built to give two loose
+   buttons a floor to stand on — the right fix for a button with nowhere to be,
+   and the wrong question: לוח סילוקין מאוחד and שכפל תמהיל act on the mix, so
+   they belong on the strip that names it, beside the three that already did.
+   See .lgr-strip-acts. */
 
 /* --------------------------------------------------------------- dropzone */
 /* THE INTAKE BAY — the hero of this page.
@@ -2519,9 +2811,10 @@ html:has(.lgr-root) {
    With the card no longer clipping (so the sticky header and totals bar can
    hold against the page), the totals row's own corners have to match the card
    the table now sits flush inside — otherwise a square edge shows through the
-   card's radius. */
-.lgr-table tfoot tr:last-child td:first-child { border-end-start-radius: var(--r); }
-.lgr-table tfoot tr:last-child td:last-child { border-end-end-radius: var(--r); }
+   card's radius. That card is the workbench, whose 1px border eats a pixel of
+   the radius its contents see. */
+.lgr-table tfoot tr:last-child td:first-child { border-end-start-radius: calc(var(--r) - 1px); }
+.lgr-table tfoot tr:last-child td:last-child { border-end-end-radius: calc(var(--r) - 1px); }
 /* Analysis tables live inside their own scrolling sheet and keep square ends. */
 .lgr-mini tfoot tr:last-child td:first-child,
 .lgr-mini tfoot tr:last-child td:last-child { border-radius: 0; }
