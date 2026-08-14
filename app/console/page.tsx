@@ -8,7 +8,7 @@
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { ADMIN_COOKIE, verifyAdminCookie } from "@/app/simulator/lib/admin-auth";
-import { loadEvents } from "@/app/simulator/lib/telemetry";
+import { loadEvents, loadLeadRefs, withLeadRefs } from "@/app/simulator/lib/telemetry";
 import { buildDashboard } from "./aggregate";
 import Console from "./Console";
 import Login from "./Login";
@@ -41,7 +41,14 @@ export default async function ConsolePage({
     : 30;
 
   const { events, sources } = await loadEvents(days);
-  const data = buildDashboard(events, days);
+
+  // The events know which lead; `leads` knows who that is and which Fireberry
+  // record they came in from. Joining before aggregating means every screen
+  // downstream gets both without asking.
+  const refs = await loadLeadRefs(
+    events.map((e) => e.lead_id).filter((n): n is number => n != null)
+  );
+  const data = buildDashboard(withLeadRefs(events, refs), days);
 
   return <Console data={data} sources={sources} />;
 }

@@ -13,7 +13,7 @@ import { OUTCOME } from "../lib/tokens";
 import { duration, num } from "../lib/labels";
 import { stamp, zoned } from "../lib/time";
 import { Badge } from "./kit";
-import { Who } from "./parts";
+import { RecordLink, Who } from "./parts";
 
 export default function VisitDrawer({
   visit,
@@ -70,7 +70,7 @@ export default function VisitDrawer({
               </div>
               <h2 style={{ fontSize: 19, margin: "2px 0 8px" }}>{visit.lead}</h2>
               <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                <Who name={visit.operator} />
+                <Who name={visit.operator} source={visit.operatorSource} />
                 <Badge
                   variant={
                     visit.outcome === "failed"
@@ -89,6 +89,10 @@ export default function VisitDrawer({
               <dl className="cns-def">
                 <dt>מזהה ליד</dt>
                 <dd className="num">{visit.leadId ?? "—"}</dd>
+                <dt>רשומה בפיירברי</dt>
+                <dd>
+                  <RecordLink id={visit.fbId} url={visit.fbUrl} />
+                </dd>
                 <dt>זמן</dt>
                 <dd className="num">
                   {stamp(visit.start)} — {zoned(visit.end).hm}

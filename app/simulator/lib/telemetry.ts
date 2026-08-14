@@ -152,6 +152,71 @@ export async function loadEvents(days: number): Promise<LoadedEvents> {
   return { events: out, sources };
 }
 
+/* ---------------------------------------------------------- lead directory */
+
+export interface LeadRef {
+  name: string | null;
+  /** The Fireberry account GUID this lead was created from, when it was. */
+  fireberryId: string | null;
+}
+
+/**
+ * Who each lead is, and which Fireberry record it came from.
+ *
+ * Every event carries `lead_id`, but `lead_name` only where the writer happened
+ * to know it — the door and the first board render. So the same person shows as
+ * "אוויט ואבנר דהן" on one row and "ליד 6266" on the next, and the Fireberry
+ * record is on the door row alone. `leads` has both for all of them, and reading
+ * it here repairs rows that were already written rather than only future ones.
+ *
+ * Never throws: the console degrades to the ids it already had.
+ */
+export async function loadLeadRefs(ids: number[]): Promise<Map<number, LeadRef>> {
+  const out = new Map<number, LeadRef>();
+  const unique = Array.from(new Set(ids.filter((n) => Number.isFinite(n))));
+  if (!unique.length) return out;
+
+  const db = service();
+  if (!db) return out;
+
+  try {
+    const { data, error } = await db
+      .from("leads")
+      .select("id, name, fireberry_id")
+      .in("id", unique);
+    if (error || !data) return out;
+    for (const row of data as { id: number; name: string | null; fireberry_id: string | null }[]) {
+      out.set(row.id, { name: row.name ?? null, fireberryId: row.fireberry_id ?? null });
+    }
+  } catch {
+    // A directory we could not read is a console with worse labels, not a
+    // console that fails to render.
+  }
+  return out;
+}
+
+/**
+ * Fill in each event's lead name and Fireberry record from the directory.
+ *
+ * What the event itself recorded always wins — this only fills blanks, so a
+ * lead renamed in Fireberry since never rewrites the name a past session was
+ * actually looked at under.
+ */
+export function withLeadRefs(events: SimEvent[], refs: Map<number, LeadRef>): SimEvent[] {
+  if (!refs.size) return events;
+  return events.map((e) => {
+    if (e.lead_id == null) return e;
+    const ref = refs.get(e.lead_id);
+    if (!ref) return e;
+    if (e.lead_name && e.fb_id) return e;
+    return {
+      ...e,
+      lead_name: e.lead_name ?? ref.name,
+      fb_id: e.fb_id ?? ref.fireberryId,
+    };
+  });
+}
+
 /* ------------------------------------------------- request-side conveniences */
 
 /** Client address as the proxy chain reported it. */

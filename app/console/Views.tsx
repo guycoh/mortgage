@@ -17,7 +17,7 @@ import DataTable from "./ui/DataTable";
 import VisitDrawer from "./ui/VisitDrawer";
 import ActionDrawer from "./ui/ActionDrawer";
 import { Badge, Segmented, SegmentedItem } from "./ui/kit";
-import { Dial, Empty, Legend, Panel, Readout, StandingBy, Trail, ViewFade, Who } from "./ui/parts";
+import { Dial, Empty, Legend, Panel, Readout, RecordLink, StandingBy, Trail, ViewFade, Who } from "./ui/parts";
 import { ACTION, OUTCOME, SERIES } from "./lib/tokens";
 import {
   bankLabel,
@@ -68,7 +68,10 @@ const ah = createColumnHelper<Action>();
 
 const actionColumns = [
   ah.accessor("ts", { header: "מתי", cell: (c) => <span className="cns-num">{stamp(c.getValue())}</span> }),
-  ah.accessor("operator", { header: "נציג", cell: (c) => <Who name={c.getValue()} /> }),
+  ah.accessor("operator", {
+    header: "נציג",
+    cell: (c) => <Who name={c.getValue()} source={c.row.original.operatorSource} />,
+  }),
   ah.accessor("lead", {
     header: "לקוח",
     cell: (c) => <span className="font-medium text-cns-fg">{c.getValue()}</span>,
@@ -178,7 +181,7 @@ export function Work({
           <span className="cns-dot mt-[7px]" data-tone="warn" />
           <span>
             <b className="font-semibold">{num(unnamed)} פעולות בלי שם נציג.</b> הכפתור
-            בפיירברי מעביר את בעל הרשומה בפרמטר{" "}
+            בפיירברי מעביר את המשתמש המחובר בפרמטר{" "}
             <code className="cns-num rounded bg-[#7a5406]/10 px-1 text-[11.5px]">?u=</code> — כניסות
             מכפתור בגרסה ישנה נרשמות כ״לא מזוהה״.
           </span>
@@ -259,7 +262,10 @@ const vh = createColumnHelper<Visit>();
 
 const visitColumns = [
   vh.accessor("start", { header: "מתי", cell: (c) => <span className="cns-num">{stamp(c.getValue())}</span> }),
-  vh.accessor("operator", { header: "נציג", cell: (c) => <Who name={c.getValue()} /> }),
+  vh.accessor("operator", {
+    header: "נציג",
+    cell: (c) => <Who name={c.getValue()} source={c.row.original.operatorSource} />,
+  }),
   vh.accessor("lead", {
     header: "לקוח",
     cell: (c) => <span className="font-medium text-cns-fg">{c.getValue()}</span>,
@@ -488,6 +494,12 @@ const leadColumns = [
     cell: (c) => <span className="font-medium text-cns-fg">{c.getValue()}</span>,
   }),
   lh.accessor((r) => r.leadId ?? "", { id: "leadId", header: "מזהה", cell: (c) => <span className="cns-num">{c.getValue() || "—"}</span> }),
+  lh.accessor((r) => r.fbId ?? "", {
+    id: "fbId",
+    header: "רשומה בפיירברי",
+    enableSorting: false,
+    cell: (c) => <RecordLink id={c.row.original.fbId} url={c.row.original.fbUrl} />,
+  }),
   lh.accessor((r) => r.clients.join(" · "), { id: "clients", header: "שמות בדוחות", cell: (c) => c.getValue() || "—" }),
   lh.accessor((r) => r.operators.join(" · "), { id: "ops", header: "טופל בידי", cell: (c) => c.getValue() || "—" }),
   lh.accessor("imports", { header: "ייבואים", cell: (c) => <span className="cns-num">{num(c.getValue())}</span> }),
@@ -505,7 +517,7 @@ export function People({ data }: { data: Dashboard }) {
         <Dial label="זמן עבודה" value={duration(data.kpis.activeMinutes)} />
       </Readout>
 
-      <Panel title="נציגים" hint="השם מגיע מכפתור פיירברי שדרכו נכנסו" flush>
+      <Panel title="נציגים" hint="המשתמש שהיה מחובר לפיירברי כשנכנס לבורד" flush>
         <DataTable
           data={data.byOperator}
           columns={operatorColumns}
@@ -515,7 +527,7 @@ export function People({ data }: { data: Dashboard }) {
           empty={
             <Empty
               title="עוד לא זוהו נציגים"
-              body="הכפתור בפיירברי מעביר את שם בעל הרשומה בפרמטר ‎?u=‎. כניסות מכפתור ישן יופיעו כ״לא מזוהה״."
+              body="הכפתור בפיירברי מעביר את המשתמש המחובר בפרמטר ‎?u=‎. כניסות מכפתור ישן יופיעו כ״לא מזוהה״."
             />
           }
         />

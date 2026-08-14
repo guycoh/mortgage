@@ -106,8 +106,24 @@ export function Dial({
 
 /* ------------------------------------------------------------------ atoms */
 
-/** Operator identity: the same monogram and colour everywhere, forever. */
-export function Who({ name, mono = false }: { name: string; mono?: boolean }) {
+/**
+ * Operator identity: the same monogram and colour everywhere, forever.
+ *
+ * `source="owner"` marks the one case where the name is NOT the person who sat
+ * down — the live Fireberry login could not be read and this is the record's
+ * מנהל לקוח standing in. It is called out rather than shown plain because a
+ * name in a column headed נציג is a claim about who did the work, and this
+ * panel spent its first fortnight quietly making that claim wrongly.
+ */
+export function Who({
+  name,
+  mono = false,
+  source = "",
+}: {
+  name: string;
+  mono?: boolean;
+  source?: "user" | "owner" | "";
+}) {
   return (
     <span className="inline-flex items-center gap-2">
       <i
@@ -117,8 +133,57 @@ export function Who({ name, mono = false }: { name: string; mono?: boolean }) {
       >
         {initials(name)}
       </i>
-      {mono ? null : <span className="text-cns-fg">{name}</span>}
+      {mono ? null : (
+        <span className="inline-flex items-baseline gap-1.5">
+          <span className="text-cns-fg">{name}</span>
+          {source === "owner" ? (
+            <span
+              className="rounded border border-cns-line bg-cns-muted px-1 py-px text-[10px] whitespace-nowrap text-cns-mutedfg"
+              title="שם בעל הרשומה בפיירברי — לא ניתן היה לזהות את המשתמש המחובר, וייתכן שמי שפתח בפועל הוא מישהו אחר"
+            >
+              בעל הרשומה
+            </span>
+          ) : null}
+        </span>
+      )}
     </span>
+  );
+}
+
+/**
+ * The Fireberry record a session came in from — the way back to the CRM.
+ *
+ * The URL is only present when the button that opened the session sent it, so
+ * this degrades in steps rather than disappearing: a link when we have one, the
+ * account id when we only have that, and an em dash when the session predates
+ * both. The id is shown either way, because it is what you paste into Fireberry
+ * search when the link is missing.
+ */
+export function RecordLink({ id, url }: { id: string | null; url: string | null }) {
+  if (!id && !url) return <>—</>;
+
+  const short = id ? id.slice(0, 8).toUpperCase() : "רשומה";
+  const body = (
+    <span dir="ltr" className="font-[family-name:var(--cns-mono)] text-[11.5px]">
+      {short}
+    </span>
+  );
+
+  if (!url) return <span title={id ?? undefined}>{body}</span>;
+
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noreferrer noopener"
+      title={id ?? undefined}
+      className="inline-flex items-center gap-1.5 text-cns-accent underline decoration-cns-accent/30 underline-offset-2 hover:decoration-cns-accent"
+    >
+      {body}
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>
+        <path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </a>
   );
 }
 

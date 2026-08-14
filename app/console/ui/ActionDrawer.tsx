@@ -13,7 +13,7 @@ import { ACTION } from "../lib/tokens";
 import { bankLabel, KIND_LABEL, ms, nis, num } from "../lib/labels";
 import { stamp, zoned } from "../lib/time";
 import { Badge } from "./kit";
-import { Who } from "./parts";
+import { RecordLink, Who } from "./parts";
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -87,7 +87,7 @@ export default function ActionDrawer({
               </div>
               <h2 style={{ fontSize: 19, margin: "2px 0 10px" }}>{action.lead}</h2>
               <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                <Who name={action.operator} />
+                <Who name={action.operator} source={action.operatorSource} />
                 <Badge variant={action.kind === "failed" ? "bad" : "secondary"}>
                   <i
                     aria-hidden
@@ -110,6 +110,10 @@ export default function ActionDrawer({
               <dl className="cns-def">
                 <Row label="שעה" value={<span className="num">{zoned(action.ts).hm}</span>} />
                 <Row label="מזהה ליד" value={<span className="num">{action.leadId ?? "—"}</span>} />
+                <Row
+                  label="רשומה בפיירברי"
+                  value={<RecordLink id={action.fbId} url={action.fbUrl} />}
+                />
                 {action.client ? <Row label="שם בדוח" value={action.client} /> : null}
                 {action.clientId ? (
                   <Row label="ת.ז" value={<span className="num">{action.clientId}</span>} />
