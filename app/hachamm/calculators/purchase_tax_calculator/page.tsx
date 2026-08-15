@@ -1,9 +1,13 @@
 "use client";
 import { useState } from "react";
+
 import { Calculator, RotateCcw } from "lucide-react";
 import { HmButton } from "../../components/HmButton";
 import { HmFigure } from "../../components/HmFigure";
 import { HmReveal } from "../../components/HmReveal";
+
+import CustomButton from "@/app/home/components/CustomButton";
+
 
 const PurchaseTaxForm = () => {
   const [propertyPrice, setPropertyPrice] = useState<number | "">("");
