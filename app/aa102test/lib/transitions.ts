@@ -117,6 +117,18 @@ export const viewIn = (dir: -1 | 1) => ({
   initial: { opacity: 0, x: 8 * dir },
   animate: { opacity: 1, x: 0 },
   exit: viewOut,
+  /**
+   * The scroll-to-top rides the END OF THE EXIT — the one moment the stage is
+   * empty and a jump cannot be seen. It lives on the element rather than on
+   * AnimatePresence's onExitComplete because the element's completion is the
+   * thing actually being waited on; the exit is recognised by its own target
+   * (opacity 0 — the entry ends at 1), so the entry finishing scrolls nothing.
+   */
+  onAnimationComplete: (def: unknown) => {
+    if (typeof def === "object" && def !== null && (def as { opacity?: number }).opacity === 0) {
+      window.scrollTo(0, 0);
+    }
+  },
   transition: {
     x: { duration: 0.3, ease: [0.2, 0, 0, 1] as [number, number, number, number] },
     opacity: { duration: 0.2, ease: "easeOut" as const },

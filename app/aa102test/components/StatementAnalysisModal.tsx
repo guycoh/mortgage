@@ -25,7 +25,9 @@ import {
   IdentificationCard,
   Printer,
   Receipt,
+  SealCheck,
   ShieldWarning,
+  Target,
   TrendUp,
   Warning,
   X,
@@ -40,6 +42,7 @@ import {
   type StatementAnalysis,
 } from "@/lib/bank-parser/analysis";
 import type { BankTranche } from "@/lib/bank-parser/types";
+import { PURPOSE_LABEL } from "@/lib/bank-parser/purpose";
 import { FREQ_PRIME, freqLabel } from "@/lib/rate-frequency";
 
 const pct = (n: number) => `${Math.round(n * 100)}%`;
@@ -234,6 +237,16 @@ export default function StatementAnalysisModal({
   const a = analysis;
   const st = a.statement;
 
+  // One chip per distinct purpose in the file. A statement usually holds one,
+  // but Leumi ships two mortgages in a single PDF and they need not agree.
+  // A purpose the lender did not state gets no chip: an empty header is honest,
+  // "לא צוין" beside the bank's name reads like a finding.
+  const purposes = st.loans
+    .filter((l) => l.purposeKind !== "unknown")
+    .map((l) => PURPOSE_LABEL[l.purposeKind])
+    .filter((label, i, all) => all.indexOf(label) === i);
+  const eligibility = st.loans.some((l) => l.funding === "eligibility");
+
   const goTo = (id: string) => {
     setTab(id);
     const body = bodyRef.current;
@@ -317,6 +330,23 @@ export default function StatementAnalysisModal({
               <IdentificationCard size={12} />
               {st.client.name}
               {st.client.idNumber && <span className="lgr-fig" style={{ color: "var(--lgr-4)" }}>{st.client.idNumber}</span>}
+            </span>
+          )}
+          {/* מטרת ההלוואה. Four lenders word it four ways ("רכישת דירה יד שניה",
+              "הלוואה לדיור לרכישה", "לווה פרטי-מגורים", "דיור"), so the chip
+              carries the normalised label and the lender's own words sit in the
+              loans table below. A זכאות is called out separately: it is state
+              money on its own terms, not a variety of purpose. */}
+          {purposes.length > 0 && (
+            <span className="lgr-chip" style={{ color: "var(--lgr-2)" }}>
+              <Target size={12} />
+              {purposes.join(" · ")}
+            </span>
+          )}
+          {eligibility && (
+            <span className="lgr-chip" style={{ color: "var(--lgr-2)" }}>
+              <SealCheck size={12} weight="fill" />
+              זכאות
             </span>
           )}
           {st.statementDate && (
@@ -724,6 +754,7 @@ export default function StatementAnalysisModal({
                   <thead>
                     <tr>
                       <th>הלוואה</th>
+                      <th className="text-start">מטרה</th>
                       <th>מסלולים</th>
                       <th>יתרה</th>
                       <th>לסילוק</th>
@@ -735,6 +766,15 @@ export default function StatementAnalysisModal({
                     {st.loans.map((l) => (
                       <tr key={l.loanNumber}>
                         <td className="lgr-fig">{l.loanNumber}</td>
+                        {/* The lender's own wording, because on this table an
+                            advisor is reconciling against the printed page. The
+                            normalised label goes in the header chip instead. */}
+                        <td className="text-start" style={{ color: "var(--lgr-3)" }}>
+                          {l.purpose || PURPOSE_LABEL[l.purposeKind]}
+                          {l.funding === "eligibility" && (
+                            <span className="lgr-fig" style={{ color: "var(--lgr-4)" }}> · זכאות</span>
+                          )}
+                        </td>
                         <td className="lgr-fig">{l.tranches.length}</td>
                         <td>{l.printed.balance ? <Money value={l.printed.balance} block={false} /> : "—"}</td>
                         <td>{l.printed.payoff ? <Money value={l.printed.payoff} block={false} /> : "—"}</td>
@@ -748,8 +788,8 @@ export default function StatementAnalysisModal({
             )}
             {a.warnings.length > 0 && (
               <ul className="mt-2.5 grid gap-1">
-                {a.warnings.map((w) => (
-                  <li key={w} className="flex items-start gap-1.5 text-[11.5px]" style={{ color: "var(--lgr-4)" }}>
+                {a.warnings.map((w, i) => (
+                  <li key={`${i}:${w}`} className="flex items-start gap-1.5 text-[11.5px]" style={{ color: "var(--lgr-4)" }}>
                     <Warning size={12} weight="fill" className="mt-0.5 flex-none" />
                     {w}
                   </li>

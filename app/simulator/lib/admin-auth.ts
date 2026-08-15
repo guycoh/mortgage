@@ -1,4 +1,4 @@
-// Session plumbing for the admin panel (/adminoam). Shared by the auth route
+// Session plumbing for the monitoring console (/console). Shared by the auth route
 // (which checks credentials and mints the cookie) and the page (which verifies
 // it) — a route file may only export HTTP methods, so the logic lives here.
 //

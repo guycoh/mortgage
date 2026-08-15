@@ -65,6 +65,12 @@ export async function POST(req: NextRequest) {
     surface: "board",
     lead_id: session.leadId,
     operator: session.operator || null,
+    // Stamped AFTER the spread on purpose: `data` is the one field the client
+    // can put arbitrary keys in, and the server's account of who this is must
+    // not be something the beacon can talk over.
+    data: session.operatorSource
+      ? { ...(parsed.data ?? {}), operator_source: session.operatorSource }
+      : (parsed.data ?? null),
     ip: requestIp(req),
     ua: requestUa(req),
   };

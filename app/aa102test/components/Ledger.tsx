@@ -18,13 +18,17 @@
 // resets — it is the difference between a 3% tranche that stays 3% and one that
 // reprices next spring.
 
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
+  ArrowCounterClockwise,
+  ArrowsClockwise,
   Bank,
+  CircleNotch,
   HandCoins,
   Plus,
   Sliders,
+  ShieldWarning,
   Table as TableIcon,
   Trash,
   Warning,
@@ -39,23 +43,75 @@ import Money from "./Money";
 import RowSettings from "./RowSettings";
 import Btn from "./Btn";
 import { settle, snap } from "../lib/transitions";
+import Toaster, { type Toast, type ToastTone } from "./Toast";
 import {
   FAMILY,
   PATH_SHORT,
   TRACK_HEX,
+  isSurety,
   rateHeat,
   type DebtGroup,
   type ImportedLoan,
 } from "../lib/credit";
 import { addMonths, monthsBetween, parseDate, startOfToday, toIso } from "../lib/dates";
+import { lenderOf } from "../lib/lenders";
 import { freqLabel } from "@/lib/rate-frequency";
+import type { AnchorResponse } from "@/lib/anchors/types";
 
 const ORDER: DebtGroup[] = ["mortgage", "loan"];
+
+/**
+ * THE SWEEP'S CLOCK.
+ *
+ * Under two seconds, and gone. A mark that lingers stops being feedback and
+ * becomes a state the reader has to dismiss in their head — so the bloom is
+ * fully clear well before anyone would reach to get rid of it.
+ *
+ * The 65ms stagger is the whole trick. Simultaneous is a flash and reads as an
+ * error state; too slow and the reader loses that the rows are one event. At
+ * 65ms four rows resolve in a fifth of a second — fast enough to be one
+ * gesture, slow enough that the eye can follow it down the column.
+ */
+const FLASH_TOTAL_MS = 1900;
+const FLASH_STAGGER_MS = 65;
+
+/** Toast ids only have to be unique within a session, and monotonic for order. */
+let toastSeq = 1;
 
 const FAM_ICON = {
   mortgage: <Bank size={12} weight="fill" className="lgr-fam-ico" />,
   loan: <HandCoins size={12} weight="fill" className="lgr-fam-ico" />,
 } as const;
+
+/** The family's palette as CSS variables, for a row or for its subtotal bar. */
+const famVarsOf = (key: DebtGroup): React.CSSProperties => {
+  const fam = FAMILY[key];
+  return {
+    "--fam": fam.color,
+    "--fam-text": fam.text,
+    "--fam-tint": fam.tint,
+    "--fam-tint-2": fam.tint2,
+    "--fam-line": fam.line,
+    "--fam-wash": fam.wash,
+    "--fam-ring": fam.ring,
+  } as React.CSSProperties;
+};
+
+/**
+ * The guarantee section's bar — slate, not a third family colour and not a
+ * warning colour. The two families are identity; this is a different KIND of
+ * fact about the board, and a red or amber bar would read as "this debt is in
+ * trouble" rather than "this debt is not the client's".
+ */
+const SURETY_VARS = {
+  "--fam": "#64748b",
+  "--fam-text": "#475569",
+  "--fam-tint": "#eef1f5",
+  "--fam-tint-2": "#e2e7ee",
+  "--fam-line": "#d3dae3",
+  "--fam-wash": "#f7f9fb",
+  "--fam-ring": "rgba(100, 116, 139, 0.4)",
+} as React.CSSProperties;
 
 /** Fields whose change we mark with the corner tick. */
 const TRACKED = [
@@ -72,6 +128,7 @@ const TRACKED = [
   "change_frequency",
   "anchor_interval",
   "source_anchor",
+  "is_guarantor",
 ] as const;
 
 type Baseline = Record<string, ImportedLoan>;
@@ -106,6 +163,19 @@ export default function Ledger({
 }) {
   const [armed, setArmed] = useState<string | null>(null);
   const [sheet, setSheet] = useState<{ id: string; rect: DOMRect } | null>(null);
+  const [anchorBusy, setAnchorBusy] = useState(false);
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  /**
+   * THE SWEEP.
+   *
+   * Which rows just changed, and when. `at` is a nonce, not a clock: it keys the
+   * overlay so pressing the button twice replays the light rather than leaving a
+   * finished animation mounted and inert. `ids` is ordered top-to-bottom, and the
+   * index in it is the row's place in the stagger — which is what turns "four
+   * numbers changed" into one legible event travelling down the mix instead of
+   * four unrelated flashes.
+   */
+  const [flash, setFlash] = useState<{ ids: string[]; at: number } | null>(null);
   /* While a percent cell has focus the field shows what was TYPED, not what the
      amount rounds back to — otherwise "2" becomes "2.0" under the caret and the
      next keystroke lands in the wrong place. */
@@ -114,6 +184,24 @@ export default function Ledger({
 
   const patch = (id: string, next: Partial<ImportedLoan>) =>
     onChange(loans.map((l) => (l.id === id ? { ...l, ...next } : l)));
+
+  /** Raise a toast. Three on screen at once is the ceiling; older ones drop. */
+  const toast = (tone: ToastTone, message: string, detail?: string, ttl = 5200) =>
+    setToasts((prev) => [...prev.slice(-2), { id: toastSeq++, tone, message, detail, ttl }]);
+
+  const dismissToast = useCallback(
+    (id: number) => setToasts((prev) => prev.filter((t) => t.id !== id)),
+    []
+  );
+
+  // The sweep unmounts once it has finished. Leaving a completed animation in the
+  // tree costs a compositor layer per row for nothing, and — more to the point —
+  // a `data-flash` that never clears would leave the wells tinted green forever.
+  useEffect(() => {
+    if (!flash) return;
+    const t = setTimeout(() => setFlash(null), FLASH_TOTAL_MS + flash.ids.length * FLASH_STAGGER_MS);
+    return () => clearTimeout(t);
+  }, [flash]);
 
   const remove = (id: string) => {
     onChange(loans.filter((l) => l.id !== id));
@@ -229,6 +317,10 @@ export default function Ledger({
 
   /** The sum spelled out, for the cell's tooltip: anchor + margin = the rate. */
   const anchorTip = (loan: ImportedLoan) => {
+    // A row the refresh declined to price says why, and says it here rather than
+    // anywhere that would make the grid taller. It is the only place the reason
+    // exists, so it comes first.
+    if (loan.anchor_note) return loan.anchor_note;
     if (loan.anchor === null && loan.anchor_margin === null)
       return "המסמך לא ציין עוגן לשורה הזו";
     const parts = [loan.source_anchor || "עוגן"];
@@ -237,6 +329,21 @@ export default function Ledger({
     if (loan.anchor_margin !== null && Number.isFinite(Number(loan.anchor_margin)))
       parts.push(`מרווח ${signed(Number(loan.anchor_margin))}`);
     parts.push(`סה"כ ${(Number(loan.rate) || 0).toFixed(2)}%`);
+    // Where a refreshed anchor came from and how old it is. Both are the point of
+    // the button: the value is only worth anything if you can see its date, and an
+    // unverified source has to say so rather than borrow the credibility of one
+    // that was checked against the bank's own price list.
+    if (loan.anchor_asof) {
+      const [y, m, d] = loan.anchor_asof.split("-");
+      parts.push(
+        `${loan.anchor_stale ? "העוגן האחרון שפורסם" : "עוגן עדכני"} · ${loan.anchor_source ?? "מקור"} · נכון ל־${d}/${m}/${y}`
+      );
+      // The cadence is what makes the date mean something: "נכון ל־01/07" says
+      // little until you know the curve republishes monthly, and that a figure
+      // dated the 1st is the current one for weeks after.
+      if (loan.anchor_cadence) parts.push(`מתעדכן ${loan.anchor_cadence}`);
+      if (loan.anchor_verified === false) parts.push("המקור טרם אומת מול פרסום הבנק");
+    }
     return parts.join(" · ");
   };
 
@@ -255,27 +362,45 @@ export default function Ledger({
   // which is what the base mix means by default.
   const famOf = (l: ImportedLoan): DebtGroup => (l.group === "loan" ? "loan" : "mortgage");
 
-  const groups = useMemo(
-    () =>
-      ORDER.map((key) => {
-        const rows = loans.filter((l) => famOf(l) === key);
-        return {
-          key,
-          rows,
-          amount: rows.reduce((s, l) => s + (Number(l.amount) || 0), 0),
-          monthly: rows.reduce((s, l) => s + calculateLoan(l, annualInflation).monthlyPayment, 0),
-        };
-      }),
-    [loans, annualInflation]
-  );
+  /**
+   * THREE SECTIONS, TWO OF WHICH ARE THE CLIENT'S.
+   *
+   * Guarantees are still rows on this board — they are imported fact, they are
+   * saved with the mix, and an advisor has to be able to correct one. What they
+   * are not is part of any total: see isSurety in lib/credit. So they get a
+   * section of their own, last, whose subtotal is stated and then left out of
+   * סה"כ — the same shape the Excel export takes, so the sheet and the screen
+   * can never quote different numbers at each other.
+   */
+  const sections = useMemo(() => {
+    // ROUNDED PER ROW, then added — because that is what the reader does. Every
+    // row prints its payment through Money, which rounds, so a subtotal that
+    // sums the raw values and rounds once at the end can miss the column above
+    // it by a shekel: 13,870 + 20,999 came to 34,868. The Excel export is forced
+    // into the same rule by its SUM() formulas, so this also keeps the sheet and
+    // the screen from quoting different numbers at each other.
+    const of = (rows: ImportedLoan[]) => ({
+      rows,
+      amount: rows.reduce((s, l) => s + Math.round(Number(l.amount) || 0), 0),
+      monthly: rows.reduce((s, l) => s + Math.round(calculateLoan(l, annualInflation).monthlyPayment), 0),
+    });
+    const owed = loans.filter((l) => !isSurety(l));
+    return [
+      ...ORDER.map((key) => ({ key, ...of(owed.filter((l) => famOf(l) === key)) })),
+      { key: "surety" as const, ...of(loans.filter(isSurety)) },
+    ];
+  }, [loans, annualInflation]);
 
-  const grand = useMemo(
-    () => ({
-      amount: loans.reduce((s, l) => s + (Number(l.amount) || 0), 0),
-      monthly: loans.reduce((s, l) => s + calculateLoan(l, annualInflation).monthlyPayment, 0),
-    }),
-    [loans, annualInflation]
-  );
+  /** The client's own — never the guarantees. */
+  const grand = useMemo(() => {
+    const own = sections.filter((s) => s.key !== "surety");
+    return {
+      amount: own.reduce((s, g) => s + g.amount, 0),
+      monthly: own.reduce((s, g) => s + g.monthly, 0),
+    };
+  }, [sections]);
+
+  const surety = sections[sections.length - 1];
 
   /* ------------------------------------------------------------------ אחוז */
   // THE PERCENT HAS TO BE A PERCENT OF SOMETHING THAT HOLDS STILL.
@@ -337,7 +462,175 @@ export default function Ledger({
     </div>
   );
 
+  /** Add a row from the bottom, so a long list never sends you back up. */
+  const addRow = (
+    <tr className="lgr-addrow">
+      <td colSpan={13}>
+        <div className="lgr-addrow-in">
+          {addBtns()}
+          <span className="lgr-addrow-hint">הוספת שורה ריקה לתמהיל</span>
+        </div>
+      </td>
+    </tr>
+  );
+
   const sheetLoan = sheet ? loans.find((l) => l.id === sheet.id) : null;
+
+  /* ------------------------------------------------- עדכון עוגנים ------- */
+  /**
+   * Replace each variable row's anchor with what that anchor is worth NOW.
+   *
+   * The anchor on an imported row is the one that priced the tranche on the day
+   * it was taken — 0.97% on a five-year track struck in 2022. To ask what
+   * recycling that tranche would cost you need the same anchor today, and the
+   * two are different facts about the same track rather than a correction of one
+   * by the other. So the original is kept on the row and can be put back.
+   *
+   * One request for the whole mix. The server holds the published tables; the
+   * board sends only what prices a row — lender, track, reset period — and gets
+   * a verdict per row. Anything it will not price is left exactly as it was,
+   * because a made-up anchor walks straight into a repayment schedule.
+   */
+  const refreshAnchors = async () => {
+    if (anchorBusy) return;
+    setAnchorBusy(true);
+    setFlash(null);
+    try {
+      const res = await fetch("/api/simulator/anchors", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          rows: loans.map((l) => ({
+            rowId: l.id,
+            // The registry is keyed by the short name, not the document's legal
+            // one: "הבנק הבינלאומי הראשון לישראל בע\"מ" is הבינלאומי here.
+            bank: l.source_bank ? lenderOf(l.source_bank).name : "",
+            pathId: Number(l.path_id) || 0,
+            resetMonths:
+              l.anchor_interval === null || l.anchor_interval === undefined
+                ? null
+                : Number(l.anchor_interval) || null,
+          })),
+        }),
+      });
+      if (!res.ok) throw new Error(String(res.status));
+      const data: AnchorResponse = await res.json();
+
+      const byId = new Map(data.rows.map((r) => [r.rowId, r]));
+      const changed: string[] = [];
+      let updated = 0;
+      let eligible = 0;
+
+
+      const next = loans.map((l) => {
+        const r = byId.get(l.id);
+        if (!r) return l;
+        // NOT_APPLICABLE is a fixed row, which was never a candidate. Only the
+        // rows that SHOULD have priced count towards "3 מתוך 4".
+        if (r.status !== "NOT_APPLICABLE") eligible++;
+        if (r.status !== "RESOLVED" || r.anchor === undefined) {
+          return { ...l, anchor_note: r.reason ?? undefined };
+        }
+        const before = Number(l.anchor);
+        const had = l.anchor !== null && l.anchor !== undefined && Number.isFinite(before);
+        if (had && Math.abs(before - r.anchor) < 0.0005) {
+          // Already current. Not a change, and not a failure either.
+          return { ...l, anchor_asof: r.effectiveAt, anchor_source: r.familyLabel, anchor_note: undefined };
+        }
+        updated++;
+        // Collected in row order, because the stagger reads down the board.
+        changed.push(l.id);
+        const margin = Number(l.anchor_margin);
+        const hasMargin = l.anchor_margin !== null && l.anchor_margin !== undefined && Number.isFinite(margin);
+        return {
+          ...l,
+          // Written once. Pressing the button twice must not overwrite the
+          // client's own anchor with the previous refresh's value.
+          anchor_original: l.anchor_original !== undefined ? l.anchor_original : (had ? before : null),
+          anchor: r.anchor,
+          // ריבית = עוגן + מרווח is this board's existing arithmetic, not a new
+          // rule — anchorRate() in lib/credit derives the anchor by subtracting
+          // the margin from the rate. Where the document gave no margin there is
+          // nothing to add to, and the rate is left alone rather than replaced by
+          // a bare anchor.
+          rate: hasMargin ? Math.round((r.anchor + margin) * 100) / 100 : l.rate,
+          anchor_asof: r.effectiveAt,
+          anchor_source: r.familyLabel,
+          anchor_verified: r.verified,
+          anchor_stale: r.stale,
+          anchor_cadence: r.cadence,
+          anchor_note: undefined,
+        };
+      });
+
+      onChange(next);
+
+      // The light only fires on rows that actually moved. Sweeping a row whose
+      // anchor was already current would be the animation telling a small lie.
+      if (changed.length) setFlash({ ids: changed, at: Date.now() });
+
+      if (updated === 0) {
+        toast(
+          "neutral",
+          eligible === 0 ? "אין בתמהיל מסלולים הנגזרים מעוגן" : "העוגנים כבר עדכניים",
+          eligible === 0 ? "כל השורות בריבית קבועה" : undefined
+        );
+      } else {
+        // The count that did not resolve is the honest half of the sentence, and
+        // it belongs on its own line rather than buried in the headline.
+        const missed = eligible - updated;
+        toast(
+          "pos",
+          updated === eligible
+            ? `עודכנו ${updated} עוגנים לפי בנק ישראל`
+            : `עודכנו ${updated} מתוך ${eligible} עוגנים`,
+          // Only what the advisor can act on. How old our cache is, is our
+          // problem — the button's whole promise is that pressing it gives the
+          // current anchor, and reporting our own staleness to the person who
+          // just pressed it makes them audit our plumbing instead of reading
+          // their client's mortgage. Freshness is enforced upstream, in the
+          // refresh route; see docs/mortgage-anchor-sources.md.
+          missed > 0
+            ? `${missed} שורות נותרו ללא שינוי — חסר מידע לזיהוי העוגן`
+            : undefined
+        );
+      }
+    } catch {
+      toast("neg", "לא ניתן היה לקבל עוגנים עדכניים", "השורות נותרו ללא שינוי");
+    } finally {
+      setAnchorBusy(false);
+    }
+  };
+
+  /** Put every refreshed row back to the anchor its document stated. */
+  const restoreAnchors = () => {
+    onChange(
+      loans.map((l) => {
+        if (l.anchor_original === undefined) return l;
+        const margin = Number(l.anchor_margin);
+        const hasMargin = l.anchor_margin !== null && l.anchor_margin !== undefined && Number.isFinite(margin);
+        const back = l.anchor_original;
+        return {
+          ...l,
+          anchor: back,
+          rate: hasMargin && back !== null ? Math.round((back + margin) * 100) / 100 : l.rate,
+          anchor_original: undefined,
+          anchor_asof: undefined,
+          anchor_source: undefined,
+          anchor_verified: undefined,
+          anchor_stale: undefined,
+          anchor_cadence: undefined,
+        };
+      })
+    );
+    setFlash(null);
+    toast("neutral", "הוחזרו העוגנים מהמסמך", "הריביות חושבו מחדש מהמרווח המקורי");
+  };
+
+  const refreshed = loans.filter((l) => l.anchor_original !== undefined).length;
+
+  /** A row's place in the sweep, or -1 if it did not change on this run. */
+  const flashOrder = (id: string) => (flash ? flash.ids.indexOf(id) : -1);
 
   /* ------------------------------------------------------------------- ui */
   return (
@@ -387,6 +680,48 @@ export default function Ledger({
           </div>
         )}
 
+        {/* עדכון עוגנים.
+            PROPOSALS ONLY. The master mix is what the client owes today, read off
+            their documents — replacing its anchors with this month's would
+            overwrite the record with a simulation and leave nothing to compare
+            against. On a copy the same act is the whole question: what would this
+            tranche cost if it repriced now?
+
+            It sits in the card header rather than in the עוגן column head: the
+            column is 9.5% of the grid, which fits an 11px icon and no word, and
+            an unlabelled glyph over a numeric column reads as a sort control. Up
+            here it can say what it does, and its result can be a sentence beside
+            it instead of a tooltip. */}
+        {!isBase && (
+          <div className="lgr-anchor-bar">
+            <Btn className="lgr-btn lgr-btn-sm" onClick={refreshAnchors} disabled={anchorBusy}>
+              {anchorBusy ? (
+                <CircleNotch size={13} weight="bold" className="lgr-spin" />
+              ) : (
+                <ArrowsClockwise size={13} weight="bold" />
+              )}
+              עדכון עוגנים
+            </Btn>
+            {/* Only once there is something to go back TO. An always-present
+                restore implies the board is in a state that needs undoing. */}
+            <AnimatePresence initial={false}>
+              {refreshed > 0 && !anchorBusy && (
+                <motion.div
+                  initial={{ opacity: 0, x: 6, scale: 0.96 }}
+                  animate={{ opacity: 1, x: 0, scale: 1 }}
+                  exit={{ opacity: 0, x: 6, scale: 0.96, transition: { duration: 0.14 } }}
+                  transition={snap}
+                >
+                  <Btn className="lgr-btn lgr-btn-sm" onClick={restoreAnchors}>
+                    <ArrowCounterClockwise size={13} weight="bold" />
+                    שחזור
+                  </Btn>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
+
         <div className="ms-auto">{addBtns()}</div>
       </header>
 
@@ -410,24 +745,33 @@ export default function Ledger({
         <div>
           <table className="lgr-table">
             <colgroup>
-              {/* Twelve columns summing to 100. תאריך סיום is the one that must
+              {/* Fourteen columns summing to 100. תאריך סיום is the one that must
                   not be squeezed: a ten-character date plus the calendar button
                   is the widest fixed content in the grid, and shaving it is what
                   put the button on top of the digits. It gets 10% here, and the
                   button's space is reserved in padding rather than hoped for —
-                  see .lgr-date-in. */}
+                  see .lgr-date-in.
+
+                  גוף מימון costs 9.5%, and 2.5 of those came back out of סכום:
+                  the lender used to ride inside the amount cell as a 14px disc
+                  with a 26px reserved lane and another 34px for its tags, on a
+                  cell that also had to hold a six-figure number. Giving the
+                  lender its own column hands סכום back to the money. The rest is
+                  half a point each off six columns that were carrying slack. */}
               {[
-                "9.5%", // סוג
-                "11%", // סכום
-                "6%", // אחוז
-                "9%", // מסלול
-                "8%", // לוח סילוקין
-                "12%", // עוגן / מרווח
-                "5.5%", // ריבית %
-                "8%", // תדירות שינוי
-                "5.5%", // חודשים
-                "10%", // תאריך סיום
-                "9.5%", // החזר חודשי
+                "8%", // סוג
+                "7%", // מטרה
+                "9%", // גוף מימון
+                "8.5%", // סכום
+                "5%", // אחוז
+                "7.5%", // מסלול
+                "7%", // לוח סילוקין
+                "9.5%", // עוגן / מרווח
+                "5%", // ריבית %
+                "6%", // תדירות שינוי
+                "5%", // חודשים
+                "9.5%", // תאריך סיום
+                "7%", // החזר חודשי
                 "6%", // actions
               ].map((w, i) => (
                 <col key={i} style={{ width: w }} />
@@ -436,6 +780,11 @@ export default function Ledger({
             <thead>
               <tr>
                 <th>סוג</th>
+                {/* מטרת ההלוואה, beside the type it qualifies: "משכנתא" says what
+                    the debt is, "כל מטרה" says what it was for, and the second
+                    changes how the first reads. */}
+                <th>מטרה</th>
+                <th>גוף מימון</th>
                 <th>סכום</th>
                 {/* the same fact as סכום in the other unit, so it sits beside it
                     rather than at the far edge of the grid */}
@@ -467,22 +816,56 @@ export default function Ledger({
 
             <AnimatePresence initial={false} mode="popLayout">
             <tbody>
-              {groups.map((g) => {
+              {sections.map((g) => {
                 if (!g.rows.length) return null;
-                const fam = FAMILY[g.key];
-                const famVars = {
-                  "--fam": fam.color,
-                  "--fam-text": fam.text,
-                  "--fam-tint": fam.tint,
-                  "--fam-tint-2": fam.tint2,
-                  "--fam-line": fam.line,
-                  "--fam-wash": fam.wash,
-                  "--fam-ring": fam.ring,
-                } as React.CSSProperties;
+                const isSuretySection = g.key === "surety";
 
                 return (
                   <Fragment key={g.key}>
+                    {/* WHERE THE CLIENT'S LEDGER ENDS.
+                        The guarantee block used to run on from the loans as if
+                        it were a third family, and with the grand total below it
+                        the eye had no reason to stop. So the mix is closed first
+                        — its add-row, then a band of the page itself showing
+                        through the card — and the guarantees open afterwards
+                        under a heading of their own. The heading is the word and
+                        nothing else: the bar below it already carries the
+                        "לא נכלל בסה"כ" chip, the grand total says ללא ערבויות,
+                        and every row is tagged ערב, so a sentence here was the
+                        fourth statement of one fact. */}
+                    {isSuretySection && (
+                      <>
+                        {addRow}
+                        <tr className="lgr-sec-gap" aria-hidden>
+                          <td colSpan={14} />
+                        </tr>
+                        <tr className="lgr-surety-head">
+                          <td colSpan={14}>
+                            <div className="lgr-surety-head-in">
+                              <ShieldWarning size={14} weight="fill" />
+                              <span className="lgr-surety-head-t">ערבויות</span>
+                            </div>
+                          </td>
+                        </tr>
+                      </>
+                    )}
                     {g.rows.map((loan) => {
+                      // THE FAMILY IS THE ROW'S, NOT THE SECTION'S. The guarantee
+                      // section holds both families at once — a guaranteed
+                      // mortgage is still a mortgage, and its chip, its spine and
+                      // its rate thresholds all have to say so.
+                      const key = famOf(loan);
+                      const fam = FAMILY[key];
+                      const famVars = {
+                        "--fam": fam.color,
+                        "--fam-text": fam.text,
+                        "--fam-tint": fam.tint,
+                        "--fam-tint-2": fam.tint2,
+                        "--fam-line": fam.line,
+                        "--fam-wash": fam.wash,
+                        "--fam-ring": fam.ring,
+                      } as React.CSSProperties;
+
                       const res = calculateLoan(loan, annualInflation);
                       const dirty = dirtyOf(loan);
                       const amount = Number(loan.amount) || 0;
@@ -493,8 +876,15 @@ export default function Ledger({
                       // an already-elapsed end date is stale data, not a blocker
                       const stale = !!end && end < today;
                       const flag = noTerm ? "err" : stale ? "warn" : undefined;
-                      const share = denom ? (amount / denom) * 100 : 0;
-                      const heat = rateHeat(loan.rate, g.key);
+                      // A guarantee is no share of the mix, because it is not in
+                      // the mix — the column says so rather than quoting a
+                      // percentage of a total this row is not part of.
+                      const share = isSuretySection || !denom ? 0 : (amount / denom) * 100;
+                      const heat = rateHeat(loan.rate, key);
+                      // Who the debt is with. Null on a hand-added row, which is
+                      // exactly the distinction the column is there to draw:
+                      // a named lender means the row is imported fact.
+                      const lender = loan.source_bank ? lenderOf(loan.source_bank) : null;
 
                       return (
                         <motion.tr
@@ -503,6 +893,7 @@ export default function Ledger({
                           className="lgr-row"
                           style={famVars}
                           data-flag={flag}
+                          data-surety={isSuretySection || undefined}
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
                           exit={{ opacity: 0 }}
@@ -512,7 +903,7 @@ export default function Ledger({
                           <td>
                             <Select
                               variant="chip"
-                              value={g.key}
+                              value={key}
                               onChange={(v) => patch(loan.id, { group: v as DebtGroup })}
                               ariaLabel="סוג ההתחייבות"
                               minWidth={148}
@@ -526,6 +917,98 @@ export default function Ledger({
                             <div className="lgr-share mt-0.5" title={`${share.toFixed(1)}% מהתמהיל`}>
                               <span style={{ width: `${Math.min(100, share)}%` }} />
                             </div>
+                          </td>
+
+                          {/* --- מטרה: WHAT THE MONEY WAS FOR ---
+                              Read, never edited: this is the document's claim,
+                              and a purpose typed over it would be indistinguish-
+                              able from one the bank printed.
+
+                              The wording is the source's own, because the four
+                              lenders each have their own and an advisor is
+                              reading against the letter in front of them —
+                              "רכישת דירה יד שניה" from מזרחי, "הלוואה לדיור
+                              לרכישה" from הפועלים, "לווה פרטי-מגורים" from
+                              לאומי. A חיווי אשראי row carries the report's much
+                              coarser 201-017 instead, and a hand-added row
+                              carries nothing at all, which the dash says.
+
+                              זכאות rides here as a tag rather than a column of
+                              its own: it is a different axis (whose money) but
+                              it only ever qualifies a purpose, and it is true of
+                              a handful of tranches in a file. */}
+                          <td>
+                            {loan.source_purpose ? (
+                              <span className="lgr-purpose" title={loan.source_purpose}>
+                                {loan.source_purpose}
+                              </span>
+                            ) : (
+                              <span className="lgr-purpose-none">—</span>
+                            )}
+                            {loan.source_eligibility && (
+                              <span className="lgr-purpose-tag">זכאות</span>
+                            )}
+                          </td>
+
+                          {/* --- גוף מימון: WHERE THE ROW CAME FROM ---
+                              The report names its own sources, one per
+                              transaction block, and until now the only thing on
+                              screen was a 14px disc riding inside the amount
+                              cell with the full legal name on hover. That works
+                              for the five banks an advisor can recognise blind
+                              and for nobody else: a third of the rows in a real
+                              חיווי אשראי come from מימון ישיר, כלמוביל, טריא or
+                              a card company, none of which have a mark anyone
+                              knows, and a hover is not a reading.
+
+                              So the lender is a column, and the mark went back
+                              to being a bullet beside its own name. Under it,
+                              when there is something to say, the kind of body it
+                              is and how the client is attached to the debt —
+                              both facts about provenance, which is what this
+                              column is. Banks say nothing there: "בנק" under
+                              "לאומי" is a line spent on nothing.
+
+                              A row with no lender is a row somebody typed. The
+                              dash says so, which the grid could not before. */}
+                          <td>
+                            {lender ? (
+                              <div className="lgr-lender" title={lender.full}>
+                                <span className="lgr-lender-id">
+                                  <BankIcon source={loan.source_bank} size={18} />
+                                  <span className="lgr-lender-name">{lender.name}</span>
+                                </span>
+                                {(lender.kindLabel || loan.is_guarantor || loan.is_shared) && (
+                                  <span className="lgr-lender-meta">
+                                    {lender.kindLabel && (
+                                      <span className="lgr-lender-kind">{lender.kindLabel}</span>
+                                    )}
+                                    {loan.is_guarantor && (
+                                      <span
+                                        className="lgr-tag"
+                                        style={{ background: FAMILY.loan.tint, color: FAMILY.loan.text }}
+                                        title="הלקוח ערב לחוב הזה — הוא לא מחזיר אותו"
+                                      >
+                                        ערב
+                                      </span>
+                                    )}
+                                    {loan.is_shared && (
+                                      <span
+                                        className="lgr-tag"
+                                        style={{ background: "var(--primary-tint)", color: "var(--primary-deep)" }}
+                                        title="החוב מופיע בשני הדוחות — נספר פעם אחת"
+                                      >
+                                        משותף
+                                      </span>
+                                    )}
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="lgr-lender-none" title="שורה שנוספה ידנית — אין לה מקור בדוח">
+                                —
+                              </span>
+                            )}
                           </td>
 
                           {/* --- סכום --- */}
@@ -542,36 +1025,6 @@ export default function Ledger({
                                   patch(loan.id, { amount: Number(e.target.value.replace(/[^\d]/g, "")) || 0 })
                                 }
                               />
-                              {/* WHOSE DEBT IT IS, AS A MARK NOT A NAME.
-                                  "בנק לאומי לישראל בע\"מ" trimmed down to
-                                  "לאומי לישראל" still ran most of the way across
-                                  the cell and met the figure coming the other
-                                  way. The bank is recognised faster from its
-                                  logo than from its name anyway, so it is a 14px
-                                  disc now, on its own row under the field, with
-                                  the full name on hover. */}
-                              {(loan.source_bank || loan.is_guarantor || loan.is_shared) && (
-                                <span className="lgr-note lgr-lender" title={loan.source_bank || undefined}>
-                                  {loan.source_bank && <BankIcon source={loan.source_bank} size={14} />}
-                                  {loan.is_guarantor && (
-                                    <span
-                                      className="lgr-tag"
-                                      style={{ background: FAMILY.loan.tint, color: FAMILY.loan.text }}
-                                    >
-                                      ערב
-                                    </span>
-                                  )}
-                                  {loan.is_shared && (
-                                    <span
-                                      className="lgr-tag"
-                                      style={{ background: "var(--primary-tint)", color: "var(--primary-deep)" }}
-                                      title="החוב מופיע בשני הדוחות — נספר פעם אחת"
-                                    >
-                                      משותף
-                                    </span>
-                                  )}
-                                </span>
-                              )}
                             </div>
                           </td>
 
@@ -663,12 +1116,53 @@ export default function Ledger({
                             <div
                               className="lgr-well"
                               data-dirty={dirty.has("anchor") || dirty.has("anchor_margin") || undefined}
+                              // The state the wash rides on. CSS owns the border
+                              // and the ink here, Motion owns the light — the two
+                              // never write the same property. See lib/transitions.
+                              data-flash={flashOrder(loan.id) >= 0 || undefined}
                               title={anchorTip(loan)}
                             >
+                              {/* THE RING.
+                                  It arrives a little larger than the field and
+                                  contracts onto its border, holds, then releases
+                                  outward as it fades — the shape of something
+                                  landing on the box and letting go, which is
+                                  what "this one just changed" looks like. The
+                                  border is the right surface for it: a wash
+                                  behind the digits competes with them, an
+                                  outline traces the thing that changed.
+
+                                  Keyed on the run so a second press replays it
+                                  rather than leaving a finished animation
+                                  mounted. */}
+                              {flashOrder(loan.id) >= 0 && flash && (
+                                <span
+                                  key={`${loan.id}:${flash.at}`}
+                                  className="lgr-flash-halo"
+                                  aria-hidden
+                                  style={
+                                    {
+                                      "--flash-delay": `${flashOrder(loan.id) * FLASH_STAGGER_MS}ms`,
+                                      "--flash-dur": `${FLASH_TOTAL_MS}ms`,
+                                    } as React.CSSProperties
+                                  }
+                                />
+                              )}
                               <div className="lgr-pair">
                                 {numField(loan, "anchor", "ריבית העוגן באחוזים", "0.00")}
                                 {numField(loan, "anchor_margin", "מרווח מהעוגן באחוזים", "0.00")}
                               </div>
+                              {/* What the document said, beside what the anchor is
+                                  worth now. The field holds the current value, so
+                                  the note only has to state the one it replaced —
+                                  "0.97 →" reads into the box beside it. Absolute,
+                                  like every other note here, so a refreshed row is
+                                  never a taller row. */}
+                              {loan.anchor_original !== undefined && loan.anchor_original !== null && (
+                                <span className="lgr-note lgr-note-num lgr-note-was">
+                                  {Number(loan.anchor_original).toFixed(2)} →
+                                </span>
+                              )}
                             </div>
                           </td>
 
@@ -685,9 +1179,9 @@ export default function Ledger({
                                 data-heat={heat ?? undefined}
                                 title={
                                   heat === "hot"
-                                    ? `ריבית גבוהה ל${FAMILY[g.key].label}`
+                                    ? `ריבית גבוהה ל${fam.label}`
                                     : heat === "warm"
-                                      ? `ריבית גבוהה מהממוצע ל${FAMILY[g.key].label}`
+                                      ? `ריבית גבוהה מהממוצע ל${fam.label}`
                                       : undefined
                                 }
                                 value={loan.rate || ""}
@@ -840,12 +1334,26 @@ export default function Ledger({
                         widths could never land on the same pixel as the rows
                         above them, and a ledger whose three levels of total
                         each hang at a different offset is unreadable. */}
-                    <tr className="lgr-groupbar" style={famVars}>
-                      <td>
+                    <tr
+                      className="lgr-groupbar"
+                      data-surety={isSuretySection || undefined}
+                      style={isSuretySection ? SURETY_VARS : famVarsOf(g.key as DebtGroup)}
+                    >
+                      {/* Spans סוג + גוף מימון. A bar names a section rather
+                          than describing one row, so it is not bound to the סוג
+                          column's 9% — and "בערבות · 1 · לא נכלל בסה"כ" is three
+                          things wide. The lender column has nothing to subtotal
+                          anyway: counting distinct lenders here would be a
+                          statistic nobody asked this bar for. */}
+                      <td colSpan={3}>
                         <div className="lgr-groupbar-in">
                           <span className="lgr-groupbar-title">
-                            {FAM_ICON[g.key]}
-                            {fam.plural}
+                            {isSuretySection ? (
+                              <ShieldWarning size={12} weight="fill" className="lgr-fam-ico" />
+                            ) : (
+                              FAM_ICON[g.key as DebtGroup]
+                            )}
+                            {isSuretySection ? "בערבות" : FAMILY[g.key as DebtGroup].plural}
                           </span>
                           <span className="lgr-count">{g.rows.length}</span>
                         </div>
@@ -855,35 +1363,42 @@ export default function Ledger({
                       </td>
                       <td>
                         <span className="lgr-pct-ro lgr-groupbar-sum">
-                          {denom ? `${((g.amount / denom) * 100).toFixed(0)}%` : ""}
+                          {isSuretySection || !denom ? "" : `${((g.amount / denom) * 100).toFixed(0)}%`}
                         </span>
                       </td>
                       <td colSpan={7} />
                       <td>
-                        <Money value={g.monthly} className="lgr-groupbar-sum" style={{ color: fam.text }} />
+                        <Money
+                          value={g.monthly}
+                          className="lgr-groupbar-sum"
+                          style={{ color: isSuretySection ? "var(--lgr-2)" : FAMILY[g.key as DebtGroup].text }}
+                        />
                       </td>
                       <td />
                     </tr>
+                    {isSuretySection && (
+                      <tr className="lgr-sec-gap" aria-hidden>
+                        <td colSpan={14} />
+                      </tr>
+                    )}
                   </Fragment>
                 );
               })}
 
-              {/* add a row from the bottom, so a long list never sends you back up */}
-              <tr className="lgr-addrow">
-                <td colSpan={11}>
-                  <div className="lgr-addrow-in">
-                    {addBtns()}
-                    <span className="lgr-addrow-hint">הוספת שורה ריקה לתמהיל</span>
-                  </div>
-                </td>
-              </tr>
+              {/* With no guarantees the add-row still closes the list, exactly
+                  as before. With them it moves up, above the break — adding a
+                  row to "the mix" belongs with the mix. */}
+              {!surety.rows.length && addRow}
             </tbody>
             </AnimatePresence>
 
             <tfoot>
               <tr>
-                <td>
-                  <span className="lgr-total-label">סה״כ</span>
+                <td colSpan={3}>
+                  <span className="lgr-total-label">
+                    {surety.rows.length ? "סה״כ של הלקוח" : "סה״כ"}
+                    {surety.rows.length > 0 && <em className="lgr-total-sub">ללא ערבויות</em>}
+                  </span>
                 </td>
                 <td>
                   <Money value={grand.amount} className="lgr-total-fig" />
@@ -898,8 +1413,11 @@ export default function Ledger({
                 </td>
                 <td colSpan={7}>
                   <div className="flex flex-wrap items-center gap-1.5 px-1">
-                    {groups
-                      .filter((g) => g.rows.length)
+                    {sections
+                      .filter(
+                        (g): g is { key: DebtGroup; rows: ImportedLoan[]; amount: number; monthly: number } =>
+                          g.key !== "surety" && g.rows.length > 0
+                      )
                       .map((g) => (
                         <span
                           key={g.key}
@@ -928,6 +1446,8 @@ export default function Ledger({
           </table>
         </div>
       )}
+
+      <Toaster toasts={toasts} onDismiss={dismissToast} />
 
       {sheet && sheetLoan && (
         <RowSettings

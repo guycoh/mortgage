@@ -23,6 +23,7 @@ import { date, has, norm, num, pageLines, pct, toDate, monthsBetween, type Line 
 import { clean } from "../fields";
 import type { BankLoan, BankStatement, BankTranche, Linkage, RateKind } from "../types";
 import { BANK_LABEL } from "../types";
+import { classifyPurpose } from "../purpose";
 
 const rightOf = (i: RawItem) => i.x + i.w;
 
@@ -198,7 +199,10 @@ export function parseLeumi(pages: RawPage[], dataPages: number[]): BankStatement
 
   const loanNumber = (dataText.match(/בהלוואה\s+([\d-]{8,})/) ?? [])[1] ?? "";
   const asOf = date((dataText.match(/ליום:?\s*(\d{1,2}\/\d{1,2}\/\d{4})/) ?? [])[1] ?? "");
+  // "לווה פרטי-מגורים" — Leumi states who borrowed and for what class of asset,
+  // never which kind of housing loan it is, so this can only resolve to `housing`.
   const purpose = clean((dataText.match(/מטרת ההלוואה\s*(.+)/) ?? [])[1] ?? "");
+  const purposeKind = classifyPurpose(purpose);
   const asOfDate = toDate(asOf);
 
   // The appendix names the borrower; the grid pages do not.
@@ -320,6 +324,9 @@ export function parseLeumi(pages: RawPage[], dataPages: number[]): BankStatement
         linkage,
         amortization: g.amort[c],
         purpose,
+        purposeKind,
+        fundingSource: "",
+        funding: "unknown",
         principal,
         indexation,
         accruedInterest: num(g.interest[c]),
@@ -349,7 +356,14 @@ export function parseLeumi(pages: RawPage[], dataPages: number[]): BankStatement
     }
   }
 
-  if (!tranches.length) warnings.push("לא נמצאו משנים בפירוט ההלוואה.");
+  // Both loan-level warnings name their loan, the way auditTranches names its
+  // tranche. One Leumi file can hold two complete statements, and these two
+  // sentences are otherwise word-for-word identical across them — the reader
+  // got the same notice twice with nothing to say which mortgage each was
+  // about, and React saw two list items keyed on the same string.
+  const on = loanNumber ? `הלוואה ${loanNumber}: ` : "";
+
+  if (!tranches.length) warnings.push(`${on}לא נמצאו משנים בפירוט ההלוואה.`);
 
   const balance = tranches.reduce((s, t) => s + (t.balance ?? 0), 0);
   // The lender prints its own total; a gap means a column was misread.
@@ -358,14 +372,16 @@ export function parseLeumi(pages: RawPage[], dataPages: number[]): BankStatement
     const explained = operationalFee !== null && Math.abs(gap - operationalFee) < 1;
     warnings.push(
       explained
-        ? `היתרה לסילוק כוללת עמלה תפעולית של ${gap.toLocaleString("en-US")} ₪ ברמת ההלוואה, שאינה משויכת למשנה.`
-        : `סך היתרה לסילוק המודפס (${Math.round(printedTotalBalance).toLocaleString("en-US")} ₪) גבוה ב-${gap.toLocaleString("en-US")} ₪ מסכום המשנים — יש לוודא.`
+        ? `${on}היתרה לסילוק כוללת עמלה תפעולית של ${gap.toLocaleString("en-US")} ₪ ברמת ההלוואה, שאינה משויכת למשנה.`
+        : `${on}סך היתרה לסילוק המודפס (${Math.round(printedTotalBalance).toLocaleString("en-US")} ₪) גבוה ב-${gap.toLocaleString("en-US")} ₪ מסכום המשנים — יש לוודא.`
     );
   }
 
   const loan: BankLoan = {
     loanNumber,
     purpose,
+    purposeKind,
+    funding: "unknown",
     tranches,
     printed: {
       balance: printedTotalBalance,

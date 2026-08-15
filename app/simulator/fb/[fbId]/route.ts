@@ -13,7 +13,12 @@
 // forged signature and an unknown account come back the same way.
 
 import { NextRequest, NextResponse } from "next/server";
-import { FB_COOKIE, signCookie, verifyLink } from "../../lib/fblink";
+import {
+  FB_COOKIE,
+  signCookie,
+  verifyLink,
+  type OperatorSource,
+} from "../../lib/fblink";
 import { leadForFireberry } from "../../lib/lead";
 import { lookupAccount } from "../../lib/fireberry";
 import { recordEvent, requestIp, requestUa } from "../../lib/telemetry";
@@ -42,10 +47,35 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ fbId: strin
   const hit = raw.match(GUID);
   const fbId = hit ? hit[0] : raw;
 
-  // Who clicked, when the button knows. The questionnaire passes the record's
-  // account owner as ?u=; absent on old buttons, and never trusted for
-  // anything but attribution.
+  // Who clicked, when the button knows. The questionnaire passes the Fireberry
+  // login that opened it as ?u=, and ?us=user to say so; ?us=owner means it
+  // could not read the live login and fell back to the record's מנהל לקוח, who
+  // may well be someone else entirely. Absent on old buttons, and never trusted
+  // for anything but attribution.
   const operator = (sp.get("u") || "").trim().slice(0, 80);
+  const rawSource = (sp.get("us") || "").trim();
+  const operatorSource: OperatorSource =
+    operator && (rawSource === "user" || rawSource === "owner") ? rawSource : "";
+
+  // The Fireberry record page, so the console can offer the trip back.
+  //
+  // This ends up as an href in an admin panel, and anyone can put anything in a
+  // query string — so it is not stored unless it parses as an absolute https URL
+  // on fireberry.com itself. That rules out javascript: and data: by
+  // construction, and rules out this parameter being used to point staff at
+  // somebody else's site.
+  const recordUrl = (() => {
+    const param = (sp.get("ru") || "").trim();
+    if (!param || param.length > 300) return null;
+    try {
+      const u = new URL(param);
+      if (u.protocol !== "https:") return null;
+      if (u.hostname !== "fireberry.com" && !u.hostname.endsWith(".fireberry.com")) return null;
+      return u.toString();
+    } catch {
+      return null;
+    }
+  })();
 
   const deny = (reason: string) => {
     void recordEvent({
@@ -108,7 +138,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ fbId: strin
   // signCookie fails for one reason only: no FB_LINK_SECRET. That is a
   // deployment that was never configured, not a fault the client can retry
   // their way out of, so it says so rather than hiding behind "משהו השתבש".
-  const cookie = signCookie(lead.id, operator);
+  const cookie = signCookie(lead.id, operator, operatorSource);
   if (!cookie) return deny("nosecret");
 
   // The session that was just minted, with everything only this route knows.
@@ -120,6 +150,15 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ fbId: strin
     lead_id: lead.id,
     lead_name: name || null,
     operator: operator || null,
+    // Both ride in `data` rather than columns of their own: adding one needs
+    // DDL against production, and neither is a dimension anybody groups by.
+    data:
+      operatorSource || recordUrl
+        ? {
+            ...(operatorSource ? { operator_source: operatorSource } : {}),
+            ...(recordUrl ? { record_url: recordUrl } : {}),
+          }
+        : null,
     ip: requestIp(req),
     ua: requestUa(req),
   });

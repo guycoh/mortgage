@@ -7,6 +7,8 @@
 // each Israeli lender's real logo — enough to recognise a bank at a glance in a
 // dense row, at 14px, with no text at all.
 
+import { lenderOf } from "../lib/lenders";
+
 /** Brand colour and initial, for lenders with no drawn mark of their own. */
 const BANK_BRANDS: { test: RegExp; color: string; initial: string }[] = [
   { test: /לאומי/, color: "#0c4a8b", initial: "ל" },
@@ -26,11 +28,34 @@ const BANK_BRANDS: { test: RegExp; color: string; initial: string }[] = [
   { test: /כרטיסי אשראי|אשראי/, color: "#4f57a6", initial: "כ" },
 ];
 
+/**
+ * A monogram off the lender's SHORT name, not off its legal one.
+ *
+ * "מימון ישיר מקבוצת ישיר (2006) בע\"מ" begins with the same letter as half the
+ * non-bank lenders in the country; "מימון ישיר" gives "מי", which at least tells
+ * two of them apart. Two words → one letter each, the way מרכנתיל is "מר".
+ */
+function monogram(source: string): string {
+  const words = (lenderOf(source).name || source.replace(/^ה?בנק\s*/, ""))
+    .split(/\s+/)
+    .filter(Boolean);
+  if (!words.length) return "?";
+  if (words.length === 1) return words[0].charAt(0);
+  return words[0].charAt(0) + words[1].charAt(0);
+}
+
+/**
+ * A lender with no drawn mark and no known brand colour gets a neutral slate
+ * disc rather than an invented colour. Now that every row prints the lender's
+ * NAME beside the mark, the disc no longer has to identify anyone on its own —
+ * so a plausible-looking green for a lender whose brand is red would be a claim
+ * made for no gain.
+ */
 function bankBrand(source?: string): { color: string; initial: string } {
   const s = source || "";
   const hit = BANK_BRANDS.find((b) => b.test.test(s));
   if (hit) return { color: hit.color, initial: hit.initial };
-  return { color: "#5f7883", initial: s.replace(/^בנק\s*/, "").trim().charAt(0) || "?" };
+  return { color: "#5f7883", initial: monogram(s) || "?" };
 }
 
 function Svg({ size, children }: { size: number; children: React.ReactNode }) {

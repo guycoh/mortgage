@@ -1,0 +1,437 @@
+/* ============================================================================
+   מוקד — what Tailwind cannot express.
+   ----------------------------------------------------------------------------
+   Cards, tables, buttons, inputs and badges are shadcn components styled with
+   `cns-*` utilities (app/console/ui/kit.tsx). What is left here is the handful
+   of things a utility class genuinely cannot do:
+
+     · the ECharts tooltip, whose markup is an HTML string built inside a chart
+       formatter, far outside React's reach
+     · the sonar rings, the ruler and the connector thread — decorative shapes
+       built from pseudo-elements
+     · cmdk's internal element hooks
+     · one numeric helper used often enough to earn a name
+
+   Everything in this file is scoped under `.cns` or a `cns-` prefix. Nothing
+   here can reach another page.
+   ========================================================================== */
+
+.cns {
+  font-family: var(--cns-ui);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.cns ::selection {
+  background: #cfe0fb;
+}
+
+/* Every figure that belongs to a column: same width per digit, so numbers
+   stack. Deliberately NOT applied to the big stat figures — equal-width digits
+   make a lone 121 look gappy at display size. */
+.cns-num,
+.cns .cns-num {
+  font-family: var(--cns-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "zero" 1;
+  /* Isolated as LTR because a figure is not a Hebrew sentence. Without this the
+     bidi algorithm drags a leading ₪ to the far side of its own number and
+     "₪2,260,934" renders as "2,260,934₪". `isolate` keeps the run from
+     disturbing the RTL text around it. */
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+/* The plane: graph paper, almost subliminal. It gives the background a sense
+   of being a surface you measure things on rather than empty space. */
+.cns-plane {
+  background-color: var(--cns-bg);
+  background-image: linear-gradient(
+      to right,
+      rgba(12, 22, 34, 0.022) 1px,
+      transparent 1px
+    ),
+    linear-gradient(to bottom, rgba(12, 22, 34, 0.022) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+/* A measured edge under the masthead instead of a plain border. */
+.cns-rule {
+  height: 9px;
+  border-bottom: 1px solid var(--cns-line2);
+  background-image: repeating-linear-gradient(
+    to right,
+    var(--cns-line2) 0 1px,
+    transparent 1px 24px
+  );
+  background-position: bottom;
+  background-size: 24px 4px;
+  background-repeat: repeat-x;
+  opacity: 0.7;
+}
+
+/* ------------------------------------------------------ live status dot */
+
+.cns-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 99px;
+  flex: none;
+  background: var(--cns-mutedfg);
+}
+.cns-dot[data-tone="good"] {
+  background: var(--cns-good);
+}
+.cns-dot[data-tone="warn"] {
+  background: var(--cns-warn);
+}
+.cns-dot[data-tone="bad"] {
+  background: var(--cns-bad);
+}
+/* A slow breath on the live dot — the one animated thing in the rail, so it
+   reads as "receiving" rather than as decoration. */
+.cns-dot[data-live] {
+  animation: cns-pulse 2.6s ease-in-out infinite;
+}
+@keyframes cns-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(30, 142, 79, 0.34);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(30, 142, 79, 0);
+  }
+}
+
+/* ------------------------------------------------------- chart tooltip */
+/* Built as an HTML string inside the ECharts formatter, so it can never be a
+   React component and never inherits a utility class. */
+
+.cns-tip {
+  font-family: var(--cns-ui);
+  min-width: 170px;
+  padding: 9px 11px 10px;
+  color: var(--cns-fg);
+}
+.cns-tip-h {
+  font-size: 12.5px;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+.cns-tip-s {
+  font-family: var(--cns-mono);
+  font-size: 10.5px;
+  color: var(--cns-mutedfg);
+  margin-bottom: 7px;
+}
+.cns-tip-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  padding: 1.5px 0;
+  color: var(--cns-fg2);
+}
+.cns-tip-row b {
+  margin-inline-start: auto;
+  font-family: var(--cns-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--cns-fg);
+}
+.cns-tip-sw {
+  width: 8px;
+  height: 8px;
+  border-radius: 2.5px;
+  flex: none;
+}
+.cns-tip-trail {
+  margin-top: 8px;
+  padding-top: 7px;
+  border-top: 1px solid var(--cns-line);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  max-width: 300px;
+}
+.cns-tip-step {
+  font-size: 10.5px;
+  padding: 1px 6px;
+  border-radius: 99px;
+  background: var(--cns-muted);
+  color: var(--cns-fg2);
+}
+.cns-tip-step[data-bad] {
+  background: rgba(194, 55, 47, 0.1);
+  color: var(--cns-bad);
+}
+
+/* --------------------------------------------------------- trail chips */
+/* The arrow between two steps is a generated character, not a rendered node —
+   it must not be selectable or read aloud as content. */
+
+.cns-step + .cns-step::before {
+  content: "←";
+  color: var(--cns-mutedfg);
+  margin-inline-end: 5px;
+  opacity: 0.7;
+}
+
+/* ------------------------------------------------------- standing by ---
+   The idle instrument: ruled lanes, a running sweep, nothing plotted. */
+
+.cns-standby {
+  min-height: 148px;
+}
+
+/* Lane rules across, hour rules down — the paper stays ruled even when the
+   pen has not moved. */
+.cns-standby-grid {
+  background-image: repeating-linear-gradient(
+      to bottom,
+      var(--cns-line) 0 1px,
+      transparent 1px 37px
+    ),
+    repeating-linear-gradient(to right, var(--cns-line) 0 1px, transparent 1px 8.5%);
+  opacity: 0.65;
+}
+
+/* One pass every seven seconds: slow enough to read as patience rather than
+   as a loading spinner. */
+.cns-standby-sweep {
+  background: linear-gradient(
+    to left,
+    rgba(31, 99, 214, 0) 0%,
+    rgba(31, 99, 214, 0.07) 55%,
+    rgba(31, 99, 214, 0.16) 92%,
+    rgba(31, 99, 214, 0.3) 100%
+  );
+  animation: cns-pass 7s linear infinite;
+}
+@keyframes cns-pass {
+  from {
+    transform: translateX(-160%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+/* The scope's own arm, going round. */
+.cns-sweep {
+  animation: cns-spin 7s linear infinite;
+}
+@keyframes cns-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ------------------------------------------------------------- thread */
+/* The vertical line joining one step of a visit to the next. */
+
+.cns-thread-rail::after {
+  content: "";
+  position: absolute;
+  top: 12px;
+  bottom: -6px;
+  width: 1px;
+  background: var(--cns-line2);
+}
+.cns-thread-row:last-child .cns-thread-rail::after {
+  display: none;
+}
+
+/* ------------------------------------------------------------ drawer */
+/* Fixed-position furniture: the scrim and the sliding panel are positioned
+   against the viewport, so they live here rather than in a utility soup. */
+
+.cns-scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(12, 22, 34, 0.28);
+  backdrop-filter: blur(2px);
+  z-index: 60;
+}
+.cns-drawer {
+  position: fixed;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: min(460px, 92vw);
+  background: var(--cns-card);
+  box-shadow: 0 0 80px -20px rgba(12, 22, 34, 0.5);
+  z-index: 61;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.cns-drawer-head {
+  position: relative;
+  padding: 20px 22px 16px;
+  border-bottom: 1px solid var(--cns-line);
+}
+.cns-drawer-body {
+  padding: 18px 22px 26px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.cns-drawer-close {
+  position: absolute;
+  top: 16px;
+  inset-inline-end: 16px;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 9px;
+  background: var(--cns-muted);
+  color: var(--cns-mutedfg);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: background 0.15s, color 0.15s;
+}
+.cns-drawer-close:hover {
+  background: rgba(194, 55, 47, 0.1);
+  color: var(--cns-bad);
+}
+
+.cns-def {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 6px 12px;
+  font-size: 12.5px;
+}
+.cns-def dt {
+  color: var(--cns-mutedfg);
+}
+.cns-def dd {
+  margin: 0;
+  color: var(--cns-fg);
+}
+
+/* The trail of one visit, drawn as a vertical thread. */
+.cns-thread-row {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+.cns-thread-rail {
+  position: relative;
+  display: grid;
+  place-items: center;
+  padding-top: 5px;
+}
+.cns-thread-rail i {
+  width: 9px;
+  height: 9px;
+  border-radius: 99px;
+  background: var(--cns-accent);
+  box-shadow: 0 0 0 3px var(--cns-card);
+  z-index: 1;
+}
+.cns-thread-rail[data-bad] i {
+  background: var(--cns-bad);
+}
+.cns-thread-body {
+  padding-bottom: 14px;
+  min-width: 0;
+}
+.cns-thread-body b {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--cns-fg);
+}
+.cns-thread-body span {
+  font-family: var(--cns-mono);
+  font-size: 10.5px;
+  color: var(--cns-mutedfg);
+}
+
+/* -------------------------------------------------------------- cmdk */
+
+.cns-cmdk-scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(12, 22, 34, 0.32);
+  backdrop-filter: blur(3px);
+  z-index: 80;
+  display: grid;
+  place-items: start center;
+  padding-top: 16vh;
+}
+.cns-cmdk {
+  width: min(520px, 92vw);
+  background: var(--cns-card);
+  border-radius: 14px;
+  border: 1px solid var(--cns-line);
+  box-shadow: 0 28px 60px -32px rgba(12, 22, 34, 0.55);
+  overflow: hidden;
+  font-family: var(--cns-ui);
+}
+.cns-cmdk input {
+  width: 100%;
+  height: 50px;
+  padding: 0 18px;
+  border: 0;
+  border-bottom: 1px solid var(--cns-line);
+  font: inherit;
+  font-size: 14.5px;
+  color: var(--cns-fg);
+  background: transparent;
+}
+.cns-cmdk input:focus {
+  outline: none;
+}
+.cns-cmdk input::placeholder {
+  color: var(--cns-mutedfg);
+}
+
+/* cmdk renders its own elements and exposes them only through attributes. */
+
+.cns-cmdk [cmdk-list] {
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 6px;
+}
+.cns-cmdk [cmdk-group-heading] {
+  font-family: var(--cns-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--cns-mutedfg);
+  padding: 9px 10px 5px;
+}
+.cns-cmdk [cmdk-item] {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: 8px;
+  font-size: 13.5px;
+  color: var(--cns-fg2);
+  cursor: pointer;
+}
+.cns-cmdk [cmdk-item][data-selected="true"] {
+  background: rgba(31, 99, 214, 0.08);
+  color: var(--cns-accent);
+}
+.cns-cmdk [cmdk-empty] {
+  padding: 24px 10px;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--cns-mutedfg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cns *,
+  .cns *::before,
+  .cns *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

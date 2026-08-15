@@ -97,12 +97,19 @@ export default function Bay({
   reports,
   onImport,
   onClear,
+  readings,
 }: {
   mixId: string;
   /** Reports already folded into this mix, oldest first. */
   reports: ImportSummary[];
   onImport: (summary: ImportSummary) => void;
   onClear: () => void;
+  /**
+   * The readings of the loaded document — its analysis, the client summary, the
+   * original PDF. Rendered on the receipt, because that is the document they
+   * read; the mix strip below has its own three buttons about the mix.
+   */
+  readings?: React.ReactNode;
 }) {
   const [drag, setDrag] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -372,7 +379,16 @@ export default function Bay({
               ))}
           </div>
 
-          <div className="ms-auto flex items-center gap-1.5">
+          <div className="lgr-receipt-acts">
+            {/* WHAT YOU CAN READ OUT OF THIS DOCUMENT, on the document.
+                These three lived on the mix strip below, where they were three
+                of six buttons about two different subjects and wrapped the strip
+                onto a second row the moment a report landed. They are readings
+                of the report — its analysis, its client summary, the original
+                PDF — so they belong on the report's own receipt, beside the
+                controls that manage it. */}
+            {readings}
+            {readings && <span className="lgr-receipt-sep" aria-hidden />}
             {/* A household holds one mortgage between two people, and each of
                 their reports lists all of it. Joint debts are merged, not
                 doubled — see mergeReportLoans. */}

@@ -10,6 +10,8 @@
 // null rather than being guessed at, because a mortgage decision made on an
 // invented number is worse than one made on an acknowledged gap.
 
+import type { FundingKind, PurposeKind } from "./purpose";
+
 /** Which lender's template produced this. */
 export type BankId = "leumi" | "poalim" | "discount" | "mercantile" | "mizrahi";
 
@@ -46,7 +48,17 @@ export interface BankTranche {
   linkage: Linkage;
   /** שפיצר / קרן שווה / בולט, as printed. */
   amortization: string;
+  /** מטרת ההלוואה in the lender's own words, verbatim. */
   purpose: string;
+  /** That wording placed in one vocabulary — see ../bank-parser/purpose.ts. */
+  purposeKind: PurposeKind;
+  /**
+   * סוג ההלוואה — חופשית מכספי בנק vs. זכאות מכספי המדינה. Only Mizrahi prints
+   * it per tranche; the others leave it empty. It is the one place a bank
+   * letter says outright that a tranche is a זכאות, which no purpose string does.
+   */
+  fundingSource: string;
+  funding: FundingKind;
 
   /* ---- money */
   /** יתרת קרן — principal outstanding, before linkage. */
@@ -133,6 +145,9 @@ export interface BankTranche {
 export interface BankLoan {
   loanNumber: string;
   purpose: string;
+  purposeKind: PurposeKind;
+  /** A loan is a זכאות when any of its tranches is drawn on state money. */
+  funding: FundingKind;
   tranches: BankTranche[];
   /** Loan-level totals as the lender printed them, for reconciliation. */
   printed: {

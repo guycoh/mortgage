@@ -18,7 +18,8 @@
 import type { Workbook, Worksheet } from "exceljs";
 import { calculateLoan } from "@/app/private/crm/leads/simulators/components/calculate/loanCalculators";
 import { schedules } from "@/app/data/amortization_schedules";
-import { FAMILY, PATH_LABEL, type DebtGroup, type ImportedLoan } from "./credit";
+import { FAMILY, PATH_LABEL, isSurety, type DebtGroup, type ImportedLoan } from "./credit";
+import { lenderOf } from "./lenders";
 
 /* ------------------------------------------------------------------ palette */
 
@@ -38,6 +39,14 @@ const C = {
   loanWash: "FFFDF3E6",
   primary: "FF4238C9",
   amber: "FFA06000",
+
+  // The guarantee block. Deliberately NOT amber — amber is the sheet's one
+  // alarm, reserved for a rate above its family's norm, and a guarantee is not
+  // an alarm. It is a different category of fact, so it gets a category colour:
+  // slate, which reads as an aside rather than as a warning or as a third
+  // family of the client's own debt.
+  surety: "FF4E5A70",
+  suretyWash: "FFF1F3F7",
 } as const;
 
 const TRACK_ARGB: Record<number, string> = {
@@ -72,6 +81,10 @@ type Col = {
 
 const COLS: Col[] = [
   { header: "סוג", width: 11 },
+  // WHOSE DEBT THIS IS. A guarantee is not a smaller loan, it is somebody
+  // else's loan — so it gets a column of its own rather than a word buried in
+  // הערות, where it could be sorted away from the row it qualifies.
+  { header: "מעמד הלקוח", width: 11 },
   { header: "מקור / גורם מדווח", width: 26 },
   { header: "מסלול", width: 17 },
   { header: "לוח סילוקין", width: 12.5 },
@@ -121,38 +134,55 @@ const pctOrNull = (v: number | string | null | undefined) => {
 
 const scheduleName = (id: number) => schedules.find((s) => s.id === id)?.schedule_name ?? "";
 
+/**
+ * Words right, figures centred — derived from whether the column has a number
+ * format, not from its position. It used to be `i <= 3 || i === SPAN - 1`, which
+ * is the same answer written as a pair of indices; adding one word column at the
+ * front then silently centred הערות and right-aligned a money column.
+ */
+const alignOf = (ci: number) => (COLS[ci].fmt ? ("center" as const) : ("right" as const));
+
 type Priced = { l: ImportedLoan; res: ReturnType<typeof calculateLoan> };
 
 /** Which column is which, by name, so inserting one cannot silently move a sum. */
 const CI = {
   family: 0,
+  standing: COLS.findIndex((c) => c.header.startsWith("מעמד")),
   amount: COLS.findIndex((c) => c.header.startsWith("יתרה")),
   rate: COLS.findIndex((c) => c.header === "ריבית"),
   anchor: COLS.findIndex((c) => c.header === "עוגן"),
   frequency: COLS.findIndex((c) => c.header.startsWith("תדירות שינוי")),
   monthly: COLS.findIndex((c) => c.header.startsWith("החזר")),
   interest: COLS.findIndex((c) => c.header.startsWith('סה"כ ריבית')),
+  cost: COLS.findIndex((c) => c.header.startsWith("עלות כוללת")),
 } as const;
 
-/** The cached result for a SUM over one of the totalled columns. */
-function columnTotal(rows: Priced[], colIndex: number): number {
-  const pick = (x: Priced) =>
-    colIndex === CI.amount
-      ? Number(x.l.amount) || 0
-      : colIndex === CI.monthly
-        ? x.res.monthlyPayment
-        : colIndex === CI.interest
-          ? x.res.totalInterest
-          : x.res.totalPaid;
-  return Math.round(rows.reduce((s, x) => s + pick(x), 0));
+/** The figure a totalled column carries on one row, before rounding. */
+function cellValue(x: Priced, colIndex: number): number {
+  if (colIndex === CI.amount) return Number(x.l.amount) || 0;
+  if (colIndex === CI.monthly) return x.res.monthlyPayment;
+  if (colIndex === CI.interest) return x.res.totalInterest;
+  return x.res.totalPaid;
 }
 
-function costPerShekel(loans: ImportedLoan[], inflation: number): number {
-  const amount = loans.reduce((s, l) => s + (Number(l.amount) || 0), 0);
-  if (!amount) return 0;
-  const paid = loans.reduce((s, l) => s + calculateLoan(l, inflation).totalPaid, 0);
-  return paid / amount;
+/**
+ * The cached result for a SUM over one of the totalled columns.
+ *
+ * ROUNDS PER ROW, then adds — because that is what the formula beside it will
+ * do. Every money cell is written through `num()`, which rounds, so `SUM(M18:M31)`
+ * adds fourteen ALREADY-ROUNDED shekels. Summing the raw values here and
+ * rounding once at the end is a different number: the two disagreed by a shekel
+ * on this report, so `13,870 + 20,999` came to `34,868`. Worse, the cached value
+ * is only what the file *shows until Excel recalculates* — the first edit
+ * anywhere would have quietly moved the total to the formula's answer.
+ *
+ * One rule for the whole sheet: what is stored is what Excel would compute.
+ */
+function columnTotal(rows: Priced[], colIndex: number): number {
+  return rows.reduce((s, x) => s + Math.round(cellValue(x, colIndex)), 0);
 }
+
+// The split that governs this sheet lives in ./credit — see isSurety there.
 
 /* -------------------------------------------------------------------- sheet */
 
@@ -171,6 +201,30 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
     },
   });
   COLS.forEach((c, i) => (ws.getColumn(i + 1).width = c.width));
+
+  /* ------------------------------------------------------------ figures --- */
+  // Priced once, split once, above every row that prints — the masthead quotes
+  // עלות לשקל and the strip below it quotes four totals, and all of them have to
+  // be the same arithmetic as the table at the bottom of the sheet.
+
+  const per = loans.map((l) => ({ l, res: calculateLoan(l, annualInflation) }));
+  // The split that governs the whole sheet — see isSurety.
+  const owed = per.filter((x) => !isSurety(x.l));
+  const sureties = per.filter((x) => isSurety(x.l));
+
+  // Through columnTotal, so the four headline figures ARE the grand-total row
+  // further down rather than a second, independently-rounded opinion of it.
+  const totalAmount = columnTotal(owed, CI.amount);
+  const totalMonthly = columnTotal(owed, CI.monthly);
+  const totalInterest = columnTotal(owed, CI.interest);
+  const totalCost = columnTotal(owed, CI.cost);
+
+  const suretyAmount = columnTotal(sureties, CI.amount);
+  const suretyMonthly = columnTotal(sureties, CI.monthly);
+
+  // Derived from the two figures printed below rather than re-summed, so the
+  // ratio and its operands can never tell different stories.
+  const perShekel = totalAmount ? totalCost / totalAmount : 0;
 
   let r = 1;
 
@@ -203,8 +257,15 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
   const stamp = ws.getCell(r, 1);
   const d = new Date();
   const dd = `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
-  const perShekel = costPerShekel(loans, annualInflation);
-  stamp.value = `הופק ב-${dd}   ·   אינפלציה שנתית בהנחה: ${annualInflation}%   ·   עלות לשקל: ${perShekel.toFixed(2)}`;
+  // A board of nothing but guarantees has no cost per shekel — the client is not
+  // paying any of them. 0.00 would be a figure where there is no figure.
+  stamp.value = [
+    `הופק ב-${dd}`,
+    `אינפלציה שנתית בהנחה: ${annualInflation}%`,
+    totalAmount ? `עלות לשקל: ${perShekel.toFixed(2)}` : "",
+  ]
+    .filter(Boolean)
+    .join("   ·   ");
   stamp.font = { name: FONT, size: 9, color: { argb: C.ink3 } };
   stamp.alignment = { horizontal: "right", vertical: "middle" };
   ws.getRow(r).height = 14;
@@ -213,14 +274,6 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
   r += 1;
 
   /* ------------------------------------------------------------ totals --- */
-
-  const per = loans.map((l) => ({ l, res: calculateLoan(l, annualInflation) }));
-  const sum = (f: (x: (typeof per)[number]) => number) => per.reduce((s, x) => s + f(x), 0);
-
-  const totalAmount = sum(({ l }) => Number(l.amount) || 0);
-  const totalMonthly = sum(({ res }) => res.monthlyPayment);
-  const totalInterest = sum(({ res }) => res.totalInterest);
-  const totalCost = sum(({ res }) => res.totalPaid);
 
   const kpis: [string, number][] = [
     ["סכום התמהיל", totalAmount],
@@ -258,14 +311,36 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
   });
   ws.getRow(kpiStart).height = 14;
   ws.getRow(kpiStart + 1).height = 23;
-  ws.getRow(kpiStart + 2).height = 6;
-  r = kpiStart + 3;
+  r = kpiStart + 2;
+
+  // What those four figures leave out, said immediately under them rather than
+  // 40 rows down where the guarantees are actually listed. A headline number
+  // with a silent exclusion is the same defect as one with a silent inclusion.
+  if (sureties.length) {
+    ws.mergeCells(r, 1, r, SPAN);
+    const aside = ws.getCell(r, 1);
+    aside.value =
+      `בנוסף: ${sureties.length} ${sureties.length === 1 ? "התחייבות" : "התחייבויות"} בערבות ` +
+      `בסך ${Math.round(suretyAmount).toLocaleString("en-US")} ₪ ` +
+      `(החזר ${Math.round(suretyMonthly).toLocaleString("en-US")} ₪ לחודש) — ` +
+      `חוב של אחר שהלקוח ערב לו, ואינו נכלל בסיכומים שלמעלה. מפורט בסוף הגיליון.`;
+    aside.font = { name: FONT, size: 9, bold: true, color: { argb: C.surety } };
+    aside.alignment = { horizontal: "right", vertical: "middle" };
+    aside.fill = solid(C.suretyWash);
+    ws.getRow(r).height = 15;
+    r += 1;
+  }
+
+  ws.getRow(r).height = 6;
+  r += 1;
 
   /* -------------------------------------------------- composition ------ */
 
+  // The client's own mix. A track composition that counts a guaranteed loan is
+  // describing a mix the client cannot refinance.
   const tracks = [1, 2, 3, 4, 5]
     .map((id) => {
-      const rows = per.filter((x) => x.l.path_id === id);
+      const rows = owed.filter((x) => x.l.path_id === id);
       return {
         id,
         amount: rows.reduce((s, x) => s + (Number(x.l.amount) || 0), 0),
@@ -326,7 +401,7 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
     cell.value = c.header;
     cell.font = { name: FONT, size: 9.5, bold: true, color: { argb: C.white } };
     cell.fill = solid(C.ink);
-    cell.alignment = { horizontal: i <= 3 || i === SPAN - 1 ? "right" : "center", vertical: "middle", wrapText: true };
+    cell.alignment = { horizontal: alignOf(i), vertical: "middle", wrapText: true };
   });
   ws.getRow(headRow).height = 24;
   r += 1;
@@ -334,104 +409,96 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
   const famOf = (l: ImportedLoan): DebtGroup => (l.group === "loan" ? "loan" : "mortgage");
   const groups: DebtGroup[] = ["mortgage", "loan"];
 
-  // Each family's data rows, so the grand total can sum THEM and skip the
-  // subtotal rows sitting between them — a single first..last span would count
-  // every mortgage twice.
-  const dataRanges: [number, number][] = [];
+  /** One data row of the detail table, in the family's colours. */
+  const writeRow = (x: Priced, i: number, accent: string): void => {
+    const { l, res } = x;
+    const g = famOf(l);
+    const notes = [l.is_shared ? "מופיע בשני הדוחות" : "", res.isIndexed ? "צמוד מדד" : ""]
+      .filter(Boolean)
+      .join(" · ");
 
-  for (const g of groups) {
-    const rows = per.filter((x) => famOf(x.l) === g);
-    if (!rows.length) continue;
+    const values: (string | number | Date | null)[] = [
+      FAMILY[g].label,
+      isSurety(l) ? "ערב" : "חייב",
+      // The document's own wording, kept in full — this column is the audit
+      // trail, and the grid is where the name is shortened. Only the reversed
+      // bracket pdf.js leaves in an RTL run is repaired; see repairName.
+      lenderOf(l.source_bank).full || "—",
+      PATH_LABEL[l.path_id] ?? "",
+      scheduleName(l.amortization_schedule_id),
+      num(Number(l.amount) || 0),
+      (Number(l.rate) || 0) / 100,
+      // Both anchor fields are percentages; blank stays blank, because 0% and
+      // "not anchored" are different facts about a row.
+      pctOrNull(l.anchor),
+      pctOrNull(l.anchor_margin),
+      // Months, so the column sorts and filters like the number it is.
+      Number(l.anchor_interval) > 0 ? Number(l.anchor_interval) : null,
+      Number(l.months) || null,
+      toDate(l.loan_end_date ?? l.end_date),
+      num(res.monthlyPayment),
+      num(res.totalInterest),
+      num(res.totalPaid),
+      notes || null,
+    ];
 
-    const accent = g === "mortgage" ? C.mortgage : C.loan;
-    const wash = g === "mortgage" ? C.mortgageWash : C.loanWash;
+    values.forEach((v, ci) => {
+      const cell = ws.getCell(r, ci + 1);
+      cell.value = v as string | number | Date | null;
+      cell.font = {
+        name: FONT,
+        size: 10,
+        color: { argb: ci === CI.family ? accent : ci === CI.standing ? C.surety : C.ink2 },
+        bold: ci === CI.family || ci === CI.standing || ci === CI.amount || ci === CI.monthly,
+      };
+      cell.alignment = { horizontal: alignOf(ci), vertical: "middle" };
+      const fmt = COLS[ci].fmt;
+      if (fmt === "money") cell.numFmt = MONEY;
+      if (fmt === "pct") cell.numFmt = PCT;
+      if (fmt === "int") cell.numFmt = "#,##0";
+      if (fmt === "date") cell.numFmt = "dd/mm/yyyy";
+      cell.border = { bottom: thin(C.line) };
+      if (i % 2 === 1) cell.fill = solid(C.band);
+    });
+    // the spine, in the family's colour
+    ws.getCell(r, 1).border = { bottom: thin(C.line), right: { style: "medium", color: { argb: accent } } };
+    // a high rate is the one thing the sheet flags, same rule as the screen
+    const rate = Number(l.rate) || 0;
+    const hot = g === "loan" ? rate >= 10 : rate >= 6.5;
+    if (hot) ws.getCell(r, CI.rate + 1).font = { name: FONT, size: 10, bold: true, color: { argb: C.amber } };
+    r += 1;
+  };
 
-    // Group band, left unmerged so a column can still be copied out cleanly.
+  /** A band naming the block below it, painted across the grid. */
+  const writeBand = (label: string, accent: string, wash: string): void => {
     const band = ws.getCell(r, 1);
-    band.value = `${FAMILY[g].plural}   (${rows.length})`;
+    band.value = label;
     band.font = { name: FONT, size: 10.5, bold: true, color: { argb: accent } };
-    band.fill = solid(wash);
     band.alignment = { horizontal: "right", vertical: "middle" };
     for (let c = 1; c <= SPAN; c += 1) ws.getCell(r, c).fill = solid(wash);
     ws.getCell(r, 1).border = { right: { style: "medium", color: { argb: accent } } };
     ws.getRow(r).height = 19;
     r += 1;
+  };
 
-    const groupFirst = r;
-    rows.forEach((x, i) => {
-      const { l, res } = x;
-      const notes = [
-        l.is_shared ? "מופיע בשני הדוחות" : "",
-        l.is_guarantor ? "בערבות" : "",
-        res.isIndexed ? "צמוד מדד" : "",
-      ]
-        .filter(Boolean)
-        .join(" · ");
-
-      const values: (string | number | Date | null)[] = [
-        FAMILY[g].label,
-        (l.source_bank ?? "").trim() || "—",
-        PATH_LABEL[l.path_id] ?? "",
-        scheduleName(l.amortization_schedule_id),
-        num(Number(l.amount) || 0),
-        (Number(l.rate) || 0) / 100,
-        // Both anchor fields are percentages; blank stays blank, because 0% and
-        // "not anchored" are different facts about a row.
-        pctOrNull(l.anchor),
-        pctOrNull(l.anchor_margin),
-        // Months, so the column sorts and filters like the number it is.
-        Number(l.anchor_interval) > 0 ? Number(l.anchor_interval) : null,
-        Number(l.months) || null,
-        toDate(l.loan_end_date ?? l.end_date),
-        num(res.monthlyPayment),
-        num(res.totalInterest),
-        num(res.totalPaid),
-        notes || null,
-      ];
-
-      values.forEach((v, ci) => {
-        const cell = ws.getCell(r, ci + 1);
-        cell.value = v as string | number | Date | null;
-        cell.font = {
-          name: FONT,
-          size: 10,
-          color: { argb: ci === 0 ? accent : C.ink2 },
-          bold: ci === CI.family || ci === CI.amount || ci === CI.monthly,
-        };
-        cell.alignment = {
-          // words right, figures centred
-          horizontal: ci <= 3 || ci === SPAN - 1 ? "right" : "center",
-          vertical: "middle",
-        };
-        const fmt = COLS[ci].fmt;
-        if (fmt === "money") cell.numFmt = MONEY;
-        if (fmt === "pct") cell.numFmt = PCT;
-        if (fmt === "int") cell.numFmt = "#,##0";
-        if (fmt === "date") cell.numFmt = "dd/mm/yyyy";
-        cell.border = { bottom: thin(C.line) };
-        if (i % 2 === 1) cell.fill = solid(C.band);
-      });
-      // the spine, in the family's colour
-      ws.getCell(r, 1).border = { bottom: thin(C.line), right: { style: "medium", color: { argb: accent } } };
-      // a high rate is the one thing the sheet flags, same rule as the screen
-      const rate = Number(l.rate) || 0;
-      const hot = g === "loan" ? rate >= 10 : rate >= 6.5;
-      if (hot)
-        ws.getCell(r, CI.rate + 1).font = { name: FONT, size: 10, bold: true, color: { argb: C.amber } };
-      r += 1;
-    });
-
-    dataRanges.push([groupFirst, r - 1]);
-
-    // group subtotal — a live formula, with the value cached so the figure is
-    // already there the moment the file opens, before any recalculation
-    const groupLast = r - 1;
+  /**
+   * A subtotal under the rows it totals — a live formula with the value cached,
+   * so the figure is already there the moment the file opens.
+   */
+  const writeSubtotal = (
+    label: string,
+    rows: Priced[],
+    first: number,
+    last: number,
+    accent: string,
+    wash: string
+  ): void => {
     COLS.forEach((c, ci) => {
       const cell = ws.getCell(r, ci + 1);
-      if (ci === 0) cell.value = `סה"כ ${FAMILY[g].plural}`;
+      if (ci === 0) cell.value = label;
       else if (c.total)
         cell.value = {
-          formula: `SUM(${colLetter(ci + 1)}${groupFirst}:${colLetter(ci + 1)}${groupLast})`,
+          formula: `SUM(${colLetter(ci + 1)}${first}:${colLetter(ci + 1)}${last})`,
           result: columnTotal(rows, ci),
         };
       cell.font = { name: FONT, size: 10.5, bold: true, color: { argb: ci === 0 ? accent : C.ink } };
@@ -444,6 +511,28 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
     r += 1;
     ws.getRow(r).height = 6;
     r += 1;
+  };
+
+  // Each family's data rows, so the grand total can sum THEM and skip the
+  // subtotal rows sitting between them — a single first..last span would count
+  // every mortgage twice.
+  const dataRanges: [number, number][] = [];
+
+  for (const g of groups) {
+    const rows = owed.filter((x) => famOf(x.l) === g);
+    if (!rows.length) continue;
+
+    const accent = g === "mortgage" ? C.mortgage : C.loan;
+    const wash = g === "mortgage" ? C.mortgageWash : C.loanWash;
+
+    // Group band, left unmerged so a column can still be copied out cleanly.
+    writeBand(`${FAMILY[g].plural}   (${rows.length})`, accent, wash);
+
+    const groupFirst = r;
+    rows.forEach((x, i) => writeRow(x, i, accent));
+    dataRanges.push([groupFirst, r - 1]);
+
+    writeSubtotal(`סה"כ ${FAMILY[g].plural}`, rows, groupFirst, r - 1, accent, wash);
   }
 
   /* ---------------------------------------------------- grand total ----- */
@@ -451,12 +540,16 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
   if (dataRanges.length) {
     COLS.forEach((c, ci) => {
       const cell = ws.getCell(r, ci + 1);
-      if (ci === 0) cell.value = 'סה"כ התמהיל';
+      // Named, not just "סה\"כ התמהיל": with a guarantee block underneath, the
+      // total has to say WHOSE debt it adds up, or the reader supplies the
+      // wrong answer from the rows nearest to it.
+      if (ci === 0) cell.value = 'סה"כ התחייבויות הלקוח';
       else if (c.total) {
         const L = colLetter(ci + 1);
-        // the raw rows of each family, never the subtotal rows between them
+        // the raw rows of each family, never the subtotal rows between them —
+        // and never the guarantees, which are not the client's to repay
         const args = dataRanges.map(([a, b]) => `${L}${a}:${L}${b}`).join(",");
-        cell.value = { formula: `SUM(${args})`, result: columnTotal(per, ci) };
+        cell.value = { formula: `SUM(${args})`, result: columnTotal(owed, ci) };
       }
       cell.font = { name: FONT, size: 11.5, bold: true, color: { argb: C.white } };
       cell.alignment = { horizontal: ci === 0 ? "right" : "center", vertical: "middle" };
@@ -469,6 +562,30 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
     r += 1;
   }
 
+  /* ------------------------------------------------------ guarantees ---- */
+
+  // AFTER the grand total, deliberately. Placed before it, a reader running
+  // their eye down the column to the ink bar would still land on a sum that
+  // appears to include these rows. Placed after it, the structure of the sheet
+  // says what the labels say: the total closed, and this is something else.
+  if (sureties.length) {
+    writeBand(`בערבות   (${sureties.length})`, C.surety, C.suretyWash);
+
+    const first = r;
+    sureties.forEach((x, i) => writeRow(x, i, C.surety));
+    writeSubtotal('סה"כ בערבות — אינו נכלל בסיכום', sureties, first, r - 1, C.surety, C.suretyWash);
+
+    ws.mergeCells(r, 1, r, SPAN);
+    const note = ws.getCell(r, 1);
+    note.value =
+      "התחייבויות שהלקוח ערב להן ואינו הלווה בהן. הן מופיעות בדוח ריכוז הנתונים תחת " +
+      '"עסקאות בהן הלקוח ערב", ואינן חלק מההחזר החודשי שלו — אך הן חשיפה קיימת לכל דבר ' +
+      "ובנק בוחן אותן באישור אשראי.";
+    note.font = { name: FONT, size: 8.5, italic: true, color: { argb: C.ink3 } };
+    note.alignment = { horizontal: "right", vertical: "middle", wrapText: true };
+    ws.getRow(r).height = 14;
+    r += 1;
+  }
 }
 
 /** 1 → A, 27 → AA. */

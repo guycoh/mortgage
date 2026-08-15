@@ -30,6 +30,7 @@ import { date, has, norm, num, pageLines, pct, signedPct, toDate, monthsBetween 
 import { clean } from "../fields";
 import type { BankLoan, BankStatement, BankTranche, Linkage, RateKind } from "../types";
 import { BANK_LABEL } from "../types";
+import { classifyFunding, classifyPurpose } from "../purpose";
 
 /** Everything left of this is the payoff column. */
 const SPLIT_X = 270;
@@ -542,7 +543,18 @@ export function parseMizrahi(pages: RawPage[], dataPages: number[]): BankStateme
     names.push(t);
   }
 
-  const purpose = clean((headText.match(/מטרת הלוואה\s*(.+)/) ?? [])[1] ?? "");
+  // The label shares a reading-order line with the four summary figures above
+  // it (סכום הביצוע, סכום המסגרת, היתרה לסילוק, ההחזר החודשי), so capturing to
+  // end-of-line returned "3,185,000.00 3,185,000.00 3,236,385.92 17,404.20
+  // רכישת דירה יד שניה". The purpose is the Hebrew tail; everything before the
+  // first Hebrew letter belongs to another field.
+  const purpose = clean(
+    ((headText.match(/מטרת הלוואה\s*(.+)/) ?? [])[1] ?? "").replace(
+      /^[^֐-׿]+/,
+      ""
+    )
+  );
+  const purposeKind = classifyPurpose(purpose);
   const loanNumber = fileNo?.[1] ?? "";
 
   const tranches: BankTranche[] = [];
@@ -630,6 +642,11 @@ export function parseMizrahi(pages: RawPage[], dataPages: number[]): BankStateme
       linkage,
       amortization: G("שיטת פרעון חלק זה בהלוואה"),
       purpose,
+      purposeKind,
+      // The only per-tranche statement of funding any of the four templates
+      // prints: "הלוואה חופשית מכספי בנק" vs. a זכאות drawn on state money.
+      fundingSource: G("סוג ההלוואה"),
+      funding: classifyFunding(G("סוג ההלוואה")),
       principal,
       indexation,
       accruedInterest: num(P("ריבית")),
@@ -725,6 +742,10 @@ export function parseMizrahi(pages: RawPage[], dataPages: number[]): BankStateme
   const loan: BankLoan = {
     loanNumber,
     purpose,
+    purposeKind,
+    funding: tranches.some((t) => t.funding === "eligibility")
+      ? "eligibility"
+      : (tranches[0]?.funding ?? "unknown"),
     tranches,
     printed: {
       balance: null,

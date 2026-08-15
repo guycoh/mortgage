@@ -19,9 +19,13 @@ import { Sliders, X } from "@phosphor-icons/react";
 import { graceTypes } from "@/app/data/graceTypes";
 import Select from "./Select";
 import { FAMILY, PATH_LABEL, type ImportedLoan } from "../lib/credit";
+import { lenderOf } from "../lib/lenders";
 
 const W = 348;
-const H = 152;
+// Measured, then rounded up for the two-line provenance footer a long lender
+// name produces. Only decides whether the sheet opens above or below the icon,
+// so erring high just flips it upward a little sooner.
+const H = 240;
 
 export default function RowSettings({
   loan,
@@ -139,12 +143,41 @@ export default function RowSettings({
             {field("חודשי גרייס", "grace_months", "0")}
           </div>
 
+          {/* WHOSE DEBT IT IS — correctable, because it now moves money.
+              While ערב was only a tag on the row it could stay read-only: it
+              described the row and changed nothing. It decides which section the
+              row sits in and whether its balance and its repayment enter any
+              total, so a report the parser read wrong has to be fixable without
+              deleting the row and retyping it. */}
+          <div className="lgr-sheet-body lgr-sheet-body-1">
+            <label className="lgr-switch" data-dirty={dirty.has("is_guarantor") || undefined}>
+              <input
+                type="checkbox"
+                checked={!!loan.is_guarantor}
+                onChange={(e) => onPatch({ is_guarantor: e.target.checked } as Partial<ImportedLoan>)}
+              />
+              <span className="lgr-switch-track" aria-hidden />
+              <span className="lgr-switch-text">
+                הלקוח ערב לחוב הזה
+                <em>
+                  {loan.is_guarantor
+                    ? "מוצג בנפרד ואינו נכלל בסיכומי התמהיל"
+                    : "החוב נספר כשלו — בסיכומים, בגרפים ובייצוא"}
+                </em>
+              </span>
+            </label>
+          </div>
+
+          {/* The grid's גוף מימון column prints the lender SHORT. This is the one
+              place with room for the name the document actually used, so it is
+              the one place that prints it in full — a provenance footer that
+              paraphrases its source is not provenance. */}
           <footer className="lgr-sheet-foot">
             {loan.source_track ? (
               <>
                 מהדוח: {loan.source_type} · {loan.source_track}
                 {loan.source_anchor ? ` · ${loan.source_anchor}` : ""}
-                {loan.source_bank ? ` · ${loan.source_bank.replace(/בע"?מ|בנק/g, "").trim()}` : ""}
+                {loan.source_bank ? ` · ${lenderOf(loan.source_bank).full}` : ""}
               </>
             ) : (
               "שורה שנוספה ידנית — אין לה מקור בדוח."

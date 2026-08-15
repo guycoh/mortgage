@@ -16,6 +16,27 @@ import type { Loan } from "@/app/private/crm/leads/simulators/components/LoanTab
 /** Which family a row belongs to. */
 export type DebtGroup = "mortgage" | "loan";
 
+/**
+ * A DEBT THE CLIENT GUARANTEES IS NOT A DEBT THE CLIENT PAYS.
+ *
+ * The דוח ריכוז נתונים keeps its own section for them — "עסקאות בהן הלקוח ערב" —
+ * and the parser carries that all the way onto the row. Everything downstream
+ * used to lose it: a guaranteed loan was filed under its family, summed into the
+ * subtotal, the grand total, the rail, the composition chart, the runoff and the
+ * comparison, marked only by a small ערב tag. That is somebody else's balance
+ * and somebody else's monthly repayment presented as the client's, which is the
+ * one number this whole surface exists to state.
+ *
+ * So the split lives here, in one predicate, and every surface that adds money
+ * up goes through it. They are still real exposure — a bank weighs them at
+ * underwriting — so they are shown, and totalled, on their own.
+ */
+export const isSurety = (l: ImportedLoan) => !!l.is_guarantor;
+
+/** The client's own debts — what every total on the page is about. */
+export const owedOnly = (loans: ImportedLoan[]) => loans.filter((l) => !isSurety(l));
+
+
 /** A Loan plus the provenance the UI colour-codes and labels by. */
 export type ImportedLoan = Loan & {
   group?: DebtGroup;
@@ -35,6 +56,42 @@ export type ImportedLoan = Loan & {
    * about the same thing and both are worth keeping.
    */
   source_anchor?: string;
+  /**
+   * מטרת ההלוואה, in the words of whichever document supplied the row.
+   *
+   * A bank payoff letter states it outright and specifically ("רכישת דירה יד
+   * שניה", "כל מטרה", "הרחבה"). The credit report only has field 201-017, whose
+   * five values merge a purchase with a renovation, so a row imported from it
+   * carries the coarser answer. Both are the lender's claim, not ours.
+   */
+  source_purpose?: string;
+  /** True when the document says this is state money — a הלוואת זכאות. */
+  source_eligibility?: boolean;
+
+  /* --- עדכון עוגנים. Session fields: the save route writes an explicit column
+     whitelist, so none of these need a migration and none of them survive a
+     reload — which is right. A refreshed anchor is a simulation of what the
+     tranche would cost if it repriced today, and the thing worth persisting is
+     the resulting mix, not the provenance of one input to it. --- */
+  /**
+   * The anchor the DOCUMENT stated, kept when the refresh replaced it.
+   *
+   * `undefined` means never refreshed; `null` means refreshed a row that had no
+   * anchor at all. The two are different and the restore has to tell them apart.
+   */
+  anchor_original?: number | null;
+  /** ISO date the refreshed anchor took effect — the "נכון ל־" on the tooltip. */
+  anchor_asof?: string;
+  /** Which published table it came from: "עוגן אג"ח צמוד מדד", "ריבית פריים". */
+  anchor_source?: string;
+  /** False when the value came from a secondary source rather than the bank's own. */
+  anchor_verified?: boolean;
+  /** Older than its family republishes — still the latest published value. */
+  anchor_stale?: boolean;
+  /** How often that family republishes, which is what dates the value. */
+  anchor_cadence?: string;
+  /** Why the refresh declined to price this row. Shown on the עוגן cell's tooltip. */
+  anchor_note?: string;
 };
 
 /* ------------------------------------------------------------------ paths */
@@ -230,6 +287,11 @@ function toLoanRow(src: ExtractedLoan, mixId: string, group: DebtGroup): Importe
     source_bank: src.source,
     source_type: src.type,
     source_track: src.trackLabel,
+    // The report's own words where it printed any. Where it printed none, the
+    // column stays empty rather than showing the normalised guess — a credit
+    // report that does not state a purpose has not stated one.
+    source_purpose: src.purpose,
+    source_eligibility: src.eligibility,
   };
 }
 

@@ -101,31 +101,60 @@ export function signLink(fbId: string, name: string, ttlSeconds = 12 * 60 * 60) 
  * request, so there is no parameter left to tamper with — you can only ever
  * reach the board your link was for.
  */
-export function signCookie(leadId: number, operator = ""): string | null {
+export function signCookie(
+  leadId: number,
+  operator = "",
+  source: OperatorSource = ""
+): string | null {
   const secret = process.env.FB_LINK_SECRET;
   if (!secret) return null;
   const exp = Math.floor(Date.now() / 1000) + 12 * 60 * 60;
   // The operator travels base64url-encoded so its own dots or pipes can never
   // masquerade as field separators, and it is covered by the signature.
   const op = Buffer.from(operator, "utf8").toString("base64url");
-  return `${leadId}.${exp}.${op}.${hmac(`${leadId}|${exp}|${op}`, secret)}`;
+  const src = source || "-";
+  return `${leadId}.${exp}.${op}.${src}.${hmac(`${leadId}|${exp}|${op}|${src}`, secret)}`;
 }
+
+/**
+ * Where the operator name came from.
+ *
+ * "user" is the Fireberry login that actually opened the board — the thing the
+ * console's נציג column claims to be showing. "owner" is the record's מנהל לקוח,
+ * used only when the live login could not be read, and it is kept distinct
+ * precisely so the panel can stop short of claiming the owner sat down.
+ */
+export type OperatorSource = "user" | "owner" | "";
 
 export interface CookieSession {
   leadId: number;
   /** Fireberry operator name the door was told about, "" when it wasn't. */
   operator: string;
+  operatorSource: OperatorSource;
 }
 
 /**
  * The session a cookie grants, or null if it is absent, stale or forged.
- * Accepts both shapes: the pre-telemetry 3-field cookie (id.exp.sig) keeps
- * working so live sessions survive the deploy.
+ *
+ * Accepts every shape this cookie has ever had: the pre-telemetry 3-field
+ * (id.exp.sig), the 4-field that added the operator, and the current 5-field
+ * that says where that operator name came from. Old cookies keep working, so a
+ * deploy never signs anybody out mid-session — they simply carry no source,
+ * which reads the same as "we do not know", because we do not.
  */
 export function readCookieSession(value: string | undefined): CookieSession | null {
   const secret = process.env.FB_LINK_SECRET;
   if (!secret || !value) return null;
   const parts = value.split(".");
+
+  const decode = (op: string): string => {
+    try {
+      return Buffer.from(op, "base64url").toString("utf8");
+    } catch {
+      /* an unreadable name is not a reason to drop a valid session */
+      return "";
+    }
+  };
 
   if (parts.length === 3) {
     const [idRaw, expRaw, sig] = parts;
@@ -134,7 +163,7 @@ export function readCookieSession(value: string | undefined): CookieSession | nu
     if (!Number.isFinite(id) || !Number.isFinite(exp) || !sig) return null;
     if (exp * 1000 < Date.now()) return null;
     if (!equal(hmac(`${id}|${exp}`, secret), sig)) return null;
-    return { leadId: id, operator: "" };
+    return { leadId: id, operator: "", operatorSource: "" };
   }
 
   if (parts.length === 4) {
@@ -144,13 +173,21 @@ export function readCookieSession(value: string | undefined): CookieSession | nu
     if (!Number.isFinite(id) || !Number.isFinite(exp) || !sig) return null;
     if (exp * 1000 < Date.now()) return null;
     if (!equal(hmac(`${id}|${exp}|${op}`, secret), sig)) return null;
-    let operator = "";
-    try {
-      operator = Buffer.from(op, "base64url").toString("utf8");
-    } catch {
-      /* an unreadable name is not a reason to drop a valid session */
-    }
-    return { leadId: id, operator };
+    return { leadId: id, operator: decode(op), operatorSource: "" };
+  }
+
+  if (parts.length === 5) {
+    const [idRaw, expRaw, op, src, sig] = parts;
+    const id = Number(idRaw);
+    const exp = Number(expRaw);
+    if (!Number.isFinite(id) || !Number.isFinite(exp) || !sig) return null;
+    if (exp * 1000 < Date.now()) return null;
+    if (!equal(hmac(`${id}|${exp}|${op}|${src}`, secret), sig)) return null;
+    return {
+      leadId: id,
+      operator: decode(op),
+      operatorSource: src === "user" || src === "owner" ? src : "",
+    };
   }
 
   return null;

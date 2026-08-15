@@ -177,6 +177,32 @@
   background: var(--bg);
 }
 
+/* THE GUTTER IS RESERVED. The three tools are three different heights, so a
+   view change is also a scrollbar change — and a scrollbar that comes and
+   goes re-seats the centred column sideways on every switch, which reads as
+   the whole UI lurching. Reserving the gutter makes the column's position a
+   constant. Scoped by :has because this stylesheet must not legislate for
+   other routes. */
+html:has(.lgr-root) {
+  scrollbar-gutter: stable;
+}
+
+/* THE STAGE — the floor under a view change. mode="wait" holds a gap between
+   the old view's exit and the new one's entry; without a floor the document
+   collapses to the masthead for those frames, the scroll position clamps, and
+   the page appears to jump. The floor keeps the document at roughly viewport
+   height through the swap — the scroll-to-top that happens inside the gap
+   lands on a surface that never moved. */
+.lgr-stage {
+  min-height: calc(100dvh - 240px);
+}
+
+/* The stand-in for a tool whose chunk is still arriving: sized like the
+   instrument, so the content's arrival swaps pixels rather than geometry. */
+.lgr-tool-skel {
+  min-height: calc(100dvh - 280px);
+}
+
 /* ------------------------------------------------------------ typography */
 
 .lgr-fig {
@@ -269,42 +295,67 @@
   font-weight: 600;
 }
 
-/* ============================================== the console: toolbar + rail */
-/* The top of the page is ONE object in two materials — a light toolbar sitting
-   directly on a dark KPI slab, sharing a 16px outline and a single shadow. The
-   title row floats above it, and none of it is sticky: this is a document, and
-   a document's masthead scrolls with it.
+/* ================================================================ masthead */
+/* THE PAGE'S NAME AND ITS PAGE-LEVEL CONTROLS, ON ONE LINE.
+   A 30px title with 20px of air under it, and then a toolbar row inside a card
+   holding one input, one select and one button: two objects, ~90px, and neither
+   of them information. They are the same rank — the name of the instrument and
+   the three things you can do to the whole of it — so they share a baseline.
 
-   The dark half is a widget in dark mode on a light page; the light half is the
-   controls that drive it. Reading down: who this is → what you can change →
-   what it costs. */
-
-.lgr-console {
-  border-radius: var(--r);
-  border: 1px solid var(--line-2);
-  background: #fff;
-  /* one step above every other card on the page — the whole header region is
-     now light, so elevation is what marks it as the instrument */
-  box-shadow: var(--shadow-hover);
-  overflow: hidden;
-}
-
-/* --- the toolbar, in three functional groups --- */
-.lgr-toolbar {
+   No border, no fill, no shadow. This is chrome; the workbench below it is the
+   only object on this page that earns an outline. Rule 5 still holds: it is
+   part of the document and scrolls with it. */
+.lgr-masthead {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 12px 24px;
-  padding: 10px 16px;
+  gap: 10px 20px;
+  /* the controls are 36px, and the row keeps that height even while they are
+     dissolving out on a tool switch — so nothing under them moves */
+  min-height: 36px;
+  margin-bottom: 14px;
 }
-/* A hairline between groups, never before the first one. Groups already sit
-   24px apart; the rule is for the eye that needs the seam stated. */
-.lgr-tool-group { display: flex; align-items: center; gap: 8px; }
-.lgr-tool-group + .lgr-tool-group { padding-inline-start: 24px; border-inline-start: 1px solid var(--line); }
-/* A group pushed to the far end has the width of the bar between it and its
-   neighbour — a rule drawn against it would sit in open space, separating
-   nothing. The gap is the separator. */
-.lgr-tool-group[data-end="true"] { margin-inline-start: auto; padding-inline-start: 0; border-inline-start: 0; }
+.lgr-masthead-title {
+  font-family: var(--display);
+  /* 24, not 30. Beside a row of 36px controls a 30px title is not more
+     important, only heavier — and the six pixels are worth more to the ledger. */
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  /* the title takes the room; everything else settles against the far edge */
+  margin-inline-end: auto;
+}
+.lgr-masthead-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* =============================================== the workbench: ONE object */
+/* FROM THE FIGURES TO THE LAST ROW, ONE CARD.
+   This region was four of them stacked — a console, an intake bay, a tray
+   holding two loose buttons, and a tab strip welded to the table — each with
+   its own outline, its own shadow and 24px of canvas between them. Four
+   outlines is four objects, and not one of them was the instrument; the
+   instrument was the thing they added up to.
+
+   Now they are bands inside one card, divided by the same hairline the ledger
+   divides its own rows with. Reading down: what the mix costs → what you can
+   put into it → which mix, and what you can do to it → the rows.
+
+   ONE SHADOW, AND THE QUIET ONE. The console wore the raised shadow to say "this
+   is the instrument" while it was a 150px header. At 1200px that same shadow
+   reads as a slab lying on the page. The card is the whole working surface now,
+   so it sits rather than floats — which is what rule 3 asked for in the first
+   place. */
+.lgr-workbench {
+  border: 1px solid var(--line-2);
+  border-radius: var(--r);
+  background: var(--card);
+  box-shadow: var(--shadow);
+}
 
 /* ONE COMPOSED FIELD — label, number and unit inside a single border, so
    "אינפלציה שנתית 2 %" reads as one parameter rather than a caption that
@@ -399,50 +450,50 @@
 .lgr-picker-caret { color: var(--lgr-4); flex: none; transition: transform 200ms var(--ease); }
 .lgr-picker[data-open="true"] .lgr-picker-caret { transform: rotate(180deg); color: var(--primary); }
 
-/* ----------------------------------------------------------- the tool switch */
-/* TWO INSTRUMENTS, ONE CLIENT, ONE SURFACE.
-   סימולטור תמהילים and משכנתא הפוכה are different tools on the same file, so
-   they are not two pages with a link between them: they are two positions of
-   one switch, and both are on screen the whole time. You can always see where
-   you are and what else you could be looking at.
+/* ------------------------------------------------------------ the app shell */
+/* THREE INSTRUMENTS, ONE CLIENT, ONE SURFACE.
+   The tools are not pages with links between them: they are positions of one
+   switch, all on screen the whole time. You can always see where you are and
+   what else you could be looking at.
 
-   The fill is a SINGLE OBJECT THAT MOVES (Motion layoutId, see ToolSwitch) —
-   one lighting up as the other goes out would read as two buttons that happen
-   to be adjacent. A control that slides has a position, which is the whole
-   point of a switch.
+   THE SHELL is application chrome, not a card: a full-bleed white bar fastened
+   to the top of the document and ruled off the canvas by a single hairline —
+   no radius, no shadow, no floating. It scrolls away with the page, because
+   rule 5 holds even for the chrome: this is a document, and a document's
+   masthead goes with it. What separates it from the content is that it is the
+   only white surface that bleeds to the viewport edge while everything below
+   lives inside the 1300px column — which its own contents align to.
 
-   Built to the lead picker's 40px, because they are the same kind of object:
-   things that name where you are rather than perform a step. Violet, because
-   rule 4 — the identity hue is what says "mortgage", and both tools price one. */
-/* THE BAND. Application chrome, not a control inside the page: white, ruled
-   off the canvas, tabs at the start and whoever the board belongs to at the
-   far end. The page's own title lives underneath it, which is the order a
-   product with more than one tool reads in — where am I, then what is this.
-
-   The state is carried by TWO objects that MOVE rather than blink: a tinted
-   field and the rule under it, both Motion layoutId on one spring (see
-   ToolSwitch). The rule is what makes a tab read as the current PAGE rather
-   than as a pressed button. */
-.lgr-nav {
-  display: flex;
-  align-items: stretch;
-  flex-wrap: wrap;
-  overflow: hidden;
-  border: 1px solid var(--line-2);
-  border-radius: var(--r);
+   The row reads brand → tools → client: the two constants bracketing the
+   thing you switch. */
+.lgr-shell {
   background: #fff;
-  box-shadow: var(--shadow);
+  border-bottom: 1px solid var(--line-2);
 }
-/* THE BRAND, at the head of the bar. Its own rule after it, so the emblem and
-   the tabs read as two things rather than as a first tab that happens to be a
-   picture. */
+/* A grid, not a flex row, because the tools are CENTERED ON THE BAR — dead
+   centre of the viewport column, not "whatever is left between the brand and
+   the client". 1fr auto 1fr keeps them there no matter how long the client's
+   name runs on the other side. */
+.lgr-nav {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 14px;
+  max-width: 1300px;
+  margin-inline: auto;
+  min-height: 66px;
+  padding: 10px 16px;
+}
+@media (min-width: 768px) {
+  .lgr-nav { padding-inline: 24px; }
+}
+/* THE BRAND, at the head of the bar. No fence after it — on a flat shell the
+   zones are spaced, not partitioned. */
 .lgr-brand {
   display: flex;
   align-items: center;
   gap: 9px;
-  flex: none;
-  padding-inline: 15px 18px;
-  border-inline-end: 1px solid var(--line);
+  justify-self: start;
 }
 .lgr-brand-name {
   font-family: var(--display);
@@ -455,55 +506,80 @@
 /* No shadow. The mark sits on the bar itself now rather than on a tile, and a
    drop shadow under a glyph on white is a smudge, not depth. */
 
-.lgr-nav-tabs { display: flex; align-items: stretch; min-width: 0; }
-/* Fenced off exactly like the brand at the other end, so the bar reads as
-   three zones: the product, the tools, the client. Two constants bracketing
-   the thing you switch. */
+/* THE TOOLS — three flat, full-height tabs standing directly on the bar: no
+   track, no fills, no container. Selection is stated in ink and a rule: the
+   current tool's label and mark go violet, and a thin underline sits flush on
+   the bar's own bottom hairline — the app-header convention, one object that
+   travels between tabs (Motion layoutId, see ToolSwitch). The tools you are
+   not on are neutral ink with dimmed marks. Between neighbours, a short 1px
+   hairline — grouping without a box. */
+.lgr-nav-tabs {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+  /* Span the shell's full height, through the nav's block padding, so every
+     tab is a bar-height hit area and the rule lands ON the bottom edge. */
+  align-self: stretch;
+  margin-block: -10px;
+}
 .lgr-nav-end {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-inline-start: auto;
-  padding: 7px 12px;
-  border-inline-start: 1px solid var(--line);
+  justify-self: end;
 }
 
 .lgr-nav-tab {
   position: relative;
   display: inline-flex;
   align-items: center;
-  height: 54px;
-  padding: 0 20px;
+  justify-content: center;
+  padding: 0 22px;
   border: 0;
   background: transparent;
   font-family: var(--ui);
   font-size: 14px;
+  /* One weight in both states: a bolder active label would resize itself and
+     nudge its neighbours mid-travel. The violet and the rule carry the
+     selection; the metal does not move. */
   font-weight: 600;
   letter-spacing: -0.01em;
-  color: var(--lgr-2);
+  color: var(--lgr-3);
   white-space: nowrap;
   cursor: pointer;
-  /* The ink crosses over while the fill is still travelling, which is what
+  /* The ink crosses over while the rule is still travelling, which is what
      makes the two labels trade places rather than blink. */
-  transition: color 180ms var(--ease), background 180ms var(--ease);
+  transition: color 180ms var(--ease);
 }
-/* One hairline between neighbours, never before the first. It sits on the
-   border box, so the tint — inset to the padding box — never covers it. */
-.lgr-nav-tab + .lgr-nav-tab { border-inline-start: 1px solid var(--line); }
-.lgr-nav-tab:hover:not([data-on="true"]) { color: var(--ink); background: var(--card-2); }
-.lgr-nav-tab[data-on="true"] { color: var(--primary-deep); font-weight: 700; }
-.lgr-nav-tab:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--focus-ring-strong); }
+/* The separator: a short hairline hung between neighbours, centred on the
+   bar's midline — never full height, so it groups the items without ever
+   drawing a container around them. */
+.lgr-nav-tab + .lgr-nav-tab::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: 0;
+  top: 50%;
+  translate: 0 -50%;
+  width: 1px;
+  height: 16px;
+  background: var(--line-2);
+}
+.lgr-nav-tab:hover:not([data-on="true"]) { color: var(--ink); }
+.lgr-nav-tab[data-on="true"] { color: var(--primary-deep); }
+.lgr-nav-tab:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; border-radius: 8px; }
 
-.lgr-nav-tint { position: absolute; inset: 0; z-index: 0; background: var(--primary-tint); }
+/* THE RULE — 2px of the identity violet, flush on the shell's bottom
+   hairline, inset to sit under the tab's content rather than wall-to-wall.
+   It is what makes a tab read as the current PAGE rather than as a pressed
+   button. */
 .lgr-nav-rule {
   position: absolute;
-  inset-inline: 0;
+  inset-inline: 14px;
   bottom: 0;
   z-index: 1;
-  height: 3px;
+  height: 2px;
+  border-radius: 2px 2px 0 0;
   background: var(--primary);
-  border-start-start-radius: 3px;
-  border-start-end-radius: 3px;
 }
 .lgr-nav-in { position: relative; z-index: 2; display: inline-flex; align-items: center; gap: 8px; }
 /* The mark carries its tab's own state, so it dims with the label rather than
@@ -536,12 +612,20 @@
   border: 0;
 }
 
+/* When brand + tools + client stop fitting one row, the tool row takes a row
+   of its own under the two constants — still centered, still one object. The
+   full-height stretch is undone here: on its own row the rule underlines the
+   tab itself, and the row keeps a stated height for the hit area. */
+@media (max-width: 940px) {
+  .lgr-nav { grid-template-columns: auto auto; justify-content: space-between; row-gap: 0; }
+  .lgr-nav-tabs { grid-column: 1 / -1; grid-row: 2; justify-self: center; align-self: auto; margin-block: 0; }
+  .lgr-nav-tab { height: 46px; }
+}
 @media (max-width: 620px) {
-  .lgr-brand { padding-inline: 11px 12px; gap: 9px; }
   .lgr-brand-name { font-size: 15px; }
-  .lgr-nav-tab { height: 46px; padding: 0 13px; font-size: 13px; }
+  .lgr-nav-tab { height: 42px; padding: 0 14px; font-size: 13px; }
   .lgr-nav-in { gap: 6px; }
-  .lgr-nav-end { width: 100%; border-top: 1px solid var(--line); border-inline-start: 0; padding: 8px 10px; }
+  .lgr-picker-name { max-width: 140px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .lgr-nav-tab, .lgr-nav-ico { transition: none; }
@@ -555,21 +639,77 @@
 .lgr-btn-save:disabled { opacity: 0.42; }
 .lgr-btn-save[data-state="saved"]:disabled { opacity: 0.85; }
 
-/* --- the KPI band --- */
-/* LIGHT, NOT DARK. The dark slab read as a widget bolted to the page rather
-   than as the top of it, and it forced every figure on the page to be judged
-   against two different grounds. It is white now, ruled off the toolbar by one
-   hairline, and it keeps its "this is the instrument" standing through the
-   console's slightly deeper elevation rather than through a colour switch.
-   Roughly a third shorter, too: the padding was the only thing making it
-   tall. */
+/* --- the read-out --- */
+/* THE FIRST BAND OF THE WORKBENCH: what the mix costs.
+   White, because this is the instrument's screen — the two control bands under
+   it are the ones that step down a tone. It is the first band, so it draws no
+   rule of its own; every band after it carries its own top hairline, which is
+   what keeps the seam honest when the intake between them collapses away.
+
+   About a quarter shorter than it was, and all of it was slack: `space-between`
+   on a stretched grid cell pushed the label and the figure apart to fill
+   whatever the tallest cell happened to be, the label ran at the browser's
+   default leading, and NumberFlow's spin mask reserved a quarter of an em above
+   and below every digit. None of that was information. */
 .lgr-rail {
-  background: #fff;
-  border-top: 1px solid var(--line);
+  display: flex;
+  align-items: stretch;
+  background: var(--card);
 }
 /* NO DIVIDERS. Four cells that share one anatomy — label above, figure below —
    are already four cells; a rule between them just adds furniture. */
+/* THE ASSUMPTION CELL — the read-out's one input.
+   Same anatomy as the four cells beside it, label above and value below, so it
+   reads as part of the band rather than as a control parked next to it. It is
+   ruled off instead of spaced off, because the seam between what you state and
+   what the machine computes is worth one hairline. Quiet chrome on the well —
+   28px, not the 36px of a toolbar field — but real chrome, because an input
+   nobody can find is a number nobody knows they can change. */
+.lgr-rail-assume {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 3px;
+  flex: none;
+  padding: 10px 16px 11px;
+  border-inline-start: 1px solid var(--line);
+  cursor: text;
+}
+.lgr-rail-assume-well {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  background: var(--card);
+  transition: border-color var(--t) var(--ease), box-shadow 120ms var(--ease);
+}
+.lgr-rail-assume:hover .lgr-rail-assume-well { border-color: var(--edge); }
+.lgr-rail-assume-well:focus-within {
+  border-color: var(--focus);
+  box-shadow: 0 0 0 2px var(--focus-ring-strong);
+}
+.lgr-rail-assume-in {
+  width: 38px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  outline: none;
+  text-align: center;
+  font-family: var(--num);
+  font-variant-numeric: tabular-nums lining-nums;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+.lgr-rail-assume-unit { font-size: 12.5px; font-weight: 600; color: var(--lgr-4); }
+
 .lgr-rail-cells {
+  flex: 1;
+  min-width: 0;
   display: grid;
   /* The three figures had a fractional share they never used, which starved
      the composition and wrapped its legend onto a second line. They are
@@ -577,24 +717,33 @@
      three tracks on one line. Still fractions rather than `auto`, because
      `auto` let the composition swallow the whole band. */
   grid-template-columns:
-    minmax(0, 0.8fr) minmax(0, 0.8fr) minmax(0, 0.8fr) minmax(340px, 1.6fr);
+    minmax(0, 0.8fr) minmax(0, 0.8fr) minmax(0, 0.8fr) minmax(320px, 1.6fr);
   gap: 4px 26px;
-  padding: 10px 16px 12px;
+  padding: 10px 16px 11px;
 }
 .lgr-rail-cell {
   position: relative;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  gap: 5px;
-  min-height: 42px;
+  /* PACKED, NOT SPREAD. `space-between` made the label-to-figure gap a function
+     of the tallest cell in the row — so the composition cell, which is three
+     elements deep, silently set the leading of the three that are two. */
+  justify-content: flex-start;
+  gap: 3px;
   min-width: 0;
+  /* The height a filled hero cell measures: 12px label at 1.3, the 3px gap, and
+     NumberFlow's 26px box with its mask. Stated as a floor so an empty board's
+     em-dash — which is type, and carries no mask — reads at the same height as
+     the figure that replaces it. Otherwise the whole ledger steps down 8px the
+     moment the first amount is typed. */
+  min-height: 53px;
 }
 .lgr-rail-label {
   display: flex;
   align-items: center;
   gap: 7px;
-  font-size: 12.5px;
+  font-size: 12px;
+  line-height: 1.3;
   font-weight: 600;
   letter-spacing: -0.005em;
   color: #5a5d66;
@@ -603,7 +752,7 @@
 .lgr-rail-value {
   font-family: var(--num);
   font-variant-numeric: tabular-nums lining-nums;
-  font-size: 21px;
+  font-size: 19px;
   font-weight: 600;
   line-height: 1;
   letter-spacing: -0.03em;
@@ -615,10 +764,16 @@
      right-aligning it lands the figure on the RTL cell's start edge — under
      the label rather than adrift to its left. */
   text-align: right;
+  /* NumberFlow reserves this much above and below every digit for the fade its
+     spin travels through, and its default 0.25em is drawn for a counter that is
+     the hero of a page. Here it was eight invisible pixels on the tallest cell
+     in the band, which set the height of all four. 0.18em still gives the
+     digits somewhere to arrive from. */
+  --number-flow-mask-height: 0.18em;
 }
 /* THE HERO. החזר חודשי is the number an advisor is solving for, so it is a full
    step larger than its three satellites and the only label set in full ink. */
-.lgr-rail-cell[data-hero="true"] .lgr-rail-value { font-size: 30px; letter-spacing: -0.04em; }
+.lgr-rail-cell[data-hero="true"] .lgr-rail-value { font-size: 26px; letter-spacing: -0.04em; }
 .lgr-rail-cell[data-hero="true"] .lgr-rail-label { color: var(--ink); font-weight: 700; }
 /* EMPTY. Not ₪0 — a stated zero is a claim, and nothing has been claimed yet. */
 .lgr-rail-value[data-empty="true"] { color: var(--lgr-4); font-weight: 400; letter-spacing: 0.02em; }
@@ -1013,27 +1168,237 @@
 .lgr-tab-x { color: var(--lgr-4); border-radius: 8px; padding: 1px; margin-inline-start: -2px; transition: background var(--t) ease, color var(--t) ease; }
 .lgr-tab-x:hover { color: inherit; background: rgba(127, 127, 127, 0.18); }
 
+/* ------------------------------------------------------- the intake band */
+/* The bay, on the instrument's own ground rather than floating on canvas beside
+   a tray of buttons. It keeps its dashed edge and its gradient — it is still
+   the one surface here that has to read as an opening — but the opening is now
+   cut into something. The band is the padding around it; the hairline is the
+   seam with the read-out above.
+
+   Full width, deliberately: the bay was capped at 760px because it shared a row
+   with the tray. With the row to itself it is a slot the width of the machine,
+   which is the affordance a drop target wants. */
+.lgr-wb-intake {
+  padding: 12px 14px;
+  border-top: 1px solid var(--line);
+}
+/* Once a report is in, the bay becomes its receipt — a card, in a band, inside
+   the workbench. It keeps a hairline so the slot still reads as a slot, and
+   gives up the shadow: a card floating inside a card is the thing this page
+   stopped doing. */
+.lgr-wb-intake > .lgr-card { box-shadow: none; }
+/* THE RECEIPT'S OWN CONTROLS — what you can read out of this document, then what
+   you do to the set of them. Same hairline idiom as everywhere else on this
+   page: the seam between two subjects is one pixel wide. */
+.lgr-receipt-acts {
+  margin-inline-start: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.lgr-receipt-sep {
+  flex: none;
+  width: 1px;
+  height: 20px;
+  margin-inline: 4px;
+  background: var(--line-2);
+}
+
 /* -------------------------------------------------- the workspace header */
-/* The mix selector, welded to the top of the board it selects. No gap, no
-   second shadow — one card with a tab strip for a lid. */
+/* THE MIX SELECTOR AND THE ACTIONS ON IT — one band, no longer a lid.
+   It used to carry the top corners and three sides of a border because it was
+   the top of its own card. Inside the workbench it is a middle band like any
+   other: one hairline above it, and one tone step down from the read-out, so
+   the two control bands read as the operating half of the instrument and the
+   white above and below them as the reading half. */
 .lgr-tabs {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
-  padding: 10px 14px;
-  border: 1px solid var(--line-2);
-  border-bottom: 0;
-  border-start-start-radius: var(--r);
-  border-start-end-radius: var(--r);
+  padding: 9px 14px;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
   background: var(--card-2);
 }
-/* the board keeps its own top hairline as the seam, and loses the corners the
-   strip above is now carrying */
-.lgr-board > .lgr-card {
-  border-start-start-radius: 0;
-  border-start-end-radius: 0;
+/* THE ACTIONS, IN TWO GROUPS. The first reads the DOCUMENT that filled the
+   board, the second acts on the MIX. Six buttons in one undifferentiated line
+   is a row you have to read; two groups with a rule between them is a row you
+   can aim at — the same hairline idiom the masthead uses between its
+   parameters and its commit. */
+.lgr-strip-acts {
+  margin-inline-start: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
 }
+.lgr-act-group { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.lgr-act-group + .lgr-act-group {
+  padding-inline-start: 10px;
+  border-inline-start: 1px solid var(--line-2);
+}
+
+/* the board is the last band: its own hairline above it, and the ledger card
+   inside gives up every edge it used to draw, because the workbench draws them
+   now. Nested cards are the thing this page was made of; this is where that
+   stops. */
+.lgr-board { border-top: 1px solid var(--line); }
+.lgr-board > .lgr-card {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+/* ============================================== השוואת תמהילים — the verdict */
+/* This was a four-column table on one half of the card and an ECharts diverging
+   bar chart on the other. The same row's shekel difference and percentage
+   difference therefore lived in two coordinate spaces 600px apart, and reading
+   one line meant finding its label twice. The magnitude is drawn inside the row
+   now; the chart is gone, and with it the 50/50 split that only existed to hold
+   it. */
+
+/* THE ANSWER, FIRST. A tinted band and one sentence — not a hero tile with a
+   caption under it. The tint is the verdict's own status colour at its lightest
+   step, which is the only colour on this page allowed to say "good" or "bad";
+   the identity violet never does. */
+.lgr-cmp-verdict {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 9px;
+  padding: 11px 16px 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--tint, var(--card-2));
+}
+.lgr-cmp-verdict[data-tone="pos"] { --tint: var(--pos-tint); --tone: var(--pos); }
+.lgr-cmp-verdict[data-tone="neg"] { --tint: var(--neg-tint); --tone: var(--neg); }
+.lgr-cmp-verdict[data-tone="flat"] { --tint: var(--card-2); --tone: var(--lgr-3); }
+/* The arrow is not decoration and not a duplicate of the colour: it is the half
+   of the signal that survives deuteranopia. */
+.lgr-cmp-verdict-ico {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  flex: none;
+  align-self: center;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--tone);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tone) 26%, transparent);
+}
+/* TEXT ON A TINTED GROUND IS TINTED FROM THAT GROUND, never neutral grey: a
+   grey sentence on a green band reads as text that landed there by accident.
+   Both steps are mixed from the tone, which keeps them well clear of 4.5:1 on
+   the 8%-tint they sit on while belonging to it. */
+.lgr-cmp-verdict-line {
+  flex: 1 1 320px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: color-mix(in srgb, var(--tone) 20%, var(--ink));
+}
+/* the figure the sentence turns on, set in the sentence rather than above it */
+.lgr-cmp-verdict-fig { font-size: 19px; color: var(--tone); margin-inline: 2px; }
+.lgr-cmp-verdict-line .lgr-money { color: var(--tone); }
+/* NOT LIKE FOR LIKE. Two mixes of different size cannot be compared on total
+   cost, and the one row that survives the mismatch is named rather than left to
+   be worked out. */
+.lgr-cmp-caveat {
+  flex: 1 1 100%;
+  font-size: 12px;
+  line-height: 1.45;
+  color: color-mix(in srgb, var(--tone) 26%, var(--lgr-3));
+}
+.lgr-cmp-caveat b { color: color-mix(in srgb, var(--tone) 22%, var(--ink)); font-weight: 700; }
+
+/* --- the ledger --- */
+.lgr-cmp-table td { padding: 7px 5px; }
+.lgr-cmp-table thead th[data-side="active"] { color: var(--ink); }
+.lgr-cmp-row > td { transition: background var(--t) var(--ease) var(--t-exit-delay); }
+.lgr-cmp-row:hover > td { background: var(--card-2); transition-delay: 0ms; }
+.lgr-cmp-row:last-child > td { border-bottom: 0; }
+.lgr-cmp-label {
+  padding-inline-start: 14px !important;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--lgr-2);
+}
+/* עלות לשקל is a ratio among six currencies. Saying its unit under its name is
+   cheaper than a legend and lands where the question is asked. */
+.lgr-cmp-label em {
+  display: block;
+  margin-top: 1px;
+  font-size: 10.5px;
+  font-weight: 500;
+  font-style: normal;
+  color: var(--lgr-4);
+}
+
+/* THE DIFFERENCE AND ITS SIZE, IN ONE CELL. The bar is scaled by percentage
+   because the metrics run from ₪13k to ₪2.8M and an absolute scale draws the
+   payment rows as nothing; the shekels are stated beside it, so both units are
+   read in one place instead of across two panels. */
+.lgr-cmp-delta { display: flex; flex-direction: column; gap: 4px; padding-inline: 8px; }
+.lgr-cmp-delta-fig {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--num);
+  font-variant-numeric: tabular-nums lining-nums;
+  font-size: 13.5px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+.lgr-cmp-delta-pct {
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--lgr-4);
+  letter-spacing: 0;
+}
+.lgr-cmp-bar {
+  display: block;
+  /* CAPPED. Left to fill its column this was a 500px slab, which reads as a
+     chart making a measurement rather than as a mark ranking seven rows against
+     each other. 180px is more resolution than seven bars can use, and it keeps
+     the figure — which is the actual number — the loudest thing in the cell. */
+  width: 100%;
+  max-width: 180px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--card-3);
+  overflow: hidden;
+}
+/* SCALED, NOT RESIZED. The bar's length is the datum, so it has to animate when
+   the datum moves — but a width transition is a layout pass per frame, and the
+   two older bars on this page that do it predate the rule. A solid block scaled
+   on one axis is the same picture on the compositor, and the origin is the
+   reading edge so it grows out of the row's start rather than from its middle. */
+.lgr-cmp-bar > span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 2px;
+  transform-origin: right center;
+  transition: transform 0.45s var(--ease);
+}
+
+/* NOTHING TO COMPARE, OR NOTHING PICKED. An empty state that names what is
+   missing and hands over the action that creates it — the picker is in this
+   card's own header, forty pixels away, so this can point at it instead of
+   sending anyone back up the page. */
+.lgr-cmp-blank {
+  display: grid;
+  place-items: center;
+  gap: 10px;
+  padding: 34px 16px 36px;
+  text-align: center;
+}
+.lgr-cmp-blank p { font-size: 13px; line-height: 1.55; color: var(--lgr-3); }
 
 /* ------------------------------------------------------- the ledger table */
 
@@ -1274,6 +1639,91 @@
   letter-spacing: -0.025em;
 }
 
+/* --------------------------------------------------------------- בערבות */
+
+/* THE ROWS THAT ARE NOT THE CLIENT'S.
+   A guarantee is real money and a real monthly repayment, but not the client's
+   to repay — so it stays on the board, editable, in its own section after both
+   families, and out of every total. The section reads as an aside rather than
+   as a third family: the same grid, one notch quieter, with the exclusion said
+   in words on the bar rather than implied by a colour. */
+/* :not(:hover) so the row still lights under the pointer — an equal-specificity
+   background here would have beaten .lgr-row:hover on source order alone and
+   quietly killed the hover feedback on exactly these rows. */
+.lgr-row[data-surety]:not(:hover):not(:focus-within) > td { background: #fbfcfe; }
+/* Held at 88%: enough to sit back from the client's own rows without becoming
+   the greyed-out look of a disabled control — every field here still edits. */
+.lgr-row[data-surety] .lgr-cell,
+.lgr-row[data-surety] .lgr-pay,
+.lgr-row[data-surety] .lgr-lender-name { opacity: 0.88; }
+/* The spine keeps the family's colour — a guaranteed mortgage is still a
+   mortgage — but broken, which is this page's existing vocabulary for "this row
+   is qualified" (see the flag notch). Only `background` is overridden, so the
+   spine keeps the base rule's geometry and its hover widening. */
+.lgr-row[data-surety] > td:first-child::after {
+  background: repeating-linear-gradient(180deg, var(--fam) 0 4px, transparent 4px 8px);
+}
+.lgr-groupbar[data-surety] > td { background: #f2f5f8; }
+.lgr-groupbar[data-surety] .lgr-groupbar-title { color: var(--lgr-2); }
+
+/* THE BREAK. A band of the page showing through the card, full bleed across
+   every column — the one thing in this table that is not a row. It is what
+   makes the guarantees read as a separate document appended to the ledger
+   rather than as a third family inside it, and it is why the eye stops before
+   reaching the grand total. */
+.lgr-sec-gap > td {
+  height: 16px;
+  padding: 0;
+  border: 0;
+  border-top: 1px solid var(--line-2);
+  border-bottom: 1px solid var(--line-2);
+  background: var(--bg);
+}
+
+/* The heading that opens the block. The family sections need none — a chip in
+   every row says which one you are in — but this block has to state what it is
+   BEFORE its figures are read, not after them in a subtotal. */
+.lgr-surety-head > td {
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid #dfe5ec;
+  background: #f2f5f8;
+}
+.lgr-surety-head-in {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  color: #55637a;
+}
+.lgr-surety-head-in svg { flex: none; }
+.lgr-surety-head-t {
+  font-family: var(--display);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: #3f4b60;
+}
+/* The label is an inline-flex ROW, so a block child would land beside the words
+   rather than under them. It becomes a column only when it has a sub-line. */
+.lgr-total-label:has(> .lgr-total-sub) {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
+  white-space: nowrap;
+}
+/* The exclusion, restated where the total is actually read. */
+.lgr-total-sub {
+  display: block;
+  margin-top: 1px;
+  font-family: var(--ui);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--lgr-4);
+}
+
 /* ------------------------------------------------------- composition bar */
 /* Segments are lit from the top and separated by a hairline of the page, so a
    4%-wide track still reads as its own block rather than a colour smear. */
@@ -1326,25 +1776,11 @@
   font-size: 9.5px; font-weight: 700; letter-spacing: 0.01em; line-height: 1.6;
 }
 
-/* ------------------------------------------------ the band-2 actions well */
-/* The two mix-wide views used to sit bare at the end of the intake band with
-   nothing behind them, which read as two buttons someone forgot to put away.
-   This is the tray they belong in: a shallow well, one step darker than the
-   page, so the raised buttons have a floor to sit on rather than hovering over
-   the canvas. It shares the bay's 16px radius — one band, two panels, same
-   corner — and stays deliberately quiet, because the dashed violet zone beside
-   it is the thing that should pull the eye. */
-.lgr-side {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 9px 11px;
-  border: 1px solid #e2e4e9;
-  border-radius: var(--r);
-  background: #f2f2f5;
-  box-shadow: inset 0 1px 2px rgba(23, 23, 30, 0.045);
-}
+/* The band-2 actions well is gone. It was a tray built to give two loose
+   buttons a floor to stand on — the right fix for a button with nowhere to be,
+   and the wrong question: לוח סילוקין מאוחד and שכפל תמהיל act on the mix, so
+   they belong on the strip that names it, beside the three that already did.
+   See .lgr-strip-acts. */
 
 /* --------------------------------------------------------------- dropzone */
 /* THE INTAKE BAY — the hero of this page.
@@ -1659,41 +2095,388 @@
    note above .lgr-money. Notes that ARE words (a bank name, "צמוד מדד") must stay
    RTL, which is why this is a modifier and not baked into .lgr-note. */
 .lgr-note-num { direction: ltr; unicode-bidi: isolate; text-align: left; }
-/* THE LENDER, AS A MARK. The bank used to be written out under the amount and
-   the two ran into each other on any six-figure row. A 14px disc says the same
-   thing in a twelfth of the width, and it is recognised faster — the full legal
-   name is on hover, which is the one thing here that needs its pointer events
-   back. Sits on the cell's end edge, below the figure's baseline, and the field
-   reserves room for it so a long number cannot reach it. */
-/* Not .lgr-mark — that is the dropzone's document mark, and it is 62px square
-   with `svg { width: 100% }`, which is exactly what this became when the two
-   shared a name. */
-/* Centred on the field's end edge rather than dropped into its bottom corner —
-   the same placement, and the same 6px inset, as the calendar button in
-   תאריך סיום. One adornment pattern for the whole grid. Inherited `bottom: 0`
-   from .lgr-note put a 14px disc one pixel off the border, which read as
-   sitting on it. */
+/* ------------------------------------------------------------- גוף מימון */
+
+/* THE LENDER, AS A NAME.
+   It used to be a 14px disc parked inside the amount cell, with the legal name
+   on hover. That was the right call while the only lenders that mattered were
+   the five banks anyone recognises by their logo. A real חיווי אשראי is not
+   that: מימון ישיר, כלמוביל, טריא, כאל and מקס hold a third of the rows and none
+   of them has a mark a reader knows, so the disc was a riddle and the answer was
+   a hover away — which on a thirty-row sheet is no answer at all.
+
+   Now it is its own column, and the mark is a bullet in front of its own name.
+   Two lines, both inside the 32px a .lgr-well occupies, so the row does not
+   grow: the name, and under it whatever qualifies it — the kind of body, and
+   whether the client merely guarantees the debt or it was counted once across
+   two reports.
+
+   Not .lgr-mark — that is the dropzone's document mark, 62px square with
+   `svg { width: 100% }`, which is exactly what this became when they shared a
+   name. */
 .lgr-lender {
   display: flex;
-  align-items: center;
-  gap: 4px;
-  top: 0;
-  bottom: 0;
-  height: 16px;
-  margin-block: auto;
-  pointer-events: auto;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+  min-width: 0;
+  /* the column's own inset, so the mark starts where every header does */
+  padding-inline-start: 9px;
+  min-height: 32px;
 }
-.lgr-lender svg { display: block; }
-/* The field reserves the mark's lane, so the figure stops before it rather than
-   merely happening to be short enough today.
-   PHYSICAL `padding-left`, not `padding-inline-end`: the amount input is
-   `direction: ltr` so its numerals never get walked by the bidi algorithm, and
-   in an LTR box the inline end is the RIGHT — the side the number already sits
-   on. The logical property reserved the wrong lane and pushed the figure
-   towards the mark instead of away from it. The note is pinned with `left`
-   for the same reason; the two have to agree. */
-.lgr-well:has(> .lgr-lender) > .lgr-num-in { padding-left: 26px; }
-.lgr-well:has(> .lgr-lender > .lgr-tag) > .lgr-num-in { padding-left: 60px; }
+.lgr-lender-id { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.lgr-lender-id svg { display: block; flex: none; }
+/* One line, always. A lender the registry has not met keeps its tidied legal
+   name, and a long one ellipsizes rather than wrapping the row taller — the
+   full name is on the cell's title either way. */
+.lgr-lender-name {
+  min-width: 0;
+  overflow: hidden;
+  font-family: var(--ui);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: -0.008em;
+  color: var(--ink);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+/* Starts at the cell's inset, under the mark rather than under the name.
+   Indenting it to the name's edge read better on a lender with one thing to say
+   and clipped the moment there were two — "חברת אשראי · משותף" is 79px and the
+   indent left 72. The line is 9.5px in the quietest ink on the page; it is not
+   going to be mistaken for the name whatever column it starts in. */
+.lgr-lender-meta {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+  overflow: hidden;
+}
+/* The tags ride a line that is already the smallest type in the grid, so they
+   lose a point of padding here rather than push the third one off the end.
+   They never shrink: ערב and משותף are yes-or-no facts, and half of one is not
+   a smaller version of it. When all three fit at once only on a wide screen —
+   a guaranteed non-bank debt that also appears in the spouse's report — it is
+   the KIND that gives way, because it is the only one of the three that reads
+   as a word after being cut. */
+.lgr-lender-meta .lgr-tag { flex: none; padding: 1px 5px; }
+.lgr-lender-kind {
+  min-width: 0;
+  overflow: hidden;
+  font-family: var(--ui);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: var(--lgr-4);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+/* A row nobody imported. Said plainly rather than left blank — an empty cell in
+   a column of names reads as a parse failure, and this is the opposite: it is
+   the one row on the sheet whose numbers are the advisor's own. */
+.lgr-lender-none {
+  display: block;
+  padding-inline-start: 9px;
+  font-family: var(--ui);
+  font-size: 12px;
+  color: var(--lgr-4);
+}
+/* --- עדכון עוגנים ------------------------------------------------------
+   In the card header, between the target field and the add buttons. Ordinary
+   header-button styling — this is an action on the mix, and dressing it down to
+   a bare glyph would have made the one control that rewrites six rates the
+   quietest thing in the bar. */
+.lgr-anchor-bar { display: flex; align-items: center; gap: 8px; min-width: 0; }
+
+/* THE RING.
+   Drawn OUTSIDE the field — inset -3px, so it surrounds the border rather than
+   sitting on it and there is a hairline of card between the two. That gap is
+   what makes it read as a mark placed around the box instead of the box's own
+   border changing colour.
+
+   Two shadows carry the weight: a tight inner one that reinforces the outline,
+   and a wide soft one that lifts the whole cell off the sheet for the moment it
+   is lit. The element itself never blurs, so the ring stays crisp while the
+   glow does the atmosphere. */
+/* THE HALO.
+   Not a border. A hard green rectangle drawn around the field reads as a
+   validation error and leaves a shape on the page that has to be got rid of;
+   what actually says "this number just refreshed" is light — a soft bloom that
+   comes out of the field and dissolves, leaving nothing behind.
+
+   Drawn UNDER the inputs (z-index 0 against the pair's 1) so it never touches
+   the digits, and blurred so it has no edge of its own at any point in the run.
+   Only opacity and transform animate, so it composites on the GPU and costs a
+   dense grid of numbers nothing.
+
+   CSS keyframes rather than Motion, deliberately. Motion owns the toasts on this
+   page, where springs and layout reflow are the whole point. A one-shot
+   decorative bloom is the opposite case: it wants to run on the compositor, it
+   must survive a throttled tab, and it must not depend on Motion animating
+   transforms with a SPRING by default — which it does, and which silently ate
+   `duration` and `times` here until the keyframes collapsed to their final
+   frame and the mark was gone before it was drawn. */
+.lgr-flash-halo {
+  position: absolute;
+  inset: -7px;
+  z-index: 0;
+  border-radius: 15px;
+  pointer-events: none;
+  /* Two stops doing different jobs: a luminous core that sits just off the
+     field's edge so the digits read against something bright, and a long tail
+     that reaches nothing so the bloom has no boundary at any point in the run.
+     A single stop gave a flat green pill; this gives light. */
+  background:
+    radial-gradient(closest-side, rgba(20, 122, 69, 0.4), rgba(20, 122, 69, 0) 72%),
+    radial-gradient(closest-side, rgba(52, 168, 105, 0.28), rgba(52, 168, 105, 0) 100%);
+  filter: blur(4px);
+  opacity: 0;
+  animation: lgr-flash-halo var(--flash-dur, 1900ms) cubic-bezier(0.22, 1, 0.36, 1)
+    var(--flash-delay, 0ms) both;
+}
+@keyframes lgr-flash-halo {
+  /* Gathers just inside the field... */
+  0% { opacity: 0; transform: scale(0.94); }
+  /* ...blooms to full... */
+  18% { opacity: 1; transform: scale(1); }
+  /* ...holds long enough to be read... */
+  50% { opacity: 0.9; transform: scale(1.02); }
+  /* ...then spreads out and is gone, leaving no shape behind. */
+  100% { opacity: 0; transform: scale(1.12); }
+}
+
+.lgr-pair { position: relative; z-index: 1; }
+
+/* The ink, for as long as the ring is on the cell. CSS owns colour, Motion owns
+   the ring — nothing is animated by both, see lib/transitions. The number is the
+   subject: it goes green and heavy the moment the ring lands, and it takes a
+   full second to come back, so the end of the mark is a fade rather than a cut.
+
+   The faint tint is deliberately almost nothing. The first version washed the
+   whole cell green and the digits had to compete with it; here the fill only
+   separates the changed field from its neighbours, and the ring does the work. */
+.lgr-well[data-flash] .lgr-cell {
+  border-color: var(--pos-line);
+  transition: border-color 0.22s ease-out;
+}
+.lgr-well[data-flash] .lgr-num-in {
+  color: #0d5233;
+  font-weight: 700;
+  transition: color 0.2s ease-out;
+}
+.lgr-well:not([data-flash]) .lgr-cell { transition: border-color 0.9s ease-in; }
+.lgr-well:not([data-flash]) .lgr-num-in { transition: color 1s ease-in; }
+
+@media (prefers-reduced-motion: reduce) {
+  /* The information is "these fields changed", and a static ring carries it.
+     The travel is the part that has to go. */
+  /* The fact is "these fields changed", and the green rim carries it. The
+     bloom is the part that has to go. */
+  .lgr-flash-halo { display: none; }
+}
+
+/* ---------------------------------------------------------------- toasts */
+/* Bottom inline-start — the far corner from the money, which runs down the
+   inline-end side of this RTL board. A toast that covers the column you just
+   changed is a toast hiding its own subject. */
+.lgr-notifs {
+  position: fixed;
+  z-index: 200;
+  inset-block-end: 22px;
+  inset-inline-start: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  pointer-events: none;
+}
+
+/* SEPARATION BY MATERIAL, not by colour.
+   This floats over a white page full of white cards, so a white card with a
+   hairline vanishes into it. Instead: a frosted, slightly translucent surface
+   that picks up whatever is behind it, a real border, and a two-part shadow —
+   a tight contact shadow that sits it on the sheet and a wide ambient one,
+   tinted with the toast's own tone, that lifts it off. */
+.lgr-notif {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  overflow: hidden;
+  width: min(460px, calc(100vw - 44px));
+  padding: 16px 18px 17px;
+  /* NO ACCENT BAR — see the note at the top of Toast.tsx. One hairline all the
+     way round, tinted by tone so the card is coloured by material rather than by
+     a rule stuck to one edge. */
+  border: 1px solid var(--tone-line, #d5dbe4);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow:
+    /* a crisp ring, because a 1px border alone disappears against the sheet */
+    0 0 0 1px rgba(16, 24, 40, 0.04),
+    0 2px 4px rgba(16, 24, 40, 0.06),
+    0 14px 30px -10px rgba(16, 24, 40, 0.22),
+    0 30px 62px -20px var(--tone-glow, rgba(16, 24, 40, 0.2));
+  pointer-events: auto;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+/* Held, because someone is reading it. A touch more lift and the drain stops —
+   an auto-dismissing message that keeps counting down while you read it is a
+   message that punishes you for reading it. */
+.lgr-notif[data-held] {
+  transform: translateY(-1px);
+  box-shadow:
+    0 0 0 1px rgba(16, 24, 40, 0.05),
+    0 3px 6px rgba(16, 24, 40, 0.07),
+    0 18px 38px -10px rgba(16, 24, 40, 0.26),
+    0 38px 76px -20px var(--tone-glow, rgba(16, 24, 40, 0.24));
+}
+.lgr-notif[data-held] .lgr-notif-edge { animation-play-state: paused; }
+
+.lgr-notif[data-tone="pos"] {
+  --tone: var(--pos);
+  --tone-line: #bcdcca;
+  --tone-glow: rgba(20, 122, 69, 0.26);
+}
+.lgr-notif[data-tone="neutral"] {
+  --tone: #64748b;
+  --tone-line: #cfd6e0;
+  --tone-glow: rgba(71, 85, 105, 0.2);
+}
+.lgr-notif[data-tone="neg"] {
+  --tone: var(--neg);
+  --tone-line: #f0c8c4;
+  --tone-glow: rgba(180, 35, 24, 0.24);
+}
+
+/* A tinted disc, so the tone reads from across a desk rather than as an 18px
+   glyph the same weight as the text beside it. */
+.lgr-notif-ico {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  margin-top: -1px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--tone) 13%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tone) 20%, transparent);
+  color: var(--tone);
+}
+.lgr-notif-msg {
+  font-family: var(--ui);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.4;
+  letter-spacing: -0.012em;
+  color: var(--ink);
+}
+.lgr-notif-detail {
+  margin-top: 3px;
+  font-family: var(--ui);
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.5;
+  color: var(--lgr-3);
+}
+/* A fallback, not a primary control — the thing dismisses itself. It appears on
+   hover, which is also exactly when the countdown is being held. */
+.lgr-notif-x {
+  display: grid;
+  place-items: center;
+  flex: none;
+  align-self: flex-start;
+  width: 24px;
+  height: 24px;
+  margin: -3px -4px 0 0;
+  border-radius: 8px;
+  color: var(--lgr-4);
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity 0.16s ease, background 0.16s ease, color 0.16s ease;
+}
+.lgr-notif:hover .lgr-notif-x { opacity: 1; }
+.lgr-notif-x:focus-visible { opacity: 1; outline: 2px solid var(--tone); outline-offset: 1px; }
+.lgr-notif-x:hover { background: var(--bg-2); color: var(--ink); }
+
+/* THE TOP ACCENT, WHICH IS ALSO THE CLOCK.
+   Full-bleed along the top edge, fading out toward the far end so it reads as a
+   drawn line rather than a filled bar — and retracting from that far end as the
+   message's life runs down. Tone identity and time remaining, one element. */
+.lgr-notif-edge {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline: 0;
+  height: 3px;
+  border-start-start-radius: 14px;
+  border-start-end-radius: 14px;
+  transform-origin: right center;
+  background: linear-gradient(
+    to left,
+    var(--tone) 0%,
+    var(--tone) 42%,
+    color-mix(in srgb, var(--tone) 30%, transparent) 100%
+  );
+  animation: lgr-notif-edge var(--ttl, 5200ms) linear both;
+}
+@keyframes lgr-notif-edge {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lgr-notif-edge { animation: none; transform: scaleX(1); }
+}
+
+/* --- מטרה --------------------------------------------------------------
+   A read-only column of the document's own words, so it is typed like the
+   lender's name beside it but one step quieter: this is context for the row,
+   not its identity. Two lines at most, because "רכישת דירה יד שניה" does not
+   fit one at 7% of the grid and truncating it to "רכישת דירה" would silently
+   turn a specific fact into the generic one. The full string is on the title. */
+.lgr-purpose {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  padding-inline-start: 9px;
+  font-family: var(--ui);
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 1.25;
+  letter-spacing: -0.006em;
+  color: var(--lgr-2);
+}
+/* A hand-added row, or a report that printed the field empty. Both are "the
+   document does not say", which is a different thing from a purpose of "אחר". */
+.lgr-purpose-none {
+  display: block;
+  padding-inline-start: 9px;
+  font-family: var(--ui);
+  font-size: 12px;
+  color: var(--lgr-4);
+}
+/* זכאות. State money on state terms — it changes what a refinance is allowed to
+   do with the tranche, so it is the one thing in this column that gets a mark
+   rather than a line of text. Sized off the existing row tags. */
+.lgr-purpose-tag {
+  display: inline-block;
+  margin-top: 2px;
+  margin-inline-start: 9px;
+  padding: 1px 5px;
+  border: 1px solid #cbd9ea;
+  border-radius: 999px;
+  background: #eef4fb;
+  font-family: var(--ui);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: #3b5f8a;
+  white-space: nowrap;
+}
+
 /* The anchor's level belongs under the anchor's NAME, not under the margin field
    at the cell's other end — parked there it read as an annotation of the margin,
    so a row whose margin was blank appeared to have a margin of 2.80%. Pinned to
@@ -1776,6 +2559,72 @@
   background: var(--card-2);
 }
 .lgr-sheet-body { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 14px; }
+/* The ערב switch spans the sheet: it is a sentence, not a field. */
+.lgr-sheet-body-1 { grid-template-columns: 1fr; padding-top: 0; }
+
+/* A switch, not a checkbox: the state is a claim about the row ("the client
+   guarantees this"), and a claim reads better as on/off than as a tick. */
+.lgr-switch {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 9px 10px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  background: var(--card-2);
+  cursor: pointer;
+  transition: border-color var(--t) ease, background var(--t) ease;
+}
+.lgr-switch:hover { border-color: var(--lgr-4); }
+.lgr-switch input { position: absolute; opacity: 0; pointer-events: none; }
+.lgr-switch-track {
+  position: relative;
+  flex: none;
+  width: 30px;
+  height: 17px;
+  margin-top: 1px;
+  border-radius: 999px;
+  background: var(--line-2);
+  transition: background var(--t) var(--ease);
+}
+.lgr-switch-track::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  inset-inline-start: 2px;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.25);
+  transition: transform var(--t) var(--ease);
+}
+/* The knob travels toward the inline END, which in this RTL sheet is the left —
+   a physical translateX would send it the wrong way. */
+.lgr-switch input:checked ~ .lgr-switch-track { background: #64748b; }
+.lgr-switch input:checked ~ .lgr-switch-track::after { transform: translateX(-13px); }
+.lgr-switch input:focus-visible ~ .lgr-switch-track {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(100, 116, 139, 0.35);
+}
+.lgr-switch-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-family: var(--ui);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.3;
+}
+.lgr-switch-text em {
+  font-style: normal;
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--lgr-4);
+}
+.lgr-switch[data-dirty="true"] { border-color: var(--primary); background: var(--primary-tint); }
 .lgr-sheet-foot {
   padding: 9px 14px;
   border-top: 1px solid var(--line);
@@ -1962,9 +2811,10 @@
    With the card no longer clipping (so the sticky header and totals bar can
    hold against the page), the totals row's own corners have to match the card
    the table now sits flush inside — otherwise a square edge shows through the
-   card's radius. */
-.lgr-table tfoot tr:last-child td:first-child { border-end-start-radius: var(--r); }
-.lgr-table tfoot tr:last-child td:last-child { border-end-end-radius: var(--r); }
+   card's radius. That card is the workbench, whose 1px border eats a pixel of
+   the radius its contents see. */
+.lgr-table tfoot tr:last-child td:first-child { border-end-start-radius: calc(var(--r) - 1px); }
+.lgr-table tfoot tr:last-child td:last-child { border-end-end-radius: calc(var(--r) - 1px); }
 /* Analysis tables live inside their own scrolling sheet and keep square ends. */
 .lgr-mini tfoot tr:last-child td:first-child,
 .lgr-mini tfoot tr:last-child td:last-child { border-radius: 0; }

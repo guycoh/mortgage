@@ -33,6 +33,7 @@ import {
 import { clean } from "../fields";
 import type { BankLoan, BankStatement, BankTranche, Linkage, RateKind } from "../types";
 import { BANK_LABEL } from "../types";
+import { classifyPurpose } from "../purpose";
 
 /** Field labels on the transposed pages, in the lender's own wording. */
 const L = {
@@ -332,7 +333,11 @@ export function parsePoalim(pages: RawPage[], dataPages: number[]): BankStatemen
         rateKind: kind,
         linkage,
         amortization: g.amort[c],
+        // Per מרכיב, and the most specific of the four: "הלוואה לדיור לרכישה".
         purpose: g.purpose[c],
+        purposeKind: classifyPurpose(g.purpose[c]),
+        fundingSource: "",
+        funding: "unknown",
         principal: null,
         indexation: null,
         accruedInterest: null,
@@ -411,6 +416,8 @@ export function parsePoalim(pages: RawPage[], dataPages: number[]): BankStatemen
     loans.push({
       loanNumber: tot.loanNumber,
       purpose: tranches[0]?.purpose ?? "",
+      purposeKind: tranches[0]?.purposeKind ?? "unknown",
+      funding: "unknown",
       tranches,
       printed: {
         balance: loanBalance || null,

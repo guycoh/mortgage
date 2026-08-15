@@ -795,15 +795,18 @@ function buildTransaction(
     if (v) fields[code] = v;
   }
   // Enums via cell-column phrase detection (handles wrapped values).
-  const setEnum = (code: string, phrases: readonly string[]) => {
-    const v = enumByCell(lines, code, phrases);
+  const setEnum = (code: string, phrases: readonly string[], blockFallback = true) => {
+    const v = enumByCell(lines, code, phrases, blockFallback);
     if (v) fields[code] = v;
   };
   setEnum("201-022", ENUMS.status);
-  setEnum("201-017", ENUMS.purpose);
+  // Both of these are printed with an empty value on a large minority of
+  // transactions, so neither may fall back to a whole-block search — see
+  // enumByCell. An absent purpose is a gap in the report, not "עסק".
+  setEnum("201-017", ENUMS.purpose, false);
   setEnum("201-021", ENUMS.currency);
   setEnum("201-044", ENUMS.frequency);
-  setEnum("201-047", ENUMS.paymentType);
+  setEnum("201-047", ENUMS.paymentType, false);
   // Days-in-arrears range (only printed when the transaction is in arrears).
   if (fields["201-051"] || fields["201-052"]) setEnum("201-050", ENUMS.arrearsRange);
   if (section === "current") {
