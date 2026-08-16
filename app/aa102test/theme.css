@@ -1182,13 +1182,14 @@ html:has(.lgr-root) {
    with the tray. With the row to itself it is a slot the width of the machine,
    which is the affordance a drop target wants. */
 .lgr-wb-intake {
-  padding: 10px 14px;
+  padding: 12px 14px;
   border-top: 1px solid var(--line);
 }
-/* Once a report is in, the slot becomes its receipt — a row of the band, no
-   box. Same inset as the slot's own content, so the tick lands where the mark
-   was and the eye does not have to move. */
-.lgr-receipt { padding: 2px 0; }
+/* Once a report is in, the bay becomes its receipt — a card, in a band, inside
+   the workbench. It keeps a hairline so the slot still reads as a slot, and
+   gives up the shadow: a card floating inside a card is the thing this page
+   stopped doing. */
+.lgr-wb-intake > .lgr-card { box-shadow: none; }
 /* THE RECEIPT'S OWN CONTROLS — what you can read out of this document, then what
    you do to the set of them. Same hairline idiom as everywhere else on this
    page: the seam between two subjects is one pixel wide. */
@@ -1217,143 +1218,14 @@ html:has(.lgr-root) {
 .lgr-tabs {
   display: flex;
   flex-wrap: wrap;
-  align-items: stretch;
-  gap: 2px;
-  /* no block padding: the tabs run the band's full height so their rule can
-     sit ON the band's bottom hairline, the way the nav's does on the shell's */
-  padding: 0 10px;
-  min-height: 44px;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 14px;
   border: 0;
   border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
   border-radius: 0;
   background: var(--card-2);
 }
-
-/* THE MIX TABS — tabs, not buttons.
-   Each mix was a pill: bordered, gradient-filled, the active one solid violet.
-   Five of them beside five bordered action buttons made the strip a tray of
-   eleven small components, and the tray was the loudest band on the
-   instrument. They are flat now, in the same grammar the nav already uses one
-   band up: bare labels on the band, ink for the active one, and a 2px rule of
-   the identity colour flush on the band's bottom hairline. Nothing on this
-   strip has an edge of its own any more; the tabs are named by type, the
-   active one by colour and the rule, the actions by their icons. */
-.lgr-mixtab {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  height: 100%;
-  min-height: 44px;
-  padding: 0 11px;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: -0.005em;
-  color: var(--lgr-3);
-  cursor: pointer;
-  white-space: nowrap;
-  transition: color var(--t) var(--ease), background var(--t) var(--ease);
-}
-.lgr-mixtab::before {
-  /* the hover floor: a soft field the tab's own shape, inset from the band's
-     edges so it never touches the hairlines */
-  content: "";
-  position: absolute;
-  inset: 6px 2px;
-  border-radius: 8px;
-  background: transparent;
-  transition: background var(--t) var(--ease);
-  z-index: 0;
-}
-.lgr-mixtab > * { position: relative; z-index: 1; }
-.lgr-mixtab:hover { color: var(--ink); }
-.lgr-mixtab:hover::before { background: rgba(28, 28, 30, 0.045); }
-.lgr-mixtab[data-on="true"] { color: var(--primary-deep); }
-.lgr-mixtab[data-on="true"]:hover::before { background: var(--primary-tint); }
-/* THE RULE. 2px, inset from the label's ends, flush on the band's bottom
-   hairline. Scales in from the middle so a tab that just became active is seen
-   becoming active, not just being it. */
-.lgr-mixtab::after {
-  content: "";
-  position: absolute;
-  inset-inline: 10px;
-  bottom: -1px;
-  height: 2px;
-  border-radius: 2px 2px 0 0;
-  background: var(--primary);
-  transform: scaleX(0);
-  transform-origin: center;
-  transition: transform 220ms var(--ease);
-  z-index: 1;
-}
-.lgr-mixtab[data-on="true"]::after { transform: scaleX(1); }
-.lgr-mixtab:focus-visible { outline: none; }
-.lgr-mixtab:focus-visible::before { box-shadow: inset 0 0 0 2px var(--focus-ring-strong); }
-/* the base mix's dot keeps its place before the name */
-.lgr-mixtab .lgr-dot { flex: none; }
-/* the row count — a figure, one step quieter than the name */
-.lgr-mixtab-n {
-  font-family: var(--num);
-  font-variant-numeric: tabular-nums;
-  font-size: 10.5px;
-  font-weight: 600;
-  color: var(--lgr-4);
-}
-.lgr-mixtab[data-on="true"] .lgr-mixtab-n { color: var(--primary); opacity: 0.8; }
-/* the actions glyph: present at rest, only quietly, so a tab is never
-   mistaken for a plain label with nothing behind it */
-.lgr-mixtab-x {
-  display: grid; place-items: center;
-  width: 20px; height: 20px;
-  margin-inline-start: -3px;
-  border-radius: 6px;
-  color: var(--lgr-4);
-  opacity: 0.55;
-  transition: opacity var(--t) var(--ease), background var(--t) var(--ease), color var(--t) var(--ease);
-}
-.lgr-mixtab:hover .lgr-mixtab-x,
-.lgr-mixtab[data-on="true"] .lgr-mixtab-x { opacity: 1; }
-.lgr-mixtab-x:hover { color: var(--ink); background: rgba(28, 28, 30, 0.08); }
-.lgr-mixtab[data-on="true"] .lgr-mixtab-x { color: var(--primary-deep); }
-.lgr-mixtab[data-on="true"] .lgr-mixtab-x:hover { background: var(--primary-tint-2, #deddf7); }
-/* renaming: the label becomes a field in place — same size, same weight,
-   underlined by the rule that already marks the active tab */
-.lgr-mixtab-edit {
-  width: 150px;
-  border: 0;
-  padding: 0;
-  background: transparent;
-  outline: none;
-  font: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--ink);
-}
-/* the mix's own actions, on the strip, quiet: icon + word, a floor on hover.
-   The one green thing stays green in its glyph and its word. */
-.lgr-strip-acts .lgr-btn,
-.lgr-tabs .lgr-mixtab-add {
-  background: transparent;
-  border-color: transparent;
-  box-shadow: none;
-  color: var(--lgr-2);
-}
-.lgr-strip-acts .lgr-btn:hover:not(:disabled),
-.lgr-tabs .lgr-mixtab-add:hover:not(:disabled) {
-  background: rgba(28, 28, 30, 0.045);
-  border-color: transparent;
-  box-shadow: none;
-  translate: 0;
-  color: var(--ink);
-}
-.lgr-strip-acts .lgr-btn-excel { color: #16603c; }
-.lgr-strip-acts .lgr-btn-excel:hover:not(:disabled) { background: var(--pos-tint); color: #0f4a2e; }
-.lgr-tabs .lgr-mixtab-add { align-self: center; color: var(--lgr-3); }
-.lgr-tabs .lgr-strip-acts { align-self: center; }
 /* THE ACTIONS, IN TWO GROUPS. The first reads the DOCUMENT that filled the
    board, the second acts on the MIX. Six buttons in one undifferentiated line
    is a row you have to read; two groups with a rule between them is a row you
@@ -1376,9 +1248,7 @@ html:has(.lgr-root) {
    inside gives up every edge it used to draw, because the workbench draws them
    now. Nested cards are the thing this page was made of; this is where that
    stops. */
-/* the seam above it is the tab strip's own bottom hairline — the one the
-   active tab's rule sits on — so the board draws none of its own */
-.lgr-board { border-top: 0; }
+.lgr-board { border-top: 1px solid var(--line); }
 .lgr-board > .lgr-card {
   border: 0;
   border-radius: 0;
@@ -1962,32 +1832,35 @@ html:has(.lgr-root) {
 /* DEAD STILL UNTIL TOUCHED. At rest this is a static panel with a static
    dashed edge — no beam, no breathing, nothing. The dashes only start marching
    when a file is actually over it, and they stop the moment it lands. */
-/* A SLOT, NOT A CARD.
-   It was a 16px-radius panel with a 2px dashed violet edge and its own
-   gradient, sitting inside the workbench's own 16px-radius edge — a card in a
-   card, and the loudest object above the ledger on an empty board. The drop
-   target is still marked (a dashed hairline is what "put a file here" reads as
-   everywhere) but it is marked the way a field is, not the way a panel is: the
-   control radius, one and a half pixels, and no fill of its own at rest. It is
-   the band's white it sits on; the wash arrives with the pointer, the tint with
-   the file. */
 .lgr-bay {
   position: relative;
   display: block;
   width: 100%;
   overflow: hidden;
-  border: 1.5px dashed var(--primary-line);
-  border-radius: var(--r-sm);
-  background: transparent;
+  /* Dashed at rest, because that is what a place-a-file-here reads as
+     everywhere. Static, though — the dashes only march once a file is actually
+     over the zone, and the marching set is an SVG drawn on top of this one. */
+  border: 2px dashed var(--primary-line);
+  border-radius: var(--r);
+  /* the page's single gradient: the identity violet at 4%, falling to white */
+  background: linear-gradient(180deg, #f3f2fd 0%, #fbfbfe 55%, #ffffff 100%);
   text-align: start;
   cursor: pointer;
-  transition: border-color var(--t) var(--ease), background var(--t) var(--ease);
+  transition: border-color var(--t) var(--ease), box-shadow var(--t) var(--ease),
+    background var(--t) var(--ease);
 }
-.lgr-bay:hover { border-color: var(--primary); background: var(--primary-wash); }
-.lgr-bay:focus-visible { outline: none; border-color: var(--primary); box-shadow: 0 0 0 2px var(--focus-ring-strong); }
-.lgr-bay[data-armed="true"] { border-color: var(--primary); background: var(--primary-wash); }
-.lgr-bay[data-drag="true"] { border-color: transparent; background: #efeefb; }
-.lgr-bay[data-state="err"] { border-color: var(--neg-line); background: var(--neg-tint); }
+.lgr-bay:hover { border-color: var(--primary); box-shadow: var(--shadow-hover); }
+.lgr-bay:focus-visible { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--focus-ring-strong); }
+.lgr-bay[data-armed="true"] {
+  border-color: var(--primary);
+  background: linear-gradient(180deg, #f1effc 0%, #f9f8fe 60%, #ffffff 100%);
+}
+.lgr-bay[data-drag="true"] {
+  border-color: transparent;
+  background: linear-gradient(180deg, #e9e7fb 0%, #f6f5fe 60%, #ffffff 100%);
+  box-shadow: var(--shadow-lift);
+}
+.lgr-bay[data-state="err"] { border-color: var(--neg); background: linear-gradient(180deg, #fdf1f0, #fff); }
 
 /* THE MARCHING ANTS.
    An SVG rect stroked with a dash array, drawn on top of the panel's own
@@ -2001,9 +1874,7 @@ html:has(.lgr-root) {
 .lgr-ants rect {
   fill: none;
   stroke: var(--primary);
-  /* half of it is clipped by the bay's overflow, so 1.5px shows — the resting
-     border's own weight, in the resting border's own place */
-  stroke-width: 3;
+  stroke-width: 4;
   stroke-dasharray: 9 7;
   animation: lgr-march 620ms linear infinite;
 }
@@ -2036,10 +1907,8 @@ html:has(.lgr-root) {
    colours saying what comes out of the bay before a word is read. */
 .lgr-mark {
   position: relative;
-  /* 50, from 62: the slot is a line of the band now, and the mark is drawn to
-     the line's height rather than the line to the mark's */
-  width: 50px;
-  height: 50px;
+  width: 62px;
+  height: 62px;
   flex: none;
   transition: translate var(--t) var(--ease) var(--t-exit-delay);
 }
@@ -2060,11 +1929,12 @@ html:has(.lgr-root) {
 }
 .lgr-bay[data-state="err"] .lgr-mark { filter: grayscale(0.7); }
 
-/* the formats footnote, trailing the payoff sentence on its own line */
+/* the formats footnote, on the bay's own bottom rule */
 .lgr-bay-foot {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 7px;
+  margin-top: 3px;
   font-size: 11px;
   /* one step up from --lgr-4: at 11px, 4.5:1 is the floor, not a target */
   color: var(--lgr-3);

@@ -1188,7 +1188,7 @@ export default function Simulator({
                       reports.length > 0 ? (
                         <>
                           <Btn
-                            className="lgr-btn lgr-btn-ghost lgr-btn-sm lgr-reading"
+                            className="lgr-btn lgr-btn-sm"
                             onClick={() => setShowClient(true)}
                             title={
                               statement
@@ -1200,7 +1200,7 @@ export default function Simulator({
                             סיכום ללקוח
                           </Btn>
                           <Btn
-                            className="lgr-btn lgr-btn-ghost lgr-btn-sm lgr-reading"
+                            className="lgr-btn lgr-btn-sm"
                             onClick={() => setShowAnalysis(true)}
                             title={
                               statement
@@ -1212,7 +1212,7 @@ export default function Simulator({
                             {statement ? "ניתוח משכנתא" : "ניתוח חיווי"}
                           </Btn>
                           <Btn
-                            className="lgr-btn lgr-btn-ghost lgr-btn-sm lgr-reading"
+                            className="lgr-btn lgr-btn-sm"
                             onClick={() => setShowDoc(true)}
                             disabled={!reports.some((r) => r.file)}
                             title={
@@ -1243,21 +1243,7 @@ export default function Simulator({
         <div className="lgr-tabs">
           {list.map((m) => (
             <div key={m.id} className="relative">
-              <div
-                className="lgr-mixtab"
-                role="tab"
-                tabIndex={0}
-                aria-selected={m.id === activeMixId}
-                data-on={m.id === activeMixId}
-                onClick={() => setActiveMixId(m.id)}
-                onKeyDown={(e) => {
-                  if (e.target !== e.currentTarget) return;
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    setActiveMixId(m.id);
-                  }
-                }}
-              >
+              <div className="lgr-tab" data-on={m.id === activeMixId} onClick={() => setActiveMixId(m.id)}>
                 {editingId === m.id ? (
                   <input
                     autoFocus
@@ -1270,18 +1256,22 @@ export default function Simulator({
                     }
                     onBlur={() => setEditingId(null)}
                     onKeyDown={(e) => e.key === "Enter" && setEditingId(null)}
-                    className="lgr-mixtab-edit"
-                    aria-label="שם התמהיל"
+                    className="w-[130px] rounded border-0 bg-white/95 px-1 text-[12.5px] text-[var(--ink)] outline-none"
                   />
                 ) : (
                   <>
-                    {m.is_base && <span className="lgr-dot" style={{ background: "var(--primary)" }} />}
+                    {m.is_base && (
+                      <span
+                        className="lgr-dot"
+                        style={{ background: m.id === activeMixId ? "#fff" : "var(--primary)" }}
+                      />
+                    )}
                     {m.mix_name}
-                    <span className="lgr-mixtab-n">{m.loans.length}</span>
+                    <span className="lgr-fig text-[10.5px] opacity-55">{m.loans.length}</span>
                   </>
                 )}
                 <button
-                  className="lgr-mixtab-x"
+                  className="lgr-tab-x"
                   onClick={(e) => {
                     e.stopPropagation();
                     setMenuFor(menuFor === m.id ? null : m.id);
@@ -1329,7 +1319,7 @@ export default function Simulator({
             </div>
           ))}
 
-          <Btn className="lgr-btn lgr-btn-sm lgr-mixtab-add" onClick={addMix} title="תמהיל חדש וריק">
+          <Btn className="lgr-btn lgr-btn-sm" onClick={addMix}>
             <Plus size={13} weight="bold" />
             תמהיל
           </Btn>

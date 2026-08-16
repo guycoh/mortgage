@@ -303,23 +303,18 @@ export default function Bay({
     );
 
     return (
-      // NOT A CARD. The receipt used to be a bordered, rounded panel inside the
-      // intake band inside the workbench — a card in a card, the exact shape
-      // this page stopped drawing. It is a row of the band now: the band's own
-      // hairlines above and below are its edges, and what tells you a document
-      // landed is the tick, the name, and the counts — not a box around them.
       <motion.div
         initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-        className="lgr-receipt"
+        className="lgr-card overflow-hidden"
       >
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-1 py-1">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
           <span
-            className="grid size-8 flex-none place-items-center rounded-full"
+            className="grid size-9 flex-none place-items-center rounded-full"
             style={{ background: "var(--pos-tint)", color: "var(--pos)" }}
           >
-            <CheckCircle size={17} weight="fill" />
+            <CheckCircle size={19} weight="fill" />
           </span>
 
           {reports.map((r, i) => (
@@ -329,7 +324,7 @@ export default function Bay({
               style={{ borderInlineStart: i ? "1px solid var(--line)" : undefined }}
             >
               <div className="flex items-center gap-2">
-                <span className="lgr-display text-[15px]">{r.clientName || "דוח ללא שם"}</span>
+                <span className="lgr-display text-[16px]">{r.clientName || "דוח ללא שם"}</span>
                 {r.clientId && (
                   <span className="lgr-chip !h-[21px] !px-2 !text-[10.5px]" style={{ color: "var(--lgr-3)" }}>
                     <IdentificationCard size={11} />
@@ -413,8 +408,8 @@ export default function Bay({
 
         {error && (
           <div
-            className="mt-2 flex items-center gap-2 rounded-[var(--r-sm)] px-3 py-1.5 text-[11.5px] font-semibold"
-            style={{ background: "var(--neg-tint)", color: "var(--neg)" }}
+            className="flex items-center gap-2 border-t px-3.5 py-1.5 text-[11.5px] font-semibold"
+            style={{ borderColor: "var(--neg-line)", background: "var(--neg-tint)", color: "var(--neg)" }}
           >
             <WarningCircle size={13} weight="fill" />
             {error}
@@ -494,7 +489,7 @@ export default function Bay({
 
       {(drag || armed) && (
         <svg className="lgr-ants" aria-hidden preserveAspectRatio="none">
-          <rect x="0" y="0" width="100%" height="100%" rx="10" />
+          <rect x="0" y="0" width="100%" height="100%" rx="16" />
         </svg>
       )}
       {(drag || busy) && <span className="lgr-beam" aria-hidden />}
@@ -506,10 +501,8 @@ export default function Bay({
           Everything it said is still here — mark, what to do, what happens, how
           to do it without dragging, and what it takes — laid across instead of
           down, in about a third of the height. */}
-      {/* One line of the band: the mark, the sentence, the button. The strip
-          settled at 74px — the mark's own height plus the slot's padding — and
-          stays there whatever the state says. */}
-      <div className="lgr-bay-in relative flex flex-wrap items-center gap-x-4 gap-y-2 px-3.5 py-2">
+      {/* py-3 rather than py-3.5: the strip settled at 90px and stays there. */}
+      <div className="relative flex flex-wrap items-center gap-x-5 gap-y-3 px-4 py-3">
         <div className="relative flex-none">
           <Mark />
           <AnimatePresence>
@@ -536,35 +529,29 @@ export default function Bay({
         </div>
 
         <div className="min-w-[190px] flex-1">
-          <div className="lgr-display text-[15.5px]" style={{ color: error ? "var(--neg)" : "var(--ink)" }}>
+          <div className="lgr-display text-[17px]" style={{ color: error ? "var(--neg)" : "var(--ink)" }}>
             {headline}
           </div>
-          {/* The payoff and what it takes, on one line: the sentence, then the
-              three formats as its footnote. Two lines under a headline made
-              the slot a paragraph; one line makes it a caption. */}
           <p
-            className="mt-0.5 flex flex-wrap items-baseline gap-x-2.5 text-[12.5px] leading-snug"
+            className="mt-1 text-[12.5px] leading-snug"
             style={{ color: error ? "var(--neg)" : "var(--lgr-3)" }}
           >
-            <span>{error || subline}</span>
-            {!error && (
-              <span className="lgr-bay-foot">
-                <span>PDF</span>
-                <i />
-                <span>חיווי אשראי</span>
-                <i />
-                <span>תדפיס משכנתא מהבנק</span>
-              </span>
-            )}
+            {error || subline}
           </p>
+          {/* what it takes, on the line it is relevant to */}
+          <div className="lgr-bay-foot">
+            <span>PDF</span>
+            <i />
+            <span>חיווי אשראי</span>
+            <i />
+            <span>תדפיס משכנתא מהבנק</span>
+          </div>
         </div>
 
-        {/* The CTA lives inside the zone. It is a <span>: the whole bay is
-            already the button, and a nested <button> would swallow the click
-            it is meant to represent. Secondary, not filled: the slot's dashed
-            edge is the affordance, and the page keeps its one filled button
-            for the act that commits the board. */}
-        <span className="lgr-btn flex-none" aria-hidden>
+        {/* The primary CTA lives inside the zone. It is a <span>: the whole bay
+            is already the button, and a nested <button> would swallow the click
+            it is meant to represent. */}
+        <span className="lgr-btn lgr-btn-primary flex-none !px-4" aria-hidden>
           {busy ? (
             <CircleNotch size={14} weight="bold" className="animate-spin" />
           ) : error ? (
