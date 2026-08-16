@@ -716,8 +716,11 @@ html:has(.lgr-root) {
      narrower now and the composition carries twice their width — enough for
      three tracks on one line. Still fractions rather than `auto`, because
      `auto` let the composition swallow the whole band. */
+  /* החזר לשקל is four characters wide where its neighbours are seven-figure
+     sums, so it takes about two thirds of their share rather than an equal
+     one — the band's room belongs to the figures that need it. */
   grid-template-columns:
-    minmax(0, 0.8fr) minmax(0, 0.8fr) minmax(0, 0.8fr) minmax(320px, 1.6fr);
+    minmax(0, 0.8fr) minmax(0, 0.8fr) minmax(0, 0.8fr) minmax(0, 0.55fr) minmax(320px, 1.6fr);
   gap: 4px 26px;
   padding: 10px 16px 11px;
 }
@@ -863,7 +866,7 @@ html:has(.lgr-root) {
 /* PLACEHOLDER vs VALUE — the difference has to be visible without reading.
    An empty field shows a muted 0.00 at 40%, regular weight; a typed value is
    full ink at 600. The old placeholders repeated the column header inside the
-   box ("עוגן", "מרווח"), which said nothing the <th> had not already said. */
+   box ("עוגן", "תוספת"), which said nothing the <th> had not already said. */
 .lgr-cell::placeholder {
   font-family: var(--num);
   font-variant-numeric: tabular-nums;
@@ -1327,7 +1330,7 @@ html:has(.lgr-root) {
   font-weight: 700;
   color: var(--lgr-2);
 }
-/* עלות לשקל is a ratio among six currencies. Saying its unit under its name is
+/* החזר לשקל is a ratio among six currencies. Saying its unit under its name is
    cheaper than a legend and lands where the question is asked. */
 .lgr-cmp-label em {
   display: block;
@@ -3001,7 +3004,7 @@ html:has(.lgr-root) {
 }
 
 /* A HEADER OVER A PAIRED CELL.
-   The עוגן column holds two fields, so one start-aligned label left "מרווח %"
+   The עוגן column holds two fields, so one start-aligned label left "תוספת %"
    floating over the gap between them. This splits the header on the same
    1fr / 56px grid `.lgr-pair` uses, so each word sits over the box it names. */
 .lgr-th-pair { display: flex; align-items: baseline; gap: 0; }

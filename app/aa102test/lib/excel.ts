@@ -18,7 +18,14 @@
 import type { Workbook, Worksheet } from "exceljs";
 import { calculateLoan } from "@/app/private/crm/leads/simulators/components/calculate/loanCalculators";
 import { schedules } from "@/app/data/amortization_schedules";
-import { FAMILY, PATH_LABEL, isSurety, type DebtGroup, type ImportedLoan } from "./credit";
+import {
+  FAMILY,
+  PATH_LABEL,
+  isSurety,
+  perShekel as perShekelOf,
+  type DebtGroup,
+  type ImportedLoan,
+} from "./credit";
 import { lenderOf } from "./lenders";
 
 /* ------------------------------------------------------------------ palette */
@@ -91,7 +98,7 @@ const COLS: Col[] = [
   { header: "יתרה (₪)", width: 14, fmt: "money", total: true },
   { header: "ריבית", width: 9.5, fmt: "pct" },
   { header: "עוגן", width: 9.5, fmt: "pct" },
-  { header: "מרווח", width: 9, fmt: "pct" },
+  { header: "תוספת", width: 9, fmt: "pct" },
   { header: "תדירות שינוי (ח׳)", width: 15, fmt: "int" },
   { header: "חודשים", width: 9.5, fmt: "int" },
   { header: "תאריך סיום", width: 13, fmt: "date" },
@@ -204,7 +211,7 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
 
   /* ------------------------------------------------------------ figures --- */
   // Priced once, split once, above every row that prints — the masthead quotes
-  // עלות לשקל and the strip below it quotes four totals, and all of them have to
+  // החזר לשקל and the strip below it quotes four totals, and all of them have to
   // be the same arithmetic as the table at the bottom of the sheet.
 
   const per = loans.map((l) => ({ l, res: calculateLoan(l, annualInflation) }));
@@ -222,9 +229,16 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
   const suretyAmount = columnTotal(sureties, CI.amount);
   const suretyMonthly = columnTotal(sureties, CI.monthly);
 
-  // Derived from the two figures printed below rather than re-summed, so the
-  // ratio and its operands can never tell different stories.
-  const perShekel = totalAmount ? totalCost / totalAmount : 0;
+  // החזר לשקל, through the one definition in ./credit — the sheet, the board's
+  // rail and the comparison table all print this under the same name, so they
+  // cannot be allowed to divide by different denominators. Note it is NOT
+  // totalCost / totalAmount: a row with no term pays nothing, and leaving its
+  // balance in the denominator makes a mix look cheaper the more unschedulable
+  // debt it carries.
+  const perShekel = perShekelOf(
+    owed.map((x) => x.l),
+    annualInflation
+  ).value;
 
   let r = 1;
 
@@ -262,7 +276,7 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
   stamp.value = [
     `הופק ב-${dd}`,
     `אינפלציה שנתית בהנחה: ${annualInflation}%`,
-    totalAmount ? `עלות לשקל: ${perShekel.toFixed(2)}` : "",
+    totalAmount ? `החזר לשקל: ${perShekel.toFixed(2)}` : "",
   ]
     .filter(Boolean)
     .join("   ·   ");

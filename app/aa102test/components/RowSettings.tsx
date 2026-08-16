@@ -5,7 +5,7 @@
 // Now they open in a small sheet anchored to the row's own settings icon, so the
 // grid never reflows.
 //
-// עוגן, מרווח and תדירות שינוי used to be here too. All three moved to the grid
+// עוגן, תוספת and תדירות שינוי used to be here too. All three moved to the grid
 // once both document types started filling them on import: a field that arrives
 // with data in it is not a field you go hunting for, and one value editable in two
 // places is one value too many. The anchor's NAME never made it onto the grid —

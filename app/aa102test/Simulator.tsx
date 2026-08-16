@@ -63,6 +63,7 @@ import {
   TRACK_HEX,
   mergeReportLoans,
   owedOnly,
+  perShekel,
   type ImportedLoan,
   type ImportSummary,
 } from "./lib/credit";
@@ -545,7 +546,11 @@ export default function Simulator({
       monthly += Math.round(r.monthlyPayment);
       interest += r.totalInterest;
     }
-    return { amount, monthly, interest };
+    // החזר לשקל — the mix's quality in one figure, and the only cell here that
+    // reads across two mixes of different sizes. Defined once in lib/credit,
+    // because the comparison table and the export quote the same name.
+    const ratio = perShekel(owed, annualInflation);
+    return { amount, monthly, interest, perShekel: ratio.value, unpriced: ratio.unpriced };
   }, [owed, annualInflation]);
 
   /** The mix's colour signature — share of balance per track, biggest first. */
@@ -974,6 +979,52 @@ export default function Simulator({
                   </div>
                 );
               })}
+
+              {/* החזר לשקל — THE ONE FIGURE THAT SAYS WHETHER THE MIX IS GOOD.
+                  The three beside it are sizes: how much a month, how much
+                  borrowed, how much interest — all of which grow with the
+                  mortgage and none of which can be judged without knowing the
+                  other two. This one is the quotient, so it reads on its own
+                  and it reads ACROSS mixes: 1.42 against 1.61 is the whole
+                  comparison, at any scale.
+
+                  Deliberately not the hero and deliberately not loud: it takes
+                  the satellites' size, in the same words the export's masthead
+                  and the comparison's last row use. And no caption under it —
+                  the cell is 53px by design, which is a label and a figure and
+                  nothing else, and growing the band to explain a term every
+                  advisor says out loud would cost the whole page 13px. The
+                  arithmetic is on the hover instead. */}
+              <div
+                className="lgr-rail-cell"
+                title={
+                  "סך כל התשלומים לאורך חיי התמהיל, חלקי הקרן שנפרעת — כמה ישולם בפועל על כל שקל שנלווה" +
+                  (totals.unpriced
+                    ? `\nאינו כולל ${totals.unpriced === 1 ? "שורה אחת ללא תקופה" : `${totals.unpriced} שורות ללא תקופה`} — חוב ללא לוח סילוקין אינו משלם דבר, וספירתו במכנה הייתה משפרת את היחס`
+                    : "")
+                }
+              >
+                <span className="lgr-rail-label">החזר לשקל</span>
+                {/* Also em-dash when nothing in the mix amortizes — a board of
+                    debts with no term has a balance and no repayment, and
+                    ₪0.00 there would read as "this mix costs nothing". */}
+                {railEmpty || !totals.perShekel ? (
+                  <span className="lgr-rail-value" data-empty="true">
+                    —
+                  </span>
+                ) : (
+                  <span className="lgr-rail-value">
+                    <span className="lgr-cur">₪</span>
+                    <NumberFlow
+                      value={totals.perShekel}
+                      locales="he-IL"
+                      format={{ minimumFractionDigits: 2, maximumFractionDigits: 2 }}
+                      spinTiming={COUNT_UP}
+                      transformTiming={COUNT_UP}
+                    />
+                  </span>
+                )}
+              </div>
 
               <div className="lgr-rail-cell">
                 <span className="lgr-rail-label">הרכב לפי מסלול</span>

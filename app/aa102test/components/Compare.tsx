@@ -27,7 +27,7 @@ import {
   type MixFullTotals,
 } from "@/app/private/crm/leads/simulators/components/calculate/mixScheduleCalculators";
 import Money from "./Money";
-import { owedOnly, type ImportedLoan } from "../lib/credit";
+import { owedOnly, perShekel, type ImportedLoan } from "../lib/credit";
 
 type Mix = { id: string; mix_name: string; loans?: ImportedLoan[] };
 
@@ -50,7 +50,7 @@ const ROWS: Metric[] = [
   { label: "תשלום ראשון", field: "firstPayment", kind: "cost" },
   { label: "תשלום השיא", field: "maxPayment", kind: "cost" },
   { label: "עלות כוללת", field: "totalPayment", kind: "cost" },
-  { label: "עלות לשקל", field: "costPerShekel", kind: "cost", ratio: true },
+  { label: "החזר לשקל", field: "costPerShekel", kind: "cost", ratio: true },
 ];
 
 const ratio = (v: number) => (isFinite(v) ? v.toFixed(2) : "0.00");
@@ -113,7 +113,8 @@ export default function Compare({
   // The client's own debts on both sides. A guarantee is somebody else's loan,
   // so counting it here would make one mix look dearer than another purely
   // because a spouse's cousin borrowed money. See isSurety in lib/credit.
-  const active: MixFullTotals = calculateMixFullTotals(owedOnly(activeMix.loans ?? []), annualInflation);
+  const activeRows = owedOnly(activeMix.loans ?? []);
+  const active: MixFullTotals = calculateMixFullTotals(activeRows, annualInflation);
   const otherRows = compareMix ? owedOnly(compareMix.loans ?? []) : [];
   const other: MixFullTotals | null = otherRows.length
     ? calculateMixFullTotals(otherRows, annualInflation)
@@ -131,16 +132,23 @@ export default function Compare({
       </div>
     );
 
-  const valueOf = (t: MixFullTotals | null, field: string) => {
+  // החזר לשקל is NOT totalPayment / originalLoanAmount, which is what this used
+  // to compute: a row with no term pays nothing and would still sit in the
+  // denominator, so a mix flattered itself by holding unschedulable debt. One
+  // definition, in lib/credit, shared with the board's rail and the export —
+  // the three quote the same name and must quote the same number.
+  const activePer = perShekel(activeRows, annualInflation).value;
+  const otherPer = perShekel(otherRows, annualInflation).value;
+
+  const valueOf = (t: MixFullTotals | null, field: string, per = 0) => {
     if (!t) return 0;
-    if (field === "costPerShekel")
-      return t.originalLoanAmount ? t.totalPayment / t.originalLoanAmount : 0;
+    if (field === "costPerShekel") return per;
     return (t[field as keyof MixFullTotals] as number) || 0;
   };
 
   const rows = ROWS.map((r) => {
-    const a = valueOf(active, r.field);
-    const b = valueOf(other, r.field);
+    const a = valueOf(active, r.field, activePer);
+    const b = valueOf(other, r.field, otherPer);
     // Round before judging. Two mixes with an identical principal still differ
     // by a float epsilon, which rendered as a red "+₪0".
     const diff = r.ratio ? a - b : Math.round(a) - Math.round(b);
@@ -156,7 +164,7 @@ export default function Compare({
   const totalDiff = rows.find((r) => r.field === "totalPayment")!.diff;
   const monthlyDiff = rows.find((r) => r.field === "firstPayment")!.diff;
   // Same money borrowed on both sides? If not, "cheaper" is comparing a
-  // mortgage to a different mortgage, and only עלות לשקל survives that.
+  // mortgage to a different mortgage, and only החזר לשקל survives that.
   const sameScale =
     Math.round(valueOf(active, "originalLoanAmount")) === Math.round(valueOf(other, "originalLoanAmount"));
 
@@ -203,7 +211,7 @@ export default function Compare({
         {!sameScale && (
           <p className="lgr-cmp-caveat">
             שימו לב: הסכומים הנלווים אינם זהים, כך שהעלות הכוללת אינה השוואה שוות־ערך.
-            השורה שכן — <b>עלות לשקל</b>.
+            השורה שכן — <b>החזר לשקל</b>.
           </p>
         )}
       </div>

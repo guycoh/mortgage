@@ -11,6 +11,7 @@ import { paths as STATIC_PATHS } from "@/app/data/paths";
 import type { CreditReport } from "@/lib/credit-parser/types";
 import type { BankStatement } from "@/lib/bank-parser/types";
 import { extractLoans, type ExtractedLoan } from "@/lib/credit-parser/loan-mapping";
+import { calculateLoan } from "@/app/private/crm/leads/simulators/components/calculate/loanCalculators";
 import type { Loan } from "@/app/private/crm/leads/simulators/components/LoanTable";
 
 /** Which family a row belongs to. */
@@ -35,6 +36,51 @@ export const isSurety = (l: ImportedLoan) => !!l.is_guarantor;
 
 /** The client's own debts — what every total on the page is about. */
 export const owedOnly = (loans: ImportedLoan[]) => loans.filter((l) => !isSurety(l));
+
+/**
+ * החזר לשקל — what the mix repays for every shekel it borrowed.
+ *
+ * ONE DEFINITION, because three surfaces quote it under one name: the rail at
+ * the top of the board, the last row of השוואת תמהילים, and the export's
+ * masthead. Two of them computing it two ways is the same number disagreeing
+ * with itself in front of a client.
+ *
+ * The numerator is every shekel that leaves the account — `totalPaid`, not
+ * amount + interest, because an indexed track repays its PRINCIPAL in indexed
+ * shekels too and only totalPaid carries that.
+ *
+ * The denominator is the principal that produced those payments, which is not
+ * always the whole balance. A credit report imports a defaulted debt with no
+ * term at all — deliberately, so nothing fabricates a repayment for it — and
+ * such a row carries a balance while paying nothing. Divided by the whole
+ * balance, a mix would report a BETTER ratio the more unschedulable debt the
+ * client has. A quality figure that improves as the client's position worsens
+ * is worse than no figure, so the denominator is exactly the set of rows the
+ * numerator came from, and `unpriced` counts what that leaves out so the
+ * surface can say so.
+ *
+ * Takes the rows it is given and filters nothing: every caller has already
+ * decided what belongs in its total — guarantees never do, see isSurety.
+ */
+export function perShekel(
+  rows: ImportedLoan[],
+  annualInflation: number
+): { value: number; paid: number; principal: number; unpriced: number } {
+  let paid = 0;
+  let principal = 0;
+  let unpriced = 0;
+  for (const l of rows) {
+    const amount = Math.round(Number(l.amount) || 0);
+    const res = calculateLoan(l, annualInflation);
+    if (res.totalPaid > 0) {
+      paid += res.totalPaid;
+      principal += amount;
+    } else if (amount > 0) {
+      unpriced += 1;
+    }
+  }
+  return { value: principal ? paid / principal : 0, paid, principal, unpriced };
+}
 
 
 /** A Loan plus the provenance the UI colour-codes and labels by. */
@@ -84,6 +130,23 @@ export type ImportedLoan = Loan & {
   anchor_asof?: string;
   /** Which published table it came from: "עוגן אג"ח צמוד מדד", "ריבית פריים". */
   anchor_source?: string;
+  /**
+   * The family key behind `anchor_source`, kept because the LABEL is prose and
+   * this is an identity. It answers the one question the refresh cannot answer
+   * from the number alone: is this row still priced off the same table it was
+   * priced off last time? A prime anchor and a bond anchor that happen to be
+   * worth the same today are not the same anchor, and treating them as one is
+   * how "already current" ends up stamped on a row that was never priced.
+   */
+  anchor_family?: string;
+  /**
+   * The track changed under the anchor, so the anchor was dropped.
+   *
+   * Not the same as "never had one": this row HAD an anchor and it belonged to
+   * the track it used to be. The flag is what lets the cell say so — a warned,
+   * empty field — instead of quietly reading as a row nobody ever priced.
+   */
+  anchor_void?: boolean;
   /** False when the value came from a secondary source rather than the bank's own. */
   anchor_verified?: boolean;
   /** Older than its family republishes — still the latest published value. */

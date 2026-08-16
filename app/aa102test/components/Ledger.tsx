@@ -10,7 +10,7 @@
 // row keeps the two families scannable without breaking the table in half.
 //
 // Every field the old grid had is still here. The four rarely-touched ones
-// (עוגן, מרווח, גרייס, חודשי גרייס) open in a sheet off the row's settings icon,
+// (עוגן, תוספת, גרייס, חודשי גרייס) open in a sheet off the row's settings icon,
 // so reaching them never reflows the grid.
 //
 // תדירות שינוי is on the grid rather than in that sheet: both document types now
@@ -46,9 +46,11 @@ import { settle, snap } from "../lib/transitions";
 import Toaster, { type Toast, type ToastTone } from "./Toast";
 import {
   FAMILY,
+  PATH_IDS,
   PATH_SHORT,
   TRACK_HEX,
   isSurety,
+  pathIdFromTrack,
   rateHeat,
   type DebtGroup,
   type ImportedLoan,
@@ -277,8 +279,89 @@ export default function Ledger({
     return `${m} ח׳`;
   };
 
+  /* --- מסלול: an anchor is priced for ONE track, so changing the track voids it -
+     An anchor is the published rate of the family the track is priced off —
+     BOI's prime for פריים, the CPI-linked bond curve for מ"צ. Change the track
+     and the number in the cell is a rate belonging to a track this row no
+     longer is; keeping it, with "עוגן עדכני · ריבית פריים · נכון ל־.." on its
+     tooltip, states a fact about prime on a מ"צ row and calls it current.
+
+     So the value and its provenance are dropped together, and the cell says
+     what is true: this row has no anchor until one is fetched or typed. The
+     dropped figure is not lost — it is named in the note, which is where an
+     advisor can read it and decide, rather than a number still sitting in a
+     field pretending to price the row.
+
+     ריבית and תוספת are NOT touched. The rate is what the whole mix is costed
+     on and blanking it would silently rewrite the client's mortgage; the
+     margin is the lender's spread over whatever the anchor is, which is a term
+     of the deal rather than a property of the index. */
+  const setPath = (id: string, pathId: number) => {
+    const l = loans.find((x) => x.id === id);
+    if (!l || Number(l.path_id) === pathId) return;
+    const before = Number(l.anchor);
+    const hadAnchor = l.anchor !== null && l.anchor !== undefined && Number.isFinite(before);
+    // Nothing to void on a row that was never anchored — and no warning to
+    // raise on one either. Switching a blank row's track is just switching it.
+    //
+    // The note counts as something to void. Every sentence this cell can carry
+    // is about ONE track — "ריבית קבועה — אינה נגזרת מעוגן", "אין כלל תמחור
+    // מתועד עבור…" — so a row that keeps its note across a track change is a
+    // row explaining itself in terms of a track it no longer is.
+    const carries =
+      hadAnchor ||
+      l.anchor_asof !== undefined ||
+      l.anchor_original !== undefined ||
+      !!l.anchor_void ||
+      !!l.anchor_note;
+    if (!carries) {
+      patch(id, { path_id: pathId });
+      return;
+    }
+    // A fixed track is not priced off anything published, so it is not missing
+    // an anchor — it has none by definition, and an amber field telling an
+    // advisor to go and fetch one would be the page inventing a problem. The
+    // wording is the resolver's own, so the cell says the same thing whether
+    // the answer came from the track picker or from the button.
+    const anchored = pathId !== PATH_IDS.fixedLinked && pathId !== PATH_IDS.fixedUnlinked;
+    const from = PATH_SHORT[Number(l.path_id)] ?? "המסלול הקודם";
+    const to = PATH_SHORT[pathId] ?? "המסלול החדש";
+    patch(id, {
+      path_id: pathId,
+      anchor: null,
+      anchor_void: anchored || undefined,
+      anchor_note: !anchored
+        ? "ריבית קבועה — אינה נגזרת מעוגן"
+        : hadAnchor
+          ? `העוגן הקודם (${before.toFixed(2)}%) תומחר למסלול ${from} — לחצו עדכון עוגנים כדי לתמחר את ${to}`
+          : `אין עוגן למסלול ${to} — לחצו עדכון עוגנים`,
+      // Nothing left to restore: what שחזור would put back is the previous
+      // track's anchor, which is the exact number this just removed.
+      anchor_original: undefined,
+      anchor_asof: undefined,
+      anchor_source: undefined,
+      anchor_family: undefined,
+      anchor_verified: undefined,
+      anchor_stale: undefined,
+      anchor_cadence: undefined,
+    } as Partial<ImportedLoan>);
+  };
+
   /* --- עוגן: the name is the value, its margin is the note underneath --- */
   const signed = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${Math.abs(n).toFixed(2)}%`;
+
+  /**
+   * Is the row still on the track its document described?
+   *
+   * `source_anchor` is the document's NAME for the anchor ("ריבית פריים"), and
+   * the tooltip leads with it. Once the advisor moves the row to another track
+   * that name describes the report, not the row — so it is stated only while
+   * the two still agree. The document's own words stay on the row either way;
+   * the settings sheet prints them under "מהדוח:", where they are attributed.
+   */
+  const onDocTrack = (loan: ImportedLoan) =>
+    !loan.source_track ||
+    pathIdFromTrack(loan.source_track, loan.group !== "loan") === Number(loan.path_id);
 
   /**
    * One of the two rate fields in the עוגן cell.
@@ -300,6 +383,11 @@ export default function Ledger({
       step="0.01"
       aria-label={label}
       title={label}
+      // An anchor dropped by a track change is not an empty field — it is a
+      // field with something missing, and the row cannot be priced until it is
+      // answered. Amber says so from across the desk; the reason is one hover
+      // away on the cell, see anchorTip.
+      data-state={key === "anchor" && loan.anchor_void ? "warn" : undefined}
       // A placeholder that repeats the column header ("עוגן" over the עוגן
       // column) tells nobody anything; it also made an empty field look filled
       // from two feet away. The shape of the number that belongs here does the
@@ -310,6 +398,12 @@ export default function Ledger({
       onChange={(e) =>
         patch(loan.id, {
           [key]: e.target.value === "" ? null : Number(e.target.value),
+          // Typing an anchor IS the answer to "this row has no anchor for its
+          // track" — so the warning and its note go with the keystroke rather
+          // than outliving the thing they asked for.
+          ...(key === "anchor" && loan.anchor_void
+            ? { anchor_void: undefined, anchor_note: undefined }
+            : {}),
         } as Partial<ImportedLoan>)
       }
     />
@@ -323,11 +417,11 @@ export default function Ledger({
     if (loan.anchor_note) return loan.anchor_note;
     if (loan.anchor === null && loan.anchor_margin === null)
       return "המסמך לא ציין עוגן לשורה הזו";
-    const parts = [loan.source_anchor || "עוגן"];
+    const parts = [(onDocTrack(loan) && loan.source_anchor) || "עוגן"];
     if (loan.anchor !== null && Number.isFinite(Number(loan.anchor)))
       parts.push(`${Number(loan.anchor).toFixed(2)}%`);
     if (loan.anchor_margin !== null && Number.isFinite(Number(loan.anchor_margin)))
-      parts.push(`מרווח ${signed(Number(loan.anchor_margin))}`);
+      parts.push(`תוספת ${signed(Number(loan.anchor_margin))}`);
     parts.push(`סה"כ ${(Number(loan.rate) || 0).toFixed(2)}%`);
     // Where a refreshed anchor came from and how old it is. Both are the point of
     // the button: the value is only worth anything if you can see its date, and an
@@ -520,7 +614,10 @@ export default function Ledger({
       const changed: string[] = [];
       let updated = 0;
       let eligible = 0;
-
+      /** Rows that came back with a real anchor — whether or not it moved. */
+      let resolved = 0;
+      /** Why rows could not be priced, one entry each, for the message. */
+      const reasons: string[] = [];
 
       const next = loans.map((l) => {
         const r = byId.get(l.id);
@@ -529,13 +626,43 @@ export default function Ledger({
         // rows that SHOULD have priced count towards "3 מתוך 4".
         if (r.status !== "NOT_APPLICABLE") eligible++;
         if (r.status !== "RESOLVED" || r.anchor === undefined) {
-          return { ...l, anchor_note: r.reason ?? undefined };
+          if (r.status !== "NOT_APPLICABLE" && r.reason) reasons.push(r.reason);
+          // A row that could not be priced keeps no claim to currency. Leaving
+          // "נכון ל־" and a family label on it lets a stamp from an earlier run
+          // — an earlier TRACK, even — outlive the answer that produced it.
+          return {
+            ...l,
+            anchor_note: r.reason ?? undefined,
+            anchor_asof: undefined,
+            anchor_source: undefined,
+            anchor_family: undefined,
+            anchor_verified: undefined,
+            anchor_stale: undefined,
+            anchor_cadence: undefined,
+          };
         }
+        resolved++;
         const before = Number(l.anchor);
         const had = l.anchor !== null && l.anchor !== undefined && Number.isFinite(before);
-        if (had && Math.abs(before - r.anchor) < 0.0005) {
+        // SAME NUMBER IS NOT SAME ANCHOR. "Already current" is a claim about the
+        // row's own anchor, so it holds only where the row was priced off the
+        // same published table last time. Two families worth 4.10% today are
+        // still two families, and a row that has just moved between them has
+        // been RE-priced — which is the change the sweep and the count are for.
+        const sameFamily = !l.anchor_family || l.anchor_family === r.family;
+        if (had && sameFamily && Math.abs(before - r.anchor) < 0.0005) {
           // Already current. Not a change, and not a failure either.
-          return { ...l, anchor_asof: r.effectiveAt, anchor_source: r.familyLabel, anchor_note: undefined };
+          return {
+            ...l,
+            anchor_asof: r.effectiveAt,
+            anchor_source: r.familyLabel,
+            anchor_family: r.family,
+            anchor_verified: r.verified,
+            anchor_stale: r.stale,
+            anchor_cadence: r.cadence,
+            anchor_void: undefined,
+            anchor_note: undefined,
+          };
         }
         updated++;
         // Collected in row order, because the stagger reads down the board.
@@ -548,7 +675,7 @@ export default function Ledger({
           // client's own anchor with the previous refresh's value.
           anchor_original: l.anchor_original !== undefined ? l.anchor_original : (had ? before : null),
           anchor: r.anchor,
-          // ריבית = עוגן + מרווח is this board's existing arithmetic, not a new
+          // ריבית = עוגן + תוספת is this board's existing arithmetic, not a new
           // rule — anchorRate() in lib/credit derives the anchor by subtracting
           // the margin from the rate. Where the document gave no margin there is
           // nothing to add to, and the rate is left alone rather than replaced by
@@ -556,9 +683,13 @@ export default function Ledger({
           rate: hasMargin ? Math.round((r.anchor + margin) * 100) / 100 : l.rate,
           anchor_asof: r.effectiveAt,
           anchor_source: r.familyLabel,
+          anchor_family: r.family,
           anchor_verified: r.verified,
           anchor_stale: r.stale,
           anchor_cadence: r.cadence,
+          // The row has an anchor for its current track again, which is exactly
+          // what the void was waiting for.
+          anchor_void: undefined,
           anchor_note: undefined,
         };
       });
@@ -569,30 +700,54 @@ export default function Ledger({
       // anchor was already current would be the animation telling a small lie.
       if (changed.length) setFlash({ ids: changed, at: Date.now() });
 
-      if (updated === 0) {
+      // THREE OUTCOMES, AND THEY ARE NOT THE SAME SENTENCE.
+      //
+      // `updated` moved, `resolved − updated` were checked and already right,
+      // and `eligible − resolved` could not be priced at all. The message used
+      // to run the last two together: a mix where nothing resolved said
+      // "העוגנים כבר עדכניים" — the button reporting success for rows it never
+      // got an answer for, which is exactly what a row that has just changed
+      // track looks like from here. Whatever is said, no row is left claiming a
+      // currency the refresh did not establish (see the write above).
+      const current = resolved - updated;
+      const missed = eligible - resolved;
+      // Only what the advisor can act on. How old our cache is, is our problem —
+      // the button's whole promise is that pressing it gives the current anchor,
+      // and reporting our own staleness to the person who just pressed it makes
+      // them audit our plumbing instead of reading their client's mortgage.
+      // Freshness is enforced upstream; see docs/mortgage-anchor-sources.md.
+      const wasCurrent =
+        current === 0 ? "" : current === 1 ? "עוגן אחד כבר היה עדכני" : `${current} עוגנים כבר היו עדכניים`;
+      const notPriced =
+        missed === 0
+          ? ""
+          : `${missed === 1 ? "שורה אחת" : `${missed} שורות`} ללא שינוי — חסר מידע לזיהוי העוגן`;
+
+      if (eligible === 0) {
+        toast("neutral", "אין בתמהיל מסלולים הנגזרים מעוגן", "כל השורות בריבית קבועה");
+      } else if (resolved === 0) {
+        // Nothing came back. The reason is the whole message — it is the only
+        // thing that tells the advisor what to fill in to get an answer. The
+        // commonest one, not the first: with four rows short of a תדירות שינוי
+        // and one from a lender with no rule on record, the sentence should be
+        // about the four. Each row still carries its own on its tooltip.
+        const tally = new Map<string, number>();
+        for (const why of reasons) tally.set(why, (tally.get(why) ?? 0) + 1);
+        const commonest = Array.from(tally.entries()).sort((a, b) => b[1] - a[1])[0]?.[0];
         toast(
-          "neutral",
-          eligible === 0 ? "אין בתמהיל מסלולים הנגזרים מעוגן" : "העוגנים כבר עדכניים",
-          eligible === 0 ? "כל השורות בריבית קבועה" : undefined
+          "neg",
+          eligible === 1 ? "לא נמצא עוגן מפורסם לשורה" : `לא נמצא עוגן מפורסם ל־${eligible} השורות`,
+          commonest
         );
+      } else if (updated === 0) {
+        // The headline already says every anchor that answered was current, so
+        // the second line is only what did not.
+        toast("neutral", "העוגנים כבר עדכניים", notPriced || undefined);
       } else {
-        // The count that did not resolve is the honest half of the sentence, and
-        // it belongs on its own line rather than buried in the headline.
-        const missed = eligible - updated;
         toast(
           "pos",
-          updated === eligible
-            ? `עודכנו ${updated} עוגנים לפי בנק ישראל`
-            : `עודכנו ${updated} מתוך ${eligible} עוגנים`,
-          // Only what the advisor can act on. How old our cache is, is our
-          // problem — the button's whole promise is that pressing it gives the
-          // current anchor, and reporting our own staleness to the person who
-          // just pressed it makes them audit our plumbing instead of reading
-          // their client's mortgage. Freshness is enforced upstream, in the
-          // refresh route; see docs/mortgage-anchor-sources.md.
-          missed > 0
-            ? `${missed} שורות נותרו ללא שינוי — חסר מידע לזיהוי העוגן`
-            : undefined
+          updated === 1 ? "עודכן עוגן אחד לפי בנק ישראל" : `עודכנו ${updated} עוגנים לפי בנק ישראל`,
+          [wasCurrent, notPriced].filter(Boolean).join(" · ") || undefined
         );
       }
     } catch {
@@ -617,14 +772,16 @@ export default function Ledger({
           anchor_original: undefined,
           anchor_asof: undefined,
           anchor_source: undefined,
+          anchor_family: undefined,
           anchor_verified: undefined,
           anchor_stale: undefined,
           anchor_cadence: undefined,
+          anchor_note: undefined,
         };
       })
     );
     setFlash(null);
-    toast("neutral", "הוחזרו העוגנים מהמסמך", "הריביות חושבו מחדש מהמרווח המקורי");
+    toast("neutral", "הוחזרו העוגנים מהמסמך", "הריביות חושבו מחדש מהתוספת המקורית");
   };
 
   const refreshed = loans.filter((l) => l.anchor_original !== undefined).length;
@@ -766,7 +923,7 @@ export default function Ledger({
                 "5%", // אחוז
                 "7.5%", // מסלול
                 "7%", // לוח סילוקין
-                "9.5%", // עוגן / מרווח
+                "9.5%", // עוגן / תוספת
                 "5%", // ריבית %
                 "6%", // תדירות שינוי
                 "5%", // חודשים
@@ -794,13 +951,13 @@ export default function Ledger({
                 {/* one header for the paired field, so both halves are named and
                     the margin's unit is stated once instead of per row */}
                 {/* One <th> over a paired cell, split on the same 1fr/56px grid the
-                    pair uses, so "מרווח" sits over the מרווח box instead of trailing
+                    pair uses, so "תוספת" sits over the תוספת box instead of trailing
                     off the end of the column. It leads ריבית now: the parts are
                     read before the total they add up to. */}
                 <th>
                   <span className="lgr-th-pair">
                     <span>עוגן %</span>
-                    <span className="lgr-th-pair-b">מרווח %</span>
+                    <span className="lgr-th-pair-b">תוספת %</span>
                   </span>
                 </th>
                 <th>ריבית %</th>
@@ -1078,7 +1235,9 @@ export default function Ledger({
                             <div className="lgr-well" data-dirty={dirty.has("path_id") || undefined}>
                               <Select
                                 value={loan.path_id}
-                                onChange={(v) => patch(loan.id, { path_id: Number(v) })}
+                                // Through setPath, not patch: the anchor beside
+                                // it is priced for the track being left behind.
+                                onChange={(v) => setPath(loan.id, Number(v))}
                                 options={paths.map((p) => ({
                                   value: p.id,
                                   label: PATH_SHORT[p.id] ?? p.name,
@@ -1102,7 +1261,7 @@ export default function Ledger({
                             </div>
                           </td>
 
-                          {/* --- עוגן / מרווח: two rates, both numeric ---
+                          {/* --- עוגן / תוספת: two rates, both numeric ---
                               The pair is the ריבית cell that FOLLOWS it, taken
                               apart: anchor + margin = the rate. Reading order is
                               now the arithmetic's own order — the two operands,
@@ -1150,7 +1309,7 @@ export default function Ledger({
                               )}
                               <div className="lgr-pair">
                                 {numField(loan, "anchor", "ריבית העוגן באחוזים", "0.00")}
-                                {numField(loan, "anchor_margin", "מרווח מהעוגן באחוזים", "0.00")}
+                                {numField(loan, "anchor_margin", "תוספת מעל העוגן באחוזים", "0.00")}
                               </div>
                               {/* What the document said, beside what the anchor is
                                   worth now. The field holds the current value, so

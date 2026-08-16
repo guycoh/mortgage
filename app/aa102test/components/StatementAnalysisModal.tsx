@@ -513,7 +513,7 @@ export default function StatementAnalysisModal({
                     <th>ריבית</th>
                     <th>חודשים</th>
                     <th>סיום</th>
-                    <th>עוגן ומרווח</th>
+                    <th>עוגן ותוספת</th>
                     <th>עמלת יציאה</th>
                   </tr>
                 </thead>
