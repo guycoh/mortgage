@@ -1857,35 +1857,71 @@ html:has(.lgr-root) {
   color: var(--lgr-4);
 }
 
-/* ------------------------------------------------------- composition bar */
-/* Segments are lit from the top and separated by a hairline of the page, so a
-   4%-wide track still reads as its own block rather than a colour smear. */
-.lgr-bar {
-  display: flex;
-  height: 46px;
-  border: 1px solid var(--line-2);
-  border-radius: var(--r-sm);
-  overflow: hidden;
-}
-.lgr-bar-seg {
-  position: relative;
+/* ---------------------------------------------------- מהלך התמהיל — charts */
+/* ONE CARD, FOUR PANELS. The panels are ruled off each other by the same
+   hairline the ledger uses between its rows — never boxed. Each carries its
+   name and one reading at the top, the canvas, and its legend when it needs
+   one; the track legend, shared by two panels, sits once in the card's header.
+   The master draws a single panel the width of the card. */
+.lgr-charts { overflow: hidden; }
+.lgr-chart-grid {
   display: grid;
-  place-items: center;
-  min-width: 3px;
-  transition: filter var(--t) ease;
+  grid-template-columns: 1fr;
 }
-.lgr-bar-seg + .lgr-bar-seg { box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.6); }
-.lgr-bar-seg:hover { filter: brightness(1.07); }
-.lgr-bar-pct {
-  font-family: var(--num);
-  font-variant-numeric: tabular-nums;
+@media (min-width: 900px) {
+  .lgr-chart-grid { grid-template-columns: 1fr 1fr; }
+  /* the second column is ruled off the first; rows are ruled by the panels' own top edge */
+  .lgr-chart-grid > .lgr-chart-panel:nth-child(2n) { border-inline-start: 1px solid var(--line); }
+  .lgr-chart-grid > .lgr-chart-panel:nth-child(-n + 2) { border-top: 0; }
+}
+.lgr-chart-panel {
+  min-width: 0;
+  padding: 12px 14px 12px;
+  border-top: 1px solid var(--line);
+}
+.lgr-charts[data-single] .lgr-chart-panel { border-top: 0; }
+.lgr-chart-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 4px;
+  padding-inline: 4px;
+}
+.lgr-chart-title {
+  font-family: var(--display);
+  font-size: 13.5px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+  white-space: nowrap;
+}
+/* the panel's one reading — the figure the chart starts from, in the
+   panel's own header so the chart never has to print it on its canvas */
+.lgr-chart-reading {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-inline-start: auto;
   font-size: 11.5px;
-  font-weight: 600;
-  color: #fff;
+  color: var(--lgr-4);
+  white-space: nowrap;
 }
-/* A pale step of the ink ramp cannot carry white text. Segments below the
-   midpoint state their share in the ink instead. */
-.lgr-bar-pct[data-dark="true"] { color: var(--primary-deep); }
+.lgr-chart-fig { font-size: 14px; font-weight: 700; color: var(--ink); }
+.lgr-chart-arrow { color: var(--lgr-4); }
+/* the legend: swatch and word, in the text ink — colour beside the label,
+   never as the label */
+.lgr-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 14px;
+  padding: 6px 6px 0;
+  font-size: 11.5px;
+  color: var(--lgr-3);
+}
+.lgr-chart-legend > span { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.lgr-chart-legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2.5px; }
+.lgr-charts .lgr-head .lgr-chart-legend { padding: 0; }
 
 /* ------------------------------------------------------------------ chips */
 

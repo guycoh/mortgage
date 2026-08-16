@@ -1472,7 +1472,10 @@ export default function Simulator({
             and keeping its own outline: this is the only place on the page where
             one card ends and another begins. */}
         <motion.div {...enter(3)} className="mt-5">
-          <Charts loans={owed} annualInflation={annualInflation} />
+          {/* The master answers one question — what does the client pay, and
+              how does it move — so it draws the payment alone. A proposal is
+              judged on four. */}
+          <Charts loans={owed} annualInflation={annualInflation} isBase={isPrimaryMix} />
         </motion.div>
         </motion.div>
         )}
