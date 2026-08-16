@@ -228,7 +228,7 @@ export default function DataTable<T>({
                       <tr aria-hidden className="bg-cns-muted/60">
                         <td
                           colSpan={r.getVisibleCells().length}
-                          className="border-y border-cns-line px-3 py-1 font-[family-name:var(--cns-mono)] text-[10px] tracking-[0.12em] text-cns-mutedfg uppercase"
+                          className="cns-num border-y border-cns-line px-3 py-1 text-[11px] text-cns-fg2"
                         >
                           {group}
                         </td>

@@ -42,18 +42,10 @@
   unicode-bidi: isolate;
 }
 
-/* The plane: graph paper, almost subliminal. It gives the background a sense
-   of being a surface you measure things on rather than empty space. */
-.cns-plane {
-  background-color: var(--cns-bg);
-  background-image: linear-gradient(
-      to right,
-      rgba(12, 22, 34, 0.022) 1px,
-      transparent 1px
-    ),
-    linear-gradient(to bottom, rgba(12, 22, 34, 0.022) 1px, transparent 1px);
-  background-size: 28px 28px;
-}
+/* The plane. It was ruled like graph paper at 2% — a texture the eye never
+   quite resolves and a tell every dashboard template shares. A flat plane
+   lets the cards be the only geometry on the page. */
+.cns-plane { background-color: var(--cns-bg); }
 
 /* A measured edge under the masthead instead of a plain border. */
 .cns-rule {

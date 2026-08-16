@@ -54,11 +54,11 @@ export function Funnel({ stages }: { stages: FunnelStage[] }) {
             {i > 0 ? (
               <div
                 className={
-                  "cns-num mt-1 text-[10.5px] " +
-                  (step < 45 ? "text-cns-warn" : "text-cns-mutedfg")
+                  "mt-1 text-[11.5px] " +
+                  (step < 45 ? "font-medium text-cns-warn" : "text-cns-mutedfg")
                 }
               >
-                {step}% מהשלב הקודם
+                <span className="cns-num">{step}%</span> מהשלב הקודם
               </div>
             ) : null}
           </li>

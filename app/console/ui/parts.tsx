@@ -82,7 +82,9 @@ export function Dial({
 }) {
   return (
     <div className="group flex flex-col gap-1 px-4 py-3.5 transition-colors hover:bg-cns-muted/50">
-      <span className="flex items-center gap-1.5 font-[family-name:var(--cns-mono)] text-[10px] tracking-[0.07em] text-cns-mutedfg uppercase">
+      {/* The dial's name, in the UI face at reading size. A tracked 10px
+          monospace label over a 27px figure named the figure in a whisper. */}
+      <span className="flex items-center gap-1.5 text-[12px] font-medium text-cns-fg2">
         {mark}
         {label}
       </span>
@@ -216,9 +218,7 @@ export function Empty({ title, body }: { title?: string; body: string }) {
       <Scope size={18} className="flex-none text-cns-mutedfg/70" />
       <div className="min-w-0">
         {title ? (
-          <div className="font-[family-name:var(--cns-mono)] text-[10px] tracking-[0.14em] text-cns-mutedfg uppercase">
-            {title}
-          </div>
+          <div className="text-[12px] font-semibold text-cns-fg2">{title}</div>
         ) : null}
         <p className="text-[12.5px] leading-relaxed text-cns-mutedfg">{body}</p>
       </div>
@@ -257,10 +257,7 @@ export function StandingBy({
           <ScopeLive size={54} />
         </div>
         <div className="min-w-0">
-          <div className="font-[family-name:var(--cns-mono)] text-[10px] tracking-[0.2em] text-cns-accent uppercase">
-            standing by
-          </div>
-          <h2 className="mt-1 text-[17px] font-semibold text-cns-fg">
+          <h2 className="text-[17px] font-semibold text-cns-fg">
             המוקד מחובר ומאזין
           </h2>
           <p className="mt-1 max-w-[440px] text-[12.5px] leading-relaxed text-cns-mutedfg">
@@ -277,7 +274,7 @@ export function StandingBy({
             ["מאזין ל", "import · export · save"],
           ].map(([k, v]) => (
             <div key={k} className="contents">
-              <dt className="tracking-[0.12em] text-cns-mutedfg/80 uppercase">{k}</dt>
+              <dt className="text-cns-mutedfg">{k}</dt>
               <dd className="m-0 text-cns-fg2">{v}</dd>
             </div>
           ))}
