@@ -427,7 +427,21 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
   const writeRow = (x: Priced, i: number, accent: string): void => {
     const { l, res } = x;
     const g = famOf(l);
-    const notes = [l.is_shared ? "מופיע בשני הדוחות" : "", res.isIndexed ? "צמוד מדד" : ""]
+    // The master's split and its exit cost ride in the notes rather than as
+    // columns of their own: the sheet's twelve-column strips and totals are
+    // laid out for the balance, and these are facts ABOUT the balance — how
+    // much of it is linkage, what leaving costs, or on a copy, that the fee
+    // was folded in. The balance column stays the balance either way.
+    const idx = Math.round(Number(l.indexation) || 0);
+    const fee = Math.round(Number(l.prepayment_fee) || 0);
+    const folded = Math.round(Number(l.fee_folded) || 0);
+    const notes = [
+      l.is_shared ? "מופיע בשני הדוחות" : "",
+      res.isIndexed ? "צמוד מדד" : "",
+      idx > 0 ? `מזה הצמדת קרן ₪${idx.toLocaleString("he-IL")}` : "",
+      fee > 0 ? `הפרשי היוון ₪${fee.toLocaleString("he-IL")}` : "",
+      folded > 0 ? `כולל הפרשי היוון ₪${folded.toLocaleString("he-IL")}` : "",
+    ]
       .filter(Boolean)
       .join(" · ");
 

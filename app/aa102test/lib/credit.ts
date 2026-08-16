@@ -114,6 +114,41 @@ export type ImportedLoan = Loan & {
   /** True when the document says this is state money — a הלוואת זכאות. */
   source_eligibility?: boolean;
 
+  /* --- THE MASTER'S SPLIT — what the client owes, the way the bank prints it.
+
+     `amount` stays the balance every calculation reads: principal PLUS the
+     linkage that has accrued on it, which is the sum a payoff letter calls
+     יתרה and the sum a recycle has to cover. The two fields below take that one
+     figure apart on the master mix only, where the row is a fact read off a
+     document rather than a proposal:
+
+       יתרת קרן   = amount − indexation     (the nominal principal)
+       הצמדת קרן  = indexation              (שיערוך / הפרשי הצמדה on it)
+
+     Kept as the INDEXATION rather than as the principal so that a row carrying
+     neither — a credit-report import, a hand-typed line, every row saved before
+     this existed — is unchanged: no indexation, so the principal IS the amount,
+     and nothing downstream has to learn a second field. See principalOf. --- */
+  /** הצמדת קרן — the part of `amount` that is linkage uplift, not principal. */
+  indexation?: number | null;
+  /**
+   * הפרשי היוון — עמלת פרעון מוקדם, what breaking this tranche costs today.
+   *
+   * NOT part of `amount`: it is not owed until the tranche is repaid early, so
+   * it prices nothing on the master. It exists for the one moment it matters —
+   * duplicating the master into a proposal, where the advisor chooses whether
+   * the new mortgage has to fund it (שכפול עם עמלות) or not.
+   */
+  prepayment_fee?: number | null;
+  /**
+   * On a row that came out of שכפול עם עמלות: how much of `amount` is the fee
+   * that was folded in. Provenance for the copy — it lets the proposal say
+   * "כולל הפרשי היוון ₪12,400" under a balance that is bigger than the
+   * master's. Session-only, like the anchor_* fields: the amount is what is
+   * saved, and the amount is right.
+   */
+  fee_folded?: number;
+
   /* --- עדכון עוגנים. Session fields: the save route writes an explicit column
      whitelist, so none of these need a migration and none of them survive a
      reload — which is right. A refreshed anchor is a simulation of what the
@@ -156,6 +191,74 @@ export type ImportedLoan = Loan & {
   /** Why the refresh declined to price this row. Shown on the עוגן cell's tooltip. */
   anchor_note?: string;
 };
+
+/* ------------------------------------------------------ the master's split */
+
+const money = (v: unknown) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+};
+
+/** הצמדת קרן on the row — 0 where the document (or the advisor) stated none. */
+export const indexationOf = (l: ImportedLoan) => Math.max(0, Math.round(money(l.indexation)));
+/** הפרשי היוון on the row — 0 where none was stated. */
+export const feeOf = (l: ImportedLoan) => Math.max(0, Math.round(money(l.prepayment_fee)));
+/**
+ * יתרת קרן — the nominal principal, which is the balance less the linkage on
+ * it. Floored at 0: an indexation typed larger than the balance is a data-entry
+ * slip, not a negative principal, and the cell shows 0 until it is corrected.
+ */
+export const principalOf = (l: ImportedLoan) =>
+  Math.max(0, Math.round(money(l.amount)) - indexationOf(l));
+
+/**
+ * The master's money, added up the way its columns are laid out. `balance` is
+ * Σamount — the same figure the rail and the totals row already state — and the
+ * three parts are what the duplicate dialog quotes back before it acts.
+ */
+export function masterTotals(rows: ImportedLoan[]) {
+  let principal = 0;
+  let indexation = 0;
+  let fee = 0;
+  let balance = 0;
+  for (const l of rows) {
+    principal += principalOf(l);
+    indexation += indexationOf(l);
+    fee += feeOf(l);
+    balance += Math.round(money(l.amount));
+  }
+  return { principal, indexation, fee, balance, withFees: balance + fee };
+}
+
+/**
+ * ONE ROW OF THE MASTER, AS A ROW OF A PROPOSAL.
+ *
+ * The bank prints יתרת קרן and הצמדת קרן apart; a proposal borrows one sum. So
+ * the copy's amount is the two added back together — which is what `amount`
+ * already holds — plus, when the advisor said so, the עמלת פרעון מוקדם the new
+ * mortgage will have to fund. The split and the fee are the master's facts and
+ * do not travel: a proposal that still carried a "fee" would look, on a
+ * reload, like a master with a fee to fold in.
+ *
+ * `fee_folded` is the receipt — see the field's note.
+ */
+export function foldMasterRow(l: ImportedLoan, withFees: boolean, mixId: string): ImportedLoan {
+  const fee = withFees ? feeOf(l) : 0;
+  // `amount` IS principal + indexation — the balance the rail already states —
+  // so it is taken as it stands rather than re-derived from the two parts.
+  const balance = Math.round(money(l.amount));
+  const { indexation: _i, prepayment_fee: _f, fee_folded: _ff, ...rest } = l;
+  void _i;
+  void _f;
+  void _ff;
+  return {
+    ...rest,
+    id: crypto.randomUUID(),
+    mix_id: mixId,
+    amount: balance + fee,
+    ...(fee > 0 ? { fee_folded: fee } : {}),
+  };
+}
 
 /* ------------------------------------------------------------------ paths */
 

@@ -44,3 +44,18 @@ create index if not exists loans_mix_id_idx on public.loans (mix_id);
 -- a reload until this runs.
 alter table public.loan_mixes
   add column if not exists target_amount numeric;
+
+-- The master's split. A payoff letter prints the balance as יתרת קרן + הצמדת
+-- קרן, and prices leaving each tranche as הפרשי היוון (עמלת פרעון מוקדם). The
+-- board shows the three as separate cells on the master mix and folds them
+-- into one amount — with or without the fee, the advisor's call — when the
+-- master is duplicated into a proposal.
+--
+-- `amount` is unchanged and is still principal + indexation, the balance every
+-- calculation reads. `indexation` says how much of it is linkage; `prepayment_fee`
+-- is a stated cost that is part of no balance. Both nullable: null is "the
+-- document printed no such line", which is not the same fact as 0. loadBoard
+-- degrades these two columns behind their own flag (hasSplit).
+alter table public.loans
+  add column if not exists indexation     numeric,
+  add column if not exists prepayment_fee numeric;

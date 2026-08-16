@@ -59,9 +59,21 @@ const EXTRA = [
  */
 const ANCHOR = ["source_anchor"] as const;
 
+/**
+ * The master's split — הצמדת קרן inside the amount, and הפרשי היוון beside it
+ * (see ImportedLoan in app/aa102test/lib/credit). Its own flag, for the same
+ * reason ANCHOR has one: a deployment that has not run this migration should
+ * lose exactly these two columns and nothing else. Nothing calculates from
+ * either — `amount` is still the balance — so without them the board loads,
+ * edits and saves; the split simply reads as "no linkage" and the fee as
+ * "none stated" after a reload.
+ */
+const SPLIT = ["indexation", "prepayment_fee"] as const;
+
 /** Flips to false the first time Postgres says the columns aren't there. */
 let hasExtra = true;
 let hasAnchor = true;
+let hasSplit = true;
 /**
  * loan_mixes.target_amount — גובה התמהיל, the figure the board's אחוז column
  * allocates against. Same deal as the two above, on the other table: without the
@@ -113,12 +125,23 @@ function toDbRow(loan: Row, mixId: string): Row {
     out.source_track = loan.source_track ?? null;
   }
   if (hasAnchor) out.source_anchor = loan.source_anchor ?? null;
+  if (hasSplit) {
+    // Both numeric and both nullable: null is "the document printed no such
+    // line", which is not the same fact as 0.
+    out.indexation = numOrNull(loan.indexation);
+    out.prepayment_fee = numOrNull(loan.prepayment_fee);
+  }
   return out;
 }
 
 /** The column list this deployment is known to have. */
 const selectCols = () =>
-  [...CORE, ...(hasExtra ? EXTRA : []), ...(hasAnchor ? ANCHOR : [])].join(",");
+  [
+    ...CORE,
+    ...(hasExtra ? EXTRA : []),
+    ...(hasAnchor ? ANCHOR : []),
+    ...(hasSplit ? SPLIT : []),
+  ].join(",");
 
 function fromDbRow(row: Row): Row {
   const out: Row = { ...row };
@@ -157,9 +180,9 @@ export async function loadBoard(lead: number) {
   const ids = mixes.map((m) => String(m.id));
   let loansRes = await supabase.from("loans").select(selectCols()).in("mix_id", ids);
 
-  // Retire the newest column set first, then the older one, so a deployment that
-  // is one migration behind loses only what that migration added.
-  for (const retire of [() => (hasAnchor = false), () => (hasExtra = false)]) {
+  // Retire the newest column set first, then the older ones, so a deployment
+  // that is one migration behind loses only what that migration added.
+  for (const retire of [() => (hasSplit = false), () => (hasAnchor = false), () => (hasExtra = false)]) {
     if (!loansRes.error || !isMissingColumn(loansRes.error)) break;
     retire();
     loansRes = await supabase.from("loans").select(selectCols()).in("mix_id", ids);
@@ -184,6 +207,7 @@ export async function loadBoard(lead: number) {
     hasExtra,
     hasAnchor,
     hasTarget,
+    hasSplit,
   };
 }
 
@@ -229,7 +253,7 @@ export async function saveBoard(lead: number, mixes: BoardMix[]) {
       const build = () =>
         (mix.loans ?? []).map((l) => ({ ...toDbRow(l, mix.id), id: l.id as string }));
       let res = await supabase.from("loans").upsert(rows, { onConflict: "id" });
-      for (const retire of [() => (hasAnchor = false), () => (hasExtra = false)]) {
+      for (const retire of [() => (hasSplit = false), () => (hasAnchor = false), () => (hasExtra = false)]) {
         if (!res.error || !isMissingColumn(res.error)) break;
         retire();
         res = await supabase.from("loans").upsert(build(), { onConflict: "id" });
@@ -251,5 +275,5 @@ export async function saveBoard(lead: number, mixes: BoardMix[]) {
     }
   }
 
-  return { success: true, hasExtra, hasAnchor };
+  return { success: true, hasExtra, hasAnchor, hasSplit };
 }

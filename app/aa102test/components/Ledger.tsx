@@ -49,8 +49,11 @@ import {
   PATH_IDS,
   PATH_SHORT,
   TRACK_HEX,
+  feeOf,
+  indexationOf,
   isSurety,
   pathIdFromTrack,
+  principalOf,
   rateHeat,
   type DebtGroup,
   type ImportedLoan,
@@ -131,6 +134,8 @@ const TRACKED = [
   "anchor_interval",
   "source_anchor",
   "is_guarantor",
+  "indexation",
+  "prepayment_fee",
 ] as const;
 
 type Baseline = Record<string, ImportedLoan>;
@@ -268,6 +273,31 @@ export default function Ledger({
       change_frequency: freqLabel(months),
     } as Partial<ImportedLoan>);
   };
+
+  /* --- THE MASTER'S MONEY: יתרת קרן + הצמדת קרן = the balance -------------
+     Two cells, one fact. `amount` is the balance every calculation reads and
+     it is what the two cells add up to — so editing either one rewrites the
+     amount, and the other cell holds still. Typing a principal keeps the
+     linkage the letter printed; typing the linkage keeps the principal. See
+     principalOf in lib/credit for why the split is stored as the indexation. */
+  const digits = (raw: string) => Number(raw.replace(/[^\d]/g, "")) || 0;
+  const setPrincipal = (id: string, raw: string) => {
+    const l = loans.find((x) => x.id === id);
+    if (!l) return;
+    patch(id, { amount: digits(raw) + indexationOf(l) });
+  };
+  const setIndexation = (id: string, raw: string) => {
+    const l = loans.find((x) => x.id === id);
+    if (!l) return;
+    // Empty is empty — a cleared cell means "the letter printed no linkage",
+    // which is null in the column and 0 in the arithmetic. principalOf treats
+    // both the same, so the balance is unchanged either way.
+    const idx = raw.trim() === "" ? null : digits(raw);
+    patch(id, { indexation: idx, amount: principalOf(l) + (idx ?? 0) });
+  };
+  /** הפרשי היוון — a stated cost, part of no balance; null when cleared. */
+  const setFee = (id: string, raw: string) =>
+    patch(id, { prepayment_fee: raw.trim() === "" ? null : digits(raw) });
 
   /** The interval in the words an advisor would say, under the figure. */
   const freqNote = (loan: ImportedLoan) => {
@@ -477,6 +507,12 @@ export default function Ledger({
       rows,
       amount: rows.reduce((s, l) => s + Math.round(Number(l.amount) || 0), 0),
       monthly: rows.reduce((s, l) => s + Math.round(calculateLoan(l, annualInflation).monthlyPayment), 0),
+      // The master's two extra sums. `amount` above is already principal +
+      // indexation, so the balance is not re-added; these are the parts the
+      // master's own columns foot — how much of it is linkage, and what leaving
+      // it all would cost.
+      indexation: rows.reduce((s, l) => s + indexationOf(l), 0),
+      fee: rows.reduce((s, l) => s + feeOf(l), 0),
     });
     const owed = loans.filter((l) => !isSurety(l));
     return [
@@ -491,6 +527,8 @@ export default function Ledger({
     return {
       amount: own.reduce((s, g) => s + g.amount, 0),
       monthly: own.reduce((s, g) => s + g.monthly, 0),
+      indexation: own.reduce((s, g) => s + g.indexation, 0),
+      fee: own.reduce((s, g) => s + g.fee, 0),
     };
   }, [sections]);
 
@@ -559,7 +597,7 @@ export default function Ledger({
   /** Add a row from the bottom, so a long list never sends you back up. */
   const addRow = (
     <tr className="lgr-addrow">
-      <td colSpan={13}>
+      <td colSpan={14}>
         <div className="lgr-addrow-in">
           {addBtns()}
           <span className="lgr-addrow-hint">הוספת שורה ריקה לתמהיל</span>
@@ -915,22 +953,51 @@ export default function Ledger({
                   cell that also had to hold a six-figure number. Giving the
                   lender its own column hands סכום back to the money. The rest is
                   half a point each off six columns that were carrying slack. */}
-              {[
-                "8%", // סוג
-                "7%", // מטרה
-                "9%", // גוף מימון
-                "8.5%", // סכום
-                "5%", // אחוז
-                "7.5%", // מסלול
-                "7%", // לוח סילוקין
-                "9.5%", // עוגן / תוספת
-                "5%", // ריבית %
-                "6%", // תדירות שינוי
-                "5%", // חודשים
-                "9.5%", // תאריך סיום
-                "7%", // החזר חודשי
-                "6%", // actions
-              ].map((w, i) => (
+              {/* THE MASTER IS THE SAME SHEET WITH ITS MONEY TAKEN APART.
+                  A payoff letter prints the balance as יתרת קרן and הצמדת קרן,
+                  and prices leaving it as הפרשי היוון. On the master those are
+                  the row's facts, so the סכום column becomes a pair — the two
+                  parts, joined the way עוגן / תוספת are — and the fee gets a
+                  column of its own beside it. אחוז leaves the master: a share
+                  the mix cannot be re-cut by is a reading, and it still reads,
+                  as the figure beside the meter under the family chip. Both
+                  layouts are fourteen columns, so every colSpan below holds.
+                  Where the master narrows a column it narrows the ones that
+                  were carrying slack — never תאריך סיום, see .lgr-date-in. */}
+              {(isBase
+                ? [
+                    "7.5%", // סוג
+                    "6%", // מטרה
+                    "8.5%", // גוף מימון
+                    "13%", // יתרת קרן / הצמדת קרן
+                    "6.25%", // הפרשי היוון
+                    "7%", // מסלול
+                    "6.5%", // לוח סילוקין
+                    "9%", // עוגן / תוספת
+                    "4.5%", // ריבית %
+                    "5.5%", // תדירות שינוי
+                    "4.75%", // חודשים
+                    "9.5%", // תאריך סיום
+                    "6.5%", // החזר חודשי
+                    "5.5%", // actions
+                  ]
+                : [
+                    "8%", // סוג
+                    "7%", // מטרה
+                    "9%", // גוף מימון
+                    "8.5%", // סכום
+                    "5%", // אחוז
+                    "7.5%", // מסלול
+                    "7%", // לוח סילוקין
+                    "9.5%", // עוגן / תוספת
+                    "5%", // ריבית %
+                    "6%", // תדירות שינוי
+                    "5%", // חודשים
+                    "9.5%", // תאריך סיום
+                    "7%", // החזר חודשי
+                    "6%", // actions
+                  ]
+              ).map((w, i) => (
                 <col key={i} style={{ width: w }} />
               ))}
             </colgroup>
@@ -942,10 +1009,30 @@ export default function Ledger({
                     changes how the first reads. */}
                 <th>מטרה</th>
                 <th>גוף מימון</th>
-                <th>סכום</th>
-                {/* the same fact as סכום in the other unit, so it sits beside it
-                    rather than at the far edge of the grid */}
-                <th>אחוז</th>
+                {isBase ? (
+                  <>
+                    {/* The balance, in the two parts the bank prints it in.
+                        The header splits on the pair's own grid so each word
+                        sits over the box it names — the same device as עוגן /
+                        תוספת, and for the same reason. */}
+                    <th title="יתרת קרן + הצמדת קרן = היתרה שכל חישוב מבוסס עליה">
+                      <span className="lgr-th-pair lgr-th-pair-money">
+                        <span>יתרת קרן</span>
+                        <span className="lgr-th-pair-b">הצמדת קרן</span>
+                      </span>
+                    </th>
+                    <th title="עמלת פרעון מוקדם — מה עולה לצאת מהמסלול היום. אינה חלק מהיתרה; נכללת בהעתק רק אם בוחרים ״שכפול עם עמלות״">
+                      הפרשי היוון
+                    </th>
+                  </>
+                ) : (
+                  <>
+                    <th>סכום</th>
+                    {/* the same fact as סכום in the other unit, so it sits beside it
+                        rather than at the far edge of the grid */}
+                    <th>אחוז</th>
+                  </>
+                )}
                 <th>מסלול</th>
                 <th>לוח סילוקין</th>
                 {/* one header for the paired field, so both halves are named and
@@ -1042,6 +1129,20 @@ export default function Ledger({
                       // exactly the distinction the column is there to draw:
                       // a named lender means the row is imported fact.
                       const lender = loan.source_bank ? lenderOf(loan.source_bank) : null;
+                      // A row that came out of שכפול עם עמלות says so. Its balance
+                      // is bigger than the master's by exactly the עמלת פרעון
+                      // מוקדם, and that is provenance — which is what this
+                      // column is — so it rides with ערב and משותף rather than
+                      // as a note squeezed under a nine-digit figure.
+                      const feeTag =
+                        (loan.fee_folded ?? 0) > 0 ? (
+                          <span
+                            className="lgr-tag lgr-tag-fee"
+                            title={`הסכום כולל הפרשי היוון של ${loan.fee_folded!.toLocaleString("he-IL")} ₪ מהמשכנתא הנוכחית`}
+                          >
+                            כולל עמלה
+                          </span>
+                        ) : null;
 
                       return (
                         <motion.tr
@@ -1071,8 +1172,19 @@ export default function Ledger({
                                 tone: FAMILY[k].color,
                               }))}
                             />
-                            <div className="lgr-share mt-0.5" title={`${share.toFixed(1)}% מהתמהיל`}>
-                              <span style={{ width: `${Math.min(100, share)}%` }} />
+                            {/* On the master the אחוז column has given its
+                                width to the money, so the share is stated
+                                here, in figures, beside the meter that was
+                                already drawing it. */}
+                            <div className="lgr-share-line mt-0.5" data-labelled={isBase || undefined}>
+                              <div className="lgr-share" title={`${share.toFixed(1)}% מהתמהיל`}>
+                                <span style={{ width: `${Math.min(100, share)}%` }} />
+                              </div>
+                              {isBase && !isSuretySection && (
+                                <span className="lgr-share-pct" title="חלקו של המסלול במשכנתא הקיימת">
+                                  {share ? `${share.toFixed(share >= 10 ? 0 : 1)}%` : "—"}
+                                </span>
+                              )}
                             </div>
                           </td>
 
@@ -1135,11 +1247,12 @@ export default function Ledger({
                                   <BankIcon source={loan.source_bank} size={18} />
                                   <span className="lgr-lender-name">{lender.name}</span>
                                 </span>
-                                {(lender.kindLabel || loan.is_guarantor || loan.is_shared) && (
+                                {(lender.kindLabel || loan.is_guarantor || loan.is_shared || feeTag) && (
                                   <span className="lgr-lender-meta">
                                     {lender.kindLabel && (
                                       <span className="lgr-lender-kind">{lender.kindLabel}</span>
                                     )}
+                                    {feeTag}
                                     {loan.is_guarantor && (
                                       <span
                                         className="lgr-tag"
@@ -1162,12 +1275,90 @@ export default function Ledger({
                                 )}
                               </div>
                             ) : (
-                              <span className="lgr-lender-none" title="שורה שנוספה ידנית — אין לה מקור בדוח">
-                                —
-                              </span>
+                              <div className="lgr-lender">
+                                <span className="lgr-lender-none" title="שורה שנוספה ידנית — אין לה מקור בדוח">
+                                  —
+                                </span>
+                                {feeTag && <span className="lgr-lender-meta">{feeTag}</span>}
+                              </div>
                             )}
                           </td>
 
+                          {isBase ? (
+                            <>
+                              {/* --- יתרת קרן / הצמדת קרן: THE BALANCE, IN THE
+                                  BANK'S TWO PARTS. One well, two fields, and the
+                                  amount every calculation reads is their sum —
+                                  see setPrincipal / setIndexation. The
+                                  principal keeps the bold of the old סכום cell:
+                                  it is still the figure the eye lands on first.
+                                  The sum is spelled out on the hover — not as a
+                                  note, because both boxes are full of digits
+                                  and a 10px figure over either is a collision —
+                                  and it is what the group bar and the totals
+                                  row foot under this column. --- */}
+                              <td>
+                                <div
+                                  className="lgr-well"
+                                  data-dirty={dirty.has("amount") || dirty.has("indexation") || undefined}
+                                  title={
+                                    indexationOf(loan) > 0
+                                      ? `יתרת קרן ${principalOf(loan).toLocaleString("he-IL")} + הצמדת קרן ${indexationOf(loan).toLocaleString("he-IL")} = ${amount.toLocaleString("he-IL")}`
+                                      : "יתרת קרן — ללא הצמדה על הקרן"
+                                  }
+                                >
+                                  <div className="lgr-pair lgr-pair-money">
+                                    <input
+                                      className="lgr-cell lgr-num-in font-bold"
+                                      value={principalOf(loan) ? principalOf(loan).toLocaleString("he-IL") : ""}
+                                      placeholder="0"
+                                      aria-label="יתרת קרן"
+                                      inputMode="numeric"
+                                      onFocus={(e) => e.currentTarget.select()}
+                                      onChange={(e) => setPrincipal(loan.id, e.target.value)}
+                                    />
+                                    <input
+                                      className="lgr-cell lgr-num-in"
+                                      value={indexationOf(loan) ? indexationOf(loan).toLocaleString("he-IL") : ""}
+                                      placeholder="0"
+                                      aria-label="הצמדת קרן"
+                                      inputMode="numeric"
+                                      onFocus={(e) => e.currentTarget.select()}
+                                      onChange={(e) => setIndexation(loan.id, e.target.value)}
+                                    />
+                                  </div>
+                                </div>
+                              </td>
+
+                              {/* --- הפרשי היוון: what leaving costs. A stated
+                                  cost, not a balance — it prices nothing here.
+                                  It is the figure שכפול עם עמלות folds into the
+                                  copy, and the column exists so that choice is
+                                  made on numbers that are on the sheet. --- */}
+                              <td>
+                                <div
+                                  className="lgr-well"
+                                  data-dirty={dirty.has("prepayment_fee") || undefined}
+                                  title={
+                                    feeOf(loan) > 0
+                                      ? `עמלת פרעון מוקדם ${feeOf(loan).toLocaleString("he-IL")} — תתווסף לקרן בשכפול עם עמלות`
+                                      : "עמלת פרעון מוקדם — לא הוזנה"
+                                  }
+                                >
+                                  <input
+                                    className="lgr-cell lgr-num-in lgr-fee-in"
+                                    value={feeOf(loan) ? feeOf(loan).toLocaleString("he-IL") : ""}
+                                    placeholder="0"
+                                    aria-label="הפרשי היוון — עמלת פרעון מוקדם"
+                                    inputMode="numeric"
+                                    onFocus={(e) => e.currentTarget.select()}
+                                    onChange={(e) => setFee(loan.id, e.target.value)}
+                                  />
+                                </div>
+                              </td>
+                            </>
+                          ) : (
+                            <>
                           {/* --- סכום --- */}
                           <td>
                             <div className="lgr-well" data-dirty={dirty.has("amount") || undefined}>
@@ -1229,6 +1420,8 @@ export default function Ledger({
                               </span>
                             )}
                           </td>
+                            </>
+                          )}
 
                           {/* --- מסלול --- */}
                           <td>
@@ -1517,13 +1710,30 @@ export default function Ledger({
                           <span className="lgr-count">{g.rows.length}</span>
                         </div>
                       </td>
+                      {/* The balance under the pair — it is the pair's sum, and
+                          the linkage inside it is stated on the hover. On the
+                          master the second cell is the section's exit cost. */}
                       <td>
-                        <Money value={g.amount} className="lgr-groupbar-sum" />
+                        <Money
+                          value={g.amount}
+                          className="lgr-groupbar-sum"
+                          title={
+                            isBase && g.indexation > 0
+                              ? `מזה הצמדת קרן ${g.indexation.toLocaleString("he-IL")} ₪`
+                              : undefined
+                          }
+                        />
                       </td>
                       <td>
-                        <span className="lgr-pct-ro lgr-groupbar-sum">
-                          {isSuretySection || !denom ? "" : `${((g.amount / denom) * 100).toFixed(0)}%`}
-                        </span>
+                        {isBase ? (
+                          g.fee > 0 && !isSuretySection ? (
+                            <Money value={g.fee} className="lgr-groupbar-sum lgr-fee-sum" title="סך עמלות הפרעון המוקדם בקבוצה" />
+                          ) : null
+                        ) : (
+                          <span className="lgr-pct-ro lgr-groupbar-sum">
+                            {isSuretySection || !denom ? "" : `${((g.amount / denom) * 100).toFixed(0)}%`}
+                          </span>
+                        )}
                       </td>
                       <td colSpan={7} />
                       <td>
@@ -1560,21 +1770,43 @@ export default function Ledger({
                   </span>
                 </td>
                 <td>
-                  <Money value={grand.amount} className="lgr-total-fig" />
+                  <Money
+                    value={grand.amount}
+                    className="lgr-total-fig"
+                    title={
+                      isBase && grand.indexation > 0
+                        ? `יתרת קרן ${(grand.amount - grand.indexation).toLocaleString("he-IL")} + הצמדת קרן ${grand.indexation.toLocaleString("he-IL")}`
+                        : undefined
+                    }
+                  />
                 </td>
-                {/* Over-allocation states itself here: with a target set this
-                    reads 108%, which is the same news as a negative יתרה לשיוך
-                    said in the column the rows were typed in. */}
-                <td>
-                  <span className="lgr-pct-ro lgr-total-fig" data-over={base > 0 && grand.amount > base ? true : undefined}>
-                    {denom ? `${Math.round((grand.amount / denom) * 100)}%` : ""}
-                  </span>
-                </td>
+                {isBase ? (
+                  // The master's second money column foots to the whole exit
+                  // cost — the number שכפול עם עמלות will add to the copy.
+                  <td>
+                    {grand.fee > 0 && (
+                      <Money
+                        value={grand.fee}
+                        className="lgr-total-fig lgr-fee-sum"
+                        title="סך עמלות הפרעון המוקדם — יתווסף לקרן בשכפול עם עמלות"
+                      />
+                    )}
+                  </td>
+                ) : (
+                  /* Over-allocation states itself here: with a target set this
+                     reads 108%, which is the same news as a negative יתרה לשיוך
+                     said in the column the rows were typed in. */
+                  <td>
+                    <span className="lgr-pct-ro lgr-total-fig" data-over={base > 0 && grand.amount > base ? true : undefined}>
+                      {denom ? `${Math.round((grand.amount / denom) * 100)}%` : ""}
+                    </span>
+                  </td>
+                )}
                 <td colSpan={7}>
                   <div className="flex flex-wrap items-center gap-1.5 px-1">
                     {sections
                       .filter(
-                        (g): g is { key: DebtGroup; rows: ImportedLoan[]; amount: number; monthly: number } =>
+                        (g): g is (typeof sections)[number] & { key: DebtGroup } =>
                           g.key !== "surety" && g.rows.length > 0
                       )
                       .map((g) => (

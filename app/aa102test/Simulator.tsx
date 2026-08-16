@@ -61,12 +61,15 @@ import {
   FAMILY,
   PATH_LABEL,
   TRACK_HEX,
+  foldMasterRow,
+  masterTotals,
   mergeReportLoans,
   owedOnly,
   perShekel,
   type ImportedLoan,
   type ImportSummary,
 } from "./lib/credit";
+import DuplicateMasterModal from "./components/DuplicateMasterModal";
 import { exportMixToExcel } from "./lib/excel";
 import { track } from "./lib/track.client";
 import { collapse, collapseOut, rise, still, viewIn, type Enter } from "./lib/transitions";
@@ -291,6 +294,8 @@ export default function Simulator({
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [annualInflation, setAnnualInflation] = useState(2.0);
   const [schedFor, setSchedFor] = useState<ImportedLoan | "mix" | null>(null);
+  /** The שכפול משכנתא נוכחית question is open. */
+  const [dupAsk, setDupAsk] = useState(false);
   const [toast, setToast] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
   const [flash, setFlash] = useState(false);
   /** Row values as of the last load / import / save — drives the change marks. */
@@ -507,6 +512,11 @@ export default function Simulator({
           // Said out loud rather than left to be discovered on the next reload:
           // the אחוז column still works, its divisor just is not stored yet.
           flash4s({ kind: "err", text: "העמודה target_amount חסרה — גובה התמהיל לא יישמר" });
+        } else if (d.hasSplit === false) {
+          // Same story for the master's split: the board computes on the
+          // amount either way, but הצמדת קרן and הפרשי היוון would not
+          // survive a reload until the migration is run.
+          flash4s({ kind: "err", text: "העמודות indexation / prepayment_fee חסרות — הצמדת קרן והפרשי היוון לא יישמרו" });
         }
       })
       .catch((e) => {
@@ -618,8 +628,20 @@ export default function Simulator({
     setMenuFor(null);
   };
 
+  /** A plain copy — a proposal duplicated as another proposal. */
   const duplicateMix = () => {
     if (!activeMix) return;
+    // THE MASTER IS NOT COPIED, IT IS FOLDED — see duplicateMaster. Its rows
+    // hold the balance in the bank's two parts and a fee beside them, and the
+    // one thing a copy has to ask is whether that fee joins the new principal.
+    // A master with nothing on it yet has nothing to fold and nothing to ask.
+    if (isPrimaryMix) {
+      const t = masterTotals(activeMix.loans);
+      if (t.balance > 0 || t.fee > 0) {
+        setDupAsk(true);
+        return;
+      }
+    }
     const id = crypto.randomUUID();
     const copy: Mix = {
       ...activeMix,
@@ -638,6 +660,45 @@ export default function Simulator({
     };
     setMixes((prev) => [...(prev ?? []), copy]);
     setActiveMixId(id);
+  };
+
+  /**
+   * שכפול משכנתא נוכחית — the master, as a proposal.
+   *
+   * Every row's יתרת קרן and הצמדת קרן become one amount (which `amount`
+   * already is), and with `withFees` the row's הפרשי היוון is added to it —
+   * the new mortgage funds the cost of leaving the old one. The split and the
+   * fee stay behind on the master; the copy carries a receipt for what was
+   * folded (fee_folded) and nothing else it would have to explain. See
+   * foldMasterRow in lib/credit.
+   *
+   * גובה התמהיל is seeded with the copy's own total, fees included when they
+   * are — so אחוז on the new tab reads 100% allocated from its first paint and
+   * every re-cut is measured against the sum that actually has to be borrowed.
+   */
+  const duplicateMaster = (withFees: boolean) => {
+    setDupAsk(false);
+    if (!activeMix) return;
+    const id = crypto.randomUUID();
+    const loans = activeMix.loans.map((l) => foldMasterRow(l, withFees, id));
+    const total = owedOnly(loans).reduce((s, l) => s + (Number(l.amount) || 0), 0);
+    const copy: Mix = {
+      ...activeMix,
+      id,
+      mix_name: withFees ? "שכפול משכנתא נוכחית + עמלות" : "שכפול משכנתא נוכחית",
+      is_base: false,
+      target_amount: total || null,
+      loans,
+    };
+    setMixes((prev) => [...(prev ?? []), copy]);
+    setActiveMixId(id);
+    const folded = masterTotals(owedOnly(activeMix.loans)).fee;
+    flash4s({
+      kind: "ok",
+      text: withFees
+        ? `נוצר העתק — הפרשי היוון של ₪${folded.toLocaleString("he-IL")} נוספו לקרן`
+        : "נוצר העתק — יתרת הקרן והצמדתה אוחדו לסכום אחד, ללא עמלות",
+    });
   };
 
   const flash4s = (t: { kind: "ok" | "err"; text: string }) => {
@@ -1286,7 +1347,11 @@ export default function Simulator({
                 className="lgr-btn lgr-btn-sm"
                 onClick={duplicateMix}
                 disabled={!activeMix}
-                title="יצירת עותק של התמהיל הזה כנקודת פתיחה להצעה"
+                title={
+                  isPrimaryMix
+                    ? "שכפול המשכנתא הנוכחית לתמהיל חדש — יתרת הקרן והצמדתה מאוחדות לסכום אחד, ותישאלו אם להוסיף את הפרשי ההיוון"
+                    : "יצירת עותק של התמהיל הזה כנקודת פתיחה להצעה"
+                }
               >
                 <Copy size={14} weight="bold" />
                 שכפל תמהיל
@@ -1427,6 +1492,15 @@ export default function Simulator({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {dupAsk && activeMix && (
+        <DuplicateMasterModal
+          mixName={activeMix.mix_name}
+          loans={activeMix.loans}
+          onPick={duplicateMaster}
+          onClose={() => setDupAsk(false)}
+        />
+      )}
 
       {schedFor && activeMix && (
         <ScheduleModal
