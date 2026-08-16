@@ -70,10 +70,25 @@ const ANCHOR = ["source_anchor"] as const;
  */
 const SPLIT = ["indexation", "prepayment_fee"] as const;
 
-/** Flips to false the first time Postgres says the columns aren't there. */
+/**
+ * מטרת ההלוואה, as one of the board's own ids (see app/aa102test/lib/purposes).
+ * Text, nullable; null is "never classified" and the cell shows a dash.
+ */
+const PURPOSE = ["purpose"] as const;
+
+/**
+ * Flips to false the first time Postgres says the columns aren't there — and
+ * stays false for the life of the process. Two consequences worth knowing:
+ * a migration applied while the server is up needs a restart to be seen, and
+ * PostgREST's own schema cache lags a DDL by up to a minute (a fresh column
+ * answers PGRST204 until it reloads — `NOTIFY pgrst, 'reload schema'` hurries
+ * it), so a request that lands in that window latches the flag off. Restart
+ * after migrating; do not trust the first request after one.
+ */
 let hasExtra = true;
 let hasAnchor = true;
 let hasSplit = true;
+let hasPurpose = true;
 /**
  * loan_mixes.target_amount — גובה התמהיל, the figure the board's אחוז column
  * allocates against. Same deal as the two above, on the other table: without the
@@ -131,6 +146,7 @@ function toDbRow(loan: Row, mixId: string): Row {
     out.indexation = numOrNull(loan.indexation);
     out.prepayment_fee = numOrNull(loan.prepayment_fee);
   }
+  if (hasPurpose) out.purpose = typeof loan.purpose === "string" && loan.purpose ? loan.purpose : null;
   return out;
 }
 
@@ -141,6 +157,7 @@ const selectCols = () =>
     ...(hasExtra ? EXTRA : []),
     ...(hasAnchor ? ANCHOR : []),
     ...(hasSplit ? SPLIT : []),
+    ...(hasPurpose ? PURPOSE : []),
   ].join(",");
 
 function fromDbRow(row: Row): Row {
@@ -182,7 +199,7 @@ export async function loadBoard(lead: number) {
 
   // Retire the newest column set first, then the older ones, so a deployment
   // that is one migration behind loses only what that migration added.
-  for (const retire of [() => (hasSplit = false), () => (hasAnchor = false), () => (hasExtra = false)]) {
+  for (const retire of [() => (hasPurpose = false), () => (hasSplit = false), () => (hasAnchor = false), () => (hasExtra = false)]) {
     if (!loansRes.error || !isMissingColumn(loansRes.error)) break;
     retire();
     loansRes = await supabase.from("loans").select(selectCols()).in("mix_id", ids);
@@ -208,6 +225,7 @@ export async function loadBoard(lead: number) {
     hasAnchor,
     hasTarget,
     hasSplit,
+    hasPurpose,
   };
 }
 
@@ -253,7 +271,7 @@ export async function saveBoard(lead: number, mixes: BoardMix[]) {
       const build = () =>
         (mix.loans ?? []).map((l) => ({ ...toDbRow(l, mix.id), id: l.id as string }));
       let res = await supabase.from("loans").upsert(rows, { onConflict: "id" });
-      for (const retire of [() => (hasSplit = false), () => (hasAnchor = false), () => (hasExtra = false)]) {
+      for (const retire of [() => (hasPurpose = false), () => (hasSplit = false), () => (hasAnchor = false), () => (hasExtra = false)]) {
         if (!res.error || !isMissingColumn(res.error)) break;
         retire();
         res = await supabase.from("loans").upsert(build(), { onConflict: "id" });
@@ -275,5 +293,5 @@ export async function saveBoard(lead: number, mixes: BoardMix[]) {
     }
   }
 
-  return { success: true, hasExtra, hasAnchor, hasSplit };
+  return { success: true, hasExtra, hasAnchor, hasSplit, hasPurpose };
 }

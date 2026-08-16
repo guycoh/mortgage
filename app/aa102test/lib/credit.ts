@@ -13,6 +13,8 @@ import type { BankStatement } from "@/lib/bank-parser/types";
 import { extractLoans, type ExtractedLoan } from "@/lib/credit-parser/loan-mapping";
 import { calculateLoan } from "@/app/private/crm/leads/simulators/components/calculate/loanCalculators";
 import type { Loan } from "@/app/private/crm/leads/simulators/components/LoanTable";
+import { creditReportPurpose } from "@/lib/bank-parser/purpose";
+import { purposeFrom, type PurposeId } from "./purposes";
 
 /** Which family a row belongs to. */
 export type DebtGroup = "mortgage" | "loan";
@@ -111,6 +113,14 @@ export type ImportedLoan = Loan & {
    * carries the coarser answer. Both are the lender's claim, not ours.
    */
   source_purpose?: string;
+  /**
+   * מטרת ההלוואה on the board's own list (see lib/purposes) — what the row IS
+   * for, as one of eleven words. Filled from the document on import (through
+   * purposeFrom), editable in the מטרה column, persisted in `loans.purpose`.
+   * Null on rows saved before the column existed: the cell shows a dash rather
+   * than inventing a purpose for a mortgage nobody classified.
+   */
+  purpose?: PurposeId | null;
   /** True when the document says this is state money — a הלוואת זכאות. */
   source_eligibility?: boolean;
 
@@ -457,6 +467,9 @@ function toLoanRow(src: ExtractedLoan, mixId: string, group: DebtGroup): Importe
     // column stays empty rather than showing the normalised guess — a credit
     // report that does not state a purpose has not stated one.
     source_purpose: src.purpose,
+    // The report's coarse 201-017, read the way the parsers read it (a
+    // mortgage's צריכה פרטית is כל מטרה), then placed on the board's list.
+    purpose: purposeFrom(creditReportPurpose(src.purpose, src.type), src.purpose, group),
     source_eligibility: src.eligibility,
   };
 }

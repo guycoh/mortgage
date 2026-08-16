@@ -897,9 +897,18 @@ html:has(.lgr-root) {
    Paired with 10% of the grid in the colgroup, worst case is ~16px of air. */
 .lgr-date-btn { width: 18px; height: 18px; }
 .lgr-date-in {
-  padding-inline-start: 8px;
-  padding-inline-end: 26px;
+  padding-inline-start: 7px;
+  padding-inline-end: 24px;
+  /* 12.5px: ten tabular characters at 13px measure 72px, and the column's
+     free run at 9.5% is 71 — the leading zero of "01/01/2053" was the pixel
+     that lost. Half a point down and the whole date is on the paper. */
+  font-size: 12.5px;
 }
+/* A two-word header that no longer fits its column on one line — "תדירות
+   שינוי" over a 5% column — breaks between its words rather than into its
+   neighbour. line-height 1.05 keeps the header row from growing by more than
+   the second word needs. */
+.lgr-th-2 { display: inline-block; line-height: 1.05; white-space: normal; text-align: start; }
 
 /* text-bearing fields (selects, the date field) speak UI, not figures */
 /* פריים, שפיצר, a picked date — these are values, not captions, and they are
@@ -2470,51 +2479,20 @@ html:has(.lgr-root) {
 }
 
 /* --- מטרה --------------------------------------------------------------
-   A read-only column of the document's own words, so it is typed like the
-   lender's name beside it but one step quieter: this is context for the row,
-   not its identity. Two lines at most, because "רכישת דירה יד שניה" does not
-   fit one at 7% of the grid and truncating it to "רכישת דירה" would silently
-   turn a specific fact into the generic one. The full string is on the title. */
-.lgr-purpose {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  padding-inline-start: 9px;
-  font-family: var(--ui);
-  font-size: 11.5px;
+   Edited now, on the board's own eleven-word list (lib/purposes) — the same
+   well as מסלול, one step quieter in type because a purpose is context for the
+   row, not its identity. The document's wording rides on the tooltip. The one
+   mark in the column is זכאות: state money on state terms changes what a
+   refinance may do with the tranche, so it is a note under the well rather
+   than a word in it. */
+.lgr-table td .lgr-well .lgr-sel-btn[aria-label="מטרת ההלוואה"] {
+  padding-inline: 7px 6px;
+  gap: 4px;
+  font-size: 12px;
   font-weight: 500;
-  line-height: 1.25;
-  letter-spacing: -0.006em;
   color: var(--lgr-2);
 }
-/* A hand-added row, or a report that printed the field empty. Both are "the
-   document does not say", which is a different thing from a purpose of "אחר". */
-.lgr-purpose-none {
-  display: block;
-  padding-inline-start: 9px;
-  font-family: var(--ui);
-  font-size: 12px;
-  color: var(--lgr-4);
-}
-/* זכאות. State money on state terms — it changes what a refinance is allowed to
-   do with the tranche, so it is the one thing in this column that gets a mark
-   rather than a line of text. Sized off the existing row tags. */
-.lgr-purpose-tag {
-  display: inline-block;
-  margin-top: 2px;
-  margin-inline-start: 9px;
-  padding: 1px 5px;
-  border: 1px solid #cbd9ea;
-  border-radius: 999px;
-  background: #eef4fb;
-  font-family: var(--ui);
-  font-size: 9.5px;
-  font-weight: 700;
-  letter-spacing: 0.01em;
-  color: #3b5f8a;
-  white-space: nowrap;
-}
+.lgr-table td .lgr-well .lgr-sel-btn[aria-label="מטרת ההלוואה"][data-empty="true"] { color: var(--lgr-4); }
 
 /* The anchor's level belongs under the anchor's NAME, not under the margin field
    at the cell's other end — parked there it read as an annotation of the margin,
@@ -3066,7 +3044,7 @@ html:has(.lgr-root) {
    the amounts (weight 500 rather than the well's 600, ink-2 rather than ink)
    because it is not part of anything the row adds up to: it is the price of
    leaving, and it should not be mistaken for a fourth balance. */
-.lgr-fee-in { font-weight: 500; color: var(--lgr-2); }
+.lgr-fee-in { padding-inline: 6px; font-weight: 500; color: var(--lgr-2); }
 .lgr-fee-in:not(:placeholder-shown) { color: var(--ink); }
 /* Its sums, in the group bar and the totals row, in the same register. */
 .lgr-fee-sum { color: var(--lgr-2) !important; font-weight: 500 !important; }

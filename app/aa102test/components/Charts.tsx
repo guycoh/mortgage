@@ -90,7 +90,6 @@ export function stackedOption(series: TrackSeries[], maxMonth: number, kind: "ba
       // never touch.
       lineStyle: { width: 1.5, color: "#fff" },
       itemStyle: { color: TRACK_HEX[s.id] },
-      emphasis: { focus: "series", areaStyle: { opacity: 1 } },
       areaStyle: { color: TRACK_HEX[s.id], opacity: 0.86 },
       data: s.points,
     })),
@@ -165,7 +164,6 @@ export function splitOption(years: Timeline["years"]): EChartsCoreOption {
       borderColor: "#fff",
       borderWidth: 1,
     },
-    emphasis: { focus: "series" },
     data: years.map((y) => y[k]),
   });
   return {
@@ -317,17 +315,6 @@ export default function Charts({
       ) : (
         <div className="lgr-chart-grid">
           <Panel
-            title="יתרת החוב"
-            reading={
-              <>
-                <Money value={t.totalBalance} block={false} weight={700} size={14} />
-                <span>היום</span>
-              </>
-            }
-          >
-            <EChart option={balanceOpt!} group={group} />
-          </Panel>
-          <Panel
             title="החזר חודשי"
             reading={
               <>
@@ -345,6 +332,24 @@ export default function Charts({
             <EChart option={paymentOpt!} group={group} />
           </Panel>
           <Panel
+            title="יתרת החוב"
+            reading={
+              <>
+                <Money value={t.totalBalance} block={false} weight={700} size={14} />
+                <span>היום</span>
+              </>
+            }
+          >
+            <EChart option={balanceOpt!} group={group} />
+          </Panel>
+          <Panel
+            title="חלוקת התשלום לקרן, הצמדה וריבית"
+            reading={<span>לפי שנה</span>}
+            legend={<Legend items={Object.values(SPLIT).map((s) => ({ color: s.color, label: s.label }))} />}
+          >
+            <EChart option={splitOpt!} />
+          </Panel>
+          <Panel
             title="ריבית ממוצעת"
             reading={
               <>
@@ -354,13 +359,6 @@ export default function Charts({
             }
           >
             <EChart option={rateOpt!} group={group} />
-          </Panel>
-          <Panel
-            title="חלוקת התשלום לקרן, הצמדה וריבית"
-            reading={<span>לפי שנה</span>}
-            legend={<Legend items={Object.values(SPLIT).map((s) => ({ color: s.color, label: s.label }))} />}
-          >
-            <EChart option={splitOpt!} />
           </Panel>
         </div>
       )}

@@ -59,6 +59,7 @@ import {
   type ImportedLoan,
 } from "../lib/credit";
 import { addMonths, monthsBetween, parseDate, startOfToday, toIso } from "../lib/dates";
+import { PURPOSES, defaultPurpose, type PurposeId } from "../lib/purposes";
 import { lenderOf } from "../lib/lenders";
 import { freqLabel } from "@/lib/rate-frequency";
 import type { AnchorResponse } from "@/lib/anchors/types";
@@ -136,6 +137,7 @@ const TRACKED = [
   "is_guarantor",
   "indexation",
   "prepayment_fee",
+  "purpose",
 ] as const;
 
 type Baseline = Record<string, ImportedLoan>;
@@ -231,6 +233,7 @@ export default function Ledger({
         loan_end_date: null,
         end_date: null,
         group,
+        purpose: defaultPurpose(group),
       },
     ]);
 
@@ -966,26 +969,26 @@ export default function Ledger({
                   were carrying slack — never תאריך סיום, see .lgr-date-in. */}
               {(isBase
                 ? [
-                    "7.5%", // סוג
-                    "6%", // מטרה
-                    "8.5%", // גוף מימון
-                    "13%", // יתרת קרן / הצמדת קרן
-                    "6.25%", // הפרשי היוון
-                    "7%", // מסלול
-                    "6.5%", // לוח סילוקין
-                    "9%", // עוגן / תוספת
+                    "6.75%", // סוג
+                    "7.5%", // מטרה — a select now, and "כל מטרה" has to fit
+                    "8%", // גוף מימון
+                    "13.25%", // יתרת קרן / הצמדת קרן — a seven-figure principal beside a 66px linkage box
+                    "5.75%", // הפרשי היוון
+                    "7.5%", // מסלול — "פריים" with its dot and caret
+                    "6.75%", // לוח סילוקין
+                    "9.5%", // עוגן / תוספת — the split header needs the width, not the boxes
                     "4.5%", // ריבית %
-                    "5.5%", // תדירות שינוי
+                    "5%", // תדירות שינוי
                     "4.75%", // חודשים
                     "9.5%", // תאריך סיום
-                    "6.5%", // החזר חודשי
-                    "5.5%", // actions
+                    "6.25%", // החזר חודשי
+                    "5%", // actions — three 19px glyphs, shown on approach
                   ]
                 : [
                     "8%", // סוג
-                    "7%", // מטרה
+                    "8%", // מטרה — a select now; the point came out of סכום, which had slack
                     "9%", // גוף מימון
-                    "8.5%", // סכום
+                    "7.5%", // סכום
                     "5%", // אחוז
                     "7.5%", // מסלול
                     "7%", // לוח סילוקין
@@ -1048,7 +1051,13 @@ export default function Ledger({
                   </span>
                 </th>
                 <th>ריבית %</th>
-                <th>תדירות שינוי</th>
+                <th title="תדירות שינוי הריבית, בחודשים">
+                  <span className="lgr-th-2">
+                    תדירות
+                    <br />
+                    שינוי
+                  </span>
+                </th>
                 <th>חודשים</th>
                 <th>תאריך סיום</th>
                 {/* the unit lives in the header, so it is stated once instead of
@@ -1206,17 +1215,37 @@ export default function Ledger({
                               its own: it is a different axis (whose money) but
                               it only ever qualifies a purpose, and it is true of
                               a handful of tranches in a file. */}
+                          {/* EDITED NOW, on the board's own list (lib/purposes).
+                              The document's wording is not lost: it is what
+                              the import classified from, and it stays on the
+                              cell's tooltip as "מהמסמך: …" so a reader can
+                              check the classification against the letter. */}
                           <td>
-                            {loan.source_purpose ? (
-                              <span className="lgr-purpose" title={loan.source_purpose}>
-                                {loan.source_purpose}
-                              </span>
-                            ) : (
-                              <span className="lgr-purpose-none">—</span>
-                            )}
-                            {loan.source_eligibility && (
-                              <span className="lgr-purpose-tag">זכאות</span>
-                            )}
+                            <div
+                              className="lgr-well"
+                              data-dirty={dirty.has("purpose") || undefined}
+                              title={
+                                loan.source_purpose
+                                  ? `מטרת ההלוואה · מהמסמך: ${loan.source_purpose}`
+                                  : loan.purpose
+                                    ? "מטרת ההלוואה"
+                                    : "מטרת ההלוואה — לא סווגה"
+                              }
+                            >
+                              <Select
+                                value={loan.purpose ?? null}
+                                onChange={(v) => patch(loan.id, { purpose: v as PurposeId })}
+                                options={PURPOSES.map((p) => ({ value: p.id, label: p.label }))}
+                                ariaLabel="מטרת ההלוואה"
+                                placeholder="—"
+                                minWidth={200}
+                              />
+                              {loan.source_eligibility && (
+                                <span className="lgr-note" title="הלוואת זכאות — כספי המדינה">
+                                  זכאות
+                                </span>
+                              )}
+                            </div>
                           </td>
 
                           {/* --- גוף מימון: WHERE THE ROW CAME FROM ---

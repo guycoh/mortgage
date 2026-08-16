@@ -16,6 +16,7 @@ import { freqLabel } from "@/lib/rate-frequency";
 import { monthsBetween, toDate } from "./text";
 import type { BankStatement, BankTranche } from "./types";
 import { PURPOSE_LABEL } from "./purpose";
+import { purposeFrom, type PurposeId } from "@/app/aa102test/lib/purposes";
 
 /**
  * Which of the five canonical tracks this tranche is.
@@ -164,12 +165,16 @@ function toRow(t: BankTranche, mixId: string, st: BankStatement): ImportedLoan {
     // advisor is reading against the letter in front of them, and "רכישת דירה
     // יד שניה" is a fact the letter states that "רכישת דירה" rounds off.
     source_purpose: t.purpose || PURPOSE_LABEL[t.purposeKind],
+    // The board's own eleven-word list, from the kind and the raw wording —
+    // the raw wording first, because it alone can say גישור or קבוצת רכישה.
+    purpose: purposeFrom(t.purposeKind, t.purpose, "mortgage"),
     source_eligibility: t.funding === "eligibility",
   } as ImportedLoan & {
     anchor_margin: number | null;
     anchor_interval: number | null;
     indexation: number | null;
     prepayment_fee: number | null;
+    purpose: PurposeId;
   };
 }
 

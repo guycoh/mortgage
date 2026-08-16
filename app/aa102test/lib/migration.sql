@@ -59,3 +59,11 @@ alter table public.loan_mixes
 alter table public.loans
   add column if not exists indexation     numeric,
   add column if not exists prepayment_fee numeric;
+
+-- מטרת ההלוואה, as one of the board's own ids — housing · any · renovation ·
+-- existing_lien · bridge · dowry · refi_housing · refi_any · business ·
+-- unknown · purchase_group (app/aa102test/lib/purposes.ts). Filled from the
+-- document on import, edited in the מטרה column. Nullable: null is "never
+-- classified", and the cell shows a dash rather than a guessed purpose.
+alter table public.loans
+  add column if not exists purpose text;

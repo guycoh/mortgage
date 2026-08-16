@@ -70,6 +70,7 @@ import {
   type ImportSummary,
 } from "./lib/credit";
 import DuplicateMasterModal from "./components/DuplicateMasterModal";
+import { asPurposeId } from "./lib/purposes";
 import { exportMixToExcel } from "./lib/excel";
 import { track } from "./lib/track.client";
 import { collapse, collapseOut, rise, still, viewIn, type Enter } from "./lib/transitions";
@@ -144,6 +145,7 @@ const newLoan = (mixId: string): ImportedLoan => ({
   rate: 0,
   months: 0,
   group: "mortgage",
+  purpose: "housing",
 });
 
 const makeMix = (name: string, isBase = false, rows = 3): Mix => {
@@ -503,7 +505,9 @@ export default function Simulator({
         adopt(
           (d.mixes ?? []).map((m: Mix) => ({
             ...m,
-            loans: (m.loans ?? []).map((l) => ({ ...l, mix_id: m.id })),
+            // A saved purpose is trusted only if it is one of ours — a stray
+            // string in the column becomes "not classified", never a label.
+            loans: (m.loans ?? []).map((l) => ({ ...l, mix_id: m.id, purpose: asPurposeId(l.purpose) })),
           }))
         );
         if (d.hasExtra === false) {
@@ -517,6 +521,8 @@ export default function Simulator({
           // amount either way, but הצמדת קרן and הפרשי היוון would not
           // survive a reload until the migration is run.
           flash4s({ kind: "err", text: "העמודות indexation / prepayment_fee חסרות — הצמדת קרן והפרשי היוון לא יישמרו" });
+        } else if (d.hasPurpose === false) {
+          flash4s({ kind: "err", text: "העמודה purpose חסרה — מטרת ההלוואה לא תישמר" });
         }
       })
       .catch((e) => {
