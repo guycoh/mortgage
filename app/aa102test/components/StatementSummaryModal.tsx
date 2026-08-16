@@ -14,7 +14,8 @@
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { motion } from "motion/react";
-import { Printer, WarningCircle, X } from "@phosphor-icons/react";
+import { Printer, X } from "@phosphor-icons/react";
+import { Worries } from "./ClientSummaryModal";
 import { BankIcon } from "./bankIcons";
 import Money, { fmt } from "./Money";
 import { noteOf, rateHeat } from "@/lib/verdicts";
@@ -198,6 +199,16 @@ export default function StatementSummaryModal({
                 <div className="lgr-cs-foot-cap">סכום לסילוק מלא</div>
                 <Money value={a.totals.payoff} size={19} weight={800} />
               </div>
+              {/* The payoff is more than the balance by two things — the fee, and
+                  the interest run up since the last instalment. Both are said, so
+                  715,460 over a 713,480 balance is arithmetic the client can check
+                  rather than a gap they have to take on trust. */}
+              {a.totals.accruedInterest > 0 && (
+                <div>
+                  <div className="lgr-cs-foot-cap">מזה ריבית שנצברה</div>
+                  <Money value={a.totals.accruedInterest} size={19} weight={800} color="var(--lgr-2)" />
+                </div>
+              )}
               <div>
                 <div className="lgr-cs-foot-cap">מזה עמלת פירעון מוקדם</div>
                 <Money
@@ -221,21 +232,7 @@ export default function StatementSummaryModal({
             </div>
           </section>
 
-          {worries.length > 0 && (
-            <section className="lgr-cs-worry">
-              <div className="lgr-cs-worry-head">
-                <WarningCircle size={17} weight="fill" />
-                מה חשוב לשים לב אליו
-              </div>
-              <ul>
-                {worries.map((w) => (
-                  <li key={w.note.say} data-sev={w.severity}>
-                    {w.note.say}
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
+          {worries.length > 0 && <Worries items={worries.map((w) => ({ say: w.note.say, severity: w.severity }))} />}
         </div>
 
         <footer className="lgr-cs-foot">

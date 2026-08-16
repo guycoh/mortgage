@@ -419,7 +419,16 @@ export interface ClientRow {
   type: string;
   parts: number;
   balance: number;
+  /**
+   * What actually leaves the account each month for this row — the same
+   * measure the footer uses (`totals.monthly`), so the section subtotals add up
+   * to it by construction. A charge the report shows nobody is servicing (see
+   * DebtLine.chargeNotPaid) is NOT in here; it is in `monthlyNotPaid`, and the
+   * page says so on the row instead of printing a payment that is not made.
+   */
   monthly: number;
+  /** Contractual charges on this row that are not being paid. */
+  monthlyNotPaid: number;
   months: number | null;
   late: boolean;
   overdue: number;
@@ -446,6 +455,13 @@ export interface ClientSection {
   title: string;
   accent: string;
   rows: ClientRow[];
+  /**
+   * Cards and overdrafts the client holds but is not using — no balance, no
+   * charge, nothing late. They are still facts (a lender counts open limits),
+   * but a row of zeros per card tells the client nothing; the page states them
+   * once, as a count and the ceiling they add up to.
+   */
+  unused?: { count: number; limit: number };
 }
 
 /**
@@ -476,6 +492,8 @@ export interface ClientView {
   shownBalance: number;
   /** footer.balance − shownBalance. Zero, or the page says so out loud. */
   unshownBalance: number;
+  /** footer.monthly − Σ rows.monthly. Zero, for the same reason. */
+  unshownMonthly: number;
 }
 
 /* ------------------------------------------------------------------ helpers */
@@ -1016,6 +1034,7 @@ const EMPTY_ROW = (bank: string, family: ClientRow["family"], type: string): Cli
   parts: 0,
   balance: 0,
   monthly: 0,
+  monthlyNotPaid: 0,
   months: null,
   late: false,
   overdue: 0,
@@ -1038,7 +1057,9 @@ function absorb(row: ClientRow, l: DebtLine): ClientRow {
   row.uids.push(l.uid);
   row.parts += 1;
   row.balance += l.balance;
-  row.monthly += l.monthly;
+  // Cash and notional charges kept apart — see ClientRow.monthly.
+  if (l.chargeNotPaid) row.monthlyNotPaid += l.monthly;
+  else row.monthly += l.monthly;
   row.limit += l.limit;
   row.peak += l.peak;
   row.overdue += l.overdue;
@@ -1086,7 +1107,7 @@ function buildClientView(a: Omit<Analysis, "flags" | "clientView">, flags: Flag[
   // One row per facility. No monthly gate: a card that has stopped being serviced
   // is the most important row on the page, and gating on monthly > 0 hid every
   // revolving facility on a real report — ₪347,593 of it.
-  const cardRows = own
+  const allCardRows = own
     .filter((l) => l.category === "card" || l.category === "overdraft")
     .map((l) => {
       const row = absorb(EMPTY_ROW(l.bank, "card", l.type), l);
@@ -1094,16 +1115,30 @@ function buildClientView(a: Omit<Analysis, "flags" | "clientView">, flags: Flag[
       return row;
     })
     .sort((x, y) => y.monthly - x.monthly || y.balance - x.balance);
+  // An open facility with nothing on it is a fact, not a row. See ClientSection.unused.
+  const isUnused = (r: ClientRow) =>
+    r.balance === 0 && r.monthly === 0 && r.monthlyNotPaid === 0 && !r.late && r.overdue === 0 &&
+    !r.remarks.some((x) => /הוצאה לפועל|לא התקבל כל תשלום/.test(x));
+  const cardRows = allCardRows.filter((r) => !isUnused(r));
+  const unusedCards = allCardRows.filter(isUnused);
 
   const sections: ClientSection[] = [
     { key: "mortgage" as const, title: "משכנתאות", accent: "#4a4691", rows: byLender(own.filter((l) => l.category === "mortgage"), "mortgage") },
     { key: "loan" as const, title: "הלוואות", accent: "#c77e4a", rows: byLender(own.filter((l) => l.category === "loan"), "loan") },
-    { key: "card" as const, title: "כרטיסי אשראי ומסגרות", accent: "#0d8b9b", rows: cardRows },
-  ].filter((s) => s.rows.length > 0);
+    {
+      key: "card" as const,
+      title: "כרטיסי אשראי ומסגרות",
+      accent: "#0d8b9b",
+      rows: cardRows,
+      unused: unusedCards.length
+        ? { count: unusedCards.length, limit: unusedCards.reduce((s, r) => s + r.limit, 0) }
+        : undefined,
+    },
+  ].filter((s) => s.rows.length > 0 || s.unused);
 
   // Anything the categoriser did not place. Without this a new transaction type
   // would silently vanish from the page while still counting in the footer.
-  const placed = new Set(sections.flatMap((s) => s.rows.flatMap((r) => r.uids)));
+  const placed = new Set([...sections.flatMap((s) => s.rows.flatMap((r) => r.uids)), ...unusedCards.flatMap((r) => r.uids)]);
   const orphans = own.filter((l) => !placed.has(l.uid));
   if (orphans.length) {
     sections.push({
@@ -1115,6 +1150,7 @@ function buildClientView(a: Omit<Analysis, "flags" | "clientView">, flags: Flag[
   }
 
   const shownBalance = sections.reduce((s, sec) => s + sec.rows.reduce((t, r) => t + r.balance, 0), 0);
+  const shownMonthly = sections.reduce((s, sec) => s + sec.rows.reduce((t, r) => t + r.monthly, 0), 0);
 
   // Ordered by severity, and each sentence's rows are on the page by construction.
   const worries = flags
@@ -1129,6 +1165,7 @@ function buildClientView(a: Omit<Analysis, "flags" | "clientView">, flags: Flag[
     guaranteedBalance: a.totals.guaranteedBalance,
     shownBalance,
     unshownBalance: Math.round(a.totals.balance - shownBalance),
+    unshownMonthly: Math.round(a.totals.monthly - shownMonthly),
   };
 }
 

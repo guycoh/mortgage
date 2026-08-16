@@ -95,10 +95,34 @@ function LenderRow({ r }: { r: ClientRow }) {
       <div className="lgr-cs-amt">
         <Money value={r.balance} size={17} weight={800} />
       </div>
-      <div className="lgr-cs-amt">
-        <Money value={r.monthly} size={17} weight={800} color={r.late ? "var(--neg)" : undefined} />
-      </div>
+      <MonthlyCell r={r} />
     </li>
+  );
+}
+
+/**
+ * The לחודש cell — what leaves the account for this row.
+ *
+ * A charge the report shows nobody is servicing is not printed as a payment:
+ * a client reading "₪2,018 לחודש" beside a loan that has been in default for
+ * two years would be told the opposite of the truth. The cell says what is
+ * paid (₪0, when nothing is) and names the charge that is not, so the section
+ * subtotal and the footer — both cash — add up on the page.
+ */
+function MonthlyCell({ r }: { r: ClientRow }) {
+  if (r.monthly === 0 && r.monthlyNotPaid > 0) {
+    return (
+      <div className="lgr-cs-amt">
+        <span className="lgr-cs-unpaid">לא משולם</span>
+        <div className="lgr-cs-rolled">חיוב {ils(r.monthlyNotPaid)} ₪ בחודש</div>
+      </div>
+    );
+  }
+  return (
+    <div className="lgr-cs-amt">
+      <Money value={r.monthly} size={17} weight={800} color={r.late ? "var(--neg)" : undefined} />
+      {r.monthlyNotPaid > 0 && <div className="lgr-cs-rolled">ועוד {ils(r.monthlyNotPaid)} ₪ שאינם משולמים</div>}
+    </div>
   );
 }
 
@@ -214,6 +238,42 @@ function CardRow({ r }: { r: ClientRow }) {
   );
 }
 
+/* ------------------------------------------------------------ the worries */
+
+/**
+ * The findings, in the client's words, each at its own weight.
+ *
+ * They used to sit in one red box, every line the same red — so "84% of your
+ * mortgage is index-linked" shouted exactly as loud as "eleven standing orders
+ * bounced", and a reader had no way to tell the alarm from the aside. The box is
+ * quiet now and each line carries its own colour: the critical and high ones in
+ * red, the medium ones in the warm tone, the rest in ink. Same list, same order
+ * (the engine sorts by severity); only the reading changed.
+ */
+export function Worries({ items }: { items: { say: string; severity: string }[] }) {
+  const alarms = items.filter((w) => w.severity === "critical" || w.severity === "high").length;
+  return (
+    <section className="lgr-cs-worry" data-alarm={alarms > 0 || undefined}>
+      <div className="lgr-cs-worry-head">
+        <WarningCircle size={16} weight="fill" />
+        מה חשוב לשים לב אליו
+        {alarms > 0 && (
+          <span className="lgr-cs-worry-n">
+            {alarms === 1 ? "נושא אחד דחוף" : `${alarms} נושאים דחופים`}
+          </span>
+        )}
+      </div>
+      <ul>
+        {items.map((w) => (
+          <li key={w.say} data-sev={w.severity}>
+            {w.say}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 /* -------------------------------------------------------------- the page */
 
 function Section({ sec }: { sec: ClientSection }) {
@@ -238,6 +298,17 @@ function Section({ sec }: { sec: ClientSection }) {
       <ul>
         {shown.map((r) =>
           sec.key === "card" ? <CardRow key={r.uids.join()} r={r} /> : <LenderRow key={r.uids.join()} r={r} />
+        )}
+        {sec.unused && (
+          <li className="lgr-cs-more" title="מסגרות פתוחות ללא יתרה וללא חיוב — נספרות אצל המלווה, לא אצלכם">
+            {sec.unused.count === 1 ? "מסגרת אחת" : `${sec.unused.count} מסגרות`} ללא ניצול
+            {sec.unused.limit > 0 && (
+              <>
+                {" · "}
+                מסגרת כוללת <Money value={sec.unused.limit} block={false} weight={700} />
+              </>
+            )}
+          </li>
         )}
         {rest.length > 0 && (
           <li className="lgr-cs-more">
@@ -342,21 +413,7 @@ export default function ClientSummaryModal({
             </p>
           )}
 
-          {v.worries.length > 0 && (
-            <section className="lgr-cs-worry">
-              <div className="lgr-cs-worry-head">
-                <WarningCircle size={17} weight="fill" />
-                מה חשוב לשים לב אליו
-              </div>
-              <ul>
-                {v.worries.map((w) => (
-                  <li key={w.say} data-sev={w.severity}>
-                    {w.say}
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
+          {v.worries.length > 0 && <Worries items={v.worries} />}
         </div>
 
         <footer className="lgr-cs-foot">
@@ -368,6 +425,11 @@ export default function ClientSummaryModal({
             {v.unshownBalance !== 0 && (
               <div className="lgr-cs-none">
                 מזה {ils(Math.abs(v.unshownBalance))} ₪ ללא שורה בעמוד
+              </div>
+            )}
+            {v.unshownMonthly !== 0 && (
+              <div className="lgr-cs-none">
+                {ils(Math.abs(v.unshownMonthly))} ₪ לחודש ללא שורה בעמוד
               </div>
             )}
             {/* Not part of the total, but the reason the mix board shows a larger
