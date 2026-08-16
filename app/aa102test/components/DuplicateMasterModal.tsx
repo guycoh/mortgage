@@ -18,7 +18,8 @@
 import { useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { motion } from "motion/react";
-import { Copy, X } from "@phosphor-icons/react";
+import { X } from "@phosphor-icons/react";
+import Btn from "./Btn";
 import Money from "./Money";
 import { masterTotals, owedOnly, type ImportedLoan } from "../lib/credit";
 
@@ -46,8 +47,9 @@ export default function DuplicateMasterModal({
   // Focus lands on the answer most advisors give — fund the fees — when there
   // are fees to fund; otherwise on the only answer that does anything.
   const primaryRef = useRef<HTMLButtonElement>(null);
+  const plainRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
-    primaryRef.current?.focus();
+    (hasFees ? primaryRef : plainRef).current?.focus();
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
     document.body.style.overflow = "hidden";
@@ -76,10 +78,7 @@ export default function DuplicateMasterModal({
         style={{ boxShadow: "var(--shadow-lift)" }}
         onClick={(e) => e.stopPropagation()}
       >
-        <header className="lgr-head">
-          <span className="lgr-dup-ico" aria-hidden>
-            <Copy size={15} weight="bold" />
-          </span>
+        <header className="lgr-head lgr-dup-head">
           <div className="min-w-0">
             <h2 id="lgr-dup-title" className="lgr-title">
               שכפול משכנתא נוכחית
@@ -94,15 +93,12 @@ export default function DuplicateMasterModal({
         </header>
 
         <div className="lgr-dup-body">
-          <p className="lgr-dup-lead">
-            העותק ייפתח כתמהיל חדש. בכל שורה, <b>יתרת הקרן והצמדת הקרן מתחברות לסכום אחד</b> — והשאלה
-            היחידה היא אם להוסיף לקרן ההלוואה גם את <b>הפרשי ההיוון</b> (עמלת הפרעון המוקדם).
-          </p>
+          {/* THE QUESTION, in one line — the same one SmartNPV asks. Everything
+              the copy does regardless of the answer (the two parts of the
+              balance become one amount) is shown as arithmetic below, not
+              explained in prose. */}
+          <p className="lgr-dup-q">האם להוסיף את הפרשי ההיוון לקרן ההלוואה?</p>
 
-          {/* THE RECEIPT. The sum each answer produces, built up line by line
-              from figures that are on the sheet behind this dialog — so what
-              is about to happen is arithmetic the advisor can check, not a
-              label they have to trust. */}
           <dl className="lgr-dup-sheet" aria-label="פירוט הסכומים">
             <div className="lgr-dup-line">
               <dt>יתרת קרן</dt>
@@ -117,67 +113,42 @@ export default function DuplicateMasterModal({
               </dd>
             </div>
             <div className="lgr-dup-line lgr-dup-line-sum">
-              <dt>
-                סכום ההעתק
-                <em>ללא עמלות</em>
-              </dt>
+              <dt>סכום ההעתק</dt>
               <dd>
-                <Money value={t.balance} weight={700} size={16} />
+                <Money value={t.balance} weight={700} size={15} />
               </dd>
             </div>
             <div className="lgr-dup-line" data-quiet={!hasFees || undefined}>
               <dt>
                 הפרשי היוון
-                <em>{hasFees ? `עמלת פרעון מוקדם · ${feeRows} ${feeRows === 1 ? "שורה" : "שורות"}` : "לא הוזנו"}</em>
+                {hasFees && <em>{feeRows} {feeRows === 1 ? "שורה" : "שורות"}</em>}
               </dt>
               <dd>
                 <Money value={t.fee} weight={600} sign color={hasFees ? "var(--warn)" : undefined} />
               </dd>
             </div>
-            <div className="lgr-dup-line lgr-dup-line-sum" data-quiet={!hasFees || undefined}>
-              <dt>
-                סכום ההעתק
-                <em>כולל עמלות</em>
-              </dt>
-              <dd>
-                <Money value={t.withFees} weight={700} size={16} />
-              </dd>
-            </div>
           </dl>
         </div>
 
-        {/* THE TWO ANSWERS. Each carries the sum it will produce, so the pair
-            reads as a choice between two mortgages rather than between two
-            words. With no fees on the sheet the second answer is not an
-            answer — it is disabled and says why, rather than offering a
-            "with fees" that would fold in nothing. */}
+        {/* THE TWO ANSWERS — ordinary buttons, the page's own two weights, each
+            carrying the sum it produces so the choice is made on figures. With
+            no fees on the sheet the second answer folds in nothing, and says
+            so instead of pretending to be a choice. */}
         <div className="lgr-dup-acts">
-          <button
-            ref={hasFees ? undefined : primaryRef}
-            className="lgr-dup-opt"
-            data-primary={!hasFees || undefined}
-            onClick={() => onPick(false)}
-          >
-            <span className="lgr-dup-opt-t">שכפול ללא עמלות</span>
-            <span className="lgr-dup-opt-d">
-              {hasFees ? "הלקוח משלם את העמלות מכיסו" : "יתרת הקרן והצמדתה, כסכום אחד"}
-            </span>
-            <Money value={t.balance} className="lgr-dup-opt-m" weight={700} size={15} />
-          </button>
-          <button
-            ref={hasFees ? primaryRef : undefined}
-            className="lgr-dup-opt"
-            data-primary={hasFees || undefined}
+          <Btn ref={plainRef} className="lgr-btn lgr-btn-sm" onClick={() => onPick(false)}>
+            שכפול ללא עמלות
+            <Money value={t.balance} className="lgr-dup-btn-m" block={false} weight={600} size={12} />
+          </Btn>
+          <Btn
+            ref={primaryRef}
+            className={`lgr-btn lgr-btn-sm ${hasFees ? "lgr-btn-primary" : ""}`}
             disabled={!hasFees}
             title={hasFees ? undefined : "לא הוזנו הפרשי היוון בתמהיל — אין מה להוסיף לקרן"}
             onClick={() => onPick(true)}
           >
-            <span className="lgr-dup-opt-t">שכפול עם עמלות</span>
-            <span className="lgr-dup-opt-d">
-              {hasFees ? "העמלות מצטרפות לקרן ההלוואה החדשה" : "לא הוזנו הפרשי היוון"}
-            </span>
-            <Money value={t.withFees} className="lgr-dup-opt-m" weight={700} size={15} />
-          </button>
+            שכפול עם עמלות
+            <Money value={t.withFees} className="lgr-dup-btn-m" block={false} weight={600} size={12} />
+          </Btn>
         </div>
       </motion.div>
     </div>,
