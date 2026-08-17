@@ -70,6 +70,7 @@ import {
   type ImportSummary,
 } from "./lib/credit";
 import DuplicateMasterModal from "./components/DuplicateMasterModal";
+import Ask from "./components/Ask";
 import { asPurposeId } from "./lib/purposes";
 import { exportMixToExcel } from "./lib/excel";
 import { track } from "./lib/track.client";
@@ -308,6 +309,16 @@ export default function Simulator({
   const [schedFor, setSchedFor] = useState<ImportedLoan | "mix" | null>(null);
   /** The שכפול משכנתא נוכחית question is open. */
   const [dupAsk, setDupAsk] = useState(false);
+  /**
+   * A dropped document names someone the board is not open on. Held here until
+   * the advisor says whether they are a household — see applyImport's gate 3.
+   */
+  const [askMerge, setAskMerge] = useState<{ summary: ImportSummary; held: string[] } | null>(null);
+  /**
+   * Leaving a board with unsaved rows. `to` is where the advisor was going;
+   * null there means out of the lead entirely.
+   */
+  const [askLeave, setAskLeave] = useState<{ to: string | null; name: string } | null>(null);
   const [toast, setToast] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
   const [flash, setFlash] = useState(false);
   /** Row values as of the last load / import / save — drives the change marks. */
@@ -789,9 +800,13 @@ export default function Simulator({
    *
    * Three things are decided before anything is merged: is this document
    * already here, is the mix empty, and is this the same person.
+   *
+   * `agreed` is the advisor's answer to the third question coming back from the
+   * dialog — the merge gate is the one branch that cannot be settled from the
+   * documents alone (see the Ask below).
    */
   const applyImport = useCallback(
-    (summary: ImportSummary) => {
+    (summary: ImportSummary, agreed = false) => {
       if (!activeMixId) return;
       const norm = (s: string) => s.replace(/\s+/g, " ").trim();
 
@@ -848,8 +863,12 @@ export default function Simulator({
          answer "true" whenever either side lacked an identity, and `some` meant
          one identity-less document switched the guard off for everything
          dropped afterwards — a stranger's file could then be folded in
-         silently. Unknown is now a reason to ask, not a reason to proceed. */
-      if (!first && reports.length > 0) {
+         silently. Unknown is now a reason to ask, not a reason to proceed.
+
+         Asking is a dialog on the board, not the browser's confirm() — the
+         question is "are these two people a household?", and it is answered by
+         reading the two names, which is what the card puts side by side. */
+      if (!first && !agreed && reports.length > 0) {
         const sameClient = reports.some(
           (r) =>
             (!!r.clientId && !!summary.clientId && r.clientId === summary.clientId) ||
@@ -858,23 +877,13 @@ export default function Simulator({
               norm(r.clientName) === norm(summary.clientName))
         );
         if (!sameClient) {
-          const held = reports.map((r) => r.clientName).filter(Boolean).join(", ");
-          const ok = window.confirm(
-            `המסמך שייך ל־${summary.clientName || "אדם ללא שם בדוח"}, והבורד פתוח על ${held || "לקוח אחר"}.\n\n` +
-              `אם אלה בני זוג — אישור יאחד את החובות לתמהיל משותף.\n` +
-              `אם זה קובץ של לקוח אחר — ביטול ישאיר את הבורד כמו שהוא.`
-          );
-          if (!ok) {
-            track("import", {
-              ok: false,
-              kind: summary.kind,
-              file_name: summary.fileName,
-              client_name: summary.clientName || undefined,
-              error: "client-mismatch-declined",
-            });
-            flash4s({ kind: "err", text: "הייבוא בוטל — המסמך לא אוחד לבורד" });
-            return;
-          }
+          setAskMerge({
+            summary,
+            held: Array.from(
+              new Set(reports.map((r) => norm(r.clientName)).filter(Boolean))
+            ),
+          });
+          return;
         }
       }
 
@@ -1004,12 +1013,15 @@ export default function Simulator({
             ) : (
               <LeadPicker
                 lead={lead}
+                // Unsaved work is asked about on the board, not in an OS slab:
+                // the answer turns on WHICH lead is being left and what is on
+                // it, and the card can state both. See Ask.
                 onPick={(l) => {
-                  if (dirty && !window.confirm("יש שינויים שלא נשמרו. לעבור לליד אחר ולאבד אותם?")) return;
+                  if (dirty) return setAskLeave({ to: `/aa102test/${l.id}`, name: l.name || `ליד ${l.id}` });
                   router.push(`/aa102test/${l.id}`);
                 }}
                 onClear={() => {
-                  if (dirty && !window.confirm("יש שינויים שלא נשמרו. לצאת מהליד ולאבד אותם?")) return;
+                  if (dirty) return setAskLeave({ to: null, name: "" });
                   router.push("/aa102test");
                 }}
               />
@@ -1634,6 +1646,76 @@ export default function Simulator({
           loans={activeMix.loans}
           onPick={duplicateMaster}
           onClose={() => setDupAsk(false)}
+        />
+      )}
+
+      {/* --- IS THIS THE SAME HOUSEHOLD? ---
+          The two names, one under the other, and the size of what is about to
+          be folded in. Nothing else: an advisor holding two PDFs decides this
+          by recognising a surname, and the card's whole job is to show it
+          rather than to explain what "OK" would do. */}
+      {askMerge && (
+        <Ask
+          // "המסמך", not "הדוח": the same gate catches a bank payoff letter,
+          // and a letter from לאומי is not a דוח.
+          title="המסמך על שם מישהו אחר"
+          sub={askMerge.summary.fileName}
+          question="לאחד את החובות לתמהיל של בני זוג?"
+          rows={[
+            { label: "במסמך שנוסף", value: askMerge.summary.clientName || "ללא שם" },
+            { label: "בבורד", value: askMerge.held.join(" · ") || "לקוח אחר" },
+            {
+              label: "ייבדקו לחפיפה",
+              value: `${askMerge.summary.loans.length} התחייבויות`,
+            },
+          ]}
+          confirm="איחוד לתמהיל משותף"
+          cancel="ביטול הייבוא"
+          onConfirm={() => {
+            const s = askMerge.summary;
+            setAskMerge(null);
+            applyImport(s, true);
+          }}
+          onClose={() => {
+            track("import", {
+              ok: false,
+              kind: askMerge.summary.kind,
+              file_name: askMerge.summary.fileName,
+              client_name: askMerge.summary.clientName || undefined,
+              error: "client-mismatch-declined",
+            });
+            setAskMerge(null);
+            flash4s({ kind: "err", text: "הייבוא בוטל — המסמך לא אוחד לבורד" });
+          }}
+        />
+      )}
+
+      {/* --- LEAVING UNSAVED WORK ---
+          Danger tone: the safe answer keeps focus and the primary weight, so
+          the reflex Enter on a dialog that appeared mid-click cannot throw a
+          board away. */}
+      {askLeave && (
+        <Ask
+          title="יש שינויים שלא נשמרו"
+          sub={lead ? `${lead.name || "ללא שם"} · ${lead.id}` : undefined}
+          question={askLeave.to ? "לעבור לליד אחר בלי לשמור?" : "לצאת מהליד בלי לשמור?"}
+          rows={
+            askLeave.to
+              ? [
+                  { label: "עוזבים", value: lead?.name || "הבורד הנוכחי" },
+                  { label: "עוברים אל", value: askLeave.name },
+                ]
+              : [{ label: "עוזבים", value: lead?.name || "הבורד הנוכחי" }]
+          }
+          confirm="לצאת בלי לשמור"
+          cancel="חזרה לבורד"
+          tone="danger"
+          onConfirm={() => {
+            const to = askLeave.to;
+            setAskLeave(null);
+            router.push(to ?? "/aa102test");
+          }}
+          onClose={() => setAskLeave(null)}
         />
       )}
 

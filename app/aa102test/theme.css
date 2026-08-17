@@ -2067,12 +2067,23 @@ html:has(.lgr-root) {
    control. Hugging the value also puts every chevron in the column at a
    different x, which is the honest signal: these are values of different
    lengths, not a column of empty boxes. */
+/* CHROME ON A GRID'S BUDGET.
+   These were carrying a desktop form's frame into a fourteen-column sheet:
+   18px of padding, 14px of gaps and a 12px chevron — 44px of furniture around
+   a 32px word like "פריים". On a table where every column is measured to its
+   content that is not neutral, it is width taken from the value in the next
+   cell along. 12px of padding, 3px gaps and an 11px chevron reads the same at
+   arm's length and hands ~7px back per select — which is what paid for סוג's
+   family chip (see the colgroup in Ledger.tsx). */
 .lgr-table .lgr-cell.lgr-sel-btn {
   width: fit-content;
   max-width: 100%;
+  padding-inline: 7px 5px;
+  gap: 3px;
   border-color: transparent;
   background: transparent;
 }
+.lgr-table .lgr-cell.lgr-sel-btn .lgr-sel-caret { width: 11px; height: 11px; }
 .lgr-table .lgr-cell.lgr-sel-btn:hover:not(:disabled) {
   border-color: var(--line-2);
   background: #fff;
@@ -2523,12 +2534,17 @@ html:has(.lgr-root) {
    row, not its identity. The document's wording rides on the tooltip. The one
    mark in the column is זכאות: state money on state terms changes what a
    refinance may do with the tranche, so it is a note under the well rather
-   than a word in it. */
+   than a word in it.
+
+   Weight 600, not 500: a purpose is context, but at 12px in ink-2 the lighter
+   cut read as a disabled field rather than a quiet one, and it was the only
+   value on the row set below the sheet's weight. It keeps its step down in
+   size and colour, which is where the hierarchy belongs. */
 .lgr-table td .lgr-well .lgr-sel-btn[aria-label="מטרת ההלוואה"] {
-  padding-inline: 7px 6px;
-  gap: 4px;
+  padding-inline: 7px 5px;
+  gap: 3px;
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--lgr-2);
 }
 .lgr-table td .lgr-well .lgr-sel-btn[aria-label="מטרת ההלוואה"][data-empty="true"] { color: var(--lgr-4); }
@@ -2576,10 +2592,18 @@ html:has(.lgr-root) {
 .lgr-fam-sel {
   width: fit-content;
   min-width: 0;
+  /* AND NEVER WIDER THAN ITS COLUMN.
+     It had no ceiling, and `fit-content` on a table-layout:fixed grid means the
+     chip simply hangs out of the cell — "משכנתא" ran 19px into מטרה and printed
+     itself over the purpose beside it. The column has been budgeted to hold the
+     chip whole (colgroup, Ledger.tsx); this is the guarantee that a narrower
+     window, a longer family word or a future re-budget degrades to an ellipsis
+     instead of to two words on top of each other. */
+  max-width: 100%;
   height: 26px;
-  /* 9px start, so the chip's word sits on the column's 14px inset like every
+  /* 8px start, so the chip's word sits on the column's 14px inset like every
      other cell's content */
-  padding: 0 9px 0 6px;
+  padding: 0 8px 0 5px;
   border: 1px solid transparent;
   border-radius: 8px;
   background: var(--fam-tint, #fff);
@@ -2587,11 +2611,15 @@ html:has(.lgr-root) {
   font-family: var(--ui);
   font-size: 11.5px;
   font-weight: 600;
-  gap: 5px;
+  gap: 4px;
 }
 .lgr-fam-sel:hover:not(:disabled) { border-color: var(--fam-line); background: var(--fam-tint-2, var(--fam-tint)); }
 .lgr-fam-sel[data-open="true"] { border-color: var(--fam); box-shadow: 0 0 0 2px var(--fam-ring, var(--focus-ring-strong)); background: var(--fam-tint); }
-.lgr-fam-sel .lgr-sel-caret { color: currentColor; opacity: 0.5; margin-inline-start: 2px; }
+/* The caret's own 2px on top of the chip's 4px gap is gone: it made the space
+   before the chevron wider than the space after the icon, and those 2px were
+   the ones "משכנתא" was overflowing by — the label was rendering as "משכנ…" on
+   every mortgage row while measuring, to the DOM, as though it fitted. */
+.lgr-fam-sel .lgr-sel-caret { width: 11px; height: 11px; color: currentColor; opacity: 0.5; margin-inline-start: 0; }
 
 /* ------------------------------------------------------------- the add row */
 
@@ -3143,49 +3171,73 @@ html:has(.lgr-root) {
    already insets the column, so the dash must not inset it again. */
 .lgr-lender > .lgr-lender-none { padding-inline-start: 0; }
 
-/* ------------------------------------------- שכפול משכנתא נוכחית, the dialog */
-/* One card, three bands: the name, the arithmetic, the two answers. 400px:
-   a seven-figure sum and its label on one line, no more. The body is the
-   question and a receipt — no prose; what the copy does is shown as sums. */
-.lgr-dup { width: min(100%, 400px); overflow: hidden; }
-.lgr-dup-head { padding: 12px 16px 10px; }
-.lgr-dup-sub { margin-top: 1px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.lgr-dup-body { padding: 12px 16px 4px; }
+/* ------------------------------------------------------- THE ASK DIALOGS ---
+   The board asks the advisor three things — שכפול עם/בלי עמלות, whether a
+   second client's report should be merged into this household, and whether to
+   leave a board with unsaved work — and all three now wear this. It began as
+   the שכפול dialog's own skin (.lgr-dup) and turned out to be the general
+   shape: one card, three bands — the name, the facts, the two answers.
+
+   400px: a seven-figure sum and its label on one line, no more. The body is a
+   question and a receipt, never prose — what an answer will do is stated as
+   the figures or the names it will act on, and the buttons say the rest. The
+   browser's own confirm() used to carry the other two questions: a grey OS
+   slab, "localhost:3500 says", two English buttons and three lines of Hebrew
+   explaining what OK meant. */
+.lgr-ask { width: min(100%, 400px); overflow: hidden; }
+.lgr-ask-head { padding: 12px 16px 10px; }
+.lgr-ask-sub { margin-top: 1px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.lgr-ask-body { padding: 12px 16px 4px; }
 /* the question — the page's UI voice at reading size, in the ink */
-.lgr-dup-q { margin: 0 0 10px; font-size: 13.5px; font-weight: 600; letter-spacing: -0.005em; color: var(--ink); }
+.lgr-ask-q { margin: 0 0 10px; font-size: 13.5px; font-weight: 600; letter-spacing: -0.005em; color: var(--ink); }
 
 /* THE RECEIPT — a ledger in miniature: label at the start, figure at the end,
    hairlines between, the sum ruled above like every subtotal on the sheet
    behind it. A line that carries nothing (no linkage, no fees) stays but
    steps back — a visible zero beats a line that comes and goes. */
-.lgr-dup-sheet {
+.lgr-ask-sheet {
   margin: 0;
   border: 1px solid var(--line-2);
   border-radius: var(--r-sm);
   background: #fff;
   overflow: hidden;
 }
-.lgr-dup-line {
+.lgr-ask-line {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
   padding: 7px 12px;
   border-top: 1px solid var(--line);
   font-size: 12.5px; color: var(--lgr-2);
 }
-.lgr-dup-line:first-child { border-top: 0; }
-.lgr-dup-line > dt { display: flex; align-items: baseline; gap: 7px; min-width: 0; margin: 0; }
-.lgr-dup-line > dt > em { font-style: normal; font-size: 11px; color: var(--lgr-4); white-space: nowrap; }
-.lgr-dup-line > dd { margin: 0; }
-.lgr-dup-line-sum { border-top: 1.5px solid var(--ink); background: var(--card-2); color: var(--ink); font-weight: 700; }
-.lgr-dup-line-sum + .lgr-dup-line { border-top-color: var(--line-2); }
-.lgr-dup-line[data-quiet] { color: var(--lgr-4); }
-.lgr-dup-line[data-quiet] .lgr-money { color: var(--lgr-4); }
+.lgr-ask-line:first-child { border-top: 0; }
+.lgr-ask-line > dt { display: flex; align-items: baseline; gap: 7px; min-width: 0; margin: 0; }
+.lgr-ask-line > dt > em { font-style: normal; font-size: 11px; color: var(--lgr-4); white-space: nowrap; }
+.lgr-ask-line > dd { margin: 0; }
+/* A value that is a name rather than a figure — the client on the document,
+   the client on the board. It reads in the ink at the row's weight, takes
+   whatever room the label leaves, and ellipsizes rather than wrapping: these
+   lines are scanned as a pair, and a two-line one breaks the comparison. */
+.lgr-ask-v {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  color: var(--ink);
+  text-align: end;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lgr-ask-line[data-quiet] .lgr-ask-v { color: var(--lgr-4); font-weight: 500; }
+.lgr-ask-line-sum { border-top: 1.5px solid var(--ink); background: var(--card-2); color: var(--ink); font-weight: 700; }
+.lgr-ask-line-sum + .lgr-ask-line { border-top-color: var(--line-2); }
+.lgr-ask-line[data-quiet] { color: var(--lgr-4); }
+.lgr-ask-line[data-quiet] .lgr-money { color: var(--lgr-4); }
 
 /* THE TWO ANSWERS — the page's own small buttons, end-aligned like every
    dialog's actions, the primary last. Each carries the sum it produces as a
    quieter figure after its label. */
-.lgr-dup-acts {
+.lgr-ask-acts {
   display: flex; justify-content: flex-end; gap: 8px;
   padding: 10px 16px 14px;
 }
-.lgr-dup-btn-m { margin-inline-start: 4px; opacity: 0.72; }
-.lgr-btn-primary .lgr-dup-btn-m { opacity: 0.85; }
+.lgr-ask-btn-m { margin-inline-start: 4px; opacity: 0.72; }
+.lgr-btn-primary .lgr-ask-btn-m { opacity: 0.85; }

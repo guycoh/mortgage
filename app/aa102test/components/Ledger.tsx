@@ -59,7 +59,7 @@ import {
   type ImportedLoan,
 } from "../lib/credit";
 import { addMonths, monthsBetween, parseDate, startOfToday, toIso } from "../lib/dates";
-import { PURPOSES, defaultPurpose, type PurposeId } from "../lib/purposes";
+import { PURPOSES, PURPOSE_LABEL_OF, defaultPurpose, type PurposeId } from "../lib/purposes";
 import { lenderOf } from "../lib/lenders";
 import { freqLabel } from "@/lib/rate-frequency";
 import type { AnchorResponse } from "@/lib/anchors/types";
@@ -967,31 +967,40 @@ export default function Ledger({
                   layouts are fourteen columns, so every colSpan below holds.
                   Where the master narrows a column it narrows the ones that
                   were carrying slack — never תאריך סיום, see .lgr-date-in. */}
+              {/* THE MASTER'S BUDGET, MEASURED RATHER THAN GUESSED.
+                  6.75% gave סוג 72px of usable cell and the family chip needs
+                  91 — so "משכנתא" hung 19px into מטרה, printing the chip over
+                  the purpose beside it. Nothing in the row had slack to lend:
+                  measured at 1280px every other column sat within 0–4px of its
+                  content. The room came from the controls instead — an in-grid
+                  select was spending 44px of chrome on a 32px word (see
+                  .lgr-cell.lgr-sel-btn) — which pays for סוג's chip and for
+                  מטרה to hold nine of its eleven values whole. */}
               {(isBase
                 ? [
-                    "6.75%", // סוג
-                    "7.5%", // מטרה — a select now, and "כל מטרה" has to fit
+                    "8.25%", // סוג — the family chip is 86px and must not clip
+                    "8.25%", // מטרה — fits every purpose but the two longest
                     "8%", // גוף מימון
-                    "13.25%", // יתרת קרן / הצמדת קרן — a seven-figure principal beside a 66px linkage box
-                    "5.75%", // הפרשי היוון
-                    "7.5%", // מסלול — "פריים" with its dot and caret
-                    "6.75%", // לוח סילוקין
+                    "12.75%", // יתרת קרן / הצמדת קרן — 1,234,567 beside a 66px linkage box
+                    "5.5%", // הפרשי היוון — its header is the widest thing in it
+                    "6.5%", // מסלול — "פריים" with its dot and caret
+                    "5.75%", // לוח סילוקין
                     "9.5%", // עוגן / תוספת — the split header needs the width, not the boxes
-                    "4.5%", // ריבית %
-                    "5%", // תדירות שינוי
-                    "4.75%", // חודשים
+                    "4.75%", // ריבית % — "6.63" was losing its last digit at 4.5
+                    "4.5%", // תדירות שינוי — two short header lines over a one-digit field
+                    "4.5%", // חודשים
                     "9.5%", // תאריך סיום
-                    "6.25%", // החזר חודשי
-                    "5%", // actions — three 19px glyphs, shown on approach
+                    "6.5%", // החזר חודשי — the totals row's ₪ figure sets this
+                    "5.75%", // actions — three glyphs and their gaps, shown on approach
                   ]
                 : [
-                    "8%", // סוג
-                    "8%", // מטרה — a select now; the point came out of סכום, which had slack
+                    "8.5%", // סוג — 8% left the chip 1px of air, which is none
+                    "8.25%", // מטרה — a select now; "קבוצת רכישה" is the value that sets it
                     "9%", // גוף מימון
                     "7.5%", // סכום
                     "5%", // אחוז
-                    "7.5%", // מסלול
-                    "7%", // לוח סילוקין
+                    "7%", // מסלול
+                    "6.75%", // לוח סילוקין
                     "9.5%", // עוגן / תוספת
                     "5%", // ריבית %
                     "6%", // תדירות שינוי
@@ -1224,13 +1233,18 @@ export default function Ledger({
                             <div
                               className="lgr-well"
                               data-dirty={dirty.has("purpose") || undefined}
-                              title={
-                                loan.source_purpose
-                                  ? `מטרת ההלוואה · מהמסמך: ${loan.source_purpose}`
-                                  : loan.purpose
-                                    ? "מטרת ההלוואה"
-                                    : "מטרת ההלוואה — לא סווגה"
-                              }
+                              // The chosen value leads, because two of the
+                              // eleven are longer than any column this sheet
+                              // can spare ("שעבוד קיים לטובת נרכש" wants 140px)
+                              // and ride as an ellipsis. The hover is then the
+                              // only place the whole value exists.
+                              title={[
+                                "מטרת ההלוואה",
+                                (loan.purpose && PURPOSE_LABEL_OF[loan.purpose as PurposeId]) || "לא סווגה",
+                                loan.source_purpose ? `מהמסמך: ${loan.source_purpose}` : "",
+                              ]
+                                .filter(Boolean)
+                                .join(" · ")}
                             >
                               <Select
                                 value={loan.purpose ?? null}

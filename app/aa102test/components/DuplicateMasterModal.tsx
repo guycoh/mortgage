@@ -70,20 +70,20 @@ export default function DuplicateMasterModal({
       <motion.div
         role="dialog"
         aria-modal="true"
-        aria-labelledby="lgr-dup-title"
+        aria-labelledby="lgr-ask-title"
         initial={{ opacity: 0, y: 10, scale: 0.985 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-        className="lgr-card lgr-dup"
+        className="lgr-card lgr-ask"
         style={{ boxShadow: "var(--shadow-lift)" }}
         onClick={(e) => e.stopPropagation()}
       >
-        <header className="lgr-head lgr-dup-head">
+        <header className="lgr-head lgr-ask-head">
           <div className="min-w-0">
-            <h2 id="lgr-dup-title" className="lgr-title">
+            <h2 id="lgr-ask-title" className="lgr-title">
               שכפול משכנתא נוכחית
             </h2>
-            <div className="lgr-sub lgr-dup-sub" title={mixName}>
+            <div className="lgr-sub lgr-ask-sub" title={mixName}>
               {mixName}
             </div>
           </div>
@@ -92,33 +92,33 @@ export default function DuplicateMasterModal({
           </button>
         </header>
 
-        <div className="lgr-dup-body">
+        <div className="lgr-ask-body">
           {/* THE QUESTION, in one line — the same one SmartNPV asks. Everything
               the copy does regardless of the answer (the two parts of the
               balance become one amount) is shown as arithmetic below, not
               explained in prose. */}
-          <p className="lgr-dup-q">האם להוסיף את הפרשי ההיוון לקרן ההלוואה?</p>
+          <p className="lgr-ask-q">האם להוסיף את הפרשי ההיוון לקרן ההלוואה?</p>
 
-          <dl className="lgr-dup-sheet" aria-label="פירוט הסכומים">
-            <div className="lgr-dup-line">
+          <dl className="lgr-ask-sheet" aria-label="פירוט הסכומים">
+            <div className="lgr-ask-line">
               <dt>יתרת קרן</dt>
               <dd>
                 <Money value={t.principal} weight={600} />
               </dd>
             </div>
-            <div className="lgr-dup-line" data-quiet={t.indexation === 0 || undefined}>
+            <div className="lgr-ask-line" data-quiet={t.indexation === 0 || undefined}>
               <dt>הצמדת קרן</dt>
               <dd>
                 <Money value={t.indexation} weight={600} sign />
               </dd>
             </div>
-            <div className="lgr-dup-line lgr-dup-line-sum">
+            <div className="lgr-ask-line lgr-ask-line-sum">
               <dt>סכום ההעתק</dt>
               <dd>
                 <Money value={t.balance} weight={700} size={15} />
               </dd>
             </div>
-            <div className="lgr-dup-line" data-quiet={!hasFees || undefined}>
+            <div className="lgr-ask-line" data-quiet={!hasFees || undefined}>
               <dt>
                 הפרשי היוון
                 {hasFees && <em>{feeRows} {feeRows === 1 ? "שורה" : "שורות"}</em>}
@@ -134,10 +134,10 @@ export default function DuplicateMasterModal({
             carrying the sum it produces so the choice is made on figures. With
             no fees on the sheet the second answer folds in nothing, and says
             so instead of pretending to be a choice. */}
-        <div className="lgr-dup-acts">
+        <div className="lgr-ask-acts">
           <Btn ref={plainRef} className="lgr-btn lgr-btn-sm" onClick={() => onPick(false)}>
             שכפול ללא עמלות
-            <Money value={t.balance} className="lgr-dup-btn-m" block={false} weight={600} size={12} />
+            <Money value={t.balance} className="lgr-ask-btn-m" block={false} weight={600} size={12} />
           </Btn>
           <Btn
             ref={primaryRef}
@@ -147,7 +147,7 @@ export default function DuplicateMasterModal({
             onClick={() => onPick(true)}
           >
             שכפול עם עמלות
-            <Money value={t.withFees} className="lgr-dup-btn-m" block={false} weight={600} size={12} />
+            <Money value={t.withFees} className="lgr-ask-btn-m" block={false} weight={600} size={12} />
           </Btn>
         </div>
       </motion.div>
