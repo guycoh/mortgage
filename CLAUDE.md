@@ -82,6 +82,12 @@ Portalled surfaces (popovers, modals) carry `.lgr-vars` for tokens, not
 - **The master mix** = first mix / `is_base`. It's what the client owes today: reports drop into it, אחוז is read-only there, עדכון עוגנים is proposals-only, גובה התמהיל (`target_amount`) is proposals-only.
 - **Duplicating the master** goes through `DuplicateMasterModal`; the copy's rows carry `fee_folded` (session-only) when fees were added.
 - **Guarantees** (`is_guarantor`) stay on the board, in their own section, and out of every total (`owedOnly`).
+- **Two documents on one board** (the household case: both spouses' חיווי list the joint mortgage in full):
+  - A debt is identified across reports by **what does not drift** — lender + `source_start_date` (201-016) + end date (201-018) + `source_orig_amount` (201-045), at least two of the three (`loanKey` in `lib/credit.ts`). Balance/months/rate are read as of each report's own date and are useless as identity; keying on them is why a ₪1.32M joint mortgage once showed as ₪2.63M. Rows with too little to identify fall back to `looseMatch` (same lender/family/track, balance ±3%, term ±6 months, rate ±0.1, both must have a term).
+  - Matching is **one-to-one** and **across documents only** — an incoming row never matches another incoming row, so two look-alike tranches inside one report stay two debts.
+  - A debt one spouse owes and the other guarantees resolves to **owed** (`claim` in `mergeReportLoans`); the first-dropped document no longer decides.
+  - `applyImport` refuses a document already on the board (same client + report date + kind), and decides "first vs fold" from **whether the mix has rows**, not from `reports.length` — a saved board reloaded has an empty `reports` and used to be wiped by the next import.
+  - The analysis engine has its own matcher (`lineKey` in `lib/analysis.ts`) keyed on the same stable facts; it keeps `role` in the key on purpose (it reports what each document said, the ledger reports the household's position).
 - **תאריך סיום ↔ חודשים are synced**, anchored on the row's own frame (end − months), never on today.
 - **Grace** (`grace_type_id` 2 = interest-only, 3 = capitalise) is implemented in the engine for שפיצר/קרן שווה.
 

@@ -164,6 +164,9 @@ function toRow(t: BankTranche, mixId: string, st: BankStatement): ImportedLoan {
     // The lender's own wording, not the normalised label: on the board an
     // advisor is reading against the letter in front of them, and "רכישת דירה
     // יד שניה" is a fact the letter states that "רכישת דירה" rounds off.
+    // The tranche's own identity, for the merge — see loanKey in lib/credit.
+    source_start_date: t.startDate,
+    source_orig_amount: t.originalAmount ?? undefined,
     source_purpose: t.purpose || PURPOSE_LABEL[t.purposeKind],
     // The board's own eleven-word list, from the kind and the raw wording —
     // the raw wording first, because it alone can say גישור or קבוצת רכישה.
@@ -175,6 +178,8 @@ function toRow(t: BankTranche, mixId: string, st: BankStatement): ImportedLoan {
     indexation: number | null;
     prepayment_fee: number | null;
     purpose: PurposeId;
+    source_start_date: string;
+    source_orig_amount: number | undefined;
   };
 }
 

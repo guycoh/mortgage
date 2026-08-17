@@ -1295,7 +1295,11 @@ export default function Ledger({
                                       <span
                                         className="lgr-tag"
                                         style={{ background: "var(--primary-tint)", color: "var(--primary-deep)" }}
-                                        title="החוב מופיע בשני הדוחות — נספר פעם אחת"
+                                        title={
+                                          loan.shared_with?.length
+                                            ? `החוב מופיע גם בדוח של ${loan.shared_with.join(", ")} — נספר פעם אחת`
+                                            : "החוב מופיע ביותר מדוח אחד — נספר פעם אחת"
+                                        }
                                       >
                                         משותף
                                       </span>

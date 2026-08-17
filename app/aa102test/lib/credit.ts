@@ -124,6 +124,31 @@ export type ImportedLoan = Loan & {
   /** True when the document says this is state money — a הלוואת זכאות. */
   source_eligibility?: boolean;
 
+  /* --- WHAT MAKES A DEBT THE SAME DEBT IN SOMEBODY ELSE'S REPORT ------------
+
+     A household's joint mortgage is printed IN FULL on both spouses' reports,
+     and the two reports are almost never pulled on the same morning. So the
+     figures that describe the debt TODAY — the balance, the months left — are
+     different in the two documents by exactly the amortisation between them,
+     and they cannot identify it. What can: the day the loan was taken, the day
+     it is due to end, and how much was borrowed. None of the three moves.
+
+     Both come straight off the credit report (201-016, 201-018, 201-045) and
+     off a bank letter's tranche. They are what `loanKey` keys on; see it for
+     what happens when a document prints none of them. --- */
+  /** תאריך פתיחה — 201-016, as printed (dd/mm/yyyy). */
+  source_start_date?: string;
+  /** סכום מקורי — 201-045. 0 when the document did not print one. */
+  source_orig_amount?: number;
+  /**
+   * Whose documents this row was found in, in load order.
+   *
+   * A merged row is one debt that two people's reports both listed; naming them
+   * is what lets the משותף tag say WHO, rather than leaving the advisor to
+   * guess which pair of documents agreed.
+   */
+  shared_with?: string[];
+
   /* --- THE MASTER'S SPLIT — what the client owes, the way the bank prints it.
 
      `amount` stays the balance every calculation reads: principal PLUS the
@@ -466,6 +491,9 @@ function toLoanRow(src: ExtractedLoan, mixId: string, group: DebtGroup): Importe
     // The report's own words where it printed any. Where it printed none, the
     // column stays empty rather than showing the normalised guess — a credit
     // report that does not state a purpose has not stated one.
+    // What identifies this debt in the spouse's report too — see loanKey.
+    source_start_date: src.startDate,
+    source_orig_amount: src.origAmount || undefined,
     source_purpose: src.purpose,
     // The report's coarse 201-017, read the way the parsers read it (a
     // mortgage's צריכה פרטית is כל מטרה), then placed on the board's list.
@@ -574,52 +602,149 @@ export function importReportToLoans(
 /* ----------------------------------------------------- more than one report */
 
 /**
- * A household's two reports overlap. A jointly-held mortgage is listed in full
- * on both spouses' דוח ריכוז נתונים, so importing both naively doubles the
- * balance and the monthly payment — the two numbers this whole page is about.
+ * A household's two reports overlap, and that is the whole problem.
  *
- * The identity of a debt across two reports is the lender plus the shape of the
- * obligation: same bank, same balance, same rate, same remaining term, same
- * track. The balance is bucketed to ₪50 because two reports are rarely pulled
- * the same morning and a month of amortization moves it slightly; anything
- * coarser started merging genuinely separate loans from the same bank.
+ * A jointly-held mortgage is listed IN FULL on both spouses' דוח ריכוז נתונים.
+ * Import both naively and the board says the couple owes twice what they owe —
+ * the two numbers this page exists to state.
+ *
+ * WHAT CANNOT IDENTIFY A DEBT: what it looks like today. The two documents are
+ * almost never pulled on the same morning, so between them the balance has
+ * amortised and the remaining term is shorter. A key built on balance + months
+ * (which is what this used to be, bucketed to ₪50) misses the joint mortgage in
+ * every real household: six weeks apart, a ₪900,000 tranche is ₪896,540 with
+ * 239 months left instead of 240, and the two rows key differently. Verified —
+ * that is how a ₪1.32M mortgage came to be shown as ₪2.63M.
+ *
+ * WHAT CAN: when it was taken, when it ends, and how much was borrowed. None of
+ * the three moves between two readings of the same debt, and together they are
+ * specific enough to keep two tranches of one mortgage apart. Both documents
+ * carry them — the credit report as 201-016 / 201-018 / 201-045, a bank letter
+ * on the tranche itself.
+ *
+ * `null` when the document printed too little to identify the row this way; the
+ * caller then falls back to matching by shape, with tolerances — see
+ * `looseMatch`. A hand-added row has no identity at all and never merges.
  */
-export function loanKey(l: ImportedLoan): string {
+export function loanKey(l: ImportedLoan): string | null {
+  const start = (l.source_start_date ?? "").trim();
+  const end = (l.loan_end_date ?? l.end_date ?? "").trim();
+  const orig = Math.round(Number(l.source_orig_amount) || 0);
+  // Two of the three, at least: an end date alone is shared by every tranche of
+  // one mortgage, and an original amount alone repeats across round-numbered
+  // consumer loans. Two together have not collided on any real report here.
+  const stated = [start, end, orig > 0 ? String(orig) : ""].filter(Boolean);
+  if (stated.length < 2) return null;
   return [
     l.group ?? "mortgage",
     (l.source_bank ?? "").replace(/\s+/g, ""),
-    Math.round((Number(l.amount) || 0) / 50),
-    (Number(l.rate) || 0).toFixed(2),
-    Number(l.months) || 0,
-    (l.source_track ?? "").replace(/\s+/g, ""),
+    start,
+    end,
+    orig,
   ].join("|");
 }
 
 /**
- * Fold a further report's rows into the mix. Anything already present is
- * marked shared rather than added again, and the count comes back so the UI
- * can say what it did instead of silently dropping rows.
+ * The fallback, for rows whose document printed no dates and no original sum.
+ *
+ * Same lender, same family, same track, and figures close enough to be one debt
+ * read on two days: the balance within 3% (a month of amortisation on a
+ * mortgage is well under 1%, and the two documents are rarely more than a
+ * quarter apart), the term within six months, the rate to the tenth. It is
+ * deliberately unwilling — a false merge hides a real debt from the client,
+ * which is worse than showing one twice — so it also refuses to match anything
+ * with no balance at all.
+ */
+function looseMatch(a: ImportedLoan, b: ImportedLoan): boolean {
+  const bank = (x: ImportedLoan) => (x.source_bank ?? "").replace(/\s+/g, "");
+  if (!bank(a) || bank(a) !== bank(b)) return false;
+  if ((a.group ?? "mortgage") !== (b.group ?? "mortgage")) return false;
+  if ((a.source_track ?? "").replace(/\s+/g, "") !== (b.source_track ?? "").replace(/\s+/g, "")) return false;
+  const av = Math.round(Number(a.amount) || 0);
+  const bv = Math.round(Number(b.amount) || 0);
+  if (av <= 0 || bv <= 0) return false;
+  // A term is what makes two figures comparable at all. Without one there is
+  // nothing to amortise and nothing to bound the drift by, and two unrelated
+  // balances that happen to sit close would fold into one.
+  if ((Number(a.months) || 0) <= 0 || (Number(b.months) || 0) <= 0) return false;
+  if (Math.abs(av - bv) > Math.max(av, bv) * 0.03) return false;
+  if (Math.abs((Number(a.months) || 0) - (Number(b.months) || 0)) > 6) return false;
+  if (Math.abs((Number(a.rate) || 0) - (Number(b.rate) || 0)) > 0.1) return false;
+  return true;
+}
+
+/**
+ * Fold a further report's rows into the mix.
+ *
+ * A debt already on the board is marked shared rather than added again, and the
+ * count comes back so the UI can say what it did instead of silently dropping
+ * rows. Matching is ONE-TO-ONE: a matched row is consumed, so a couple who both
+ * hold two identical ₪250,000 tranches end up with two rows and not one — the
+ * old map never removed its hit, and every incoming twin folded onto the same
+ * existing row, losing a debt each time.
+ *
+ * The row that stays is the one already on the board, figures and all. It may
+ * carry the advisor's own edits by now, and overwriting those with a second
+ * document's view of the same debt would undo work without saying so.
  */
 export function mergeReportLoans(
   existing: ImportedLoan[],
-  incoming: ImportedLoan[]
+  incoming: ImportedLoan[],
+  /** Whose report the incoming rows came from — recorded on what they match. */
+  from = ""
 ): { merged: ImportedLoan[]; duplicates: number } {
-  const at = new Map<string, number>();
-  const merged = existing.map((l, i) => {
-    at.set(loanKey(l), i);
-    return { ...l };
+  const merged = existing.map((l) => ({ ...l }));
+  /** Indices still available to match against — one debt, one partner. */
+  const free = new Set(merged.map((_, i) => i));
+
+  const byKey = new Map<string, number[]>();
+  merged.forEach((l, i) => {
+    const k = loanKey(l);
+    if (!k) return;
+    const list = byKey.get(k);
+    if (list) list.push(i);
+    else byKey.set(k, [i]);
   });
+
+  const claim = (i: number, l: ImportedLoan) => {
+    free.delete(i);
+    const seen = merged[i].shared_with ?? [];
+    // ROLE IS RESOLVED, NOT INHERITED. One spouse can guarantee the very loan
+    // the other owes, and both reports print it. Whichever document arrived
+    // first used to decide: drop the guarantor's report first and the debt was
+    // filed as a guarantee — which isSurety keeps out of every total, so the
+    // household's loan silently vanished from the board's balance and monthly.
+    // A debt anybody in the household OWES is owed.
+    const owed = !l.is_guarantor || !merged[i].is_guarantor;
+    merged[i] = {
+      ...merged[i],
+      is_guarantor: !owed,
+      is_shared: true,
+      shared_with: from && !seen.includes(from) ? [...seen, from] : seen,
+    };
+  };
 
   let duplicates = 0;
   for (const l of incoming) {
     const k = loanKey(l);
-    const hit = at.get(k);
-    if (hit !== undefined) {
-      merged[hit] = { ...merged[hit], is_shared: true };
+    const slot = k ? (byKey.get(k) ?? []).find((i) => free.has(i)) : undefined;
+    if (slot !== undefined) {
+      claim(slot, l);
       duplicates += 1;
       continue;
     }
-    at.set(k, merged.length);
+    // Nothing identified it. Try the shape, against rows nobody has claimed.
+    const loose = k === null ? Array.from(free).find((i) => looseMatch(merged[i], l)) : undefined;
+    if (loose !== undefined) {
+      claim(loose, l);
+      duplicates += 1;
+      continue;
+    }
+    // ONLY ACROSS DOCUMENTS. An appended row is NOT registered as a candidate,
+    // so two debts that look alike inside the SAME report stay two debts. The
+    // old map registered them, and a report holding two ₪200,000 tranches at
+    // one bank came in as one row — a lost debt, reported to the advisor as a
+    // household overlap that never happened.
     merged.push(l);
   }
   return { merged, duplicates };

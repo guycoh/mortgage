@@ -1176,7 +1176,19 @@ html:has(.lgr-root) {
   color: #fff;
 }
 .lgr-tab[data-on="true"]:hover { background: var(--primary-deep); border-color: var(--primary-press); }
-.lgr-tab[data-on="true"] .lgr-tab-x { color: rgba(255, 255, 255, 0.62); }
+.lgr-tab[data-on="true"] /* A HOUSEHOLD'S NAME CANNOT OWN THE STRIP.
+   The master mix is named after whoever's reports built it, and two Israeli
+   full names joined make a 60-character label — a third of the tab strip for
+   one tab, pushing the proposals off the row. The tab keeps its full name on
+   the hover and shows what fits. */
+.lgr-tab-name {
+  max-width: 230px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lgr-tab-x { color: rgba(255, 255, 255, 0.62); }
 .lgr-tab-x { color: var(--lgr-4); border-radius: 8px; padding: 1px; margin-inline-start: -2px; transition: background var(--t) ease, color var(--t) ease; }
 .lgr-tab-x:hover { color: inherit; background: rgba(127, 127, 127, 0.18); }
 
@@ -1209,6 +1221,33 @@ html:has(.lgr-root) {
   align-items: center;
   gap: 6px;
 }
+/* WHICH DOCUMENT THE READINGS ARE ABOUT — shown only when two kinds are
+   loaded. A pair of flat words on the receipt's own ground, the chosen one in
+   the ink: it is a statement of subject, not a control panel. */
+.lgr-reading-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 9px;
+  background: var(--card-3);
+}
+.lgr-reading-opt {
+  padding: 3px 9px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  font-family: var(--ui);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--lgr-3);
+  cursor: pointer;
+  transition: background var(--t) var(--ease), color var(--t) var(--ease);
+}
+.lgr-reading-opt:hover { color: var(--ink); }
+.lgr-reading-opt[data-on] { background: #fff; color: var(--primary-deep); box-shadow: 0 1px 2px rgba(0,0,0,0.06); }
+.lgr-reading-opt:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring-strong); }
+
 .lgr-receipt-sep {
   flex: none;
   width: 1px;

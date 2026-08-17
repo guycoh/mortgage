@@ -363,6 +363,13 @@ export default function ClientSummaryModal({
 
   const a = analysis;
   const v = a.clientView;
+  const names = a.clients.map((c) => c.name).filter(Boolean);
+  // Newest first, so a two-report household reads "לפי 2 דוחות, 06/03–22/06".
+  const dates = a.clients
+    .map((c) => c.reportDate)
+    .filter(Boolean)
+    .filter((d, i, all) => all.indexOf(d) === i)
+    .sort((x, y) => (x.split("/").reverse().join("") < y.split("/").reverse().join("") ? 1 : -1));
 
   return createPortal(
     <div
@@ -384,11 +391,21 @@ export default function ClientSummaryModal({
       >
         <header className="lgr-head">
           <div className="min-w-0">
+            {/* EVERY CLIENT THIS PAGE TOTALS, NAMED ON IT.
+                It used to be headed with the first report's client and dated
+                with the first report's date, while the figures underneath
+                covered a whole household — a page handed to one spouse stating
+                the other's debts under their name alone. */}
             <h2 className="lgr-display text-[19px] leading-tight">
-              {a.clients[0]?.name || "סיכום ההתחייבויות"}
+              {names.join(" · ") || "סיכום ההתחייבויות"}
             </h2>
             <div className="mt-0.5 text-[12px]" style={{ color: "var(--lgr-4)" }}>
-              סיכום ההתחייבויות{a.clients[0]?.reportDate ? ` · נכון ל-${a.clients[0].reportDate}` : ""}
+              סיכום ההתחייבויות
+              {dates.length === 1
+                ? ` · נכון ל-${dates[0]}`
+                : dates.length > 1
+                  ? ` · לפי ${dates.length} דוחות, ${dates[dates.length - 1]}–${dates[0]}`
+                  : ""}
             </div>
           </div>
           <div className="lgr-noprint ms-auto flex items-center gap-1.5">

@@ -62,22 +62,32 @@ export default function ReportViewerModal({
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
-        aria-label="חיווי אשראי"
+        aria-label={current?.bank ? "תדפיס משכנתא" : "חיווי אשראי"}
       >
         <header className="lgr-head">
-          <h2 className="lgr-title">חיווי אשראי</h2>
+          {/* The title names the document being looked at. It was hardcoded
+              "חיווי אשראי", so a bank payoff letter — the other thing this
+              viewer opens — was headed as a credit report. */}
+          <h2 className="lgr-title">{current?.bank ? "תדפיס משכנתא" : "חיווי אשראי"}</h2>
 
           {reports.length > 1 ? (
             <div className="flex flex-wrap items-center gap-1.5">
+              {/* With two documents the client's name is not enough to tell
+                  them apart — a client's own credit report and their own bank
+                  letter carry the same name, and so do the same file dropped
+                  twice. The tab says which FILE it is. */}
               {reports.map((r, i) => (
                 <button
                   key={`${r.clientId}-${i}`}
                   className="lgr-tab"
                   data-on={i === active || undefined}
                   onClick={() => setActive(i)}
+                  title={`${r.clientName || "דוח"} · ${r.fileName}${r.reportDate ? ` · ${r.reportDate}` : ""}`}
                 >
                   <IdentificationCard size={13} />
-                  {r.clientName || `דוח ${i + 1}`}
+                  <span className="truncate" style={{ maxWidth: 190 }}>
+                    {r.fileName || r.clientName || `דוח ${i + 1}`}
+                  </span>
                 </button>
               ))}
             </div>

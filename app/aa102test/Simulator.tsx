@@ -252,11 +252,21 @@ function SaveButton({
   );
 }
 
-/** The base mix is named after whoever's reports built it. */
-function nameFor(mix: Mix, summary: ImportSummary, first: boolean): string {
+/**
+ * The base mix is named after whoever's reports built it.
+ *
+ * Two Israeli full names joined with a plus is a 60-character tab sitting in a
+ * strip beside every other mix, and a third report used to append again with
+ * no ceiling. Past the second client the name counts instead of listing: the
+ * full roster is on the receipt above, which has room for it.
+ */
+function nameFor(mix: Mix, summary: ImportSummary, first: boolean, held: string[] = []): string {
   if (!mix.is_base || !summary.clientName) return mix.mix_name;
   if (first) return `משכנתא נוכחית · ${summary.clientName}`;
-  return mix.mix_name.includes(summary.clientName) ? mix.mix_name : `${mix.mix_name} + ${summary.clientName}`;
+  const names = Array.from(new Set([...held, summary.clientName].map((n) => n.replace(/\s+/g, " ").trim()).filter(Boolean)));
+  if (names.length <= 1) return `משכנתא נוכחית · ${names[0] ?? summary.clientName}`;
+  if (names.length === 2) return `משכנתא נוכחית · ${names[0]} + ${names[1]}`;
+  return `משכנתא נוכחית · ${names[0]} ועוד ${names.length - 1}`;
 }
 
 export default function Simulator({
@@ -308,11 +318,26 @@ export default function Simulator({
   // The two analyses read a חיווי אשראי. A bank statement fills the same board
   // but carries none of that material — no arrears history, no proceedings, no
   // inquiries — so those buttons belong only to the reports that can answer them.
-  const creditReports = reports.filter((r) => r.report).map((r) => r.report!);
+  const creditDocs = reports.filter((r) => r.report);
+  const creditReports = creditDocs.map((r) => r.report!);
   // A statement analysis reads one bank's mortgage; a credit report reads a whole
   // household. Only one of the two is ever loaded, so the buttons follow the
   // document rather than being shown and then explaining themselves away.
-  const statement = reports.find((r) => r.bank)?.bank ?? null;
+  const statements = reports.filter((r) => r.bank);
+  const statement = statements[0]?.bank ?? null;
+  /**
+   * Which document a reading is about.
+   *
+   * The two kinds were assumed to be alternatives ("only one of the two is ever
+   * loaded"), and nothing enforced it: the bay invites a second document and a
+   * bank letter can perfectly well land beside a credit report. When both were
+   * present the buttons took the statement's wording while BOTH modals mounted,
+   * one on top of the other at the same z-index. So the kind is a state now,
+   * defaulting to whatever arrived first, and exactly one modal is ever open.
+   */
+  const bothKinds = !!statement && creditReports.length > 0;
+  /** Which loaded document the readings are about — see bothKinds. */
+  const [reading, setReading] = useState<"credit" | "bank">("credit");
   const [showDoc, setShowDoc] = useState(false);
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [showClient, setShowClient] = useState(false);
@@ -538,6 +563,14 @@ export default function Simulator({
 
   useEffect(() => setCompareMixId(null), [activeMixId]);
 
+  // A reading can only be about a document that is here. Clearing the board, or
+  // dropping the other kind first, must not leave the buttons pointing at a
+  // subject with nothing behind it.
+  useEffect(() => {
+    if (reading === "bank" && !statement) setReading("credit");
+    else if (reading === "credit" && !creditReports.length && statement) setReading("bank");
+  }, [reading, statement, creditReports.length]);
+
   // leave guard — the workbook only lives here, so losing it should cost a click
   useEffect(() => {
     if (!dirty) return;
@@ -748,36 +781,86 @@ export default function Simulator({
   };
 
   /**
-   * The first report replaces the mix's empty starter rows. Every report after
-   * it is folded in — a household's two reports both list the joint mortgage in
-   * full, so the overlap is merged instead of doubling the balance.
+   * A DOCUMENT LANDS ON THE BOARD.
+   *
+   * The first one fills an empty mix. Every one after it is FOLDED IN, because
+   * a household's two reports both list the joint mortgage in full and adding
+   * them up states a debt the couple does not have — see mergeReportLoans.
+   *
+   * Three things are decided before anything is merged: is this document
+   * already here, is the mix empty, and is this the same person.
    */
   const applyImport = useCallback(
     (summary: ImportSummary) => {
       if (!activeMixId) return;
-      const first = reports.length === 0;
+      const norm = (s: string) => s.replace(/\s+/g, " ").trim();
+
+      /* --- 1. IS THIS DOCUMENT ALREADY ON THE BOARD? ------------------------
+         Dropping the same PDF twice used to pass every guard: same client, so
+         no confirm, and then every row matched itself, so the board tagged all
+         of them משותף and announced "N התחייבויות משותפות אוחדו" — a claim that
+         a second person's report had agreed, when the advisor had simply
+         dropped the file again. A document is the same document when it is the
+         same client's reading of the same day. */
+      const sameDoc = reports.find(
+        (r) =>
+          (r.clientId && summary.clientId
+            ? r.clientId === summary.clientId
+            : norm(r.clientName) === norm(summary.clientName)) &&
+          r.reportDate === summary.reportDate &&
+          r.kind === summary.kind
+      );
+      if (sameDoc) {
+        track("import", {
+          ok: false,
+          kind: summary.kind,
+          file_name: summary.fileName,
+          client_name: summary.clientName || undefined,
+          error: "duplicate-document",
+        });
+        flash4s({
+          kind: "err",
+          text: `הדוח הזה כבר טעון — ${summary.clientName || "אותו לקוח"}${summary.reportDate ? `, ${summary.reportDate}` : ""}`,
+        });
+        return;
+      }
+
+      /* --- 2. IS THERE ANYTHING HERE TO FOLD INTO? --------------------------
+         Not "have I imported in this session" — that was `reports.length === 0`,
+         and `reports` is empty on every fresh load. An advisor who saved a
+         board, came back tomorrow and dropped the spouse's report had the
+         saved rows REPLACED rather than merged. The board itself is the
+         answer: a mix holding nothing but blank starter rows is empty. */
+      const target = (mixes ?? []).find((m) => m.id === activeMixId);
+      const hasRows = (target?.loans ?? []).some(
+        (l) => (Number(l.amount) || 0) > 0 || !!l.source_bank
+      );
+      const first = !hasRows;
       let duplicates = 0;
 
-      // A second document naming a DIFFERENT person is either the legitimate
-      // household case (a couple's two חיווי reports — the very reason the
-      // merge exists) or a mis-drag of another client's file. The board cannot
-      // tell a spouse from a stranger, so it asks — one click for the couple,
-      // a saved disaster for the wrong file. Same person is recognised by ת"ז
-      // when both sides carry one, by name otherwise; with no identity on
-      // either side the drop passes, since refusing on missing data would
-      // block real work.
-      if (!first) {
-        const norm = (s: string) => s.replace(/\s+/g, " ").trim();
-        const sameClient = reports.some((r) => {
-          if (r.clientId && summary.clientId) return r.clientId === summary.clientId;
-          if (r.clientName && summary.clientName)
-            return norm(r.clientName) === norm(summary.clientName);
-          return true;
-        });
+      /* --- 3. IS THIS THE SAME PERSON? --------------------------------------
+         A second document naming a DIFFERENT person is either the legitimate
+         household case (a couple's two חיווי reports — the very reason the
+         merge exists) or a mis-drag of another client's file. The board cannot
+         tell a spouse from a stranger, so it asks.
+
+         The test is a POSITIVE match against someone already here. It used to
+         answer "true" whenever either side lacked an identity, and `some` meant
+         one identity-less document switched the guard off for everything
+         dropped afterwards — a stranger's file could then be folded in
+         silently. Unknown is now a reason to ask, not a reason to proceed. */
+      if (!first && reports.length > 0) {
+        const sameClient = reports.some(
+          (r) =>
+            (!!r.clientId && !!summary.clientId && r.clientId === summary.clientId) ||
+            (!!r.clientName &&
+              !!summary.clientName &&
+              norm(r.clientName) === norm(summary.clientName))
+        );
         if (!sameClient) {
           const held = reports.map((r) => r.clientName).filter(Boolean).join(", ");
           const ok = window.confirm(
-            `המסמך שייך ל־${summary.clientName || "אדם אחר"}, והבורד פתוח על ${held || "לקוח אחר"}.\n\n` +
+            `המסמך שייך ל־${summary.clientName || "אדם ללא שם בדוח"}, והבורד פתוח על ${held || "לקוח אחר"}.\n\n` +
               `אם אלה בני זוג — אישור יאחד את החובות לתמהיל משותף.\n` +
               `אם זה קובץ של לקוח אחר — ביטול ישאיר את הבורד כמו שהוא.`
           );
@@ -795,31 +878,44 @@ export default function Simulator({
         }
       }
 
+      /** Rows that arrived in THIS import, for the baseline below. */
+      let landed: ImportedLoan[] = [];
+
       setMixes((prev) => {
         const next = (prev ?? []).map((m) => {
           if (m.id !== activeMixId) return m;
           const incoming = summary.loans.map((l) => ({ ...l, mix_id: activeMixId }));
-          const loans = first ? incoming : undefined;
-          if (!first) {
-            const res = mergeReportLoans(m.loans, incoming);
-            duplicates = res.duplicates;
-            return { ...m, mix_name: nameFor(m, summary, first), loans: res.merged };
+          if (first) {
+            landed = incoming;
+            return { ...m, mix_name: nameFor(m, summary, true, reports.map((r) => r.clientName)), loans: incoming };
           }
-          return { ...m, mix_name: nameFor(m, summary, first), loans: loans! };
+          const res = mergeReportLoans(m.loans, incoming, summary.clientName);
+          duplicates = res.duplicates;
+          landed = res.merged;
+          return { ...m, mix_name: nameFor(m, summary, false, reports.map((r) => r.clientName)), loans: res.merged };
         });
-        // the freshly imported rows are the new "unchanged" reference
-        const map: Record<string, ImportedLoan> = {};
-        for (const m of next) for (const l of m.loans) map[l.id] = { ...l };
-        setBaseline(map);
         return next;
+      });
+
+      // The rows this import produced are the new "unchanged" reference — and
+      // ONLY those. Rebuilding the whole map from every mix wiped the change
+      // marks on the proposals too, so an advisor who had corrected figures on
+      // a copy lost the record of what they had touched.
+      setBaseline((prevBase) => {
+        const map = { ...prevBase };
+        for (const l of landed) map[l.id] = { ...l };
+        return map;
       });
 
       setReports((prev) => [...prev, summary]);
       if (!first) {
         flash4s(
           duplicates > 0
-            ? { kind: "ok", text: `${duplicates} התחייבויות משותפות אוחדו ולא נספרו פעמיים` }
-            : { kind: "ok", text: "הדוח נוסף — לא נמצאו חפיפות" }
+            ? {
+                kind: "ok",
+                text: `${duplicates === 1 ? "התחייבות אחת משותפת אוחדה" : `${duplicates} התחייבויות משותפות אוחדו`} ולא נספרו פעמיים`,
+              }
+            : { kind: "ok", text: "הדוח נוסף — לא נמצאה חפיפה בין הדוחות" }
         );
       }
       setFlash(true);
@@ -827,7 +923,7 @@ export default function Simulator({
       setTimeout(() => setFlash(false), 1600);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [activeMixId, reports.length]
+    [activeMixId, reports, mixes]
   );
 
   /** Start over: drop the reports and give the mix its blank rows back. */
@@ -1183,6 +1279,7 @@ export default function Simulator({
                   <Bay
                     mixId={activeMixId}
                     reports={reports}
+                    onBoard={loans}
                     onImport={applyImport}
                     onClear={clearImport}
                     // The three readings of the loaded document, on the
@@ -1193,11 +1290,38 @@ export default function Simulator({
                     readings={
                       reports.length > 0 ? (
                         <>
+                          {/* WHICH DOCUMENT THE READINGS ARE ABOUT.
+                              Only when both kinds are loaded — one document
+                              needs no chooser, and a picker over a single
+                              subject is furniture. */}
+                          {bothKinds && (
+                            <>
+                              <span className="lgr-reading-pick">
+                                {(
+                                  [
+                                    ["credit", "חיווי אשראי"],
+                                    ["bank", "תדפיס משכנתא"],
+                                  ] as const
+                                ).map(([k, label]) => (
+                                  <button
+                                    key={k}
+                                    type="button"
+                                    className="lgr-reading-opt"
+                                    data-on={reading === k || undefined}
+                                    onClick={() => setReading(k)}
+                                  >
+                                    {label}
+                                  </button>
+                                ))}
+                              </span>
+                              <span className="lgr-receipt-sep" aria-hidden />
+                            </>
+                          )}
                           <Btn
                             className="lgr-btn lgr-btn-sm"
                             onClick={() => setShowClient(true)}
                             title={
-                              statement
+                              reading === "bank"
                                 ? "עמוד אחד להראות ללקוח — מה יש לו, כמה זה עולה בחודש, ומה יעלה לסלק"
                                 : "עמוד אחד להראות ללקוח — מה יש לו, כמה זה עולה בחודש, ומה לשים לב אליו"
                             }
@@ -1209,13 +1333,13 @@ export default function Simulator({
                             className="lgr-btn lgr-btn-sm"
                             onClick={() => setShowAnalysis(true)}
                             title={
-                              statement
+                              reading === "bank"
                                 ? "ניתוח המשכנתא — תמהיל, עמלות יציאה, שינויי ריבית וכדאיות מיחזור"
                                 : "ניתוח מלא של חיווי האשראי — פיגורים, הליכים, חשיפות וסיכונים"
                             }
                           >
                             <Stethoscope size={14} weight="bold" style={{ color: "var(--primary)" }} />
-                            {statement ? "ניתוח משכנתא" : "ניתוח חיווי"}
+                            {reading === "bank" ? "ניתוח משכנתא" : "ניתוח חיווי"}
                           </Btn>
                           <Btn
                             className="lgr-btn lgr-btn-sm"
@@ -1272,7 +1396,9 @@ export default function Simulator({
                         style={{ background: m.id === activeMixId ? "#fff" : "var(--primary)" }}
                       />
                     )}
-                    {m.mix_name}
+                    <span className="lgr-tab-name" title={m.mix_name}>
+                      {m.mix_name}
+                    </span>
                     <span className="lgr-fig text-[10.5px] opacity-55">{m.loans.length}</span>
                   </>
                 )}
@@ -1529,30 +1655,30 @@ export default function Simulator({
 
       {/* Derived on open rather than on import: the analysis is a read of the
           reports, and recomputing it costs nothing next to parsing the PDF. */}
-      {showClient && statement && (
+      {showClient && statement && reading === "bank" && (
         <StatementSummaryModal
           analysis={analyseStatement(statement)}
           onClose={() => setShowClient(false)}
         />
       )}
 
-      {showAnalysis && statement && (
+      {showAnalysis && statement && reading === "bank" && (
         <StatementAnalysisModal
           analysis={analyseStatement(statement)}
           onClose={() => setShowAnalysis(false)}
         />
       )}
 
-      {showClient && creditReports.length > 0 && (
+      {showClient && creditReports.length > 0 && reading === "credit" && (
         <ClientSummaryModal
-          analysis={analyseReports(creditReports, reports.map((r) => r.fileName))}
+          analysis={analyseReports(creditReports, creditDocs.map((r) => r.fileName))}
           onClose={() => setShowClient(false)}
         />
       )}
 
-      {showAnalysis && creditReports.length > 0 && (
+      {showAnalysis && creditReports.length > 0 && reading === "credit" && (
         <AnalysisModal
-          analysis={analyseReports(creditReports, reports.map((r) => r.fileName))}
+          analysis={analyseReports(creditReports, creditDocs.map((r) => r.fileName))}
           onClose={() => setShowAnalysis(false)}
         />
       )}

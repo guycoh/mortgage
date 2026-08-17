@@ -551,17 +551,39 @@ function trackSliceLabel(tr: InterestTrack): string {
  * — lender, size, price, term — with the balance bucketed to ₪50 because the
  * two reports are rarely pulled the same morning.
  */
+/**
+ * What makes a debt the same debt in the other spouse's report.
+ *
+ * The same rule the ledger keys on — see loanKey in lib/credit. It used to
+ * include the balance (bucketed to ₪50), the rate and the remaining term, all
+ * three of which are read AS OF each report's own date: two reports pulled a
+ * month apart described the household's joint mortgage differently, nothing
+ * matched, and this engine counted it twice while claiming it had folded
+ * "joint debts" together. What identifies a debt is when it was taken, when it
+ * ends and how much was borrowed; none of those move.
+ *
+ * The role stays in the key here on purpose. This engine reports what each
+ * document SAID — a debt one spouse guarantees is a guarantee on their report —
+ * and it states the two separately. (The ledger resolves them to one owed row,
+ * because a board is one household's position, not one document's claim.)
+ */
 function lineKey(l: DebtLine): string {
+  const stated = [l.startDate, l.endDate, l.original > 0 ? String(l.original) : ""].filter(Boolean);
+  const identified = stated.length >= 2;
   return [
     l.category,
     l.type,
     l.role,
     l.bank.replace(/\s+/g, ""),
-    Math.round(l.balance / 50),
-    l.rate === null ? "-" : l.rate.toFixed(2),
-    l.months ?? "-",
     l.startDate,
     l.endDate,
+    l.original > 0 ? Math.round(l.original) : "",
+    // Only where the document printed too little to identify the debt does its
+    // shape have to stand in — and then the old brittleness is the safer error,
+    // because a false merge hides a real debt.
+    identified ? "" : Math.round(l.balance / 50),
+    identified ? "" : l.rate === null ? "-" : l.rate.toFixed(2),
+    identified ? "" : (l.months ?? "-"),
   ].join("|");
 }
 

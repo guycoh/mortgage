@@ -34,7 +34,7 @@ import { extractPages, parsePdfFile } from "@/lib/credit-parser/extract.client";
 import { detectBank, parseBankStatement } from "@/lib/bank-parser";
 import { bankStatementToLoans } from "@/lib/bank-parser/to-loans";
 import { track } from "../lib/track.client";
-import { FAMILY, importReportToLoans, type ImportSummary } from "../lib/credit";
+import { FAMILY, importReportToLoans, type ImportedLoan, type ImportSummary } from "../lib/credit";
 import Btn from "./Btn";
 import { settle, snap } from "../lib/transitions";
 
@@ -95,6 +95,7 @@ function Mark() {
 export default function Bay({
   mixId,
   reports,
+  onBoard = [],
   onImport,
   onClear,
   readings,
@@ -102,6 +103,8 @@ export default function Bay({
   mixId: string;
   /** Reports already folded into this mix, oldest first. */
   reports: ImportSummary[];
+  /** The rows those reports actually produced, after the merge. */
+  onBoard?: ImportedLoan[];
   onImport: (summary: ImportSummary) => void;
   onClear: () => void;
   /**
@@ -172,7 +175,15 @@ export default function Bay({
       e.preventDefault();
       depth = 0;
       setArmed(false);
-      if (!busyRef.current) handleRef.current(e.dataTransfer?.files ?? null);
+      // A credit report takes seconds to decode, and an advisor holding both
+      // spouses' PDFs drops the second one straight after the first. That used
+      // to be swallowed in silence — no error, no shake, nothing.
+      if (busyRef.current) {
+        setError("קובץ אחד בכל פעם — המתינו לסיום הפענוח וגררו שוב");
+        setRejects((n) => n + 1);
+        return;
+      }
+      handleRef.current(e.dataTransfer?.files ?? null);
     };
 
     window.addEventListener("dragenter", onEnter);
@@ -291,16 +302,24 @@ export default function Bay({
   // are, how many of each family came out, and the two ways on — add another,
   // or start over. Counts, not amounts: the grid states the amounts.
   if (reports.length) {
-    const found = reports.reduce(
-      (acc, r) => {
-        for (const l of r.loans) {
-          if (l.group === "loan") acc.loan += 1;
-          else acc.mortgage += 1;
-        }
+    /* WHAT IS ON THE BOARD, NOT WHAT WAS IN THE DOCUMENTS.
+       These chips used to add the documents up. Two reports of one household
+       therefore counted the joint mortgage twice — the very thing the merge
+       had just prevented one line above — and the same file dropped twice
+       printed "משכנתאות 4 · הלוואות 4" over a ledger holding four rows. They
+       count the mix now, which is the thing the advisor is looking at, and
+       they leave guarantees out: a debt somebody else repays is stated by the
+       ערב tag on its own row, not counted among the client's. */
+    const found = onBoard.reduce(
+      (acc, l) => {
+        if (l.is_guarantor) return acc;
+        if (l.group === "loan") acc.loan += 1;
+        else acc.mortgage += 1;
         return acc;
       },
       { mortgage: 0, loan: 0 }
     );
+    const shared = onBoard.filter((l) => l.is_shared).length;
 
     return (
       <motion.div
@@ -378,6 +397,16 @@ export default function Bay({
                 </motion.span>
               ))}
           </div>
+
+          {shared > 0 && (
+            <span
+              className="lgr-chip"
+              style={{ background: "var(--primary-tint)", color: "var(--primary-deep)", borderColor: "var(--primary-line)" }}
+              title="חובות שהופיעו בשני הדוחות — נספרו פעם אחת"
+            >
+              {shared === 1 ? "התחייבות משותפת" : `${shared} משותפות`}
+            </span>
+          )}
 
           <div className="lgr-receipt-acts">
             {/* WHAT YOU CAN READ OUT OF THIS DOCUMENT, on the document.
