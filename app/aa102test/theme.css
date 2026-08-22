@@ -2078,8 +2078,13 @@ html:has(.lgr-root) {
 .lgr-table .lgr-cell.lgr-sel-btn {
   width: fit-content;
   max-width: 100%;
-  padding-inline: 7px 5px;
-  gap: 3px;
+  /* 5/4 and a 2px gap, down from 7/5/3. Four pixels of chrome per select, on
+     three columns whose VALUES were being ellipsized to pay for it — מטרה was
+     printing "כל מ…" and לוח סילוקין "בלון …". A control that spends its
+     column on its own padding and then truncates the word it exists to show
+     has its priorities backwards. */
+  padding-inline: 5px 4px;
+  gap: 2px;
   border-color: transparent;
   background: transparent;
 }
@@ -2218,8 +2223,10 @@ html:has(.lgr-root) {
   justify-content: center;
   gap: 1px;
   min-width: 0;
-  /* the column's own inset, so the mark starts where every header does */
-  padding-inline-start: 9px;
+  /* the column's own inset, so the mark starts where every header does — 6px
+     rather than 9, bought back for the name itself: "מזרחי טפחות" was losing
+     its last word to three pixels of alignment. */
+  padding-inline-start: 6px;
   min-height: 32px;
 }
 .lgr-lender-id { display: flex; align-items: center; gap: 6px; min-width: 0; }
@@ -2601,9 +2608,10 @@ html:has(.lgr-root) {
      instead of to two words on top of each other. */
   max-width: 100%;
   height: 26px;
-  /* 8px start, so the chip's word sits on the column's 14px inset like every
-     other cell's content */
-  padding: 0 8px 0 5px;
+  /* 6px start rather than 8: the chip's own word comes first. "משכנתא" was
+     ellipsizing to "משכ…" while the chip held two pixels of inset it did not
+     need — the column's 9px td padding already sets the row's left edge. */
+  padding: 0 6px 0 4px;
   border: 1px solid transparent;
   border-radius: 8px;
   background: var(--fam-tint, #fff);

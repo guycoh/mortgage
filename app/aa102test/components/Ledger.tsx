@@ -1024,45 +1024,44 @@ export default function Ledger({
                   header. Measure before moving any of these again. */}
               {(isBase
                 ? [
-                    "7.6%", // סוג — the family chip is 86px; this is 92
-                    "6.2%", // מטרה — a select that already elides its longest values
-                    "6.1%", // גוף מימון — likewise: lender names elide by design
-                    "12.25%", // יתרת קרן / הצמדת קרן — at 11.75 "230,835" lost its last digit
-                    "5.25%", // הפרשי היוון — header wraps to two lines to fit this
+                    "7.9%", // סוג — measured: "משכנתא" in the chip needs 7.85
+                    "6.9%", // מטרה — "כל מטרה" MEASURES 41px and PAINTS wider: the DOM reported
+                    // no overflow while the cell showed "כל מט…". Sized with headroom
+                    // over the measurement, and confirmed on pixels — see CLAUDE.md §8
+                    // on intrinsic sizing lying about Hebrew in this stack.
+                    "8.4%", // גוף מימון — measured: "מזרחי טפחות" needs 8.35, the
+                    // longest name the registry hands this column. It is the widest
+                    // requirement on the grid and everything else was budgeted round it.
+                    "12.25%", // יתרת קרן / הצמדת קרן — 11.75 clipped "230,835"
+                    "4.4%", // הפרשי היוון — a fee figure under a two-line header
                     "6%", // מסלול — "פריים" with its dot and caret
-                    "6.5%", // לוח סילוקין — "בלון חלקי" is now a common value and must read
-                    "9.25%", // עוגן / תוספת — the split header needs the width, not the boxes
+                    "6.8%", // לוח סילוקין — measured: "בלון חלקי" needs 6.75
+                    "9.25%", // עוגן / תוספת — the split header needs the width
                     "4.75%", // ריבית % — "6.63" was losing its last digit at 4.5
-                    "6.5%", // שת"פ / ע.נ.נ — "₪-1,234,567" under "12.34%"
-                    "4.25%", // תדירות שינוי — two short header lines over a one-digit field
-                    "4.6%", // חודשים — the input and its "26.8 שנ׳" caption collided at 4.25
-                    "9.5%", // תאריך סיום
-                    "6.25%", // החזר חודשי — the totals row's ₪ figure sets this
-                    // actions — 5% where it was 5.75%; the difference went to יתרת קרן,
-                    // which was clipping the last digit of a six-figure balance. These
-                    // are hover-only glyphs, so the trade is a real number against a
-                    // control that is invisible at rest. NOTE: this cell's scrollWidth
-                    // exceeds clientWidth by exactly 4px at EVERY width — swept 5/5.75/
-                    // 6.5/8% — so it is a fixed overhang, not a truncation. Do not widen
-                    // the column chasing it (see CLAUDE.md §8 on that measurement lying).
-                    "5%",
+                    "6%", // שת"פ / ע.נ.נ — measured against a ₪193,146 figure, the largest a
+                    // household this size produces; 5.5 clipped it
+                    "3.75%", // תדירות שינוי — one or two digits under a two-line header
+                    "4.6%", // חודשים — the input and its "26.8 שנ׳" caption
+                    "9.5%", // תאריך סיום — ten characters plus the calendar button
+                    "5.9%", // החזר חודשי — "₪2,021" over its "צמוד מדד" caption
+                    "3.6%", // actions — three hover-only glyphs
                   ]
                 : [
                     "8.25%", // סוג
-                    "7.5%", // מטרה — a select; "קבוצת רכישה" is the value that sets it
-                    "7.25%", // גוף מימון — elides by design
-                    "7.75%", // סכום
-                    "4.5%", // אחוז
-                    "6.75%", // מסלול
-                    "6.75%", // לוח סילוקין — "בלון חלקי" must read
-                    "9%", // עוגן / תוספת
-                    "4.75%", // ריבית %
-                    "6.5%", // שת"פ / ע.נ.נ
-                    "5.25%", // תדירות שינוי
-                    "4.75%", // חודשים
+                    "7.4%", // מטרה — a select; "קבוצת רכישה" is the value that sets it
+                    "8.4%", // גוף מימון — same requirement as the master
+                    "9%", // סכום
+                    "5%", // אחוז
+                    "6.5%", // מסלול
+                    "6.8%", // לוח סילוקין
+                    "9.25%", // עוגן / תוספת
+                    "5%", // ריבית %
+                    "6%", // שת"פ / ע.נ.נ
+                    "4.1%", // תדירות שינוי
+                    "4.6%", // חודשים
                     "9.5%", // תאריך סיום
-                    "6.5%", // החזר חודשי
-                    "5%", // actions
+                    "6.15%", // החזר חודשי
+                    "4.05%", // actions
                   ]
               ).map((w, i) => (
                 <col key={i} style={{ width: w }} />
