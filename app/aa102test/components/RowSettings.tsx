@@ -1,6 +1,6 @@
 "use client";
 
-// גרייס and חודשי גרייס — the two fields nobody touches on a normal day. They
+// גרייס — the two month counts nobody touches on a normal day. They
 // used to live in an expander tray that pushed every row below it down the page.
 // Now they open in a small sheet anchored to the row's own settings icon, so the
 // grid never reflows.
@@ -16,8 +16,6 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
 import { Sliders, X } from "@phosphor-icons/react";
-import { graceTypes } from "@/app/data/graceTypes";
-import Select from "./Select";
 import { FAMILY, PATH_LABEL, type ImportedLoan } from "../lib/credit";
 import { lenderOf } from "../lib/lenders";
 
@@ -56,7 +54,7 @@ export default function RowSettings({
   useEffect(() => {
     const onPointer = (e: PointerEvent) => {
       if (ref.current?.contains(e.target as Node)) return;
-      // the grace listbox portals outside this sheet
+      // a portalled listbox opened from inside this sheet is still inside it
       if ((e.target as HTMLElement)?.closest?.(".lgr-pop")) return;
       onClose();
     };
@@ -78,7 +76,41 @@ export default function RowSettings({
     };
   }, [onClose]);
 
-  const field = (label: string, key: "grace_months", placeholder?: string) => (
+  /**
+   * What the two numbers add up to, in words, under the fields.
+   *
+   * The sheet asks for months and the row is priced in months, but the thing an
+   * advisor is actually deciding is a sequence — and a sequence of three phases
+   * is exactly the kind of thing two number boxes fail to show. Saying it back
+   * also surfaces the clamp: ask for more grace than the term holds and the
+   * sentence reports what was actually used, rather than the row quietly
+   * amortising over a month you did not intend.
+   */
+  const graceNote = (
+    fullRaw?: number | null,
+    partialRaw?: number | null,
+    monthsRaw?: number | null
+  ) => {
+    const months = Math.max(Math.floor(Number(monthsRaw) || 0), 0);
+    const room = months > 1 ? months - 1 : 0;
+    const partial = Math.min(Math.max(Math.floor(Number(partialRaw) || 0), 0), room);
+    const full = Math.min(Math.max(Math.floor(Number(fullRaw) || 0), 0), room - partial);
+    if (!full && !partial) return "ללא גרייס — הקרן מופחתת מהחודש הראשון.";
+    const phases: string[] = [];
+    if (full) phases.push(`${full} ח׳ ללא תשלום (הריבית נצברת לקרן)`);
+    if (partial) phases.push(`${partial} ח׳ ריבית בלבד`);
+    const left = months - full - partial;
+    phases.push(`${left} ח׳ הפחתת קרן`);
+    const asked = Math.max(Math.floor(Number(fullRaw) || 0), 0) + Math.max(Math.floor(Number(partialRaw) || 0), 0);
+    const clamped = asked > full + partial;
+    return phases.join(" · ") + (clamped ? " — קוצר לתקופת ההלוואה" : "");
+  };
+
+  const field = (
+    label: string,
+    key: "grace_months" | "grace_full_months" | "grace_partial_months",
+    placeholder?: string
+  ) => (
     <label className="flex flex-col gap-1">
       <span className="lgr-label">{label}</span>
       <div className="lgr-well" data-dirty={dirty.has(key) || undefined}>
@@ -127,21 +159,22 @@ export default function RowSettings({
             </button>
           </header>
 
+          {/* GRACE IS TWO PERIODS, SO IT IS TWO FIELDS.
+              A type plus a count could only ever say "six months of one kind",
+              and a construction loan is both kinds in sequence: nothing paid
+              while the interest capitalises, then interest-only, then the
+              balance amortises on the row's own לוח סילוקין. Two month counts
+              say that; a dropdown cannot. Order is fixed (מלא then חלקי) and
+              stated under the fields rather than made an input, because the
+              reverse — from paying interest back to paying nothing — is not a
+              product anyone sells. */}
           <div className="lgr-sheet-body">
-            <label className="flex flex-col gap-1">
-              <span className="lgr-label">גרייס</span>
-              <div className="lgr-well" data-dirty={dirty.has("grace_type_id") || undefined}>
-                <Select
-                  value={loan.grace_type_id ?? 1}
-                  onChange={(v) => onPatch({ grace_type_id: Number(v) })}
-                  options={graceTypes.map((gt) => ({ value: gt.id, label: gt.name }))}
-                  ariaLabel="סוג גרייס"
-                  minWidth={150}
-                />
-              </div>
-            </label>
-            {field("חודשי גרייס", "grace_months", "0")}
+            {field("גרייס מלא (חודשים)", "grace_full_months", "0")}
+            {field("גרייס חלקי (חודשים)", "grace_partial_months", "0")}
           </div>
+          <p className="lgr-sheet-note">
+            {graceNote(loan.grace_full_months, loan.grace_partial_months, loan.months)}
+          </p>
 
           {/* WHOSE DEBT IT IS — correctable, because it now moves money.
               While ערב was only a tag on the row it could stay read-only: it

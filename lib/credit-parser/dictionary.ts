@@ -154,7 +154,9 @@ export const ENUMS = {
     "אחר",
   ],
   currency: ['ש"ח', "אירו", "דולר", 'דולר ארה"ב'],
-  frequency: ["תשלום בלון", "חודשי", "רבעוני", "שנתי", "דו חודשי"],
+  // Longest first, same rule as `purpose` above: "חודשי" is a substring of
+  // "דו חודשי", so tested first it would read every bi-monthly debt as monthly.
+  frequency: ["תשלום בלון", "דו חודשי", "רבעוני", "חודשי", "שנתי"],
   // "קרן, ריבית והצמדה" must precede "קרן וריבית" and "קרן": the cell match
   // returns the first phrase it finds inside the value, and both shorter ones
   // are substrings of it. Read in the old order, 21 linked mortgages in one

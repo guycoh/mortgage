@@ -250,17 +250,38 @@ export function enumByCell(
       else break;
     }
   }
-  const valToks: Tok[] = [];
-  for (const l of lines) {
-    if (Math.abs(l.y - codeLine.y) > 22) continue;
-    for (const t of l.toks) {
-      if (!isHebrew(t.str)) continue;
-      if (t.x > leftBound - 1 && t.x < labelX - 0.5) valToks.push(t);
+  /* THE CODE LINE SPEAKS FIRST, THE NEIGHBOURS ONLY FINISH ITS SENTENCE.
+     The window has to reach onto adjacent rows, because a value genuinely wraps
+     across them — סטטוס העסקה prints as "העסקה משולמת" above the code line,
+     "כסדרה או לא" beside it and "מנוצלת" below. But reaching that far also
+     drags in whatever a NEIGHBOURING field's label happens to put inside this
+     cell's x-range, and on this template the row under תדירות התשלומים is
+     "סכום התשלום החודשי הצפוי". Its "חודשי" outvoted a שנתי sitting right
+     beside the code, so every debt in every report came back monthly and a
+     ₪32,859 annual loan was modelled as ₪392/mo of outflow that never happens.
+     So: whatever the code line says on its own wins — unless widening finds a
+     LONGER phrase that contains it, which is the wrapped case ("קרן" on the
+     code line completing to "קרן, ריבית והצמדה" below). */
+  const collect = (ls: Line[]): Tok[] => {
+    const out: Tok[] = [];
+    for (const l of ls) {
+      for (const t of l.toks) {
+        if (!isHebrew(t.str)) continue;
+        if (t.x > leftBound - 1 && t.x < labelX - 0.5) out.push(t);
+      }
     }
-  }
-  valToks.sort((a, b) => b.y - a.y || b.x - a.x);
-  const hay = normEnum(valToks.map((t) => t.str).join(""));
-  for (const p of phrases) if (hay.includes(normEnum(p))) return p;
+    return out.sort((a, b) => b.y - a.y || b.x - a.x);
+  };
+  const firstPhrase = (toks: Tok[]): string => {
+    const hay = normEnum(toks.map((t) => t.str).join(""));
+    for (const p of phrases) if (hay.includes(normEnum(p))) return p;
+    return "";
+  };
+  const onLine = firstPhrase(collect([codeLine]));
+  const wide = firstPhrase(collect(lines.filter((l) => Math.abs(l.y - codeLine.y) <= 22)));
+  if (onLine && !(wide && wide !== onLine && normEnum(wide).includes(normEnum(onLine))))
+    return onLine;
+  if (wide) return wide;
   return blockFallback ? matchEnum(lines, phrases) : "";
 }
 

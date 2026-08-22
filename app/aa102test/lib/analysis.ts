@@ -336,9 +336,17 @@ export interface Analysis {
     overdue: number;
     limit: number;
     rate: number | null;
-    /** Guaranteed rather than owed — real exposure, not their repayment. */
+    /**
+     * Guaranteed rather than owed — real exposure, not their repayment.
+     *
+     * Guarantees the household ITSELF owes are excluded: they are already inside
+     * `balance` and `monthly`, and restating them as extra would be the same
+     * money twice. Those are counted by `guaranteedInternalCount` instead.
+     */
     guaranteedBalance: number;
     guaranteedCount: number;
+    /** Guarantees on a debt someone else in this household is the debtor on. */
+    guaranteedInternalCount: number;
   };
   mortgage: {
     balance: number;
@@ -526,6 +534,15 @@ function weightedRate(rows: { balance: number; rate: number | null }[]): number 
 const BALLOON_RE = /בלון|בולט/;
 const VARIABLE_RE = /משתנה|פריים/;
 
+/**
+ * 201-047 naming ריבית without naming קרן — the instalment is the month's
+ * interest and the balance does not move. Not a balloon: a balloon states when
+ * the principal falls due (201-054), and these state nothing at all.
+ */
+function isInterestOnly(l: DebtLine): boolean {
+  return /ריבית/.test(l.paymentType) && !/קרן/.test(l.paymentType);
+}
+
 function isLinked(tr: InterestTrack): boolean {
   return !/לא\s*צמוד/.test(tr.linkage) && tr.linkage.includes("צמוד");
 }
@@ -567,13 +584,18 @@ function trackSliceLabel(tr: InterestTrack): string {
  * and it states the two separately. (The ledger resolves them to one owed row,
  * because a board is one household's position, not one document's claim.)
  */
-function lineKey(l: DebtLine): string {
+/**
+ * The debt itself, with no claim about who is on the hook for it.
+ *
+ * lineKey adds the role; this is what is left when you take it away, and it is
+ * how a guarantee is recognised as the very loan somebody else here owes.
+ */
+function debtIdentity(l: DebtLine): string {
   const stated = [l.startDate, l.endDate, l.original > 0 ? String(l.original) : ""].filter(Boolean);
   const identified = stated.length >= 2;
   return [
     l.category,
     l.type,
-    l.role,
     l.bank.replace(/\s+/g, ""),
     l.startDate,
     l.endDate,
@@ -585,6 +607,10 @@ function lineKey(l: DebtLine): string {
     identified ? "" : l.rate === null ? "-" : l.rate.toFixed(2),
     identified ? "" : (l.months ?? "-"),
   ].join("|");
+}
+
+function lineKey(l: DebtLine): string {
+  return `${l.role}|${debtIdentity(l)}`;
 }
 
 /* -------------------------------------------------------------- debt lines */
@@ -722,34 +748,65 @@ function toLine(
  */
 function buildLines(reports: CreditReport[]): DebtLine[] {
   const out: DebtLine[] = [];
-  const at = new Map<string, number>();
+  /**
+   * Candidates per key, and which of them are still unclaimed.
+   *
+   * MATCHING IS ONE-TO-ONE, the same rule the ledger's mergeReportLoans follows.
+   * A single index per key looked sufficient — until a report held two debts the
+   * key cannot tell apart. This household's mortgage has two ₪18,500 tranches
+   * opened the same day and maturing the same day, differing only in track; the
+   * second was never registered, so when the spouse's report arrived only the
+   * first could match. The other folded onto nothing and was pushed as new: 15
+   * mortgages instead of 14, ₪1,370,874 instead of ₪1,352,841, and a "13
+   * התחייבויות משותפות" that was one short of the truth.
+   */
+  const byKey = new Map<string, number[]>();
+  const free = new Set<number>();
 
-  for (const report of reports) {
+  for (let ri = 0; ri < reports.length; ri += 1) {
+    const report = reports[ri];
     const reporter = report.client?.name || "דוח";
     // extractLoans has already back-solved rate and term; join on uid rather
     // than repeat that arithmetic here.
     const priced = new Map(extractLoans(report).map((l) => [l.uid, l]));
 
+    // Everything gathered so far is a candidate for THIS report, and each may
+    // absorb one of its lines. Reset per report rather than once: a third
+    // document has to be able to match a debt the second already matched, while
+    // lines this report adds must not be matched by this same report.
+    free.clear();
+    for (let i = 0; i < out.length; i += 1) free.add(i);
+
     for (const t of report.transactions) {
       if (t.section === "inactive") continue;
       const line = toLine(t, priced.get(t.uid), reporter);
       if (line.balance <= 0 && line.limit <= 0) continue;
+      // A uid is `${section}-${n}`, numbered within its own report — so two
+      // documents both name their first עו"ש "current-1". Across a merge those
+      // are two different accounts at two different banks, and sharing an id
+      // made them one row's worth of React key and one target for "הצג במסמך".
+      // Namespaced here rather than in the parser, where the raw uid is what
+      // `priced` is keyed by.
+      line.uid = `r${ri}:${line.uid}`;
 
       const k = lineKey(line);
-      const hit = at.get(k);
-      // Merge only ACROSS reports. Two facilities at one bank can legitimately
-      // look identical — same type, both drawn to zero — and folding those
-      // together inside a single report both loses a debt and claims a joint
-      // holding that does not exist.
-      if (hit !== undefined && !out[hit].reportedBy.includes(reporter)) {
-        const prev = out[hit];
-        prev.shared = true;
-        prev.reportedBy.push(reporter);
+      // Merge only ACROSS reports, and only onto a line nobody has claimed yet.
+      // Two facilities at one bank can legitimately look identical — same type,
+      // both drawn to zero — and folding those together inside a single report
+      // both loses a debt and claims a joint holding that does not exist.
+      const hit = (byKey.get(k) ?? []).find((i) => free.has(i));
+      if (hit !== undefined) {
+        free.delete(hit);
+        out[hit].shared = true;
+        if (!out[hit].reportedBy.includes(reporter)) out[hit].reportedBy.push(reporter);
         continue;
       }
-      // Later reports should still be able to match this line.
-      if (hit === undefined) at.set(k, out.length);
+      // A new line, and a candidate for whatever report comes next.
+      const i = out.length;
       out.push(line);
+      const list = byKey.get(k);
+      if (list) list.push(i);
+      else byKey.set(k, [i]);
     }
   }
 
@@ -939,16 +996,36 @@ function sourceTotals(reports: CreditReport[]): SourceTotal[] {
  * rarely does. Where they differ, the difference is stated rather than
  * quietly averaged away.
  */
-function reconcile(reports: CreditReport[], lines: DebtLine[]): Reconciliation {
+function reconcile(reports: CreditReport[]): Reconciliation {
   const rows = sourceTotals(reports).filter((s) => s.role === "debtor");
   const summaryBalance = rows.reduce((s, r) => s + r.balance, 0);
   const summaryLimit = rows.reduce((s, r) => s + r.limit, 0);
   const summaryOriginal = rows.reduce((s, r) => s + r.originalAmount, 0);
 
-  const own = lines.filter((l) => l.role === "debtor");
-  const extractedBalance = own.reduce((s, l) => s + l.balance, 0);
-  const extractedLimit = own.reduce((s, l) => s + l.limit, 0);
-  const extractedOriginal = own.reduce((s, l) => s + l.original, 0);
+  // BOTH SIDES COUNT EVERY DOCUMENT, duplicates and all.
+  //
+  // This asks one question — did the geometric parse of the transaction pages
+  // come up short of the plain summary table? — and it is a question about a
+  // document, not about a household. Measuring the summaries of two reports
+  // against a DEDUPED detail made a couple's shared mortgage look like a
+  // reading failure: ₪1,334,808 "missing", and an advisor told the analysis
+  // "עלול לחסר" when it was complete. So the detail is re-counted here per
+  // report, on the same terms as the summary, instead of reusing the merged
+  // lines.
+  let extractedBalance = 0;
+  let extractedLimit = 0;
+  let extractedOriginal = 0;
+  for (const report of reports) {
+    for (const t of report.transactions) {
+      if (t.section === "inactive" || t.role !== "debtor") continue;
+      const balance = num(t.fields["201-049"]);
+      const limit = num(t.fields["201-020"]);
+      if (balance <= 0 && limit <= 0) continue;
+      extractedBalance += balance;
+      extractedLimit += limit;
+      extractedOriginal += num(t.fields["201-045"]);
+    }
+  }
   // Under ₪500 is rounding and column-order noise, not a disagreement.
   const TOL = 500;
 
@@ -1553,6 +1630,44 @@ function buildFlags(a: Omit<Analysis, "flags" | "clientView">): Flag[] {
     });
   }
 
+  /* ---- debts that are not repaid monthly */
+  const offCadence = own.filter(
+    (l) => l.frequency.trim() !== "" && !/חודשי/.test(l.frequency)
+  );
+  if (offCadence.length) {
+    push({
+      id: "non-monthly",
+      target: { section: sectionOf(offCadence[0]), uids: offCadence.map((l) => l.uid) },
+      severity: "medium",
+      title: "התחייבות שאינה נפרעת חודשית",
+      detail: `${offCadence.length === 1 ? "התחייבות אחת נפרעת" : `${offCadence.length} התחייבויות נפרעות`} בתדירות ${Array.from(new Set(offCadence.map((l) => l.frequency.trim()))).join(", ")}. שדה 201-046 מציג 0 משום שאין תשלום חודשי — לא משום שהנתון חסר. ההחזר החודשי המוצג עבורן הוא שקילות חודשית שחושבה כאן.`,
+      client: show(
+        `${offCadence.length === 1 ? "הלוואה אחת נפרעת" : `${offCadence.length} הלוואות נפרעות`} פעם בשנה ולא כל חודש — הסכום החודשי המוצג הוא ממוצע, בפועל התשלום יוצא במרוכז`,
+        offCadence.map((l) => l.uid)
+      ),
+      amount: offCadence.reduce((s, l) => s + l.balance, 0),
+      where: Array.from(new Set(offCadence.map((l) => l.bank))),
+    });
+  }
+
+  /* ---- instalments that buy no equity */
+  const interestOnly = own.filter((l) => !l.balloon && isInterestOnly(l));
+  if (interestOnly.length) {
+    push({
+      id: "interest-only",
+      target: { section: sectionOf(interestOnly[0]), uids: interestOnly.map((l) => l.uid) },
+      severity: "medium",
+      title: "מסלולים בריבית בלבד",
+      detail: `${interestOnly.length} התחייבויות משלמות ריבית ללא קרן — היתרה אינה קטנה מדי חודש. הדוח אינו מציין עד מתי (201-055 ריק), ולכן מועד המעבר להחזר מלא וגובהו אינם ידועים מהמסמך.`,
+      client: show(
+        `${interestOnly.length === 1 ? "מסלול אחד משלם" : `${interestOnly.length} מסלולים משלמים`} ריבית בלבד — הקרן לא יורדת, וההחזר צפוי לעלות כשתתחיל להיפרע`,
+        interestOnly.map((l) => l.uid)
+      ),
+      amount: interestOnly.reduce((s, l) => s + l.balance, 0),
+      where: Array.from(new Set(interestOnly.map((l) => l.bank))),
+    });
+  }
+
   /* ---- mortgage risk composition */
   if (a.mortgage.balance > 0) {
     const varSeverity = variableSeverity(a.mortgage.variableShare);
@@ -1699,6 +1814,23 @@ function buildFlags(a: Omit<Analysis, "flags" | "clientView">): Flag[] {
     });
   }
 
+  /* ---- guarantees INSIDE the household: stated, but never counted twice */
+  if (a.totals.guaranteedInternalCount > 0) {
+    push({
+      id: "guarantor-internal",
+      target: {
+        section: "guarantees",
+        uids: a.lines.filter((l) => l.role === "guarantor").map((l) => l.uid),
+      },
+      severity: "info",
+      title: "ערבות הדדית בתוך המשק",
+      detail: `${a.totals.guaranteedInternalCount} התחייבויות שהלקוח ערב להן נלקחו על ידי אדם אחר בדוחות שנטענו. הן כבר נספרות כחוב של המשק, ולא נוספו שוב כחשיפה.`,
+      client: show(
+        `${a.totals.guaranteedInternalCount === 1 ? "התחייבות אחת שאתם ערבים לה נלקחה" : `${a.totals.guaranteedInternalCount} התחייבויות שאתם ערבים להן נלקחו`} על ידי בן/בת הזוג — הן כבר נכללות בסכומים למעלה ולא נספרו פעמיים`
+      ),
+    });
+  }
+
   /* ---- joint debts, so the doubling question is answered before it is asked */
   const shared = a.lines.filter((l) => l.shared);
   if (shared.length) {
@@ -1761,7 +1893,22 @@ export function analyseReports(rawReports: CreditReport[], rawNames: string[] = 
       .sort((a, b) => b.getTime() - a.getTime())[0] ?? new Date();
   const lines = buildLines(reports);
   const own = lines.filter((l) => l.role === "debtor");
-  const guaranteed = lines.filter((l) => l.role === "guarantor");
+  /**
+   * Guarantees, minus the ones the household already owes.
+   *
+   * lineKey keeps `role` on purpose, so one spouse guaranteeing the very loan the
+   * other owes stays two lines — this engine reports what each document said. The
+   * TOTALS must not follow it there. Both of this couple's guarantees are
+   * מרדכי's own loans, already inside סה״כ הלוואות, and adding "ובנוסף ₪400,975
+   * בערבות — לא ההחזר שלכם" counted the same money twice and called it someone
+   * else's. A guarantee is extra exposure only when nobody here is the debtor.
+   */
+  const owedKeys = new Set(own.map(debtIdentity));
+  const guaranteed = lines.filter(
+    (l) => l.role === "guarantor" && !owedKeys.has(debtIdentity(l))
+  );
+  /** Every guarantee the documents stated, including the internal ones. */
+  const guaranteedAll = lines.filter((l) => l.role === "guarantor");
 
   const byCategory = categoryTotals(lines);
   const mortgages = own.filter((l) => l.category === "mortgage");
@@ -1826,6 +1973,7 @@ export function analyseReports(rawReports: CreditReport[], rawNames: string[] = 
       rate: weightedRate(own),
       guaranteedBalance: guaranteed.reduce((s, l) => s + l.balance, 0),
       guaranteedCount: guaranteed.length,
+      guaranteedInternalCount: guaranteedAll.length - guaranteed.length,
     },
     mortgage: {
       balance: mortgageBalance,
@@ -1899,7 +2047,7 @@ export function analyseReports(rawReports: CreditReport[], rawNames: string[] = 
       };
     })(),
     sources: sourceTotals(reports),
-    reconcile: reconcile(reports, lines),
+    reconcile: reconcile(reports),
     warnings: Array.from(new Set(reports.flatMap((r) => r.warnings ?? []))),
   };
 

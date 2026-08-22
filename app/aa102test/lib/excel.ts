@@ -22,11 +22,13 @@ import {
   FAMILY,
   PATH_LABEL,
   isSurety,
+  reportedMonthly,
   perShekel as perShekelOf,
   type DebtGroup,
   type ImportedLoan,
 } from "./credit";
 import { lenderOf } from "./lenders";
+import { rowYield } from "./yield";
 
 /* ------------------------------------------------------------------ palette */
 
@@ -74,6 +76,8 @@ export interface ExcelInput {
   mixName: string;
   loans: ImportedLoan[];
   annualInflation: number;
+  /** שיעור היוון — the board-wide rate ע.נ.נ discounts at. */
+  annualDiscount: number;
   /** Names and IDs from the imported reports, in import order. */
   clients: { name: string; id: string; reportDate?: string }[];
 }
@@ -103,8 +107,23 @@ const COLS: Col[] = [
   { header: "חודשים", width: 9.5, fmt: "int" },
   { header: "תאריך סיום", width: 13, fmt: "date" },
   { header: "החזר חודשי (₪)", width: 15, fmt: "money", total: true },
-  { header: 'סה"כ ריבית (₪)', width: 15, fmt: "money", total: true },
-  { header: "עלות כוללת (₪)", width: 15, fmt: "money", total: true },
+  // THE LAST TWO COLUMNS ARE THE ONLY MODELLED ONES, AND THEY SAY SO.
+  // Everything to their left is the document: balance, rate, anchor, term, end
+  // date and — since the payment column started carrying 201-046 — the monthly
+  // too. Total interest and total cost appear in no credit report; they are this
+  // engine's projection to maturity. Unlabelled beside eight report figures they
+  // read as report figures, and a reader who multiplies the monthly by the term
+  // will not land on them exactly (the bank strikes its instalment on its own
+  // billing cycle). "(תחזית)" is what stops that from looking like an error.
+  { header: 'סה"כ ריבית (₪) · תחזית', width: 17, fmt: "money", total: true },
+  { header: "עלות כוללת (₪) · תחזית", width: 17, fmt: "money", total: true },
+  // Both are this engine's readings, not the document's — same class as the
+  // two "תחזית" columns above, and labelled in the same breath. שת"פ is an
+  // annual EFFECTIVE rate, which is why it does not equal the nominal ריבית
+  // column: a row quoted 4.40% nominal returns 4.49% effective, and that is
+  // the figure the credit report itself prints as ריבית מתואמת.
+  { header: 'שת"פ · תשואה פנימית', width: 15, fmt: "pct" },
+  { header: "ע.נ.נ (₪) · ערך נוכחי נקי", width: 17, fmt: "money" },
   { header: "הערות", width: 16 },
 ];
 
@@ -116,7 +135,14 @@ const solid = (argb: string) => ({ type: "pattern" as const, pattern: "solid" as
 
 const thin = (argb: string) => ({ style: "thin" as const, color: { argb } });
 
-/** dd/mm/yyyy or yyyy-mm-dd → a real Excel date, so the column sorts. */
+/**
+ * dd/mm/yyyy or yyyy-mm-dd → a real Excel date, so the column sorts.
+ *
+ * Built in UTC, not local time. ExcelJS writes the serial from the instant's UTC
+ * parts, so a local midnight east of Greenwich lands on the previous day's 21:00
+ * and every date in the sheet printed one day early — 01/06/2053 on the report
+ * and on the board, 31/05/2053 in the export.
+ */
 function toDate(v?: string | null): Date | null {
   if (!v) return null;
   const part = String(v).split("T")[0];
@@ -125,7 +151,10 @@ function toDate(v?: string | null): Date | null {
   if (bits.length !== 3) return null;
   const [a, b, c] = bits.map(Number);
   if ([a, b, c].some(Number.isNaN)) return null;
-  const d = bits[0].length === 4 ? new Date(a, b - 1, c) : new Date(c, b - 1, a);
+  const d =
+    bits[0].length === 4
+      ? new Date(Date.UTC(a, b - 1, c))
+      : new Date(Date.UTC(c, b - 1, a));
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
@@ -164,10 +193,26 @@ const CI = {
   cost: COLS.findIndex((c) => c.header.startsWith("עלות כוללת")),
 } as const;
 
+/**
+ * The monthly this sheet reports: the document's own figure wherever it printed
+ * one, and only otherwise the engine's.
+ *
+ * This is the difference between a reproduction and a re-derivation. The board
+ * re-prices every row so an advisor can change one and watch the effect, and it
+ * should — but re-pricing lands a percent or so off what the bank actually
+ * charges (its instalment is struck on its own billing cycle at its own
+ * effective rate), and on a tranche paying interest only it was landing 37%
+ * off. A client checking this sheet against their bank statement must find the
+ * bank's number on it.
+ */
+function monthlyOf(x: Priced): number {
+  return reportedMonthly(x.l) ?? x.res.monthlyPayment;
+}
+
 /** The figure a totalled column carries on one row, before rounding. */
 function cellValue(x: Priced, colIndex: number): number {
   if (colIndex === CI.amount) return Number(x.l.amount) || 0;
-  if (colIndex === CI.monthly) return x.res.monthlyPayment;
+  if (colIndex === CI.monthly) return monthlyOf(x);
   if (colIndex === CI.interest) return x.res.totalInterest;
   return x.res.totalPaid;
 }
@@ -194,7 +239,7 @@ function columnTotal(rows: Priced[], colIndex: number): number {
 /* -------------------------------------------------------------------- sheet */
 
 function buildSheet(wb: Workbook, input: ExcelInput): void {
-  const { loans, annualInflation, clients } = input;
+  const { loans, annualInflation, annualDiscount, clients } = input;
 
   const ws = wb.addWorksheet("תמהיל", {
     views: [{ rightToLeft: true, showGridLines: false }],
@@ -358,7 +403,7 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
       return {
         id,
         amount: rows.reduce((s, x) => s + (Number(x.l.amount) || 0), 0),
-        monthly: rows.reduce((s, x) => s + x.res.monthlyPayment, 0),
+        monthly: rows.reduce((s, x) => s + monthlyOf(x), 0),
         count: rows.length,
       };
     })
@@ -426,6 +471,7 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
   /** One data row of the detail table, in the family's colours. */
   const writeRow = (x: Priced, i: number, accent: string): void => {
     const { l, res } = x;
+    const ry = rowYield(Number(l.amount) || 0, res, annualDiscount);
     const g = famOf(l);
     // The master's split and its exit cost ride in the notes rather than as
     // columns of their own: the sheet's twelve-column strips and totals are
@@ -435,9 +481,27 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
     const idx = Math.round(Number(l.indexation) || 0);
     const fee = Math.round(Number(l.prepayment_fee) || 0);
     const folded = Math.round(Number(l.fee_folded) || 0);
+    const freq = (l.source_frequency ?? "").trim();
+    const reported = reportedMonthly(l);
     const notes = [
       l.is_shared ? "מופיע בשני הדוחות" : "",
       res.isIndexed ? "צמוד מדד" : "",
+      // Say which rows are NOT the document. Silence on a reproduction reads as
+      // "this came from the report", so the exceptions are the ones that speak:
+      // a debt the report priced at nothing, and a row edited away from what it
+      // was imported as.
+      reported === null && Number(l.source_monthly) > 0
+        ? "השורה נערכה — ההחזר חושב מחדש ואינו הסכום שבדוח"
+        : reported === null && !freq
+          ? "הדוח לא ציין החזר חודשי — הסכום כאן מחושב"
+          : "",
+      // A non-monthly debt still has to be priced monthly (the engine knows no
+      // other cadence), so the sheet says so instead of letting the column pass
+      // for something the bank printed. The yearly figure is the one the client
+      // will recognise from their account.
+      freq
+        ? `תשלום ${freq} · כ-₪${Math.round(res.monthlyPayment * 12).toLocaleString("he-IL")} לשנה · ההחזר החודשי כאן הוא שקילות חודשית, לא סכום שהבנק דיווח`
+        : "",
       idx > 0 ? `מזה הצמדת קרן ₪${idx.toLocaleString("he-IL")}` : "",
       fee > 0 ? `הפרשי היוון ₪${fee.toLocaleString("he-IL")}` : "",
       folded > 0 ? `כולל הפרשי היוון ₪${folded.toLocaleString("he-IL")}` : "",
@@ -464,9 +528,13 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
       Number(l.anchor_interval) > 0 ? Number(l.anchor_interval) : null,
       Number(l.months) || null,
       toDate(l.loan_end_date ?? l.end_date),
-      num(res.monthlyPayment),
+      num(reported ?? res.monthlyPayment),
       num(res.totalInterest),
       num(res.totalPaid),
+      // Excel wants the fraction for a % cell; null keeps a row that cannot
+      // be measured blank rather than claiming 0%.
+      ry.irr === null ? null : ry.irr / 100,
+      ry.npv === null ? null : Math.round(ry.npv),
       notes || null,
     ];
 

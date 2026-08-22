@@ -306,6 +306,40 @@ export default function Simulator({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [annualInflation, setAnnualInflation] = useState(2.0);
+  /**
+   * שיעור היוון — the rate ע.נ.נ discounts every row's payments at.
+   *
+   * ONE rate for the whole board, not one per row. NPV is only meaningful
+   * against something, and the something an advisor is comparing to is the cost
+   * of money today — so discounting each row at its own rate would answer a
+   * different question per row and make the column unsummable. Seeded from Bank
+   * of Israel via /api/interest (the same call that fills prime) and editable,
+   * because the rate a client can actually get is a judgement, not a published
+   * number.
+   */
+  const [annualDiscount, setAnnualDiscount] = useState(4.5);
+  /** Set once the advisor types a rate, so the BoI seed never overwrites them. */
+  const discountTouched = useRef(false);
+
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/interest")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { interest?: number } | null) => {
+        // The published rate is a starting point, not an answer — it is what
+        // money costs the banks, and the advisor adjusts to what it costs this
+        // client. Guarded because a board mid-edit must not have its assumptions
+        // rewritten by a late response.
+        if (!alive || discountTouched.current) return;
+        if (typeof d?.interest === "number" && d.interest > 0 && d.interest < 25) {
+          setAnnualDiscount(Math.round(d.interest * 10) / 10);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
   const [schedFor, setSchedFor] = useState<ImportedLoan | "mix" | null>(null);
   /** The שכפול משכנתא נוכחית question is open. */
   const [dupAsk, setDupAsk] = useState(false);
@@ -956,6 +990,7 @@ export default function Simulator({
         mixName: activeMix.mix_name,
         loans,
         annualInflation,
+        annualDiscount,
         clients: reports.map((r) => ({ name: r.clientName, id: r.clientId, reportDate: r.reportDate })),
       });
     } catch {
@@ -1263,6 +1298,34 @@ export default function Simulator({
                 <span className="lgr-rail-assume-unit">%</span>
               </span>
             </label>
+
+            {/* The second assumption, beside the first because it is the same
+                kind of thing: a number the advisor supplies that the read-out
+                depends on. אינפלציה prices the indexed rows; שיעור היוון prices
+                every row's ע.נ.נ — it is what "worth" is measured against, and
+                with no rate stated the column would be an opinion with the
+                opinion hidden. Seeded from Bank of Israel, then it is theirs. */}
+            <label
+              className="lgr-rail-assume"
+              title="שיעור ההיוון שלפיו מחושב ע.נ.נ — הערך הנוכחי של התשלומים מול יתרת הקרן"
+            >
+              <span className="lgr-rail-label">שיעור היוון</span>
+              <span className="lgr-rail-assume-well">
+                <input
+                  type="number"
+                  step="0.1"
+                  value={annualDiscount}
+                  onChange={(e) => {
+                    discountTouched.current = true;
+                    setAnnualDiscount(parseFloat(e.target.value) || 0);
+                  }}
+                  onFocus={(e) => e.currentTarget.select()}
+                  className="lgr-rail-assume-in"
+                  aria-label="שיעור היוון שנתי באחוזים"
+                />
+                <span className="lgr-rail-assume-unit">%</span>
+              </span>
+            </label>
           </div>
 
           {/* -------------------------------------------------- the intake band */}
@@ -1544,6 +1607,7 @@ export default function Simulator({
                 loans={loans}
                 paths={PATHS}
                 annualInflation={annualInflation}
+                annualDiscount={annualDiscount}
                 baseline={baseline}
                 // The master is the same mix a dropped report belongs to — what
                 // the client owes today. Allocation by percentage is a thing you

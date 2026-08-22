@@ -2645,6 +2645,15 @@ html:has(.lgr-root) {
 .lgr-sheet-body { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 14px; }
 /* The ערב switch spans the sheet: it is a sentence, not a field. */
 .lgr-sheet-body-1 { grid-template-columns: 1fr; padding-top: 0; }
+/* The sentence under the grace fields: what the two numbers mean in sequence.
+   Sits between the fields and the switch below them, so it needs the same
+   inline padding as .lgr-sheet-body and none of its top gap. */
+.lgr-sheet-note {
+  margin: -4px 14px 10px;
+  font-size: 10.5px;
+  line-height: 1.45;
+  color: var(--lgr-4);
+}
 
 /* A switch, not a checkbox: the state is a claim about the row ("the client
    guarantees this"), and a claim reads better as on/off than as a tick. */
@@ -3241,3 +3250,25 @@ html:has(.lgr-root) {
 }
 .lgr-ask-btn-m { margin-inline-start: 4px; opacity: 0.72; }
 .lgr-btn-primary .lgr-ask-btn-m { opacity: 0.85; }
+
+/* שת"פ / ע.נ.נ — two read-outs stacked in one cell.
+   Flat text, no well: on this grid a sunken field means "you may type here",
+   and neither of these is editable. The rate leads because it is the one that
+   compares to the ריבית column beside it; the shekel figure sits under it in
+   the muted weight calculated cells use everywhere else.
+   Tabular figures so the two lines align digit-for-digit down the column. */
+.lgr-yield {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding-inline: 6px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+}
+.lgr-yield-irr { font-size: 12px; color: var(--lgr-1); }
+.lgr-yield-npv { font-size: 10.5px; color: var(--lgr-4); }
+/* Sign is the meaning of ע.נ.נ, so it is the one thing that gets colour —
+   and only as type, never as a fill, so the row's family stripe stays the
+   loudest thing in it. */
+.lgr-yield-npv[data-sign="pos"] { color: var(--neg, #b4442e); }
+.lgr-yield-npv[data-sign="neg"] { color: var(--pos, #2f7d5b); }

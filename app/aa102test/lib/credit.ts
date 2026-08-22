@@ -141,6 +141,33 @@ export type ImportedLoan = Loan & {
   /** סכום מקורי — 201-045. 0 when the document did not print one. */
   source_orig_amount?: number;
   /**
+   * החזר חודשי exactly as the document printed it (201-046).
+   *
+   * Absent when the document printed none — which is a different fact from a
+   * printed zero, and the export says which. The board goes on pricing rows with
+   * the engine, because that is what lets an advisor change one and see the
+   * effect; the EXPORT is a reproduction of the document and shows this.
+   */
+  source_monthly?: number;
+  /**
+   * The row as it stood when that payment was true — see `monthlyBasis` for the
+   * fields it covers: the money, the term, the schedule and both grace periods.
+   *
+   * The printed payment is a statement about a specific debt repaid a specific
+   * way. Change any of those and it becomes a statement about a loan that no
+   * longer exists on this row, so the export falls back to the engine and says
+   * so in the הערות column.
+   */
+  source_monthly_basis?: string;
+  /**
+   * תדירות התשלומים — 201-044, as printed, but only when it is NOT monthly.
+   *
+   * Set on the handful of debts the grid has to price monthly without their
+   * actually being monthly, so every surface that quotes their החזר חודשי can
+   * say it is an annualised equivalent rather than a figure the bank stated.
+   */
+  source_frequency?: string;
+  /**
    * Whose documents this row was found in, in load order.
    *
    * A merged row is one debt that two people's reports both listed; naming them
@@ -438,6 +465,44 @@ export const isIndexedPath = (pathId: number) =>
 /* ------------------------------------------------------------- conversion */
 
 /**
+ * The identity of the debt a printed payment describes. See `source_monthly_basis`.
+ *
+ * Grace and the amortisation schedule are in the signature, not just the money.
+ * The bank's figure describes a debt repaid a particular WAY, so putting a row
+ * into grace — or switching it to a balloon — invalidates it exactly as surely
+ * as changing the balance does. Left out, a row an advisor had just moved into
+ * six months of full grace went on exporting the ₪1,059 the report printed for
+ * a row that was amortising from month one.
+ */
+export function monthlyBasis(
+  amount: number,
+  rate: number,
+  months: number,
+  scheduleId: number = 1,
+  graceFull: number = 0,
+  gracePartial: number = 0
+): string {
+  return `${Math.round(amount)}|${rate}|${months}|${scheduleId}|${graceFull}|${gracePartial}`;
+}
+
+/**
+ * The payment the DOCUMENT stated for this row, or null when it stated none —
+ * or when the row has since been edited into a different debt.
+ */
+export function reportedMonthly(l: ImportedLoan): number | null {
+  if (!(Number(l.source_monthly) > 0)) return null;
+  const now = monthlyBasis(
+    Number(l.amount) || 0,
+    Number(l.rate) || 0,
+    Number(l.months) || 0,
+    Number(l.amortization_schedule_id) || 1,
+    Number(l.grace_full_months) || 0,
+    Number(l.grace_partial_months) || 0
+  );
+  return l.source_monthly_basis === now ? Number(l.source_monthly) : null;
+}
+
+/**
  * The anchor's own rate: what is left of the quoted rate once the margin over the
  * anchor is taken out. Null without a margin — an unanchored fixed rate is not an
  * anchor, and returning the rate itself would present it as one.
@@ -469,7 +534,17 @@ function toLoanRow(src: ExtractedLoan, mixId: string, group: DebtGroup): Importe
     // both so an imported date survives a round-trip.
     loan_end_date: iso,
     end_date: iso,
-    amortization_schedule_id: 1, // שפיצר — what a bank mortgage almost always is
+    // שפיצר is what a bank mortgage almost always is — but not always, and the
+    // report says which. 201-047 naming ריבית without קרן means the instalment
+    // is buying no equity, and בלון חלקי is this engine's word for exactly that:
+    // interest every month, principal at the end. Amortising those anyway
+    // overstated one household's mortgage by ₪732/mo (11%).
+    //
+    // It is the honest reading rather than a guess. The report states today's
+    // instalment; it does not state when principal starts (201-054 and 201-055
+    // are blank), so nothing here picks a grace length — the row is the document,
+    // and an advisor who learns the real one sets it in the row sheet.
+    amortization_schedule_id: src.interestOnly ? 3 : 1,
     grace_type_id: 1, // ללא
     grace_months: 0,
     // The numeric column is the anchor's own RATE. The report does not print it,
@@ -494,6 +569,16 @@ function toLoanRow(src: ExtractedLoan, mixId: string, group: DebtGroup): Importe
     // What identifies this debt in the spouse's report too — see loanKey.
     source_start_date: src.startDate,
     source_orig_amount: src.origAmount || undefined,
+    source_frequency: src.nonMonthly ? src.paymentFrequency : undefined,
+    source_monthly: src.knownPayment > 0 ? src.knownPayment : undefined,
+    source_monthly_basis: monthlyBasis(
+      Math.round(src.balance),
+      Number(src.interest) || 0,
+      Number(src.months) || 0,
+      src.interestOnly ? 3 : 1,
+      0,
+      0
+    ),
     source_purpose: src.purpose,
     // The report's coarse 201-017, read the way the parsers read it (a
     // mortgage's צריכה פרטית is כל מטרה), then placed on the board's list.

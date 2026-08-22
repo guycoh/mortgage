@@ -217,6 +217,9 @@ function nameFor(mix: Mix, summary: ImportSummary, first: boolean): string {
   return mix.mix_name.includes(summary.clientName) ? mix.mix_name : `${mix.mix_name} + ${summary.clientName}`;
 }
 
+/** שיעור היוון for the export here — see the note at the call site. */
+const DEFAULT_DISCOUNT = 4.5;
+
 export default function Simulator({
   lead,
   endpoint = "/api/aa100/mixes",
@@ -617,6 +620,12 @@ export default function Simulator({
         mixName: activeMix.mix_name,
         loans,
         annualInflation,
+        // /hachamsim is a layout variant with no שיעור היוון control of its own,
+        // so ע.נ.נ in its export is computed at the Bank of Israel rate the
+        // /aa102test rail seeds from. Give this surface its own input and pass
+        // it here; until then the column is honest about being a fixed
+        // assumption rather than silently absent.
+        annualDiscount: DEFAULT_DISCOUNT,
         clients: reports.map((r) => ({ name: r.clientName, id: r.clientId, reportDate: r.reportDate })),
       });
     } catch {
