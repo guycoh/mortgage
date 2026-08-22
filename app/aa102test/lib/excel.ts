@@ -66,6 +66,9 @@ const TRACK_ARGB: Record<number, string> = {
   5: "FFC62370",
 };
 
+/** Bank of Israel's published rate — the seed /aa102test's rail also starts from. */
+const DEFAULT_DISCOUNT = 4.5;
+
 const FONT = "Arial";
 const MONEY = "#,##0";
 const PCT = "0.00%";
@@ -76,8 +79,15 @@ export interface ExcelInput {
   mixName: string;
   loans: ImportedLoan[];
   annualInflation: number;
-  /** שיעור היוון — the board-wide rate ע.נ.נ discounts at. */
-  annualDiscount: number;
+  /**
+   * שיעור היוון — the rate ע.נ.נ discounts at.
+   *
+   * Optional so that only the surface which HAS the control has to pass it.
+   * /aa102test owns the rail input and passes what the advisor set; anything
+   * else exporting through here gets the published Bank of Israel rate, which
+   * is where that input starts too.
+   */
+  annualDiscount?: number;
   /** Names and IDs from the imported reports, in import order. */
   clients: { name: string; id: string; reportDate?: string }[];
 }
@@ -239,7 +249,7 @@ function columnTotal(rows: Priced[], colIndex: number): number {
 /* -------------------------------------------------------------------- sheet */
 
 function buildSheet(wb: Workbook, input: ExcelInput): void {
-  const { loans, annualInflation, annualDiscount, clients } = input;
+  const { loans, annualInflation, annualDiscount = DEFAULT_DISCOUNT, clients } = input;
 
   const ws = wb.addWorksheet("תמהיל", {
     views: [{ rightToLeft: true, showGridLines: false }],
