@@ -61,7 +61,6 @@ import {
 import { addMonths, monthsBetween, parseDate, startOfToday, toIso } from "../lib/dates";
 import { PURPOSES, PURPOSE_LABEL_OF, defaultPurpose, type PurposeId } from "../lib/purposes";
 import { lenderOf } from "../lib/lenders";
-import { rowYield, type RowYield } from "../lib/yield";
 import { freqLabel } from "@/lib/rate-frequency";
 import type { AnchorResponse } from "@/lib/anchors/types";
 
@@ -267,39 +266,6 @@ export default function Ledger({
       end_date: iso,
       months: l && d ? Math.max(0, monthsBetween(anchorOf(l), d)) : 0,
     });
-  };
-
-  /* --- שת"פ / ע.נ.נ: the two read-outs, and what they mean on this row --- */
-  /**
-   * The tooltip does the explaining the two-line header cannot.
-   *
-   * It also states the discount rate, because ע.נ.נ is meaningless without it
-   * and the rate lives up in the rail — far enough away that a reader looking at
-   * a shekel figure has no reason to connect the two.
-   */
-  const yieldTip = (loan: ImportedLoan, ry: RowYield) => {
-    if (ry.irr === null && ry.npv === null)
-      return "אין לוח תשלומים לשורה הזו — חסרים יתרה, ריבית או תקופה";
-    const parts: string[] = [];
-    if (ry.irr !== null) {
-      const nominal = Number(loan.rate) || 0;
-      parts.push(
-        `שת"פ ${ry.irr.toFixed(2)}% — שיעור התשואה הפנימי של לוח התשלומים, שנתי אפקטיבי` +
-          (nominal > 0 ? ` (הריבית הנקובה ${nominal.toFixed(2)}% נומינלית)` : "")
-      );
-    }
-    if (ry.npv !== null) {
-      const v = Math.round(ry.npv);
-      parts.push(
-        `ע.נ.נ ₪${v.toLocaleString("en-US")} — ערך התשלומים בהיוון ${annualDiscount}% פחות יתרת הקרן` +
-          (v > 0
-            ? "; חיובי, כלומר השורה יקרה משיעור ההיוון"
-            : v < 0
-              ? "; שלילי, כלומר השורה זולה משיעור ההיוון"
-              : "")
-      );
-    }
-    return parts.join(" · ");
   };
 
   /* --- תדירות שינוי: months are the value, the wording is derived from them --- */
@@ -637,7 +603,7 @@ export default function Ledger({
   /** Add a row from the bottom, so a long list never sends you back up. */
   const addRow = (
     <tr className="lgr-addrow">
-      <td colSpan={15}>
+      <td colSpan={14}>
         <div className="lgr-addrow-in">
           {addBtns()}
           <span className="lgr-addrow-hint">הוספת שורה ריקה לתמהיל</span>
@@ -1013,55 +979,51 @@ export default function Ledger({
                   select was spending 44px of chrome on a 32px word (see
                   .lgr-cell.lgr-sel-btn) — which pays for סוג's chip and for
                   מטרה to hold nine of its eleven values whole. */}
-              {/* FIFTEEN COLUMNS NOW — שת"פ / ע.נ.נ was added to a grid that had
-                  no free width, so every percentage below it moved. The new
-                  column carries two figures stacked (a rate over a shekel
-                  amount) rather than side by side, which is what let it fit in
-                  6.5% instead of the ~11% two columns would have cost. The
-                  width came out of control chrome and the columns whose content
-                  is shortest — never תאריך סיום (a ten-character date plus its
-                  button), never ריבית (4.5 clipped "6.63"), never עוגן's split
-                  header. Measure before moving any of these again. */}
+              {/* FOURTEEN COLUMNS, and the widths are the measured ones.
+                  שת"פ / ע.נ.נ lived here for a while and its 6% came out of the
+                  three columns that carry words — סוג read "משכ…", מטרה "כל מט…",
+                  גוף מימון "הבינ…". Both figures are read-outs rather than
+                  inputs, so they belong in the row sheet beside גרייס, and the
+                  6% goes back where it was taken from.
+
+                  The control chrome stays trimmed (theme.css: the in-grid select
+                  at 5/4 with a 2px gap, the lender inset at 6px, the family chip
+                  at 6px). It was never the column's to spend, and it is what
+                  lets these widths hold at 1280px with room over the measurement
+                  — which this font stack needs, because Hebrew paints wider than
+                  it measures (CLAUDE.md §8). */}
               {(isBase
                 ? [
-                    "7.9%", // סוג — measured: "משכנתא" in the chip needs 7.85
-                    "6.9%", // מטרה — "כל מטרה" MEASURES 41px and PAINTS wider: the DOM reported
-                    // no overflow while the cell showed "כל מט…". Sized with headroom
-                    // over the measurement, and confirmed on pixels — see CLAUDE.md §8
-                    // on intrinsic sizing lying about Hebrew in this stack.
-                    "8.4%", // גוף מימון — measured: "מזרחי טפחות" needs 8.35, the
-                    // longest name the registry hands this column. It is the widest
-                    // requirement on the grid and everything else was budgeted round it.
+                    "8.5%", // סוג — the family chip, with headroom over "משכנתא"
+                    "7.5%", // מטרה — "כל מטרה" measures 41px and paints wider
+                    "9%", // גוף מימון — "מזרחי טפחות", the longest name the registry gives
                     "12.25%", // יתרת קרן / הצמדת קרן — 11.75 clipped "230,835"
-                    "4.4%", // הפרשי היוון — a fee figure under a two-line header
-                    "6%", // מסלול — "פריים" with its dot and caret
-                    "6.8%", // לוח סילוקין — measured: "בלון חלקי" needs 6.75
+                    "5.5%", // הפרשי היוון — a fee figure under a two-line header
+                    "6.25%", // מסלול — "פריים" with its dot and caret
+                    "7%", // לוח סילוקין — "בלון חלקי" is the value that sets it
                     "9.25%", // עוגן / תוספת — the split header needs the width
                     "4.75%", // ריבית % — "6.63" was losing its last digit at 4.5
-                    "6%", // שת"פ / ע.נ.נ — measured against a ₪193,146 figure, the largest a
-                    // household this size produces; 5.5 clipped it
-                    "3.75%", // תדירות שינוי — one or two digits under a two-line header
+                    "4.25%", // תדירות שינוי
                     "4.6%", // חודשים — the input and its "26.8 שנ׳" caption
                     "9.5%", // תאריך סיום — ten characters plus the calendar button
-                    "5.9%", // החזר חודשי — "₪2,021" over its "צמוד מדד" caption
-                    "3.6%", // actions — three hover-only glyphs
+                    "6.25%", // החזר חודשי — the totals row's ₪ figure sets this
+                    "5.4%", // actions — three hover-only glyphs
                   ]
                 : [
-                    "8.25%", // סוג
-                    "7.4%", // מטרה — a select; "קבוצת רכישה" is the value that sets it
-                    "8.4%", // גוף מימון — same requirement as the master
-                    "9%", // סכום
-                    "5%", // אחוז
-                    "6.5%", // מסלול
-                    "6.8%", // לוח סילוקין
+                    "8.5%", // סוג
+                    "7.75%", // מטרה — a select; "קבוצת רכישה" is the value that sets it
+                    "9%", // גוף מימון
+                    "10%", // סכום
+                    "6%", // אחוז
+                    "6.75%", // מסלול
+                    "7%", // לוח סילוקין
                     "9.25%", // עוגן / תוספת
                     "5%", // ריבית %
-                    "6%", // שת"פ / ע.נ.נ
-                    "4.1%", // תדירות שינוי
+                    "5%", // תדירות שינוי
                     "4.6%", // חודשים
                     "9.5%", // תאריך סיום
-                    "6.15%", // החזר חודשי
-                    "4.05%", // actions
+                    "6.25%", // החזר חודשי
+                    "5.4%", // actions
                   ]
               ).map((w, i) => (
                 <col key={i} style={{ width: w }} />
@@ -1129,19 +1091,6 @@ export default function Ledger({
                   </span>
                 </th>
                 <th>ריבית %</th>
-                {/* Two readings of the same row that only agree when nothing
-                    unusual is going on: שת"פ is the rate the payments actually
-                    return, ע.נ.נ is what they are worth today against the
-                    board's שיעור היוון. Stacked rather than paired sideways —
-                    a rate and a shekel figure do not share a baseline, and the
-                    grid had 6.5% to give, not 11%. */}
-                <th title='שת"פ — שיעור התשואה הפנימי של לוח התשלומים (שנתי אפקטיבי). ע.נ.נ — הערך הנוכחי הנקי של התשלומים מול יתרת הקרן, לפי שיעור ההיוון שברֵאה'>
-                  <span className="lgr-th-2">
-                    שת&quot;פ
-                    <br />
-                    ע.נ.נ
-                  </span>
-                </th>
                 <th title="תדירות שינוי הריבית, בחודשים">
                   <span className="lgr-th-2">
                     תדירות
@@ -1181,10 +1130,10 @@ export default function Ledger({
                       <>
                         {addRow}
                         <tr className="lgr-sec-gap" aria-hidden>
-                          <td colSpan={15} />
+                          <td colSpan={14} />
                         </tr>
                         <tr className="lgr-surety-head">
-                          <td colSpan={15}>
+                          <td colSpan={14}>
                             <div className="lgr-surety-head-in">
                               <ShieldWarning size={14} weight="fill" />
                               <span className="lgr-surety-head-t">ערבויות</span>
@@ -1211,10 +1160,6 @@ export default function Ledger({
                       } as React.CSSProperties;
 
                       const res = calculateLoan(loan, annualInflation);
-                      // Both read the schedule the engine just produced, so a
-                      // row with grace, a balloon or indexation is measured as
-                      // whatever it actually is rather than re-derived.
-                      const ry = rowYield(Number(loan.amount) || 0, res, annualDiscount);
                       const dirty = dirtyOf(loan);
                       const amount = Number(loan.amount) || 0;
                       const months = Number(loan.months) || 0;
@@ -1677,41 +1622,6 @@ export default function Ledger({
                             </div>
                           </td>
 
-                          {/* --- שת"פ / ע.נ.נ: what the row actually returns,
-                              and what it is worth today ---
-                              Read-only, and the only pair of read-outs on a grid
-                              of inputs — so they are printed as flat text, the
-                              way calculated cells are everywhere else here, with
-                              no well around them. Both are null on a row that
-                              cannot produce a schedule (no term, no balance, an
-                              empty starter row) and print "—" rather than 0,
-                              because 0% is a claim and "no schedule" is not.
-
-                              ע.נ.נ is signed and the sign is the point: positive
-                              means the row costs more than money costs at the
-                              board's שיעור היוון. Negative is tinted, because a
-                              debt cheaper than the market is the one an advisor
-                              must not refinance away by accident. */}
-                          <td>
-                            <div className="lgr-yield" title={yieldTip(loan, ry)}>
-                              <span className="lgr-yield-irr">
-                                {ry.irr === null ? "—" : `${ry.irr.toFixed(2)}%`}
-                              </span>
-                              <span
-                                className="lgr-yield-npv"
-                                data-sign={
-                                  ry.npv === null || Math.round(ry.npv) === 0
-                                    ? undefined
-                                    : ry.npv > 0
-                                      ? "pos"
-                                      : "neg"
-                                }
-                              >
-                                {ry.npv === null ? "—" : `₪${Math.round(ry.npv).toLocaleString("en-US")}`}
-                              </span>
-                            </div>
-                          </td>
-
                           {/* --- תדירות שינוי, in months ---
                               A number, not a phrase: the interval is arithmetic and
                               the column is read alongside ריבית and עוגן, which are
@@ -1915,7 +1825,7 @@ export default function Ledger({
                     </tr>
                     {isSuretySection && (
                       <tr className="lgr-sec-gap" aria-hidden>
-                        <td colSpan={15} />
+                        <td colSpan={14} />
                       </tr>
                     )}
                   </Fragment>
@@ -2013,6 +1923,8 @@ export default function Ledger({
           loan={sheetLoan}
           anchorRect={sheet.rect}
           dirty={dirtyOf(sheetLoan)}
+          annualInflation={annualInflation}
+          annualDiscount={annualDiscount}
           onPatch={(next) => patch(sheetLoan.id, next)}
           onClose={() => setSheet(null)}
         />

@@ -2656,6 +2656,23 @@ html:has(.lgr-root) {
 /* The sentence under the grace fields: what the two numbers mean in sequence.
    Sits between the fields and the switch below them, so it needs the same
    inline padding as .lgr-sheet-body and none of its top gap. */
+/* A READ-OUT, NOT A FIELD. The sheet's other two boxes are sunken wells you
+   type into; שת"פ and ע.נ.נ are answers. Flat, no border, no focus ring — the
+   same distinction the ledger draws between an input and a calculated cell.
+   Tabular figures so the two line up under each other. */
+.lgr-readout {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 5px 2px 0;
+  min-height: 32px;
+  font-variant-numeric: tabular-nums;
+}
+.lgr-readout-v { font-size: 14px; font-weight: 600; color: var(--lgr-1); line-height: 1.15; }
+.lgr-readout-n { font-size: 10px; color: var(--lgr-4); }
+/* The pair sits above the grace note's rule, so it opens its own band. */
+.lgr-sheet-body-ro { padding-top: 2px; border-top: 1px solid var(--line); margin-top: 2px; }
+
 .lgr-sheet-note {
   margin: -4px 14px 10px;
   font-size: 10.5px;

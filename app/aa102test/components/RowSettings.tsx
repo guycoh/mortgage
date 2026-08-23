@@ -1,6 +1,7 @@
 "use client";
 
-// גרייס — the two month counts nobody touches on a normal day. They
+// גרייס — the two month counts nobody touches on a normal day — and the row's
+// two read-outs, שת"פ and ע.נ.נ, which nobody types at all. They
 // used to live in an expander tray that pushed every row below it down the page.
 // Now they open in a small sheet anchored to the row's own settings icon, so the
 // grid never reflows.
@@ -17,18 +18,22 @@ import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
 import { Sliders, X } from "@phosphor-icons/react";
 import { FAMILY, PATH_LABEL, type ImportedLoan } from "../lib/credit";
+import { calculateLoan } from "@/app/private/crm/leads/simulators/components/calculate/loanCalculators";
+import { rowYield } from "../lib/yield";
 import { lenderOf } from "../lib/lenders";
 
 const W = 348;
 // Measured, then rounded up for the two-line provenance footer a long lender
 // name produces. Only decides whether the sheet opens above or below the icon,
 // so erring high just flips it upward a little sooner.
-const H = 240;
+const H = 330;
 
 export default function RowSettings({
   loan,
   anchorRect,
   dirty,
+  annualInflation = 2,
+  annualDiscount = 4.5,
   onPatch,
   onClose,
 }: {
@@ -36,6 +41,15 @@ export default function RowSettings({
   /** Where the row's settings icon is, in viewport coordinates. */
   anchorRect: DOMRect;
   dirty: Set<string>;
+  /**
+   * The two assumptions the read-outs depend on, so the sheet can state them.
+   *
+   * Optional, and defaulted to the board's own starting values, so only the
+   * surface that HAS these controls has to pass them — /aa102test does;
+   * /hachamsim renders this sheet from its own Ledger copy and does not.
+   */
+  annualInflation?: number;
+  annualDiscount?: number;
   onPatch: (next: Partial<ImportedLoan>) => void;
   onClose: () => void;
 }) {
@@ -106,6 +120,27 @@ export default function RowSettings({
     return phases.join(" · ") + (clamped ? " — קוצר לתקופת ההלוואה" : "");
   };
 
+  /**
+   * שת"פ and ע.נ.נ — the row's two read-outs, measured off the schedule the
+   * engine produces for it, so grace, a balloon and indexation are all already
+   * in them. They live here rather than on the grid because they are not
+   * inputs: the grid is where you change a row, this sheet is where you read
+   * what changing it did.
+   */
+  const res = calculateLoan(loan, annualInflation);
+  const ry = rowYield(Number(loan.amount) || 0, res, annualDiscount);
+
+  /** A read-out, not a field: flat, unfocusable, and dashed when unmeasurable. */
+  const readout = (label: string, value: string | null, note: string, title: string) => (
+    <div className="flex flex-col gap-1" title={title}>
+      <span className="lgr-label">{label}</span>
+      <div className="lgr-readout">
+        <span className="lgr-readout-v">{value ?? "—"}</span>
+        <span className="lgr-readout-n">{note}</span>
+      </div>
+    </div>
+  );
+
   const field = (
     label: string,
     key: "grace_months" | "grace_full_months" | "grace_partial_months",
@@ -175,6 +210,36 @@ export default function RowSettings({
           <p className="lgr-sheet-note">
             {graceNote(loan.grace_full_months, loan.grace_partial_months, loan.months)}
           </p>
+
+          {/* TWO SEPARATE READ-OUTS, not one stacked cell.
+              A rate and a shekel figure answer different questions and share no
+              baseline; pairing them saved width on the grid and cost clarity.
+              Here there is width, so each gets its own label, its own value and
+              its own line of what it means. */}
+          <div className="lgr-sheet-body lgr-sheet-body-ro">
+            {readout(
+              'שת"פ — תשואה פנימית',
+              ry.irr === null ? null : `${ry.irr.toFixed(2)}%`,
+              "שנתי אפקטיבי",
+              ry.irr === null
+                ? "אין לוח תשלומים לשורה — חסרים יתרה, ריבית או תקופה"
+                : `שיעור התשואה הפנימי של לוח התשלומים: הריבית שבה הערך הנוכחי של כל התשלומים שווה ליתרת הקרן. שנתי אפקטיבי — ${(Number(loan.rate) || 0).toFixed(2)}% נומינלי בשורה`
+            )}
+            {readout(
+              "ע.נ.נ — ערך נוכחי נקי",
+              ry.npv === null ? null : `₪${Math.round(ry.npv).toLocaleString("en-US")}`,
+              `בהיוון ${annualDiscount}%`,
+              ry.npv === null
+                ? "אין לוח תשלומים לשורה"
+                : `הערך הנוכחי של כל התשלומים, מהוון ב-${annualDiscount}%, פחות יתרת הקרן. ${
+                    Math.round(ry.npv) > 0
+                      ? "חיובי — השורה יקרה משיעור ההיוון"
+                      : Math.round(ry.npv) < 0
+                        ? "שלילי — השורה זולה משיעור ההיוון"
+                        : "אפס — השורה מתומחרת בדיוק בשיעור ההיוון"
+                  }`
+            )}
+          </div>
 
           {/* WHOSE DEBT IT IS — correctable, because it now moves money.
               While ערב was only a tag on the row it could stay read-only: it
