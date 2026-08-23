@@ -2682,10 +2682,13 @@ html:has(.lgr-root) {
 
 /* A switch, not a checkbox: the state is a claim about the row ("the client
    guarantees this"), and a claim reads better as on/off than as a tick. */
+/* Centred, not top-aligned: the caption under the label is conditional now, so
+   the text block is one line as often as two and flex-start left the knob
+   riding high on the common case. */
 .lgr-switch {
   position: relative;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 9px;
   padding: 9px 10px;
   border: 1px solid var(--line-2);
@@ -2701,7 +2704,6 @@ html:has(.lgr-root) {
   flex: none;
   width: 30px;
   height: 17px;
-  margin-top: 1px;
   border-radius: 999px;
   background: var(--line-2);
   transition: background var(--t) var(--ease);

@@ -10,8 +10,8 @@
 // once both document types started filling them on import: a field that arrives
 // with data in it is not a field you go hunting for, and one value editable in two
 // places is one value too many. The anchor's NAME never made it onto the grid —
-// it is words, and the עוגן column is numeric — so it stays as provenance in the
-// footer below.
+// it is words, and the עוגן column is numeric — so it survives in the footer's
+// hover text, with the rest of what the document said.
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -23,9 +23,11 @@ import { rowYield } from "../lib/yield";
 import { lenderOf } from "../lib/lenders";
 
 const W = 348;
-// Measured, then rounded up for the two-line provenance footer a long lender
-// name produces. Only decides whether the sheet opens above or below the icon,
-// so erring high just flips it upward a little sooner.
+// The TALLEST the sheet gets — grace note showing and the ערב caption with it
+// (measured 329; the ordinary sheet is 297). It only decides whether the sheet
+// opens above or below the icon, and the two errors are not symmetric: too high
+// flips a short sheet upward for nothing, too low lets a tall one open downward
+// off the bottom of the screen. So it tracks the maximum, not the common case.
 const H = 330;
 
 export default function RowSettings({
@@ -91,14 +93,15 @@ export default function RowSettings({
   }, [onClose]);
 
   /**
-   * What the two numbers add up to, in words, under the fields.
+   * The sequence the two numbers produce — and NOTHING when they produce the
+   * ordinary one.
    *
-   * The sheet asks for months and the row is priced in months, but the thing an
-   * advisor is actually deciding is a sequence — and a sequence of three phases
-   * is exactly the kind of thing two number boxes fail to show. Saying it back
-   * also surfaces the clamp: ask for more grace than the term holds and the
-   * sentence reports what was actually used, rather than the row quietly
-   * amortising over a month you did not intend.
+   * A three-phase sequence is the one thing two number boxes cannot show, so it
+   * is worth a line; it also surfaces the clamp, when the term is too short to
+   * hold the grace that was asked for. But the default — no grace, principal
+   * from month one — is what every row does, and a line explaining the default
+   * on every row is how a sheet fills with words nobody reads. Two zeros
+   * already say it.
    */
   const graceNote = (
     fullRaw?: number | null,
@@ -109,16 +112,17 @@ export default function RowSettings({
     const room = months > 1 ? months - 1 : 0;
     const partial = Math.min(Math.max(Math.floor(Number(partialRaw) || 0), 0), room);
     const full = Math.min(Math.max(Math.floor(Number(fullRaw) || 0), 0), room - partial);
-    if (!full && !partial) return "ללא גרייס — הקרן מופחתת מהחודש הראשון.";
+    if (!full && !partial) return "";
+    // Months, unlabelled: the fields above are titled (חודשים) and repeating the
+    // unit three times in one line is the bloat, not the information.
     const phases: string[] = [];
-    if (full) phases.push(`${full} ח׳ ללא תשלום (הריבית נצברת לקרן)`);
-    if (partial) phases.push(`${partial} ח׳ ריבית בלבד`);
-    const left = months - full - partial;
-    phases.push(`${left} ח׳ הפחתת קרן`);
+    if (full) phases.push(`${full} ללא תשלום`);
+    if (partial) phases.push(`${partial} ריבית בלבד`);
+    phases.push(`${months - full - partial} הפחתת קרן`);
     const asked = Math.max(Math.floor(Number(fullRaw) || 0), 0) + Math.max(Math.floor(Number(partialRaw) || 0), 0);
-    const clamped = asked > full + partial;
-    return phases.join(" · ") + (clamped ? " — קוצר לתקופת ההלוואה" : "");
+    return phases.join(" · ") + (asked > full + partial ? " · קוצר לתקופה" : "");
   };
+  const grace = graceNote(loan.grace_full_months, loan.grace_partial_months, loan.months);
 
   /**
    * שת"פ and ע.נ.נ — the row's two read-outs, measured off the schedule the
@@ -129,6 +133,16 @@ export default function RowSettings({
    */
   const res = calculateLoan(loan, annualInflation);
   const ry = rowYield(Number(loan.amount) || 0, res, annualDiscount);
+
+  /** Everything the document said about this row — the footer's hover text. */
+  const source = [
+    loan.source_type,
+    loan.source_track,
+    loan.source_anchor,
+    loan.source_bank ? lenderOf(loan.source_bank).full : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   /** A read-out, not a field: flat, unfocusable, and dashed when unmeasurable. */
   const readout = (label: string, value: string | null, note: string, title: string) => (
@@ -207,9 +221,7 @@ export default function RowSettings({
             {field("גרייס מלא (חודשים)", "grace_full_months", "0")}
             {field("גרייס חלקי (חודשים)", "grace_partial_months", "0")}
           </div>
-          <p className="lgr-sheet-note">
-            {graceNote(loan.grace_full_months, loan.grace_partial_months, loan.months)}
-          </p>
+          {grace && <p className="lgr-sheet-note">{grace}</p>}
 
           {/* TWO SEPARATE READ-OUTS, not one stacked cell.
               A rate and a shekel figure answer different questions and share no
@@ -255,31 +267,28 @@ export default function RowSettings({
                 onChange={(e) => onPatch({ is_guarantor: e.target.checked } as Partial<ImportedLoan>)}
               />
               <span className="lgr-switch-track" aria-hidden />
+              {/* Only the ON state earns a second line. Off is the default, and
+                  "the client is not a guarantor" is the whole of what an
+                  unchecked switch labelled הלקוח ערב לחוב הזה already says. */}
               <span className="lgr-switch-text">
                 הלקוח ערב לחוב הזה
-                <em>
-                  {loan.is_guarantor
-                    ? "מוצג בנפרד ואינו נכלל בסיכומי התמהיל"
-                    : "החוב נספר כשלו — בסיכומים, בגרפים ובייצוא"}
-                </em>
+                {loan.is_guarantor && <em>מחוץ לסיכומי התמהיל</em>}
               </span>
             </label>
           </div>
 
-          {/* The grid's גוף מימון column prints the lender SHORT. This is the one
-              place with room for the name the document actually used, so it is
-              the one place that prints it in full — a provenance footer that
-              paraphrases its source is not provenance. */}
-          <footer className="lgr-sheet-foot">
-            {loan.source_track ? (
-              <>
-                מהדוח: {loan.source_type} · {loan.source_track}
-                {loan.source_anchor ? ` · ${loan.source_anchor}` : ""}
-                {loan.source_bank ? ` · ${lenderOf(loan.source_bank).full}` : ""}
-              </>
-            ) : (
-              "שורה שנוספה ידנית — אין לה מקור בדוח."
-            )}
+          {/* PROVENANCE, ONE LINE — the rest on hover.
+              Four facts were printed here and three of them are already on the
+              grid or in this sheet's own header: the type is the family chip,
+              the lender is the גוף מימון column, and the anchor's name is a
+              full sentence ("הריבית הממוצעת על משכנתאות צמודות מדד") for a
+              value the עוגן column already shows as a number. What is NOT
+              anywhere else is the track the DOCUMENT named, which is worth
+              seeing precisely when it stops matching the מסלול on the row. So
+              that is the line; `title` still carries the document's own wording
+              in full, including the lender's legal name, so nothing was lost. */}
+          <footer className="lgr-sheet-foot" title={source || undefined}>
+            {loan.source_track ? <>מהדוח · {loan.source_track}</> : "נוספה ידנית"}
           </footer>
         </motion.div>
       )}
