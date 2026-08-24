@@ -44,3 +44,47 @@ create index if not exists loans_mix_id_idx on public.loans (mix_id);
 -- a reload until this runs.
 alter table public.loan_mixes
   add column if not exists target_amount numeric;
+
+-- The master's split. A payoff letter prints the balance as יתרת קרן + הצמדת
+-- קרן, and prices leaving each tranche as הפרשי היוון (עמלת פרעון מוקדם). The
+-- board shows the three as separate cells on the master mix and folds them
+-- into one amount — with or without the fee, the advisor's call — when the
+-- master is duplicated into a proposal.
+--
+-- `amount` is unchanged and is still principal + indexation, the balance every
+-- calculation reads. `indexation` says how much of it is linkage; `prepayment_fee`
+-- is a stated cost that is part of no balance. Both nullable: null is "the
+-- document printed no such line", which is not the same fact as 0. loadBoard
+-- degrades these two columns behind their own flag (hasSplit).
+alter table public.loans
+  add column if not exists indexation     numeric,
+  add column if not exists prepayment_fee numeric;
+
+-- מטרת ההלוואה, as one of the board's own ids — housing · any · renovation ·
+-- existing_lien · bridge · dowry · refi_housing · refi_any · business ·
+-- unknown · purchase_group (app/aa102test/lib/purposes.ts). Filled from the
+-- document on import, edited in the מטרה column. Nullable: null is "never
+-- classified", and the cell shows a dash rather than a guessed purpose.
+alter table public.loans
+  add column if not exists purpose text;
+
+-- גרייס כשתי תקופות, לא כסוג אחד.
+--
+-- grace_type_id + grace_months could say "six months of one kind". A real
+-- construction loan is two kinds in sequence: full grace first (nothing is
+-- paid, interest capitalises onto the principal), partial grace after it
+-- (interest is paid, principal is frozen), and only then does the balance
+-- amortise on the row's own לוח סילוקין — שפיצר or קרן שווה.
+--
+-- Both integers, both defaulting to 0, both meaning "months". The legacy pair
+-- is kept and is still written on every save (see toDbRow): it is what
+-- /aa100test, /aa101test and the CRM simulator read, and it is the fallback
+-- when this migration has not run. The engine prefers these two and falls back
+-- to the pair, so a row behaves identically either way for any grace a single
+-- period can express.
+--
+-- Order is fixed — full then partial. Going the other way, from paying interest
+-- back to paying nothing, is not a product.
+alter table public.loans
+  add column if not exists grace_full_months    integer default 0,
+  add column if not exists grace_partial_months integer default 0;

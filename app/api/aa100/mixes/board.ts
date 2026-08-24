@@ -59,9 +59,50 @@ const EXTRA = [
  */
 const ANCHOR = ["source_anchor"] as const;
 
-/** Flips to false the first time Postgres says the columns aren't there. */
+/**
+ * The master's split — הצמדת קרן inside the amount, and הפרשי היוון beside it
+ * (see ImportedLoan in app/aa102test/lib/credit). Its own flag, for the same
+ * reason ANCHOR has one: a deployment that has not run this migration should
+ * lose exactly these two columns and nothing else. Nothing calculates from
+ * either — `amount` is still the balance — so without them the board loads,
+ * edits and saves; the split simply reads as "no linkage" and the fee as
+ * "none stated" after a reload.
+ */
+const SPLIT = ["indexation", "prepayment_fee"] as const;
+
+/**
+ * מטרת ההלוואה, as one of the board's own ids (see app/aa102test/lib/purposes).
+ * Text, nullable; null is "never classified" and the cell shows a dash.
+ */
+const PURPOSE = ["purpose"] as const;
+
+/**
+ * גרייס as two month counts rather than one type + one count.
+ *
+ * Its own flag, and it needs one more than the others do: unlike the split or
+ * the purpose, these columns DO feed a calculation. A deployment missing the
+ * migration falls back to `grace_type_id`/`grace_months`, which every row is
+ * still written with — see toDbRow, which keeps the legacy pair in step so the
+ * schedule a row produces is the same either way for the single-period case
+ * that pair can express. What such a deployment cannot store is a row using
+ * BOTH periods; it keeps the longer one and says so on load.
+ */
+const GRACE = ["grace_full_months", "grace_partial_months"] as const;
+
+/**
+ * Flips to false the first time Postgres says the columns aren't there — and
+ * stays false for the life of the process. Two consequences worth knowing:
+ * a migration applied while the server is up needs a restart to be seen, and
+ * PostgREST's own schema cache lags a DDL by up to a minute (a fresh column
+ * answers PGRST204 until it reloads — `NOTIFY pgrst, 'reload schema'` hurries
+ * it), so a request that lands in that window latches the flag off. Restart
+ * after migrating; do not trust the first request after one.
+ */
 let hasExtra = true;
 let hasAnchor = true;
+let hasSplit = true;
+let hasPurpose = true;
+let hasGrace = true;
 /**
  * loan_mixes.target_amount — גובה התמהיל, the figure the board's אחוז column
  * allocates against. Same deal as the two above, on the other table: without the
@@ -113,18 +154,59 @@ function toDbRow(loan: Row, mixId: string): Row {
     out.source_track = loan.source_track ?? null;
   }
   if (hasAnchor) out.source_anchor = loan.source_anchor ?? null;
+  if (hasSplit) {
+    // Both numeric and both nullable: null is "the document printed no such
+    // line", which is not the same fact as 0.
+    out.indexation = numOrNull(loan.indexation);
+    out.prepayment_fee = numOrNull(loan.prepayment_fee);
+  }
+  if (hasPurpose) out.purpose = typeof loan.purpose === "string" && loan.purpose ? loan.purpose : null;
+  // THE LEGACY PAIR IS ALWAYS WRITTEN, whether or not the new columns exist.
+  // grace_type_id/grace_months are what /aa100test, /aa101test and the CRM
+  // simulator read, and they are the fallback this deployment uses if the
+  // migration has not run. One period maps exactly; a row using both keeps the
+  // longer one there, because a wrong-but-shorter grace understates the debt.
+  const gFull = intOrNull(loan.grace_full_months) ?? 0;
+  const gPartial = intOrNull(loan.grace_partial_months) ?? 0;
+  if (gFull || gPartial) {
+    out.grace_type_id = gFull >= gPartial ? 3 : 2;
+    out.grace_months = Math.max(gFull, gPartial);
+  } else {
+    out.grace_type_id = 1;
+    out.grace_months = 0;
+  }
+  if (hasGrace) {
+    out.grace_full_months = gFull;
+    out.grace_partial_months = gPartial;
+  }
   return out;
 }
 
 /** The column list this deployment is known to have. */
 const selectCols = () =>
-  [...CORE, ...(hasExtra ? EXTRA : []), ...(hasAnchor ? ANCHOR : [])].join(",");
+  [
+    ...CORE,
+    ...(hasExtra ? EXTRA : []),
+    ...(hasAnchor ? ANCHOR : []),
+    ...(hasSplit ? SPLIT : []),
+    ...(hasPurpose ? PURPOSE : []),
+    ...(hasGrace ? GRACE : []),
+  ].join(",");
 
 function fromDbRow(row: Row): Row {
   const out: Row = { ...row };
   // a row saved before the migration has no family; mortgage is what the base
   // mix means anyway
   out.group = row.debt_group === "loan" ? "loan" : "mortgage";
+  // A row stored before the grace migration — or by a deployment without those
+  // columns — still states its grace in the legacy pair. Read it into the two
+  // month fields so the board and the engine only ever deal in one shape.
+  if (row.grace_full_months == null && row.grace_partial_months == null) {
+    const legacyMonths = Math.max(intOrNull(row.grace_months) ?? 0, 0);
+    const legacyType = intOrNull(row.grace_type_id) ?? 1;
+    out.grace_full_months = legacyType === 3 ? legacyMonths : 0;
+    out.grace_partial_months = legacyType === 2 ? legacyMonths : 0;
+  }
   delete out.debt_group;
   out.is_guarantor = !!row.is_guarantor;
   out.is_shared = !!row.is_shared;
@@ -157,9 +239,9 @@ export async function loadBoard(lead: number) {
   const ids = mixes.map((m) => String(m.id));
   let loansRes = await supabase.from("loans").select(selectCols()).in("mix_id", ids);
 
-  // Retire the newest column set first, then the older one, so a deployment that
-  // is one migration behind loses only what that migration added.
-  for (const retire of [() => (hasAnchor = false), () => (hasExtra = false)]) {
+  // Retire the newest column set first, then the older ones, so a deployment
+  // that is one migration behind loses only what that migration added.
+  for (const retire of [() => (hasGrace = false), () => (hasPurpose = false), () => (hasSplit = false), () => (hasAnchor = false), () => (hasExtra = false)]) {
     if (!loansRes.error || !isMissingColumn(loansRes.error)) break;
     retire();
     loansRes = await supabase.from("loans").select(selectCols()).in("mix_id", ids);
@@ -184,6 +266,8 @@ export async function loadBoard(lead: number) {
     hasExtra,
     hasAnchor,
     hasTarget,
+    hasSplit,
+    hasPurpose,
   };
 }
 
@@ -229,7 +313,7 @@ export async function saveBoard(lead: number, mixes: BoardMix[]) {
       const build = () =>
         (mix.loans ?? []).map((l) => ({ ...toDbRow(l, mix.id), id: l.id as string }));
       let res = await supabase.from("loans").upsert(rows, { onConflict: "id" });
-      for (const retire of [() => (hasAnchor = false), () => (hasExtra = false)]) {
+      for (const retire of [() => (hasGrace = false), () => (hasPurpose = false), () => (hasSplit = false), () => (hasAnchor = false), () => (hasExtra = false)]) {
         if (!res.error || !isMissingColumn(res.error)) break;
         retire();
         res = await supabase.from("loans").upsert(build(), { onConflict: "id" });
@@ -251,5 +335,5 @@ export async function saveBoard(lead: number, mixes: BoardMix[]) {
     }
   }
 
-  return { success: true, hasExtra, hasAnchor };
+  return { success: true, hasExtra, hasAnchor, hasSplit, hasPurpose };
 }

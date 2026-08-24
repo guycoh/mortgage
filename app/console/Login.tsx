@@ -32,7 +32,7 @@ export default function Login({ error }: { error?: string }) {
 
         <form method="post" action="/console/auth" className="flex flex-col gap-3.5">
           <label className="flex flex-col gap-1.5">
-            <span className="font-[family-name:var(--cns-mono)] text-[9.5px] font-medium tracking-[0.16em] text-cns-mutedfg uppercase">
+            <span className="text-[12px] font-medium text-cns-fg2">
               שם משתמש
             </span>
             <input
@@ -47,7 +47,7 @@ export default function Login({ error }: { error?: string }) {
           </label>
 
           <label className="flex flex-col gap-1.5">
-            <span className="font-[family-name:var(--cns-mono)] text-[9.5px] font-medium tracking-[0.16em] text-cns-mutedfg uppercase">
+            <span className="text-[12px] font-medium text-cns-fg2">
               סיסמה
             </span>
             <input
@@ -77,8 +77,8 @@ export default function Login({ error }: { error?: string }) {
           </button>
         </form>
 
-        <p className="mt-5 border-t border-cns-line pt-3.5 text-center font-[family-name:var(--cns-mono)] text-[9.5px] tracking-[0.16em] text-cns-mutedfg uppercase">
-          restricted · monitoring
+        <p className="mt-5 border-t border-cns-line pt-3.5 text-center text-[11.5px] text-cns-mutedfg">
+          מסך ניטור פנימי — הכניסה לצוות בלבד
         </p>
       </div>
     </div>

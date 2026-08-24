@@ -255,7 +255,7 @@ export function TableHead({ className, ...props }: React.ComponentProps<"th">) {
       className={cn(
         // A heavier rule under the head than between rows: the header is a
         // masthead for the column, not just another row.
-        "sticky top-0 z-10 h-9 border-b-2 border-cns-line2 bg-cns-card px-3 text-start align-middle font-[family-name:var(--cns-mono)] text-[10px] font-medium tracking-[0.12em] whitespace-nowrap text-cns-mutedfg uppercase select-none",
+        "sticky top-0 z-10 h-9 border-b-2 border-cns-line2 bg-cns-card px-3 text-start align-middle text-[11.5px] font-semibold whitespace-nowrap text-cns-fg2 select-none",
         className
       )}
       {...props}

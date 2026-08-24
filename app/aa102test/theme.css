@@ -716,8 +716,11 @@ html:has(.lgr-root) {
      narrower now and the composition carries twice their width — enough for
      three tracks on one line. Still fractions rather than `auto`, because
      `auto` let the composition swallow the whole band. */
+  /* החזר לשקל is four characters wide where its neighbours are seven-figure
+     sums, so it takes about two thirds of their share rather than an equal
+     one — the band's room belongs to the figures that need it. */
   grid-template-columns:
-    minmax(0, 0.8fr) minmax(0, 0.8fr) minmax(0, 0.8fr) minmax(320px, 1.6fr);
+    minmax(0, 0.8fr) minmax(0, 0.8fr) minmax(0, 0.8fr) minmax(0, 0.55fr) minmax(320px, 1.6fr);
   gap: 4px 26px;
   padding: 10px 16px 11px;
 }
@@ -863,7 +866,7 @@ html:has(.lgr-root) {
 /* PLACEHOLDER vs VALUE — the difference has to be visible without reading.
    An empty field shows a muted 0.00 at 40%, regular weight; a typed value is
    full ink at 600. The old placeholders repeated the column header inside the
-   box ("עוגן", "מרווח"), which said nothing the <th> had not already said. */
+   box ("עוגן", "תוספת"), which said nothing the <th> had not already said. */
 .lgr-cell::placeholder {
   font-family: var(--num);
   font-variant-numeric: tabular-nums;
@@ -894,9 +897,18 @@ html:has(.lgr-root) {
    Paired with 10% of the grid in the colgroup, worst case is ~16px of air. */
 .lgr-date-btn { width: 18px; height: 18px; }
 .lgr-date-in {
-  padding-inline-start: 8px;
-  padding-inline-end: 26px;
+  padding-inline-start: 7px;
+  padding-inline-end: 24px;
+  /* 12.5px: ten tabular characters at 13px measure 72px, and the column's
+     free run at 9.5% is 71 — the leading zero of "01/01/2053" was the pixel
+     that lost. Half a point down and the whole date is on the paper. */
+  font-size: 12.5px;
 }
+/* A two-word header that no longer fits its column on one line — "תדירות
+   שינוי" over a 5% column — breaks between its words rather than into its
+   neighbour. line-height 1.05 keeps the header row from growing by more than
+   the second word needs. */
+.lgr-th-2 { display: inline-block; line-height: 1.05; white-space: normal; text-align: start; }
 
 /* text-bearing fields (selects, the date field) speak UI, not figures */
 /* פריים, שפיצר, a picked date — these are values, not captions, and they are
@@ -1164,7 +1176,19 @@ html:has(.lgr-root) {
   color: #fff;
 }
 .lgr-tab[data-on="true"]:hover { background: var(--primary-deep); border-color: var(--primary-press); }
-.lgr-tab[data-on="true"] .lgr-tab-x { color: rgba(255, 255, 255, 0.62); }
+.lgr-tab[data-on="true"] /* A HOUSEHOLD'S NAME CANNOT OWN THE STRIP.
+   The master mix is named after whoever's reports built it, and two Israeli
+   full names joined make a 60-character label — a third of the tab strip for
+   one tab, pushing the proposals off the row. The tab keeps its full name on
+   the hover and shows what fits. */
+.lgr-tab-name {
+  max-width: 230px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lgr-tab-x { color: rgba(255, 255, 255, 0.62); }
 .lgr-tab-x { color: var(--lgr-4); border-radius: 8px; padding: 1px; margin-inline-start: -2px; transition: background var(--t) ease, color var(--t) ease; }
 .lgr-tab-x:hover { color: inherit; background: rgba(127, 127, 127, 0.18); }
 
@@ -1197,6 +1221,33 @@ html:has(.lgr-root) {
   align-items: center;
   gap: 6px;
 }
+/* WHICH DOCUMENT THE READINGS ARE ABOUT — shown only when two kinds are
+   loaded. A pair of flat words on the receipt's own ground, the chosen one in
+   the ink: it is a statement of subject, not a control panel. */
+.lgr-reading-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 9px;
+  background: var(--card-3);
+}
+.lgr-reading-opt {
+  padding: 3px 9px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  font-family: var(--ui);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--lgr-3);
+  cursor: pointer;
+  transition: background var(--t) var(--ease), color var(--t) var(--ease);
+}
+.lgr-reading-opt:hover { color: var(--ink); }
+.lgr-reading-opt[data-on] { background: #fff; color: var(--primary-deep); box-shadow: 0 1px 2px rgba(0,0,0,0.06); }
+.lgr-reading-opt:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring-strong); }
+
 .lgr-receipt-sep {
   flex: none;
   width: 1px;
@@ -1327,7 +1378,7 @@ html:has(.lgr-root) {
   font-weight: 700;
   color: var(--lgr-2);
 }
-/* עלות לשקל is a ratio among six currencies. Saying its unit under its name is
+/* החזר לשקל is a ratio among six currencies. Saying its unit under its name is
    cheaper than a legend and lands where the question is asked. */
 .lgr-cmp-label em {
   display: block;
@@ -1724,35 +1775,71 @@ html:has(.lgr-root) {
   color: var(--lgr-4);
 }
 
-/* ------------------------------------------------------- composition bar */
-/* Segments are lit from the top and separated by a hairline of the page, so a
-   4%-wide track still reads as its own block rather than a colour smear. */
-.lgr-bar {
-  display: flex;
-  height: 46px;
-  border: 1px solid var(--line-2);
-  border-radius: var(--r-sm);
-  overflow: hidden;
-}
-.lgr-bar-seg {
-  position: relative;
+/* ---------------------------------------------------- מהלך התמהיל — charts */
+/* ONE CARD, FOUR PANELS. The panels are ruled off each other by the same
+   hairline the ledger uses between its rows — never boxed. Each carries its
+   name and one reading at the top, the canvas, and its legend when it needs
+   one; the track legend, shared by two panels, sits once in the card's header.
+   The master draws a single panel the width of the card. */
+.lgr-charts { overflow: hidden; }
+.lgr-chart-grid {
   display: grid;
-  place-items: center;
-  min-width: 3px;
-  transition: filter var(--t) ease;
+  grid-template-columns: 1fr;
 }
-.lgr-bar-seg + .lgr-bar-seg { box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.6); }
-.lgr-bar-seg:hover { filter: brightness(1.07); }
-.lgr-bar-pct {
-  font-family: var(--num);
-  font-variant-numeric: tabular-nums;
+@media (min-width: 900px) {
+  .lgr-chart-grid { grid-template-columns: 1fr 1fr; }
+  /* the second column is ruled off the first; rows are ruled by the panels' own top edge */
+  .lgr-chart-grid > .lgr-chart-panel:nth-child(2n) { border-inline-start: 1px solid var(--line); }
+  .lgr-chart-grid > .lgr-chart-panel:nth-child(-n + 2) { border-top: 0; }
+}
+.lgr-chart-panel {
+  min-width: 0;
+  padding: 12px 14px 12px;
+  border-top: 1px solid var(--line);
+}
+.lgr-charts[data-single] .lgr-chart-panel { border-top: 0; }
+.lgr-chart-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 4px;
+  padding-inline: 4px;
+}
+.lgr-chart-title {
+  font-family: var(--display);
+  font-size: 13.5px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+  white-space: nowrap;
+}
+/* the panel's one reading — the figure the chart starts from, in the
+   panel's own header so the chart never has to print it on its canvas */
+.lgr-chart-reading {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-inline-start: auto;
   font-size: 11.5px;
-  font-weight: 600;
-  color: #fff;
+  color: var(--lgr-4);
+  white-space: nowrap;
 }
-/* A pale step of the ink ramp cannot carry white text. Segments below the
-   midpoint state their share in the ink instead. */
-.lgr-bar-pct[data-dark="true"] { color: var(--primary-deep); }
+.lgr-chart-fig { font-size: 14px; font-weight: 700; color: var(--ink); }
+.lgr-chart-arrow { color: var(--lgr-4); }
+/* the legend: swatch and word, in the text ink — colour beside the label,
+   never as the label */
+.lgr-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 14px;
+  padding: 6px 6px 0;
+  font-size: 11.5px;
+  color: var(--lgr-3);
+}
+.lgr-chart-legend > span { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.lgr-chart-legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2.5px; }
+.lgr-charts .lgr-head .lgr-chart-legend { padding: 0; }
 
 /* ------------------------------------------------------------------ chips */
 
@@ -1980,12 +2067,28 @@ html:has(.lgr-root) {
    control. Hugging the value also puts every chevron in the column at a
    different x, which is the honest signal: these are values of different
    lengths, not a column of empty boxes. */
+/* CHROME ON A GRID'S BUDGET.
+   These were carrying a desktop form's frame into a fourteen-column sheet:
+   18px of padding, 14px of gaps and a 12px chevron — 44px of furniture around
+   a 32px word like "פריים". On a table where every column is measured to its
+   content that is not neutral, it is width taken from the value in the next
+   cell along. 12px of padding, 3px gaps and an 11px chevron reads the same at
+   arm's length and hands ~7px back per select — which is what paid for סוג's
+   family chip (see the colgroup in Ledger.tsx). */
 .lgr-table .lgr-cell.lgr-sel-btn {
   width: fit-content;
   max-width: 100%;
+  /* 5/4 and a 2px gap, down from 7/5/3. Four pixels of chrome per select, on
+     three columns whose VALUES were being ellipsized to pay for it — מטרה was
+     printing "כל מ…" and לוח סילוקין "בלון …". A control that spends its
+     column on its own padding and then truncates the word it exists to show
+     has its priorities backwards. */
+  padding-inline: 5px 4px;
+  gap: 2px;
   border-color: transparent;
   background: transparent;
 }
+.lgr-table .lgr-cell.lgr-sel-btn .lgr-sel-caret { width: 11px; height: 11px; }
 .lgr-table .lgr-cell.lgr-sel-btn:hover:not(:disabled) {
   border-color: var(--line-2);
   background: #fff;
@@ -2120,8 +2223,10 @@ html:has(.lgr-root) {
   justify-content: center;
   gap: 1px;
   min-width: 0;
-  /* the column's own inset, so the mark starts where every header does */
-  padding-inline-start: 9px;
+  /* the column's own inset, so the mark starts where every header does — 6px
+     rather than 9, bought back for the name itself: "מזרחי טפחות" was losing
+     its last word to three pixels of alignment. */
+  padding-inline-start: 6px;
   min-height: 32px;
 }
 .lgr-lender-id { display: flex; align-items: center; gap: 6px; min-width: 0; }
@@ -2431,51 +2536,25 @@ html:has(.lgr-root) {
 }
 
 /* --- מטרה --------------------------------------------------------------
-   A read-only column of the document's own words, so it is typed like the
-   lender's name beside it but one step quieter: this is context for the row,
-   not its identity. Two lines at most, because "רכישת דירה יד שניה" does not
-   fit one at 7% of the grid and truncating it to "רכישת דירה" would silently
-   turn a specific fact into the generic one. The full string is on the title. */
-.lgr-purpose {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  padding-inline-start: 9px;
-  font-family: var(--ui);
-  font-size: 11.5px;
-  font-weight: 500;
-  line-height: 1.25;
-  letter-spacing: -0.006em;
+   Edited now, on the board's own eleven-word list (lib/purposes) — the same
+   well as מסלול, one step quieter in type because a purpose is context for the
+   row, not its identity. The document's wording rides on the tooltip. The one
+   mark in the column is זכאות: state money on state terms changes what a
+   refinance may do with the tranche, so it is a note under the well rather
+   than a word in it.
+
+   Weight 600, not 500: a purpose is context, but at 12px in ink-2 the lighter
+   cut read as a disabled field rather than a quiet one, and it was the only
+   value on the row set below the sheet's weight. It keeps its step down in
+   size and colour, which is where the hierarchy belongs. */
+.lgr-table td .lgr-well .lgr-sel-btn[aria-label="מטרת ההלוואה"] {
+  padding-inline: 7px 5px;
+  gap: 3px;
+  font-size: 12px;
+  font-weight: 600;
   color: var(--lgr-2);
 }
-/* A hand-added row, or a report that printed the field empty. Both are "the
-   document does not say", which is a different thing from a purpose of "אחר". */
-.lgr-purpose-none {
-  display: block;
-  padding-inline-start: 9px;
-  font-family: var(--ui);
-  font-size: 12px;
-  color: var(--lgr-4);
-}
-/* זכאות. State money on state terms — it changes what a refinance is allowed to
-   do with the tranche, so it is the one thing in this column that gets a mark
-   rather than a line of text. Sized off the existing row tags. */
-.lgr-purpose-tag {
-  display: inline-block;
-  margin-top: 2px;
-  margin-inline-start: 9px;
-  padding: 1px 5px;
-  border: 1px solid #cbd9ea;
-  border-radius: 999px;
-  background: #eef4fb;
-  font-family: var(--ui);
-  font-size: 9.5px;
-  font-weight: 700;
-  letter-spacing: 0.01em;
-  color: #3b5f8a;
-  white-space: nowrap;
-}
+.lgr-table td .lgr-well .lgr-sel-btn[aria-label="מטרת ההלוואה"][data-empty="true"] { color: var(--lgr-4); }
 
 /* The anchor's level belongs under the anchor's NAME, not under the margin field
    at the cell's other end — parked there it read as an annotation of the margin,
@@ -2520,10 +2599,19 @@ html:has(.lgr-root) {
 .lgr-fam-sel {
   width: fit-content;
   min-width: 0;
+  /* AND NEVER WIDER THAN ITS COLUMN.
+     It had no ceiling, and `fit-content` on a table-layout:fixed grid means the
+     chip simply hangs out of the cell — "משכנתא" ran 19px into מטרה and printed
+     itself over the purpose beside it. The column has been budgeted to hold the
+     chip whole (colgroup, Ledger.tsx); this is the guarantee that a narrower
+     window, a longer family word or a future re-budget degrades to an ellipsis
+     instead of to two words on top of each other. */
+  max-width: 100%;
   height: 26px;
-  /* 9px start, so the chip's word sits on the column's 14px inset like every
-     other cell's content */
-  padding: 0 9px 0 6px;
+  /* 6px start rather than 8: the chip's own word comes first. "משכנתא" was
+     ellipsizing to "משכ…" while the chip held two pixels of inset it did not
+     need — the column's 9px td padding already sets the row's left edge. */
+  padding: 0 6px 0 4px;
   border: 1px solid transparent;
   border-radius: 8px;
   background: var(--fam-tint, #fff);
@@ -2531,11 +2619,15 @@ html:has(.lgr-root) {
   font-family: var(--ui);
   font-size: 11.5px;
   font-weight: 600;
-  gap: 5px;
+  gap: 4px;
 }
 .lgr-fam-sel:hover:not(:disabled) { border-color: var(--fam-line); background: var(--fam-tint-2, var(--fam-tint)); }
 .lgr-fam-sel[data-open="true"] { border-color: var(--fam); box-shadow: 0 0 0 2px var(--fam-ring, var(--focus-ring-strong)); background: var(--fam-tint); }
-.lgr-fam-sel .lgr-sel-caret { color: currentColor; opacity: 0.5; margin-inline-start: 2px; }
+/* The caret's own 2px on top of the chip's 4px gap is gone: it made the space
+   before the chevron wider than the space after the icon, and those 2px were
+   the ones "משכנתא" was overflowing by — the label was rendering as "משכנ…" on
+   every mortgage row while measuring, to the DOM, as though it fitted. */
+.lgr-fam-sel .lgr-sel-caret { width: 11px; height: 11px; color: currentColor; opacity: 0.5; margin-inline-start: 0; }
 
 /* ------------------------------------------------------------- the add row */
 
@@ -2561,13 +2653,42 @@ html:has(.lgr-root) {
 .lgr-sheet-body { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 14px; }
 /* The ערב switch spans the sheet: it is a sentence, not a field. */
 .lgr-sheet-body-1 { grid-template-columns: 1fr; padding-top: 0; }
+/* The sentence under the grace fields: what the two numbers mean in sequence.
+   Sits between the fields and the switch below them, so it needs the same
+   inline padding as .lgr-sheet-body and none of its top gap. */
+/* A READ-OUT, NOT A FIELD. The sheet's other two boxes are sunken wells you
+   type into; שת"פ and ע.נ.נ are answers. Flat, no border, no focus ring — the
+   same distinction the ledger draws between an input and a calculated cell.
+   Tabular figures so the two line up under each other. */
+.lgr-readout {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 5px 2px 0;
+  min-height: 32px;
+  font-variant-numeric: tabular-nums;
+}
+.lgr-readout-v { font-size: 14px; font-weight: 600; color: var(--lgr-1); line-height: 1.15; }
+.lgr-readout-n { font-size: 10px; color: var(--lgr-4); }
+/* The pair sits above the grace note's rule, so it opens its own band. */
+.lgr-sheet-body-ro { padding-top: 2px; border-top: 1px solid var(--line); margin-top: 2px; }
+
+.lgr-sheet-note {
+  margin: -4px 14px 10px;
+  font-size: 10.5px;
+  line-height: 1.45;
+  color: var(--lgr-4);
+}
 
 /* A switch, not a checkbox: the state is a claim about the row ("the client
    guarantees this"), and a claim reads better as on/off than as a tick. */
+/* Centred, not top-aligned: the caption under the label is conditional now, so
+   the text block is one line as often as two and flex-start left the knob
+   riding high on the common case. */
 .lgr-switch {
   position: relative;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 9px;
   padding: 9px 10px;
   border: 1px solid var(--line-2);
@@ -2583,7 +2704,6 @@ html:has(.lgr-root) {
   flex: none;
   width: 30px;
   height: 17px;
-  margin-top: 1px;
   border-radius: 999px;
   background: var(--line-2);
   transition: background var(--t) var(--ease);
@@ -2910,27 +3030,50 @@ html:has(.lgr-root) {
 
 .lgr-cs-more { padding: 8px 2px; font-size: 12.5px; color: var(--lgr-3); }
 
-/* The worries. Last, so they land after the facts rather than instead of them. */
+/* THE WORRIES. Last, so they land after the facts rather than instead of them.
+   A quiet box, not a red slab: the box holds the list, and each line carries
+   its own weight — critical and high in red, medium in the warm tone, the rest
+   in ink with a grey mark. When there is nothing urgent the heading is ink too;
+   the count beside it says how many lines are the ones to act on. */
 .lgr-cs-worry {
   margin-top: 12px;
-  padding: 11px 13px;
-  border: 1px solid var(--neg-line);
-  border-radius: var(--r);
-  background: var(--neg-tint);
+  padding: 11px 13px 12px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  background: var(--card-2);
 }
+.lgr-cs-worry[data-alarm] { border-color: var(--neg-line); }
 .lgr-cs-worry-head {
   display: flex; align-items: center; gap: 7px;
-  font-size: 13.5px; font-weight: 800; color: var(--neg);
+  font-size: 13.5px; font-weight: 700; color: var(--ink);
 }
-.lgr-cs-worry ul { margin-top: 6px; display: grid; gap: 4px; }
+.lgr-cs-worry[data-alarm] .lgr-cs-worry-head { color: var(--neg); }
+.lgr-cs-worry-n {
+  margin-inline-start: 4px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--neg-tint);
+  font-size: 11px; font-weight: 700; color: var(--neg);
+}
+.lgr-cs-worry ul { margin-top: 7px; display: grid; gap: 5px; }
 .lgr-cs-worry li {
   position: relative; padding-inline-start: 14px;
-  font-size: 13px; line-height: 1.5; color: #7d1229;
+  font-size: 13px; line-height: 1.5; color: var(--lgr-2);
 }
 .lgr-cs-worry li::before {
   content: ""; position: absolute; inset-inline-start: 3px; top: 8px;
-  width: 5px; height: 5px; border-radius: 99px; background: var(--neg);
+  width: 5px; height: 5px; border-radius: 99px; background: var(--lgr-4);
 }
+.lgr-cs-worry li[data-sev="critical"],
+.lgr-cs-worry li[data-sev="high"] { color: #7d1229; font-weight: 600; }
+.lgr-cs-worry li[data-sev="critical"]::before,
+.lgr-cs-worry li[data-sev="high"]::before { background: var(--neg); }
+.lgr-cs-worry li[data-sev="medium"] { color: var(--warn); }
+.lgr-cs-worry li[data-sev="medium"]::before { background: var(--warn); }
+
+/* A charge nobody is paying: the word, in the neg tone, where a figure would
+   claim a payment that is not made — see MonthlyCell. */
+.lgr-cs-unpaid { display: block; font-family: var(--ui); font-size: 13px; font-weight: 700; color: var(--neg); line-height: 1.3; }
 
 .lgr-cs-foot {
   display: flex; align-items: flex-end; justify-content: space-between; gap: 16px;
@@ -3001,9 +3144,158 @@ html:has(.lgr-root) {
 }
 
 /* A HEADER OVER A PAIRED CELL.
-   The עוגן column holds two fields, so one start-aligned label left "מרווח %"
+   The עוגן column holds two fields, so one start-aligned label left "תוספת %"
    floating over the gap between them. This splits the header on the same
    1fr / 56px grid `.lgr-pair` uses, so each word sits over the box it names. */
 .lgr-th-pair { display: flex; align-items: baseline; gap: 0; }
 .lgr-th-pair > :first-child { flex: 1; min-width: 0; }
 .lgr-th-pair-b { flex: 0 0 56px; }
+
+/* --------------------------------------------- the master's money, apart */
+
+/* יתרת קרן / הצמדת קרן — the עוגן pair's construction on the balance.
+   The linkage box is 66px, not 56: it holds shekels, not a rate — "119,187" is
+   seven characters at 13px tabular and 56px clips the first of them. The
+   principal takes what is left of the 13% column, which at the page's width
+   is ~80px of digits — nine characters, i.e. a mortgage in the millions.
+   The header over it is split on the same seam so each word sits over its
+   box, exactly as עוגן % / תוספת % are. */
+.lgr-pair-money > .lgr-cell:last-child { flex: 0 0 66px; padding-inline: 7px; }
+.lgr-th-pair-money .lgr-th-pair-b { flex: 0 0 66px; }
+/* The header pair carries the column inset on its start edge already; the
+   second label needs its own so it lands over the box's digits. */
+.lgr-th-pair-money .lgr-th-pair-b { padding-inline-start: 2px; }
+
+/* הפרשי היוון — a stated cost among balances. It reads a step quieter than
+   the amounts (weight 500 rather than the well's 600, ink-2 rather than ink)
+   because it is not part of anything the row adds up to: it is the price of
+   leaving, and it should not be mistaken for a fourth balance. */
+.lgr-fee-in { padding-inline: 6px; font-weight: 500; color: var(--lgr-2); }
+.lgr-fee-in:not(:placeholder-shown) { color: var(--ink); }
+/* Its sums, in the group bar and the totals row, in the same register. */
+.lgr-fee-sum { color: var(--lgr-2) !important; font-weight: 500 !important; }
+
+/* THE SHARE, IN FIGURES, under the family chip.
+   On the master the אחוז column gave its width to the money, and the meter that
+   was already under the chip gains a label. Meter and figure share one line so
+   neither grows the cell: the meter takes the room, the figure takes 30px of it.
+   Held at the note's size and colour — it is a reading, and it sits beside the
+   chip that names the row rather than competing with it. */
+/* 8px tall, so chip + gap + line = 34px and the cell never outgrows the 36px
+   well beside it — the row's height is the well's, on the master as before. */
+.lgr-share-line { display: flex; align-items: center; gap: 5px; height: 8px; }
+.lgr-share-line > .lgr-share { flex: 1; min-width: 0; }
+.lgr-share-pct {
+  flex: none;
+  min-width: 26px;
+  font-family: var(--num);
+  font-variant-numeric: tabular-nums lining-nums;
+  font-size: 9.5px;
+  font-weight: 600;
+  line-height: 8px;
+  color: var(--lgr-3);
+  text-align: start;
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+/* "כולל עמלה" — the copy's receipt for a folded-in עמלת פרעון מוקדם. It sits on
+   the lender's meta line with ערב and משותף, in the mortgage identity's tint so
+   it reads as a fact about the row rather than a warning about it. */
+.lgr-tag-fee { background: var(--primary-tint); color: var(--primary-deep); }
+/* A hand-added row wraps its dash in the lender box to carry that tag; the box
+   already insets the column, so the dash must not inset it again. */
+.lgr-lender > .lgr-lender-none { padding-inline-start: 0; }
+
+/* ------------------------------------------------------- THE ASK DIALOGS ---
+   The board asks the advisor three things — שכפול עם/בלי עמלות, whether a
+   second client's report should be merged into this household, and whether to
+   leave a board with unsaved work — and all three now wear this. It began as
+   the שכפול dialog's own skin (.lgr-dup) and turned out to be the general
+   shape: one card, three bands — the name, the facts, the two answers.
+
+   400px: a seven-figure sum and its label on one line, no more. The body is a
+   question and a receipt, never prose — what an answer will do is stated as
+   the figures or the names it will act on, and the buttons say the rest. The
+   browser's own confirm() used to carry the other two questions: a grey OS
+   slab, "localhost:3500 says", two English buttons and three lines of Hebrew
+   explaining what OK meant. */
+.lgr-ask { width: min(100%, 400px); overflow: hidden; }
+.lgr-ask-head { padding: 12px 16px 10px; }
+.lgr-ask-sub { margin-top: 1px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.lgr-ask-body { padding: 12px 16px 4px; }
+/* the question — the page's UI voice at reading size, in the ink */
+.lgr-ask-q { margin: 0 0 10px; font-size: 13.5px; font-weight: 600; letter-spacing: -0.005em; color: var(--ink); }
+
+/* THE RECEIPT — a ledger in miniature: label at the start, figure at the end,
+   hairlines between, the sum ruled above like every subtotal on the sheet
+   behind it. A line that carries nothing (no linkage, no fees) stays but
+   steps back — a visible zero beats a line that comes and goes. */
+.lgr-ask-sheet {
+  margin: 0;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  background: #fff;
+  overflow: hidden;
+}
+.lgr-ask-line {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 7px 12px;
+  border-top: 1px solid var(--line);
+  font-size: 12.5px; color: var(--lgr-2);
+}
+.lgr-ask-line:first-child { border-top: 0; }
+.lgr-ask-line > dt { display: flex; align-items: baseline; gap: 7px; min-width: 0; margin: 0; }
+.lgr-ask-line > dt > em { font-style: normal; font-size: 11px; color: var(--lgr-4); white-space: nowrap; }
+.lgr-ask-line > dd { margin: 0; }
+/* A value that is a name rather than a figure — the client on the document,
+   the client on the board. It reads in the ink at the row's weight, takes
+   whatever room the label leaves, and ellipsizes rather than wrapping: these
+   lines are scanned as a pair, and a two-line one breaks the comparison. */
+.lgr-ask-v {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  color: var(--ink);
+  text-align: end;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lgr-ask-line[data-quiet] .lgr-ask-v { color: var(--lgr-4); font-weight: 500; }
+.lgr-ask-line-sum { border-top: 1.5px solid var(--ink); background: var(--card-2); color: var(--ink); font-weight: 700; }
+.lgr-ask-line-sum + .lgr-ask-line { border-top-color: var(--line-2); }
+.lgr-ask-line[data-quiet] { color: var(--lgr-4); }
+.lgr-ask-line[data-quiet] .lgr-money { color: var(--lgr-4); }
+
+/* THE TWO ANSWERS — the page's own small buttons, end-aligned like every
+   dialog's actions, the primary last. Each carries the sum it produces as a
+   quieter figure after its label. */
+.lgr-ask-acts {
+  display: flex; justify-content: flex-end; gap: 8px;
+  padding: 10px 16px 14px;
+}
+.lgr-ask-btn-m { margin-inline-start: 4px; opacity: 0.72; }
+.lgr-btn-primary .lgr-ask-btn-m { opacity: 0.85; }
+
+/* שת"פ / ע.נ.נ — two read-outs stacked in one cell.
+   Flat text, no well: on this grid a sunken field means "you may type here",
+   and neither of these is editable. The rate leads because it is the one that
+   compares to the ריבית column beside it; the shekel figure sits under it in
+   the muted weight calculated cells use everywhere else.
+   Tabular figures so the two lines align digit-for-digit down the column. */
+.lgr-yield {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding-inline: 6px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+}
+.lgr-yield-irr { font-size: 12px; color: var(--lgr-1); }
+.lgr-yield-npv { font-size: 10.5px; color: var(--lgr-4); }
+/* Sign is the meaning of ע.נ.נ, so it is the one thing that gets colour —
+   and only as type, never as a fill, so the row's family stripe stays the
+   loudest thing in it. */
+.lgr-yield-npv[data-sign="pos"] { color: var(--neg, #b4442e); }
+.lgr-yield-npv[data-sign="neg"] { color: var(--pos, #2f7d5b); }

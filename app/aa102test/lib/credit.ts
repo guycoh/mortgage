@@ -11,7 +11,10 @@ import { paths as STATIC_PATHS } from "@/app/data/paths";
 import type { CreditReport } from "@/lib/credit-parser/types";
 import type { BankStatement } from "@/lib/bank-parser/types";
 import { extractLoans, type ExtractedLoan } from "@/lib/credit-parser/loan-mapping";
+import { calculateLoan } from "@/app/private/crm/leads/simulators/components/calculate/loanCalculators";
 import type { Loan } from "@/app/private/crm/leads/simulators/components/LoanTable";
+import { creditReportPurpose } from "@/lib/bank-parser/purpose";
+import { purposeFrom, type PurposeId } from "./purposes";
 
 /** Which family a row belongs to. */
 export type DebtGroup = "mortgage" | "loan";
@@ -35,6 +38,51 @@ export const isSurety = (l: ImportedLoan) => !!l.is_guarantor;
 
 /** The client's own debts — what every total on the page is about. */
 export const owedOnly = (loans: ImportedLoan[]) => loans.filter((l) => !isSurety(l));
+
+/**
+ * החזר לשקל — what the mix repays for every shekel it borrowed.
+ *
+ * ONE DEFINITION, because three surfaces quote it under one name: the rail at
+ * the top of the board, the last row of השוואת תמהילים, and the export's
+ * masthead. Two of them computing it two ways is the same number disagreeing
+ * with itself in front of a client.
+ *
+ * The numerator is every shekel that leaves the account — `totalPaid`, not
+ * amount + interest, because an indexed track repays its PRINCIPAL in indexed
+ * shekels too and only totalPaid carries that.
+ *
+ * The denominator is the principal that produced those payments, which is not
+ * always the whole balance. A credit report imports a defaulted debt with no
+ * term at all — deliberately, so nothing fabricates a repayment for it — and
+ * such a row carries a balance while paying nothing. Divided by the whole
+ * balance, a mix would report a BETTER ratio the more unschedulable debt the
+ * client has. A quality figure that improves as the client's position worsens
+ * is worse than no figure, so the denominator is exactly the set of rows the
+ * numerator came from, and `unpriced` counts what that leaves out so the
+ * surface can say so.
+ *
+ * Takes the rows it is given and filters nothing: every caller has already
+ * decided what belongs in its total — guarantees never do, see isSurety.
+ */
+export function perShekel(
+  rows: ImportedLoan[],
+  annualInflation: number
+): { value: number; paid: number; principal: number; unpriced: number } {
+  let paid = 0;
+  let principal = 0;
+  let unpriced = 0;
+  for (const l of rows) {
+    const amount = Math.round(Number(l.amount) || 0);
+    const res = calculateLoan(l, annualInflation);
+    if (res.totalPaid > 0) {
+      paid += res.totalPaid;
+      principal += amount;
+    } else if (amount > 0) {
+      unpriced += 1;
+    }
+  }
+  return { value: principal ? paid / principal : 0, paid, principal, unpriced };
+}
 
 
 /** A Loan plus the provenance the UI colour-codes and labels by. */
@@ -65,8 +113,103 @@ export type ImportedLoan = Loan & {
    * carries the coarser answer. Both are the lender's claim, not ours.
    */
   source_purpose?: string;
+  /**
+   * מטרת ההלוואה on the board's own list (see lib/purposes) — what the row IS
+   * for, as one of eleven words. Filled from the document on import (through
+   * purposeFrom), editable in the מטרה column, persisted in `loans.purpose`.
+   * Null on rows saved before the column existed: the cell shows a dash rather
+   * than inventing a purpose for a mortgage nobody classified.
+   */
+  purpose?: PurposeId | null;
   /** True when the document says this is state money — a הלוואת זכאות. */
   source_eligibility?: boolean;
+
+  /* --- WHAT MAKES A DEBT THE SAME DEBT IN SOMEBODY ELSE'S REPORT ------------
+
+     A household's joint mortgage is printed IN FULL on both spouses' reports,
+     and the two reports are almost never pulled on the same morning. So the
+     figures that describe the debt TODAY — the balance, the months left — are
+     different in the two documents by exactly the amortisation between them,
+     and they cannot identify it. What can: the day the loan was taken, the day
+     it is due to end, and how much was borrowed. None of the three moves.
+
+     Both come straight off the credit report (201-016, 201-018, 201-045) and
+     off a bank letter's tranche. They are what `loanKey` keys on; see it for
+     what happens when a document prints none of them. --- */
+  /** תאריך פתיחה — 201-016, as printed (dd/mm/yyyy). */
+  source_start_date?: string;
+  /** סכום מקורי — 201-045. 0 when the document did not print one. */
+  source_orig_amount?: number;
+  /**
+   * החזר חודשי exactly as the document printed it (201-046).
+   *
+   * Absent when the document printed none — which is a different fact from a
+   * printed zero, and the export says which. The board goes on pricing rows with
+   * the engine, because that is what lets an advisor change one and see the
+   * effect; the EXPORT is a reproduction of the document and shows this.
+   */
+  source_monthly?: number;
+  /**
+   * The row as it stood when that payment was true — see `monthlyBasis` for the
+   * fields it covers: the money, the term, the schedule and both grace periods.
+   *
+   * The printed payment is a statement about a specific debt repaid a specific
+   * way. Change any of those and it becomes a statement about a loan that no
+   * longer exists on this row, so the export falls back to the engine and says
+   * so in the הערות column.
+   */
+  source_monthly_basis?: string;
+  /**
+   * תדירות התשלומים — 201-044, as printed, but only when it is NOT monthly.
+   *
+   * Set on the handful of debts the grid has to price monthly without their
+   * actually being monthly, so every surface that quotes their החזר חודשי can
+   * say it is an annualised equivalent rather than a figure the bank stated.
+   */
+  source_frequency?: string;
+  /**
+   * Whose documents this row was found in, in load order.
+   *
+   * A merged row is one debt that two people's reports both listed; naming them
+   * is what lets the משותף tag say WHO, rather than leaving the advisor to
+   * guess which pair of documents agreed.
+   */
+  shared_with?: string[];
+
+  /* --- THE MASTER'S SPLIT — what the client owes, the way the bank prints it.
+
+     `amount` stays the balance every calculation reads: principal PLUS the
+     linkage that has accrued on it, which is the sum a payoff letter calls
+     יתרה and the sum a recycle has to cover. The two fields below take that one
+     figure apart on the master mix only, where the row is a fact read off a
+     document rather than a proposal:
+
+       יתרת קרן   = amount − indexation     (the nominal principal)
+       הצמדת קרן  = indexation              (שיערוך / הפרשי הצמדה on it)
+
+     Kept as the INDEXATION rather than as the principal so that a row carrying
+     neither — a credit-report import, a hand-typed line, every row saved before
+     this existed — is unchanged: no indexation, so the principal IS the amount,
+     and nothing downstream has to learn a second field. See principalOf. --- */
+  /** הצמדת קרן — the part of `amount` that is linkage uplift, not principal. */
+  indexation?: number | null;
+  /**
+   * הפרשי היוון — עמלת פרעון מוקדם, what breaking this tranche costs today.
+   *
+   * NOT part of `amount`: it is not owed until the tranche is repaid early, so
+   * it prices nothing on the master. It exists for the one moment it matters —
+   * duplicating the master into a proposal, where the advisor chooses whether
+   * the new mortgage has to fund it (שכפול עם עמלות) or not.
+   */
+  prepayment_fee?: number | null;
+  /**
+   * On a row that came out of שכפול עם עמלות: how much of `amount` is the fee
+   * that was folded in. Provenance for the copy — it lets the proposal say
+   * "כולל הפרשי היוון ₪12,400" under a balance that is bigger than the
+   * master's. Session-only, like the anchor_* fields: the amount is what is
+   * saved, and the amount is right.
+   */
+  fee_folded?: number;
 
   /* --- עדכון עוגנים. Session fields: the save route writes an explicit column
      whitelist, so none of these need a migration and none of them survive a
@@ -84,6 +227,23 @@ export type ImportedLoan = Loan & {
   anchor_asof?: string;
   /** Which published table it came from: "עוגן אג"ח צמוד מדד", "ריבית פריים". */
   anchor_source?: string;
+  /**
+   * The family key behind `anchor_source`, kept because the LABEL is prose and
+   * this is an identity. It answers the one question the refresh cannot answer
+   * from the number alone: is this row still priced off the same table it was
+   * priced off last time? A prime anchor and a bond anchor that happen to be
+   * worth the same today are not the same anchor, and treating them as one is
+   * how "already current" ends up stamped on a row that was never priced.
+   */
+  anchor_family?: string;
+  /**
+   * The track changed under the anchor, so the anchor was dropped.
+   *
+   * Not the same as "never had one": this row HAD an anchor and it belonged to
+   * the track it used to be. The flag is what lets the cell say so — a warned,
+   * empty field — instead of quietly reading as a row nobody ever priced.
+   */
+  anchor_void?: boolean;
   /** False when the value came from a secondary source rather than the bank's own. */
   anchor_verified?: boolean;
   /** Older than its family republishes — still the latest published value. */
@@ -93,6 +253,74 @@ export type ImportedLoan = Loan & {
   /** Why the refresh declined to price this row. Shown on the עוגן cell's tooltip. */
   anchor_note?: string;
 };
+
+/* ------------------------------------------------------ the master's split */
+
+const money = (v: unknown) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+};
+
+/** הצמדת קרן on the row — 0 where the document (or the advisor) stated none. */
+export const indexationOf = (l: ImportedLoan) => Math.max(0, Math.round(money(l.indexation)));
+/** הפרשי היוון on the row — 0 where none was stated. */
+export const feeOf = (l: ImportedLoan) => Math.max(0, Math.round(money(l.prepayment_fee)));
+/**
+ * יתרת קרן — the nominal principal, which is the balance less the linkage on
+ * it. Floored at 0: an indexation typed larger than the balance is a data-entry
+ * slip, not a negative principal, and the cell shows 0 until it is corrected.
+ */
+export const principalOf = (l: ImportedLoan) =>
+  Math.max(0, Math.round(money(l.amount)) - indexationOf(l));
+
+/**
+ * The master's money, added up the way its columns are laid out. `balance` is
+ * Σamount — the same figure the rail and the totals row already state — and the
+ * three parts are what the duplicate dialog quotes back before it acts.
+ */
+export function masterTotals(rows: ImportedLoan[]) {
+  let principal = 0;
+  let indexation = 0;
+  let fee = 0;
+  let balance = 0;
+  for (const l of rows) {
+    principal += principalOf(l);
+    indexation += indexationOf(l);
+    fee += feeOf(l);
+    balance += Math.round(money(l.amount));
+  }
+  return { principal, indexation, fee, balance, withFees: balance + fee };
+}
+
+/**
+ * ONE ROW OF THE MASTER, AS A ROW OF A PROPOSAL.
+ *
+ * The bank prints יתרת קרן and הצמדת קרן apart; a proposal borrows one sum. So
+ * the copy's amount is the two added back together — which is what `amount`
+ * already holds — plus, when the advisor said so, the עמלת פרעון מוקדם the new
+ * mortgage will have to fund. The split and the fee are the master's facts and
+ * do not travel: a proposal that still carried a "fee" would look, on a
+ * reload, like a master with a fee to fold in.
+ *
+ * `fee_folded` is the receipt — see the field's note.
+ */
+export function foldMasterRow(l: ImportedLoan, withFees: boolean, mixId: string): ImportedLoan {
+  const fee = withFees ? feeOf(l) : 0;
+  // `amount` IS principal + indexation — the balance the rail already states —
+  // so it is taken as it stands rather than re-derived from the two parts.
+  const balance = Math.round(money(l.amount));
+  const { indexation: _i, prepayment_fee: _f, fee_folded: _ff, ...rest } = l;
+  void _i;
+  void _f;
+  void _ff;
+  return {
+    ...rest,
+    id: crypto.randomUUID(),
+    mix_id: mixId,
+    amount: balance + fee,
+    ...(fee > 0 ? { fee_folded: fee } : {}),
+  };
+}
 
 /* ------------------------------------------------------------------ paths */
 
@@ -237,6 +465,44 @@ export const isIndexedPath = (pathId: number) =>
 /* ------------------------------------------------------------- conversion */
 
 /**
+ * The identity of the debt a printed payment describes. See `source_monthly_basis`.
+ *
+ * Grace and the amortisation schedule are in the signature, not just the money.
+ * The bank's figure describes a debt repaid a particular WAY, so putting a row
+ * into grace — or switching it to a balloon — invalidates it exactly as surely
+ * as changing the balance does. Left out, a row an advisor had just moved into
+ * six months of full grace went on exporting the ₪1,059 the report printed for
+ * a row that was amortising from month one.
+ */
+export function monthlyBasis(
+  amount: number,
+  rate: number,
+  months: number,
+  scheduleId: number = 1,
+  graceFull: number = 0,
+  gracePartial: number = 0
+): string {
+  return `${Math.round(amount)}|${rate}|${months}|${scheduleId}|${graceFull}|${gracePartial}`;
+}
+
+/**
+ * The payment the DOCUMENT stated for this row, or null when it stated none —
+ * or when the row has since been edited into a different debt.
+ */
+export function reportedMonthly(l: ImportedLoan): number | null {
+  if (!(Number(l.source_monthly) > 0)) return null;
+  const now = monthlyBasis(
+    Number(l.amount) || 0,
+    Number(l.rate) || 0,
+    Number(l.months) || 0,
+    Number(l.amortization_schedule_id) || 1,
+    Number(l.grace_full_months) || 0,
+    Number(l.grace_partial_months) || 0
+  );
+  return l.source_monthly_basis === now ? Number(l.source_monthly) : null;
+}
+
+/**
  * The anchor's own rate: what is left of the quoted rate once the margin over the
  * anchor is taken out. Null without a margin — an unanchored fixed rate is not an
  * anchor, and returning the rate itself would present it as one.
@@ -268,7 +534,17 @@ function toLoanRow(src: ExtractedLoan, mixId: string, group: DebtGroup): Importe
     // both so an imported date survives a round-trip.
     loan_end_date: iso,
     end_date: iso,
-    amortization_schedule_id: 1, // שפיצר — what a bank mortgage almost always is
+    // שפיצר is what a bank mortgage almost always is — but not always, and the
+    // report says which. 201-047 naming ריבית without קרן means the instalment
+    // is buying no equity, and בלון חלקי is this engine's word for exactly that:
+    // interest every month, principal at the end. Amortising those anyway
+    // overstated one household's mortgage by ₪732/mo (11%).
+    //
+    // It is the honest reading rather than a guess. The report states today's
+    // instalment; it does not state when principal starts (201-054 and 201-055
+    // are blank), so nothing here picks a grace length — the row is the document,
+    // and an advisor who learns the real one sets it in the row sheet.
+    amortization_schedule_id: src.interestOnly ? 3 : 1,
     grace_type_id: 1, // ללא
     grace_months: 0,
     // The numeric column is the anchor's own RATE. The report does not print it,
@@ -290,7 +566,23 @@ function toLoanRow(src: ExtractedLoan, mixId: string, group: DebtGroup): Importe
     // The report's own words where it printed any. Where it printed none, the
     // column stays empty rather than showing the normalised guess — a credit
     // report that does not state a purpose has not stated one.
+    // What identifies this debt in the spouse's report too — see loanKey.
+    source_start_date: src.startDate,
+    source_orig_amount: src.origAmount || undefined,
+    source_frequency: src.nonMonthly ? src.paymentFrequency : undefined,
+    source_monthly: src.knownPayment > 0 ? src.knownPayment : undefined,
+    source_monthly_basis: monthlyBasis(
+      Math.round(src.balance),
+      Number(src.interest) || 0,
+      Number(src.months) || 0,
+      src.interestOnly ? 3 : 1,
+      0,
+      0
+    ),
     source_purpose: src.purpose,
+    // The report's coarse 201-017, read the way the parsers read it (a
+    // mortgage's צריכה פרטית is כל מטרה), then placed on the board's list.
+    purpose: purposeFrom(creditReportPurpose(src.purpose, src.type), src.purpose, group),
     source_eligibility: src.eligibility,
   };
 }
@@ -395,52 +687,149 @@ export function importReportToLoans(
 /* ----------------------------------------------------- more than one report */
 
 /**
- * A household's two reports overlap. A jointly-held mortgage is listed in full
- * on both spouses' דוח ריכוז נתונים, so importing both naively doubles the
- * balance and the monthly payment — the two numbers this whole page is about.
+ * A household's two reports overlap, and that is the whole problem.
  *
- * The identity of a debt across two reports is the lender plus the shape of the
- * obligation: same bank, same balance, same rate, same remaining term, same
- * track. The balance is bucketed to ₪50 because two reports are rarely pulled
- * the same morning and a month of amortization moves it slightly; anything
- * coarser started merging genuinely separate loans from the same bank.
+ * A jointly-held mortgage is listed IN FULL on both spouses' דוח ריכוז נתונים.
+ * Import both naively and the board says the couple owes twice what they owe —
+ * the two numbers this page exists to state.
+ *
+ * WHAT CANNOT IDENTIFY A DEBT: what it looks like today. The two documents are
+ * almost never pulled on the same morning, so between them the balance has
+ * amortised and the remaining term is shorter. A key built on balance + months
+ * (which is what this used to be, bucketed to ₪50) misses the joint mortgage in
+ * every real household: six weeks apart, a ₪900,000 tranche is ₪896,540 with
+ * 239 months left instead of 240, and the two rows key differently. Verified —
+ * that is how a ₪1.32M mortgage came to be shown as ₪2.63M.
+ *
+ * WHAT CAN: when it was taken, when it ends, and how much was borrowed. None of
+ * the three moves between two readings of the same debt, and together they are
+ * specific enough to keep two tranches of one mortgage apart. Both documents
+ * carry them — the credit report as 201-016 / 201-018 / 201-045, a bank letter
+ * on the tranche itself.
+ *
+ * `null` when the document printed too little to identify the row this way; the
+ * caller then falls back to matching by shape, with tolerances — see
+ * `looseMatch`. A hand-added row has no identity at all and never merges.
  */
-export function loanKey(l: ImportedLoan): string {
+export function loanKey(l: ImportedLoan): string | null {
+  const start = (l.source_start_date ?? "").trim();
+  const end = (l.loan_end_date ?? l.end_date ?? "").trim();
+  const orig = Math.round(Number(l.source_orig_amount) || 0);
+  // Two of the three, at least: an end date alone is shared by every tranche of
+  // one mortgage, and an original amount alone repeats across round-numbered
+  // consumer loans. Two together have not collided on any real report here.
+  const stated = [start, end, orig > 0 ? String(orig) : ""].filter(Boolean);
+  if (stated.length < 2) return null;
   return [
     l.group ?? "mortgage",
     (l.source_bank ?? "").replace(/\s+/g, ""),
-    Math.round((Number(l.amount) || 0) / 50),
-    (Number(l.rate) || 0).toFixed(2),
-    Number(l.months) || 0,
-    (l.source_track ?? "").replace(/\s+/g, ""),
+    start,
+    end,
+    orig,
   ].join("|");
 }
 
 /**
- * Fold a further report's rows into the mix. Anything already present is
- * marked shared rather than added again, and the count comes back so the UI
- * can say what it did instead of silently dropping rows.
+ * The fallback, for rows whose document printed no dates and no original sum.
+ *
+ * Same lender, same family, same track, and figures close enough to be one debt
+ * read on two days: the balance within 3% (a month of amortisation on a
+ * mortgage is well under 1%, and the two documents are rarely more than a
+ * quarter apart), the term within six months, the rate to the tenth. It is
+ * deliberately unwilling — a false merge hides a real debt from the client,
+ * which is worse than showing one twice — so it also refuses to match anything
+ * with no balance at all.
+ */
+function looseMatch(a: ImportedLoan, b: ImportedLoan): boolean {
+  const bank = (x: ImportedLoan) => (x.source_bank ?? "").replace(/\s+/g, "");
+  if (!bank(a) || bank(a) !== bank(b)) return false;
+  if ((a.group ?? "mortgage") !== (b.group ?? "mortgage")) return false;
+  if ((a.source_track ?? "").replace(/\s+/g, "") !== (b.source_track ?? "").replace(/\s+/g, "")) return false;
+  const av = Math.round(Number(a.amount) || 0);
+  const bv = Math.round(Number(b.amount) || 0);
+  if (av <= 0 || bv <= 0) return false;
+  // A term is what makes two figures comparable at all. Without one there is
+  // nothing to amortise and nothing to bound the drift by, and two unrelated
+  // balances that happen to sit close would fold into one.
+  if ((Number(a.months) || 0) <= 0 || (Number(b.months) || 0) <= 0) return false;
+  if (Math.abs(av - bv) > Math.max(av, bv) * 0.03) return false;
+  if (Math.abs((Number(a.months) || 0) - (Number(b.months) || 0)) > 6) return false;
+  if (Math.abs((Number(a.rate) || 0) - (Number(b.rate) || 0)) > 0.1) return false;
+  return true;
+}
+
+/**
+ * Fold a further report's rows into the mix.
+ *
+ * A debt already on the board is marked shared rather than added again, and the
+ * count comes back so the UI can say what it did instead of silently dropping
+ * rows. Matching is ONE-TO-ONE: a matched row is consumed, so a couple who both
+ * hold two identical ₪250,000 tranches end up with two rows and not one — the
+ * old map never removed its hit, and every incoming twin folded onto the same
+ * existing row, losing a debt each time.
+ *
+ * The row that stays is the one already on the board, figures and all. It may
+ * carry the advisor's own edits by now, and overwriting those with a second
+ * document's view of the same debt would undo work without saying so.
  */
 export function mergeReportLoans(
   existing: ImportedLoan[],
-  incoming: ImportedLoan[]
+  incoming: ImportedLoan[],
+  /** Whose report the incoming rows came from — recorded on what they match. */
+  from = ""
 ): { merged: ImportedLoan[]; duplicates: number } {
-  const at = new Map<string, number>();
-  const merged = existing.map((l, i) => {
-    at.set(loanKey(l), i);
-    return { ...l };
+  const merged = existing.map((l) => ({ ...l }));
+  /** Indices still available to match against — one debt, one partner. */
+  const free = new Set(merged.map((_, i) => i));
+
+  const byKey = new Map<string, number[]>();
+  merged.forEach((l, i) => {
+    const k = loanKey(l);
+    if (!k) return;
+    const list = byKey.get(k);
+    if (list) list.push(i);
+    else byKey.set(k, [i]);
   });
+
+  const claim = (i: number, l: ImportedLoan) => {
+    free.delete(i);
+    const seen = merged[i].shared_with ?? [];
+    // ROLE IS RESOLVED, NOT INHERITED. One spouse can guarantee the very loan
+    // the other owes, and both reports print it. Whichever document arrived
+    // first used to decide: drop the guarantor's report first and the debt was
+    // filed as a guarantee — which isSurety keeps out of every total, so the
+    // household's loan silently vanished from the board's balance and monthly.
+    // A debt anybody in the household OWES is owed.
+    const owed = !l.is_guarantor || !merged[i].is_guarantor;
+    merged[i] = {
+      ...merged[i],
+      is_guarantor: !owed,
+      is_shared: true,
+      shared_with: from && !seen.includes(from) ? [...seen, from] : seen,
+    };
+  };
 
   let duplicates = 0;
   for (const l of incoming) {
     const k = loanKey(l);
-    const hit = at.get(k);
-    if (hit !== undefined) {
-      merged[hit] = { ...merged[hit], is_shared: true };
+    const slot = k ? (byKey.get(k) ?? []).find((i) => free.has(i)) : undefined;
+    if (slot !== undefined) {
+      claim(slot, l);
       duplicates += 1;
       continue;
     }
-    at.set(k, merged.length);
+    // Nothing identified it. Try the shape, against rows nobody has claimed.
+    const loose = k === null ? Array.from(free).find((i) => looseMatch(merged[i], l)) : undefined;
+    if (loose !== undefined) {
+      claim(loose, l);
+      duplicates += 1;
+      continue;
+    }
+    // ONLY ACROSS DOCUMENTS. An appended row is NOT registered as a candidate,
+    // so two debts that look alike inside the SAME report stay two debts. The
+    // old map registered them, and a report holding two ₪200,000 tranches at
+    // one bank came in as one row — a lost debt, reported to the advisor as a
+    // household overlap that never happened.
     merged.push(l);
   }
   return { merged, duplicates };

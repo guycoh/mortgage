@@ -46,6 +46,42 @@ export interface ExtractedLoan {
   purpose: string;
   /** הלוואת משכנתה מסובסדת ע"י משרד השיכון (remark 201-060) — a הלוואת זכאות. */
   eligibility: boolean;
+  /** סוג התשלום החודשי הצפוי (201-047), verbatim — "" when the cell is blank. */
+  paymentType: string;
+  /** תדירות התשלומים (201-044), verbatim — "חודשי", "שנתי", "" when blank. */
+  paymentFrequency: string;
+  /**
+   * The debt is NOT repaid monthly (201-044 says something other than חודשי).
+   *
+   * This is why a zero in 201-046 must never be read as "the bank didn't say".
+   * That field is סכום התשלום *החודשי* הצפוי, so on an annual loan it is 0
+   * because there is no monthly payment to state — and this household has one:
+   * a ₪32,859 Leumi loan on תדירות שנתי, last paid 10/06/2026, next due June
+   * 2027. Nothing read 201-044 before, so it was modelled as an ordinary
+   * monthly debt and ₪392/mo of outflow that never happens went into the
+   * board, the analysis and "יוצא מהחשבון כל חודש" on the client's summary.
+   *
+   * The engine has no cadence but monthly, so the row is still PRICED monthly —
+   * a debt shown at ₪0/mo would vanish from affordability while its schedule
+   * quietly amortised the balance anyway. What changes is that the figure is
+   * now labelled an annualised equivalent instead of passing as reported.
+   */
+  nonMonthly: boolean;
+  /**
+   * The instalment buys no equity: 201-047 names ריבית without naming קרן
+   * ("ריבית", "ריבית והצמדה"), so the payment is the month's interest and the
+   * principal is untouched — a tranche in גרייס, or one built that way.
+   *
+   * It matters because it is the difference between two very different numbers.
+   * A ₪212,143 tranche at 4.40% pays ₪778 a month while it is interest-only and
+   * ₪1,103 once it amortises over its remaining 334 months; reading the type as
+   * decoration and amortising anyway overstated this household's mortgage by
+   * ₪732 a month. What the report does NOT say is how long the grace lasts —
+   * 201-054 (בלון) and 201-055 (תחילת התשלום הדחוי) are both blank on every one
+   * of them — so nothing here invents an end for it. See the schedule choice in
+   * app/aa102test/lib/credit.ts.
+   */
+  interestOnly: boolean;
   /** תדירות שינוי — derived, because this report has no field for it. */
   changeFrequency: string;
   /** עוגן (201-034) of the dominant track, e.g. "ריבית פריים" ("" when blank). */
@@ -178,6 +214,14 @@ function isLoanOrMortgage(t: Transaction): boolean {
 
 const OVERDRAFT_RE = /עובר ושב|עו["״]?ש/;
 const CARD_RE = /מסגרת|כרטיס/;
+// 201-047 spells the instalment out in words: "קרן וריבית", "קרן, ריבית והצמדה",
+// "ריבית", "ריבית והצמדה", and on revolving facilities plain "קרן". Interest
+// without principal is the case that changes the arithmetic, so both halves are
+// tested rather than matching "ריבית" alone — "קרן, ריבית והצמדה" contains it too.
+const INTEREST_ONLY_RE = /ריבית/;
+const PRINCIPAL_RE = /קרן/;
+/** 201-044's monthly answer. Anything else is a cadence the grid cannot model. */
+const MONTHLY_RE = /חודשי/;
 
 /** Classify a transaction into its BDI page-2 section. */
 export function liabilityCategory(t: Transaction): LiabilityCategory {
@@ -310,6 +354,12 @@ function deriveLoan(t: Transaction, asOf: Date): ExtractedLoan {
   const knownPayment = parseNum(t.fields["201-046"]);
   const mortgage = isMortgageTxn(t);
   const anchor = anchorOf(t.interestTracks);
+  const paymentType = t.fields["201-047"] ?? "";
+  const interestOnly = INTEREST_ONLY_RE.test(paymentType) && !PRINCIPAL_RE.test(paymentType);
+  const paymentFrequency = (t.fields["201-044"] ?? "").trim();
+  // Blank counts as monthly: it is the overwhelming default, and every debt the
+  // grid can model is monthly anyway. Only a stated non-monthly cadence is news.
+  const nonMonthly = paymentFrequency !== "" && !MONTHLY_RE.test(paymentFrequency);
 
   // 1) Remaining months from the planned end date (independent of interest).
   //
@@ -329,10 +379,18 @@ function deriveLoan(t: Transaction, asOf: Date): ExtractedLoan {
   }
 
   // 2) Interest from the tracks; if none, back-solve from the known payment.
+  //
+  // The back-solve assumes the payment is retiring principal, so it cannot be
+  // pointed at an interest-only tranche — there the payment IS the interest,
+  // and the rate falls straight out of it.
   let interest = interestFromTracks(t);
-  if (interest === "" && knownPayment > 0 && balance > 0 && months) {
-    const r = solveMonthlyRate(balance, knownPayment, months);
-    if (r > 0) interest = round2(r * 12 * 100);
+  if (interest === "" && knownPayment > 0 && balance > 0) {
+    if (interestOnly) {
+      interest = round2((knownPayment / balance) * 12 * 100);
+    } else if (months) {
+      const r = solveMonthlyRate(balance, knownPayment, months);
+      if (r > 0) interest = round2(r * 12 * 100);
+    }
   }
 
   // 3) Months still unknown? back-solve from the known payment + interest —
@@ -348,8 +406,17 @@ function deriveLoan(t: Transaction, asOf: Date): ExtractedLoan {
   }
 
   const rMonthly = parseFloat(interest || "0") / 100 / 12;
+  // An interest-only instalment is the month's interest and nothing else, and it
+  // does not need a term to be known — which is just as well, because a tranche
+  // whose principal never falls due has no amortisation to measure.
   const monthlyPayment =
-    balance > 0 && months ? Math.round(payment(balance, rMonthly, months)) : 0;
+    balance <= 0
+      ? 0
+      : interestOnly
+        ? Math.round(balance * rMonthly)
+        : months
+          ? Math.round(payment(balance, rMonthly, months))
+          : 0;
 
   return {
     uid: t.uid,
@@ -366,6 +433,10 @@ function deriveLoan(t: Transaction, asOf: Date): ExtractedLoan {
     // and that remark is the only place either document type states it outright
     // besides Mizrahi's per-part סוג ההלוואה.
     eligibility: (t.remarks ?? []).some((r) => SUBSIDISED_RE.test(r)),
+    paymentType,
+    interestOnly,
+    paymentFrequency,
+    nonMonthly,
     changeFrequency: changeFrequency(t.interestTracks),
     anchorName: anchor.name,
     anchorMargin: anchor.margin,

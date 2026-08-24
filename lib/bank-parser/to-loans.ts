@@ -16,6 +16,7 @@ import { freqLabel } from "@/lib/rate-frequency";
 import { monthsBetween, toDate } from "./text";
 import type { BankStatement, BankTranche } from "./types";
 import { PURPOSE_LABEL } from "./purpose";
+import { purposeFrom, type PurposeId } from "@/app/aa102test/lib/purposes";
 
 /**
  * Which of the five canonical tracks this tranche is.
@@ -129,6 +130,14 @@ function toRow(t: BankTranche, mixId: string, st: BankStatement): ImportedLoan {
     mix_id: mixId,
     path_id: pathIdOf(t),
     amount: Math.round(t.balance ?? 0),
+    // The balance, taken apart the way the letter prints it. `amount` above is
+    // principal + indexation and stays the figure everything computes on;
+    // these two let the master show יתרת קרן and הצמדת קרן as separate cells,
+    // and carry the עמלת פרעון מוקדם that a שכפול עם עמלות folds into the copy.
+    // Null where the template does not print the line — a missing figure is
+    // not a zero.
+    indexation: t.indexation === null || t.indexation === undefined ? null : Math.round(t.indexation),
+    prepayment_fee: t.breakFee === null || t.breakFee === undefined ? null : Math.round(t.breakFee),
     rate: t.rate ?? 0,
     months: termOf(t, st.statementDate),
     loan_end_date: end,
@@ -155,9 +164,23 @@ function toRow(t: BankTranche, mixId: string, st: BankStatement): ImportedLoan {
     // The lender's own wording, not the normalised label: on the board an
     // advisor is reading against the letter in front of them, and "רכישת דירה
     // יד שניה" is a fact the letter states that "רכישת דירה" rounds off.
+    // The tranche's own identity, for the merge — see loanKey in lib/credit.
+    source_start_date: t.startDate,
+    source_orig_amount: t.originalAmount ?? undefined,
     source_purpose: t.purpose || PURPOSE_LABEL[t.purposeKind],
+    // The board's own eleven-word list, from the kind and the raw wording —
+    // the raw wording first, because it alone can say גישור or קבוצת רכישה.
+    purpose: purposeFrom(t.purposeKind, t.purpose, "mortgage"),
     source_eligibility: t.funding === "eligibility",
-  } as ImportedLoan & { anchor_margin: number | null; anchor_interval: number | null };
+  } as ImportedLoan & {
+    anchor_margin: number | null;
+    anchor_interval: number | null;
+    indexation: number | null;
+    prepayment_fee: number | null;
+    purpose: PurposeId;
+    source_start_date: string;
+    source_orig_amount: number | undefined;
+  };
 }
 
 /** A readable track name when the lender's own wording is missing. */

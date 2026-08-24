@@ -17,7 +17,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { LogOut, Search } from "lucide-react";
+import { Activity as ActivityIcon, HeartPulse, LayoutDashboard, ListChecks, LogOut, Search, Users } from "lucide-react";
 import { Scope } from "./ui/marks";
 import type { Dashboard } from "./aggregate";
 import { Activity, Health, Overview, People, Work } from "./Views";
@@ -33,36 +33,47 @@ import "./console.css";
 
 type ViewKey = "work" | "activity" | "overview" | "people" | "health";
 
-const VIEWS: { key: ViewKey; label: string; title: string; hint: string }[] = [
+/**
+ * The screens, in the order the rail reads. Each carries its own glyph: a
+ * menu of five Hebrew words is scanned by shape, and five shapes are found
+ * faster than five words. The numbers that used to prefix them are gone —
+ * "01…05" said nothing about the screens and dressed the rail as an index.
+ */
+const VIEWS: { key: ViewKey; label: string; title: string; hint: string; icon: React.ComponentType<{ className?: string; strokeWidth?: number }> }[] = [
   {
     key: "work",
     label: "פעילות",
     title: "כל הפעולות",
     hint: "כל ייבוא דוח וכל ייצוא אקסל — מי, על מי, ומתי",
+    icon: ListChecks,
   },
   {
     key: "activity",
     label: "ביקורים",
     title: "ביקורים",
     hint: "כל ישיבת עבודה בבורד, על ציר הזמן",
+    icon: ActivityIcon,
   },
   {
     key: "overview",
     label: "סקירה",
     title: "סקירה",
     hint: "נפח, מקצב ומסלול העבודה בחלון הנבחר",
+    icon: LayoutDashboard,
   },
   {
     key: "people",
     label: "נציגים",
     title: "נציגים ולקוחות",
     hint: "מי משתמש בכלי ועל מי",
+    icon: Users,
   },
   {
     key: "health",
     label: "תקינות",
     title: "תקינות",
     hint: "מה נשבר, מה נדחה, ומאיפה המסך קורא",
+    icon: HeartPulse,
   },
 ];
 
@@ -148,21 +159,18 @@ export default function Console({
                 <span className="block truncate text-[14px] leading-tight font-semibold tracking-tight">
                   מוקד הסימולטור
                 </span>
-                <span className="block font-[family-name:var(--cns-mono)] text-[9px] tracking-[0.18em] text-cns-mutedfg uppercase">
-                  control
-                </span>
+                <span className="block text-[11px] leading-tight text-cns-mutedfg">ניטור הבורד</span>
               </span>
             </div>
 
-            <div className="px-2 pb-2 font-[family-name:var(--cns-mono)] text-[9px] tracking-[0.18em] text-cns-mutedfg uppercase">
-              מסכים
-            </div>
-
-            {/* A numbered index, not an icon menu. */}
-            <nav className="flex flex-col">
-              {VIEWS.map((v, i) => {
+            {/* Five screens, five glyphs, and the count of what each screen is
+                about at its end. 38px rows: a rail item is a target first and a
+                label second. */}
+            <nav className="flex flex-col gap-0.5" aria-label="מסכי המוקד">
+              {VIEWS.map((v) => {
                 const c = counts[v.key];
                 const on = v.key === view;
+                const Icon = v.icon;
                 return (
                   <button
                     key={v.key}
@@ -170,24 +178,24 @@ export default function Console({
                     onClick={() => setView(v.key)}
                     aria-current={on ? "page" : undefined}
                     className={
-                      "group relative flex items-center gap-2.5 rounded-md px-2 py-[7px] text-start text-[13px] transition-colors " +
+                      "group relative flex h-[38px] items-center gap-2.5 rounded-lg px-2.5 text-start text-[13.5px] transition-colors " +
                       (on ? "bg-cns-muted font-semibold text-cns-fg" : "text-cns-fg2 hover:bg-cns-muted/60 hover:text-cns-fg")
                     }
                   >
-                    <span
-                      className={
-                        "font-[family-name:var(--cns-mono)] text-[10px] tabular-nums " +
-                        (on ? "text-cns-accent" : "text-cns-mutedfg/70")
-                      }
-                    >
-                      {String(i + 1).padStart(2, "0")}
-                    </span>
+                    <Icon
+                      className={"size-4 flex-none " + (on ? "text-cns-accent" : "text-cns-mutedfg group-hover:text-cns-fg2")}
+                      strokeWidth={1.9}
+                    />
                     {v.label}
                     {c.n != null ? (
                       <span
                         className={
-                          "cns-num ms-auto text-[11px] " +
-                          (c.bad ? "text-cns-bad" : on ? "text-cns-fg2" : "text-cns-mutedfg/80")
+                          "cns-num ms-auto rounded-md px-1.5 py-px text-[11px] " +
+                          (c.bad
+                            ? "bg-cns-bad/10 text-cns-bad"
+                            : on
+                              ? "bg-cns-card text-cns-fg2 shadow-[0_0_0_1px_var(--cns-line)]"
+                              : "text-cns-mutedfg")
                         }
                       >
                         {num(c.n)}
@@ -196,7 +204,7 @@ export default function Console({
                     {on ? (
                       <span
                         aria-hidden
-                        className="absolute inset-y-1.5 -end-3 w-[2px] rounded-full bg-cns-accent"
+                        className="absolute inset-y-2 -end-3 w-[2px] rounded-full bg-cns-accent"
                       />
                     ) : null}
                   </button>
@@ -239,19 +247,25 @@ export default function Console({
             <div className="sticky top-0 z-20 bg-gradient-to-b from-[var(--cns-bg)] from-65% to-transparent px-6 pt-5 backdrop-blur-[2px]">
               <div className="flex items-end justify-between gap-6">
                 <div className="min-w-0">
-                  <div className="flex items-center gap-2 font-[family-name:var(--cns-mono)] text-[10px] tracking-[0.16em] text-cns-mutedfg uppercase">
-                    <span>{data.days} ימים אחרונים</span>
-                    {data.lastEventAt ? (
-                      <>
-                        <span className="text-cns-line2">/</span>
-                        <span>אירוע אחרון {ago(data.lastEventAt, +new Date(data.generatedAt))}</span>
-                      </>
-                    ) : null}
-                  </div>
-                  <h1 className="mt-1 truncate text-[29px] leading-[1.15] font-semibold tracking-[-0.025em]">
+                  <h1 className="truncate text-[27px] leading-[1.15] font-semibold tracking-[-0.025em]">
                     {current.title}
                   </h1>
-                  <p className="mt-0.5 truncate text-[12.5px] text-cns-mutedfg">{current.hint}</p>
+                  {/* One line under the name: what the screen shows, then the
+                      window it shows it for and how fresh it is. Plain UI type —
+                      the tracked monospace kicker that used to sit above the
+                      title was an eyebrow, and it was the hardest text on the
+                      page to read. */}
+                  <p className="mt-1 flex flex-wrap items-center gap-x-2 truncate text-[12.5px] text-cns-fg2">
+                    <span>{current.hint}</span>
+                    <span className="text-cns-line2" aria-hidden>·</span>
+                    <span className="text-cns-mutedfg">{data.days} הימים האחרונים</span>
+                    {data.lastEventAt ? (
+                      <>
+                        <span className="text-cns-line2" aria-hidden>·</span>
+                        <span className="text-cns-mutedfg">אירוע אחרון {ago(data.lastEventAt, +new Date(data.generatedAt))}</span>
+                      </>
+                    ) : null}
+                  </p>
                 </div>
 
                 <div className="flex flex-none items-center gap-2 pb-1">

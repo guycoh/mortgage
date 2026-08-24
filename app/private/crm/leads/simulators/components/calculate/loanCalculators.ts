@@ -10,9 +10,25 @@ export type Loan = {
   mix_id: string;
   path_id: number; // מקשר למסלול
   /** 1=ללא, 2=חלקי (ריבית בלבד), 3=מלא (הריבית נצברת לקרן). אופציונלי —
-   *  שורות ותיקות בלי השדות (או עם null מה־DB) מתנהגות כ"ללא", כמו קודם. */
+   *  שורות ותיקות בלי השדות (או עם null מה־DB) מתנהגות כ"ללא", כמו קודם.
+   *  נשמר לתאימות לאחור; המנוע קורא קודם את שני שדות החודשים שלהלן. */
   grace_type_id?: number | null;
   grace_months?: number | null;
+  /**
+   * גרייס כשתי תקופות חודשים, לא כסוג אחד.
+   *
+   * הלוואת בנייה אמיתית עוברת את שתיהן: קודם גרייס מלא (לא משולם דבר והריבית
+   * נצברת לקרן), אחריו גרייס חלקי (משולמת ריבית והקרן קופאת), ורק אז היתרה
+   * מופחתת לפי לוח הסילוקין של השורה — שפיצר או קרן שווה. סוג יחיד + מספר
+   * חודשים יחיד לא יכול לתאר את הרצף הזה.
+   *
+   * הסדר קבוע: מלא ואז חלקי. המעבר ההפוך — מתשלום ריבית חזרה לאי־תשלום — אינו
+   * מוצר קיים.
+   *
+   * שדות ישנים ממשיכים לעבוד: שורה בלי אלה נקראת מ־grace_type_id/grace_months.
+   */
+  grace_full_months?: number | null;
+  grace_partial_months?: number | null;
 };
 
 export type ScheduleRow = {
@@ -57,11 +73,24 @@ export function calculateLoan(
   // חלקי (2): בחודשי הגרייס משולמת ריבית בלבד והקרן קופאת.
   // מלא (3): לא משולם דבר והריבית נצברת לקרן (וגם ההצמדה, במסלול צמוד).
   // בלונים (3/4) הם ממילא צורת גרייס — השדות לא חלים עליהם.
-  const graceType = loan.grace_type_id ?? 1;
-  const g =
-    (graceType === 2 || graceType === 3) && n > 1
-      ? Math.min(Math.max(Math.floor(loan.grace_months ?? 0), 0), n - 1)
-      : 0;
+  // שתי תקופות גרייס, מלא ואז חלקי. שורה ישנה שנשמרה עם סוג + חודשים נקראת
+  // לתוך אותו מבנה, כך שהתנהגותה לא משתנה.
+  const legacyType = loan.grace_type_id ?? 1;
+  const legacyMonths = Math.max(Math.floor(loan.grace_months ?? 0), 0);
+  const wantFull = Math.max(
+    Math.floor(loan.grace_full_months ?? (legacyType === 3 ? legacyMonths : 0)),
+    0
+  );
+  const wantPartial = Math.max(
+    Math.floor(loan.grace_partial_months ?? (legacyType === 2 ? legacyMonths : 0)),
+    0
+  );
+  // חייב להישאר לפחות חודש אחד לפירעון הקרן. כשהבקשה ארוכה מדי, הגרייס המלא
+  // נחתך ראשון — הוא זה שמגדיל את החוב.
+  const graceRoom = n > 1 ? n - 1 : 0;
+  const gPartial = Math.min(wantPartial, graceRoom);
+  const gFull = Math.min(wantFull, graceRoom - gPartial);
+  const g = gFull + gPartial;
 
   let schedule: ScheduleRow[] = [];
   let totalPrincipal = 0;
@@ -90,7 +119,8 @@ export function calculateLoan(
         const interestReal = openingReal * r;
         const interestNominal = isIndexed ? interestReal * factorCurr : interestReal;
 
-        const full = graceType === 3;
+        // מלא קודם, אחריו חלקי — ההבחנה היא לפי החודש, לא לפי ההלוואה.
+        const full = month <= gFull;
         const paymentNominal = full ? 0 : interestNominal;
         const principalNominal = full ? -interestNominal : 0;
         const closingReal = full ? openingReal * (1 + r) : openingReal;
@@ -179,7 +209,8 @@ export function calculateLoan(
       for (let month = 1; month <= g; month++) {
         const openingBalance = balance;
         const interest = openingBalance * r;
-        const full = graceType === 3;
+        // מלא קודם, אחריו חלקי — ההבחנה היא לפי החודש, לא לפי ההלוואה.
+        const full = month <= gFull;
         const payment = full ? 0 : interest;
         const principal = full ? -interest : 0;
         let closingBalance = full ? openingBalance + interest : openingBalance;

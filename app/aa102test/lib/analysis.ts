@@ -336,9 +336,17 @@ export interface Analysis {
     overdue: number;
     limit: number;
     rate: number | null;
-    /** Guaranteed rather than owed — real exposure, not their repayment. */
+    /**
+     * Guaranteed rather than owed — real exposure, not their repayment.
+     *
+     * Guarantees the household ITSELF owes are excluded: they are already inside
+     * `balance` and `monthly`, and restating them as extra would be the same
+     * money twice. Those are counted by `guaranteedInternalCount` instead.
+     */
     guaranteedBalance: number;
     guaranteedCount: number;
+    /** Guarantees on a debt someone else in this household is the debtor on. */
+    guaranteedInternalCount: number;
   };
   mortgage: {
     balance: number;
@@ -419,7 +427,16 @@ export interface ClientRow {
   type: string;
   parts: number;
   balance: number;
+  /**
+   * What actually leaves the account each month for this row — the same
+   * measure the footer uses (`totals.monthly`), so the section subtotals add up
+   * to it by construction. A charge the report shows nobody is servicing (see
+   * DebtLine.chargeNotPaid) is NOT in here; it is in `monthlyNotPaid`, and the
+   * page says so on the row instead of printing a payment that is not made.
+   */
   monthly: number;
+  /** Contractual charges on this row that are not being paid. */
+  monthlyNotPaid: number;
   months: number | null;
   late: boolean;
   overdue: number;
@@ -446,6 +463,13 @@ export interface ClientSection {
   title: string;
   accent: string;
   rows: ClientRow[];
+  /**
+   * Cards and overdrafts the client holds but is not using — no balance, no
+   * charge, nothing late. They are still facts (a lender counts open limits),
+   * but a row of zeros per card tells the client nothing; the page states them
+   * once, as a count and the ceiling they add up to.
+   */
+  unused?: { count: number; limit: number };
 }
 
 /**
@@ -476,6 +500,8 @@ export interface ClientView {
   shownBalance: number;
   /** footer.balance − shownBalance. Zero, or the page says so out loud. */
   unshownBalance: number;
+  /** footer.monthly − Σ rows.monthly. Zero, for the same reason. */
+  unshownMonthly: number;
 }
 
 /* ------------------------------------------------------------------ helpers */
@@ -508,6 +534,15 @@ function weightedRate(rows: { balance: number; rate: number | null }[]): number 
 const BALLOON_RE = /בלון|בולט/;
 const VARIABLE_RE = /משתנה|פריים/;
 
+/**
+ * 201-047 naming ריבית without naming קרן — the instalment is the month's
+ * interest and the balance does not move. Not a balloon: a balloon states when
+ * the principal falls due (201-054), and these state nothing at all.
+ */
+function isInterestOnly(l: DebtLine): boolean {
+  return /ריבית/.test(l.paymentType) && !/קרן/.test(l.paymentType);
+}
+
 function isLinked(tr: InterestTrack): boolean {
   return !/לא\s*צמוד/.test(tr.linkage) && tr.linkage.includes("צמוד");
 }
@@ -533,18 +568,49 @@ function trackSliceLabel(tr: InterestTrack): string {
  * — lender, size, price, term — with the balance bucketed to ₪50 because the
  * two reports are rarely pulled the same morning.
  */
-function lineKey(l: DebtLine): string {
+/**
+ * What makes a debt the same debt in the other spouse's report.
+ *
+ * The same rule the ledger keys on — see loanKey in lib/credit. It used to
+ * include the balance (bucketed to ₪50), the rate and the remaining term, all
+ * three of which are read AS OF each report's own date: two reports pulled a
+ * month apart described the household's joint mortgage differently, nothing
+ * matched, and this engine counted it twice while claiming it had folded
+ * "joint debts" together. What identifies a debt is when it was taken, when it
+ * ends and how much was borrowed; none of those move.
+ *
+ * The role stays in the key here on purpose. This engine reports what each
+ * document SAID — a debt one spouse guarantees is a guarantee on their report —
+ * and it states the two separately. (The ledger resolves them to one owed row,
+ * because a board is one household's position, not one document's claim.)
+ */
+/**
+ * The debt itself, with no claim about who is on the hook for it.
+ *
+ * lineKey adds the role; this is what is left when you take it away, and it is
+ * how a guarantee is recognised as the very loan somebody else here owes.
+ */
+function debtIdentity(l: DebtLine): string {
+  const stated = [l.startDate, l.endDate, l.original > 0 ? String(l.original) : ""].filter(Boolean);
+  const identified = stated.length >= 2;
   return [
     l.category,
     l.type,
-    l.role,
     l.bank.replace(/\s+/g, ""),
-    Math.round(l.balance / 50),
-    l.rate === null ? "-" : l.rate.toFixed(2),
-    l.months ?? "-",
     l.startDate,
     l.endDate,
+    l.original > 0 ? Math.round(l.original) : "",
+    // Only where the document printed too little to identify the debt does its
+    // shape have to stand in — and then the old brittleness is the safer error,
+    // because a false merge hides a real debt.
+    identified ? "" : Math.round(l.balance / 50),
+    identified ? "" : l.rate === null ? "-" : l.rate.toFixed(2),
+    identified ? "" : (l.months ?? "-"),
   ].join("|");
+}
+
+function lineKey(l: DebtLine): string {
+  return `${l.role}|${debtIdentity(l)}`;
 }
 
 /* -------------------------------------------------------------- debt lines */
@@ -682,34 +748,65 @@ function toLine(
  */
 function buildLines(reports: CreditReport[]): DebtLine[] {
   const out: DebtLine[] = [];
-  const at = new Map<string, number>();
+  /**
+   * Candidates per key, and which of them are still unclaimed.
+   *
+   * MATCHING IS ONE-TO-ONE, the same rule the ledger's mergeReportLoans follows.
+   * A single index per key looked sufficient — until a report held two debts the
+   * key cannot tell apart. This household's mortgage has two ₪18,500 tranches
+   * opened the same day and maturing the same day, differing only in track; the
+   * second was never registered, so when the spouse's report arrived only the
+   * first could match. The other folded onto nothing and was pushed as new: 15
+   * mortgages instead of 14, ₪1,370,874 instead of ₪1,352,841, and a "13
+   * התחייבויות משותפות" that was one short of the truth.
+   */
+  const byKey = new Map<string, number[]>();
+  const free = new Set<number>();
 
-  for (const report of reports) {
+  for (let ri = 0; ri < reports.length; ri += 1) {
+    const report = reports[ri];
     const reporter = report.client?.name || "דוח";
     // extractLoans has already back-solved rate and term; join on uid rather
     // than repeat that arithmetic here.
     const priced = new Map(extractLoans(report).map((l) => [l.uid, l]));
 
+    // Everything gathered so far is a candidate for THIS report, and each may
+    // absorb one of its lines. Reset per report rather than once: a third
+    // document has to be able to match a debt the second already matched, while
+    // lines this report adds must not be matched by this same report.
+    free.clear();
+    for (let i = 0; i < out.length; i += 1) free.add(i);
+
     for (const t of report.transactions) {
       if (t.section === "inactive") continue;
       const line = toLine(t, priced.get(t.uid), reporter);
       if (line.balance <= 0 && line.limit <= 0) continue;
+      // A uid is `${section}-${n}`, numbered within its own report — so two
+      // documents both name their first עו"ש "current-1". Across a merge those
+      // are two different accounts at two different banks, and sharing an id
+      // made them one row's worth of React key and one target for "הצג במסמך".
+      // Namespaced here rather than in the parser, where the raw uid is what
+      // `priced` is keyed by.
+      line.uid = `r${ri}:${line.uid}`;
 
       const k = lineKey(line);
-      const hit = at.get(k);
-      // Merge only ACROSS reports. Two facilities at one bank can legitimately
-      // look identical — same type, both drawn to zero — and folding those
-      // together inside a single report both loses a debt and claims a joint
-      // holding that does not exist.
-      if (hit !== undefined && !out[hit].reportedBy.includes(reporter)) {
-        const prev = out[hit];
-        prev.shared = true;
-        prev.reportedBy.push(reporter);
+      // Merge only ACROSS reports, and only onto a line nobody has claimed yet.
+      // Two facilities at one bank can legitimately look identical — same type,
+      // both drawn to zero — and folding those together inside a single report
+      // both loses a debt and claims a joint holding that does not exist.
+      const hit = (byKey.get(k) ?? []).find((i) => free.has(i));
+      if (hit !== undefined) {
+        free.delete(hit);
+        out[hit].shared = true;
+        if (!out[hit].reportedBy.includes(reporter)) out[hit].reportedBy.push(reporter);
         continue;
       }
-      // Later reports should still be able to match this line.
-      if (hit === undefined) at.set(k, out.length);
+      // A new line, and a candidate for whatever report comes next.
+      const i = out.length;
       out.push(line);
+      const list = byKey.get(k);
+      if (list) list.push(i);
+      else byKey.set(k, [i]);
     }
   }
 
@@ -899,16 +996,36 @@ function sourceTotals(reports: CreditReport[]): SourceTotal[] {
  * rarely does. Where they differ, the difference is stated rather than
  * quietly averaged away.
  */
-function reconcile(reports: CreditReport[], lines: DebtLine[]): Reconciliation {
+function reconcile(reports: CreditReport[]): Reconciliation {
   const rows = sourceTotals(reports).filter((s) => s.role === "debtor");
   const summaryBalance = rows.reduce((s, r) => s + r.balance, 0);
   const summaryLimit = rows.reduce((s, r) => s + r.limit, 0);
   const summaryOriginal = rows.reduce((s, r) => s + r.originalAmount, 0);
 
-  const own = lines.filter((l) => l.role === "debtor");
-  const extractedBalance = own.reduce((s, l) => s + l.balance, 0);
-  const extractedLimit = own.reduce((s, l) => s + l.limit, 0);
-  const extractedOriginal = own.reduce((s, l) => s + l.original, 0);
+  // BOTH SIDES COUNT EVERY DOCUMENT, duplicates and all.
+  //
+  // This asks one question — did the geometric parse of the transaction pages
+  // come up short of the plain summary table? — and it is a question about a
+  // document, not about a household. Measuring the summaries of two reports
+  // against a DEDUPED detail made a couple's shared mortgage look like a
+  // reading failure: ₪1,334,808 "missing", and an advisor told the analysis
+  // "עלול לחסר" when it was complete. So the detail is re-counted here per
+  // report, on the same terms as the summary, instead of reusing the merged
+  // lines.
+  let extractedBalance = 0;
+  let extractedLimit = 0;
+  let extractedOriginal = 0;
+  for (const report of reports) {
+    for (const t of report.transactions) {
+      if (t.section === "inactive" || t.role !== "debtor") continue;
+      const balance = num(t.fields["201-049"]);
+      const limit = num(t.fields["201-020"]);
+      if (balance <= 0 && limit <= 0) continue;
+      extractedBalance += balance;
+      extractedLimit += limit;
+      extractedOriginal += num(t.fields["201-045"]);
+    }
+  }
   // Under ₪500 is rounding and column-order noise, not a disagreement.
   const TOL = 500;
 
@@ -1016,6 +1133,7 @@ const EMPTY_ROW = (bank: string, family: ClientRow["family"], type: string): Cli
   parts: 0,
   balance: 0,
   monthly: 0,
+  monthlyNotPaid: 0,
   months: null,
   late: false,
   overdue: 0,
@@ -1038,7 +1156,9 @@ function absorb(row: ClientRow, l: DebtLine): ClientRow {
   row.uids.push(l.uid);
   row.parts += 1;
   row.balance += l.balance;
-  row.monthly += l.monthly;
+  // Cash and notional charges kept apart — see ClientRow.monthly.
+  if (l.chargeNotPaid) row.monthlyNotPaid += l.monthly;
+  else row.monthly += l.monthly;
   row.limit += l.limit;
   row.peak += l.peak;
   row.overdue += l.overdue;
@@ -1086,7 +1206,7 @@ function buildClientView(a: Omit<Analysis, "flags" | "clientView">, flags: Flag[
   // One row per facility. No monthly gate: a card that has stopped being serviced
   // is the most important row on the page, and gating on monthly > 0 hid every
   // revolving facility on a real report — ₪347,593 of it.
-  const cardRows = own
+  const allCardRows = own
     .filter((l) => l.category === "card" || l.category === "overdraft")
     .map((l) => {
       const row = absorb(EMPTY_ROW(l.bank, "card", l.type), l);
@@ -1094,16 +1214,30 @@ function buildClientView(a: Omit<Analysis, "flags" | "clientView">, flags: Flag[
       return row;
     })
     .sort((x, y) => y.monthly - x.monthly || y.balance - x.balance);
+  // An open facility with nothing on it is a fact, not a row. See ClientSection.unused.
+  const isUnused = (r: ClientRow) =>
+    r.balance === 0 && r.monthly === 0 && r.monthlyNotPaid === 0 && !r.late && r.overdue === 0 &&
+    !r.remarks.some((x) => /הוצאה לפועל|לא התקבל כל תשלום/.test(x));
+  const cardRows = allCardRows.filter((r) => !isUnused(r));
+  const unusedCards = allCardRows.filter(isUnused);
 
   const sections: ClientSection[] = [
     { key: "mortgage" as const, title: "משכנתאות", accent: "#4a4691", rows: byLender(own.filter((l) => l.category === "mortgage"), "mortgage") },
     { key: "loan" as const, title: "הלוואות", accent: "#c77e4a", rows: byLender(own.filter((l) => l.category === "loan"), "loan") },
-    { key: "card" as const, title: "כרטיסי אשראי ומסגרות", accent: "#0d8b9b", rows: cardRows },
-  ].filter((s) => s.rows.length > 0);
+    {
+      key: "card" as const,
+      title: "כרטיסי אשראי ומסגרות",
+      accent: "#0d8b9b",
+      rows: cardRows,
+      unused: unusedCards.length
+        ? { count: unusedCards.length, limit: unusedCards.reduce((s, r) => s + r.limit, 0) }
+        : undefined,
+    },
+  ].filter((s) => s.rows.length > 0 || s.unused);
 
   // Anything the categoriser did not place. Without this a new transaction type
   // would silently vanish from the page while still counting in the footer.
-  const placed = new Set(sections.flatMap((s) => s.rows.flatMap((r) => r.uids)));
+  const placed = new Set([...sections.flatMap((s) => s.rows.flatMap((r) => r.uids)), ...unusedCards.flatMap((r) => r.uids)]);
   const orphans = own.filter((l) => !placed.has(l.uid));
   if (orphans.length) {
     sections.push({
@@ -1115,6 +1249,7 @@ function buildClientView(a: Omit<Analysis, "flags" | "clientView">, flags: Flag[
   }
 
   const shownBalance = sections.reduce((s, sec) => s + sec.rows.reduce((t, r) => t + r.balance, 0), 0);
+  const shownMonthly = sections.reduce((s, sec) => s + sec.rows.reduce((t, r) => t + r.monthly, 0), 0);
 
   // Ordered by severity, and each sentence's rows are on the page by construction.
   const worries = flags
@@ -1129,6 +1264,7 @@ function buildClientView(a: Omit<Analysis, "flags" | "clientView">, flags: Flag[
     guaranteedBalance: a.totals.guaranteedBalance,
     shownBalance,
     unshownBalance: Math.round(a.totals.balance - shownBalance),
+    unshownMonthly: Math.round(a.totals.monthly - shownMonthly),
   };
 }
 
@@ -1494,6 +1630,44 @@ function buildFlags(a: Omit<Analysis, "flags" | "clientView">): Flag[] {
     });
   }
 
+  /* ---- debts that are not repaid monthly */
+  const offCadence = own.filter(
+    (l) => l.frequency.trim() !== "" && !/חודשי/.test(l.frequency)
+  );
+  if (offCadence.length) {
+    push({
+      id: "non-monthly",
+      target: { section: sectionOf(offCadence[0]), uids: offCadence.map((l) => l.uid) },
+      severity: "medium",
+      title: "התחייבות שאינה נפרעת חודשית",
+      detail: `${offCadence.length === 1 ? "התחייבות אחת נפרעת" : `${offCadence.length} התחייבויות נפרעות`} בתדירות ${Array.from(new Set(offCadence.map((l) => l.frequency.trim()))).join(", ")}. שדה 201-046 מציג 0 משום שאין תשלום חודשי — לא משום שהנתון חסר. ההחזר החודשי המוצג עבורן הוא שקילות חודשית שחושבה כאן.`,
+      client: show(
+        `${offCadence.length === 1 ? "הלוואה אחת נפרעת" : `${offCadence.length} הלוואות נפרעות`} פעם בשנה ולא כל חודש — הסכום החודשי המוצג הוא ממוצע, בפועל התשלום יוצא במרוכז`,
+        offCadence.map((l) => l.uid)
+      ),
+      amount: offCadence.reduce((s, l) => s + l.balance, 0),
+      where: Array.from(new Set(offCadence.map((l) => l.bank))),
+    });
+  }
+
+  /* ---- instalments that buy no equity */
+  const interestOnly = own.filter((l) => !l.balloon && isInterestOnly(l));
+  if (interestOnly.length) {
+    push({
+      id: "interest-only",
+      target: { section: sectionOf(interestOnly[0]), uids: interestOnly.map((l) => l.uid) },
+      severity: "medium",
+      title: "מסלולים בריבית בלבד",
+      detail: `${interestOnly.length} התחייבויות משלמות ריבית ללא קרן — היתרה אינה קטנה מדי חודש. הדוח אינו מציין עד מתי (201-055 ריק), ולכן מועד המעבר להחזר מלא וגובהו אינם ידועים מהמסמך.`,
+      client: show(
+        `${interestOnly.length === 1 ? "מסלול אחד משלם" : `${interestOnly.length} מסלולים משלמים`} ריבית בלבד — הקרן לא יורדת, וההחזר צפוי לעלות כשתתחיל להיפרע`,
+        interestOnly.map((l) => l.uid)
+      ),
+      amount: interestOnly.reduce((s, l) => s + l.balance, 0),
+      where: Array.from(new Set(interestOnly.map((l) => l.bank))),
+    });
+  }
+
   /* ---- mortgage risk composition */
   if (a.mortgage.balance > 0) {
     const varSeverity = variableSeverity(a.mortgage.variableShare);
@@ -1640,6 +1814,23 @@ function buildFlags(a: Omit<Analysis, "flags" | "clientView">): Flag[] {
     });
   }
 
+  /* ---- guarantees INSIDE the household: stated, but never counted twice */
+  if (a.totals.guaranteedInternalCount > 0) {
+    push({
+      id: "guarantor-internal",
+      target: {
+        section: "guarantees",
+        uids: a.lines.filter((l) => l.role === "guarantor").map((l) => l.uid),
+      },
+      severity: "info",
+      title: "ערבות הדדית בתוך המשק",
+      detail: `${a.totals.guaranteedInternalCount} התחייבויות שהלקוח ערב להן נלקחו על ידי אדם אחר בדוחות שנטענו. הן כבר נספרות כחוב של המשק, ולא נוספו שוב כחשיפה.`,
+      client: show(
+        `${a.totals.guaranteedInternalCount === 1 ? "התחייבות אחת שאתם ערבים לה נלקחה" : `${a.totals.guaranteedInternalCount} התחייבויות שאתם ערבים להן נלקחו`} על ידי בן/בת הזוג — הן כבר נכללות בסכומים למעלה ולא נספרו פעמיים`
+      ),
+    });
+  }
+
   /* ---- joint debts, so the doubling question is answered before it is asked */
   const shared = a.lines.filter((l) => l.shared);
   if (shared.length) {
@@ -1702,7 +1893,22 @@ export function analyseReports(rawReports: CreditReport[], rawNames: string[] = 
       .sort((a, b) => b.getTime() - a.getTime())[0] ?? new Date();
   const lines = buildLines(reports);
   const own = lines.filter((l) => l.role === "debtor");
-  const guaranteed = lines.filter((l) => l.role === "guarantor");
+  /**
+   * Guarantees, minus the ones the household already owes.
+   *
+   * lineKey keeps `role` on purpose, so one spouse guaranteeing the very loan the
+   * other owes stays two lines — this engine reports what each document said. The
+   * TOTALS must not follow it there. Both of this couple's guarantees are
+   * מרדכי's own loans, already inside סה״כ הלוואות, and adding "ובנוסף ₪400,975
+   * בערבות — לא ההחזר שלכם" counted the same money twice and called it someone
+   * else's. A guarantee is extra exposure only when nobody here is the debtor.
+   */
+  const owedKeys = new Set(own.map(debtIdentity));
+  const guaranteed = lines.filter(
+    (l) => l.role === "guarantor" && !owedKeys.has(debtIdentity(l))
+  );
+  /** Every guarantee the documents stated, including the internal ones. */
+  const guaranteedAll = lines.filter((l) => l.role === "guarantor");
 
   const byCategory = categoryTotals(lines);
   const mortgages = own.filter((l) => l.category === "mortgage");
@@ -1767,6 +1973,7 @@ export function analyseReports(rawReports: CreditReport[], rawNames: string[] = 
       rate: weightedRate(own),
       guaranteedBalance: guaranteed.reduce((s, l) => s + l.balance, 0),
       guaranteedCount: guaranteed.length,
+      guaranteedInternalCount: guaranteedAll.length - guaranteed.length,
     },
     mortgage: {
       balance: mortgageBalance,
@@ -1840,7 +2047,7 @@ export function analyseReports(rawReports: CreditReport[], rawNames: string[] = 
       };
     })(),
     sources: sourceTotals(reports),
-    reconcile: reconcile(reports, lines),
+    reconcile: reconcile(reports),
     warnings: Array.from(new Set(reports.flatMap((r) => r.warnings ?? []))),
   };
 

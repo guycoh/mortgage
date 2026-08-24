@@ -7,7 +7,7 @@
 // then sitting there selected, and a browser lets you pick up selected text
 // with the mouse and drop it into any other field on the page. On a grid of
 // near-identical columns that is a real hazard: the second half of a click that
-// wandered a few pixels silently moves ריבית into מרווח, with no undo and
+// wandered a few pixels silently moves ריבית into תוספת, with no undo and
 // nothing on screen to say it happened. Nobody ever means to do it.
 //
 // So text drags that start inside a field are cancelled at the source, and text

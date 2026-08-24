@@ -805,7 +805,16 @@ function buildTransaction(
   // enumByCell. An absent purpose is a gap in the report, not "עסק".
   setEnum("201-017", ENUMS.purpose, false);
   setEnum("201-021", ENUMS.currency);
-  setEnum("201-044", ENUMS.frequency);
+  // 201-044 joins the no-fallback list, and for the same reason as the two
+  // above — but it was the worst case of it. EVERY transaction block prints the
+  // labels "סוג התשלום החודשי הצפוי" and "סכום התשלום החודשי הצפוי", so a block
+  // search for the frequency phrases always found "חודשי" inside one of them.
+  // The field therefore read "חודשי" on all 65 transactions of two reports,
+  // including an עו"ש and three credit cards that print no frequency at all —
+  // and a ₪32,859 Leumi loan whose cell plainly says שנתי. Nothing downstream
+  // could tell a monthly debt from an annual one, and the annual one was
+  // modelled as ₪392/mo of outflow that does not happen.
+  setEnum("201-044", ENUMS.frequency, false);
   setEnum("201-047", ENUMS.paymentType, false);
   // Days-in-arrears range (only printed when the transaction is in arrears).
   if (fields["201-051"] || fields["201-052"]) setEnum("201-050", ENUMS.arrearsRange);
@@ -903,6 +912,26 @@ function parseTransactionsSection(
       contact = parseContact([line]);
       if (cur) cur.contact = contact;
       pendingSourceLines.push(line);
+    }
+
+    /* §2 HAS NO (201-002) TO START A TRANSACTION ON.
+       Its accounts are named by (201-029) מזהה עסקה, and one "שם מקור המידע
+       המדווח" header can carry several of them — a bank the client holds two
+       accounts at, or the guarantor section where every guarantee sits under a
+       single header. Keyed on the header alone those fused into one segment,
+       and scalarIn then answered every field from whichever account came first.
+       In r03 that put a CLOSED ₪0 guarantee ahead of a live one: גובה מסגרת and
+       יתרת חוב both read 0, the row was dropped for having neither, and
+       ₪225,590 of guaranteed exposure disappeared from the analysis without a
+       word. A second מזהה עסקה under the same header is a second account. */
+    const startsCurrentTxn =
+      section === "current" &&
+      codes.includes("201-029") &&
+      cur !== null &&
+      cur.lines.some((l) => detectCodes(l).some((c) => c.code === "201-029"));
+    if (startsCurrentTxn) {
+      cur = { role, source, contact, lines: [] };
+      segs.push(cur);
     }
 
     const startsTxn = section !== "current" && codes.includes("201-002");

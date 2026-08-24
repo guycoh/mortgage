@@ -35,6 +35,14 @@ export type Loan = {
   amortization_schedule_id: number;
   grace_type_id?: number | null; // סוג גרייס (מתוך grace_types)
   grace_months?: number; // ✅ חדש — מספר חודשי גרייס
+  /**
+   * גרייס כשתי תקופות: מלא ואז חלקי, ואחריהן הפחתת קרן לפי לוח הסילוקין.
+   * מוגדר גם ב־Loan של loanCalculators, שם המנוע קורא אותו; כאן כדי ש־
+   * ImportedLoan (app/aa102test/lib/credit) יכיר בשדות. השדות הישנים למעלה
+   * נשמרים וממשיכים לעבוד — ראו migration.sql.
+   */
+  grace_full_months?: number | null;
+  grace_partial_months?: number | null;
 };
 
 

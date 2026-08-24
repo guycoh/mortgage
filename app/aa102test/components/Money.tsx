@@ -49,10 +49,13 @@ export default function Money({
   block = true,
   sign,
   hot,
+  title,
 }: {
   value: number;
   className?: string;
   style?: CSSProperties;
+  /** A hover note on the figure — what it is made of, where that is not obvious. */
+  title?: string;
   size?: number;
   weight?: number;
   color?: string;
@@ -72,6 +75,7 @@ export default function Money({
       dir="ltr"
       data-hot={hot || undefined}
       data-pulse={pulse || undefined}
+      title={title}
       className={`lgr-money${block ? " lgr-money-block" : ""}${className ? ` ${className}` : ""}`}
       style={{ fontSize: size, fontWeight: weight, color, ...style }}
     >
