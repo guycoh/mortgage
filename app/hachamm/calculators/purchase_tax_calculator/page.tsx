@@ -1,14 +1,11 @@
 "use client";
 import { useState } from "react";
-<<<<<<< Updated upstream
 
 import { Calculator, RotateCcw } from "lucide-react";
 import { HmButton } from "../../components/HmButton";
 import { HmFigure } from "../../components/HmFigure";
 import { HmReveal } from "../../components/HmReveal";
 
-=======
->>>>>>> Stashed changes
 import CustomButton from "@/app/home/components/CustomButton";
 
 

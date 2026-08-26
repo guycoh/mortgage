@@ -76,7 +76,9 @@ export default function MortgageClearanceInstructions() {
                 {" "}
 
                 <a
-                  href="https://www.mizrachi-tefahot.co.il/"
+
+              
+                  href="https://www.mizrahi-tefahot.co.il/"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-[#F97316] font-bold hover:underline"
@@ -145,7 +147,9 @@ export default function MortgageClearanceInstructions() {
                 נכנסים לקישור{" "}
 
                 <a
-                  href="https://sc.mizrachi-tefahot.co.il/TFHLogin/index.html#/login"
+
+              
+                  href="https://sc.mizrahi-tefahot.co.il/TFHLogin/index.html#/login"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="
