@@ -105,17 +105,9 @@ export default function LoanCalculator() {
   };
 
   return (
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
     <div className="hm-page">
       <div className="flex min-h-screen items-start justify-center bg-linear-to-b from-[#f8fafc] to-[#e6eff3] px-2 pt-10 pb-20">
         <div className="relative w-full max-w-[500px]">
-=======
-=======
->>>>>>> Stashed changes
-<div className="flex justify-center items-start min-h-screen bg-linear-to-b from-[#f8fafc] to-[#e6eff3] pt-10 pb-20 px-2">
-  <div className="relative w-full max-w-[500px]">
->>>>>>> Stashed changes
 
           {/* ===== קוביית המחשבון ===== */}
           <div className="hm-device z-10 p-5 sm:p-8">
@@ -413,13 +405,4 @@ export default function LoanCalculator() {
       </div>
     </div>
   );
-<<<<<<< Updated upstream
 }
-=======
-}
-
-
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
