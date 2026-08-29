@@ -1,42 +1,61 @@
-// app/card/page.tsx
-import DigitalBusinessCardM from "./DigitalBusinessCard";
+import type { Metadata, Viewport } from "next";
+import { Assistant, Frank_Ruhl_Libre } from "next/font/google";
+
+import DigitalCard from "./DigitalCard";
+import { CARD_URL, person } from "./data";
+//import "./card.css";
+import "./card.css"
 
 
-export const metadata = {
-  title: "גיא כהן-יועץ משכנתא",
-  description: "הכרטיס הדיגיטלי של גיא כהן - משרדים ב ",
+/* Self-hosted at build time by next/font — no runtime request to Google. */
+const display = Frank_Ruhl_Libre({
+  subsets: ["hebrew", "latin"],
+  weight: ["400", "500", "700", "800"],
+  variable: "--glc-font-display",
+  display: "swap",
+});
+
+const sans = Assistant({
+  subsets: ["hebrew", "latin"],
+  weight: ["300", "400", "500", "600", "700"],
+  variable: "--glc-font-sans",
+  display: "swap",
+});
+
+export const metadata: Metadata = {
+  title: `${person.full} · ${person.role}`,
+  description: `הכרטיס הדיגיטלי של ${person.full} — ${person.role}, ${person.org}`,
   openGraph: {
-    title: "הכרטיס של גיא כהן ",
-    description: "     ",
-    url: "https://morg-orcin.vercel.app/", // שנה לכתובת האמיתית שלך
-    siteName: "save",
-    images: [
-      {
-        url: "https://morg-orcin.vercel.app/assets/images/imgFiles/my_image.jpg", // לינק מלא לתמונה
-        width: 1200,
-        height: 630,
-        alt: "SAVE - משרדים בתל אביב ",
-      },
-    ],
+    title: `${person.full} · ${person.role}`,
+    description: `${person.street}, ${person.city}`,
+    url: CARD_URL,
+    siteName: person.org,
     locale: "he_IL",
     type: "website",
+    images: [
+      {
+        url: "https://morg-orcin.vercel.app/assets/images/imgFiles/my_image.jpg",
+        width: 1200,
+        height: 630,
+        alt: person.full,
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "הכרטיס של גיא כהן - יועץ משכנתא ",
-    description: "בקרו אותנו והתחילו דרך חדשה עם משכנתא חכמה!",
-    images: ["https://yourwebsite.com/images/card-preview.jpg"],
+    title: `${person.full} · ${person.role}`,
+    description: `הכרטיס הדיגיטלי של ${person.full}`,
+    images: ["https://morg-orcin.vercel.app/assets/images/imgFiles/my_image.jpg"],
   },
 };
 
-export default function CardPage() {
-  return (
-    <main >
+export const viewport: Viewport = {
+  themeColor: "#6e6222",
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+};
 
-      <DigitalBusinessCardM/>
-      {/* כאן הקומפוננטה של הכרטיס שלך */}
-  
-      {/* ועוד תוכן */}
-    </main>
-  );
+export default function CardGuyCohenTestPage() {
+  return <DigitalCard fontClass={`${display.variable} ${sans.variable}`} />;
 }

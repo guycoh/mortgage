@@ -1,6 +1,7 @@
 "use client";
 
-import { Drawer } from "vaul";
+//import { Drawer } from "vaul";
+import {Drawer} from "vaul"
 import { QRCodeSVG } from "qrcode.react";
 
 import { Copy, Share2, UserPlus } from "lucide-react";
