@@ -46,6 +46,7 @@
     "react-dom": "19.0.0",
     "react-json-view-lite": "^2.5.0",
     "react-number-format": "^5.4.4",
+    "react-pdf": "^11.0.0",
     "recharts": "^3.9.0",
     "resend": "^4.5.2",
     "server-only": "^0.0.1",
