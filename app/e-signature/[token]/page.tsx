@@ -1,5 +1,6 @@
 "use client";
 
+import { use } from "react";
 import dynamic from "next/dynamic";
 
 const SignDocumentClient = dynamic(() => import("./ClientPage"), {
@@ -11,6 +12,9 @@ const SignDocumentClient = dynamic(() => import("./ClientPage"), {
   ),
 });
 
-export default function SignPage({ params }: any) {
-  return <SignDocumentClient token={params?.token} />;
+export default function SignPage({ params }: { params: Promise<{ token: string }> }) {
+  // פתיחת ה-Promise כדי לחלץ את הטוקן בבטחה
+  const resolvedParams = use(params);
+
+  return <SignDocumentClient token={resolvedParams.token} />;
 }
