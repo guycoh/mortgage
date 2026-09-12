@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
 import dynamic from "next/dynamic";
 
 const FilesLibrary = dynamic(() => import("./components/FilesLibrary"), { ssr: false });
@@ -21,7 +22,16 @@ export default function Dashboard() {
     <div className="p-6 min-h-screen bg-gray-50" dir="rtl">
       <div className="max-w-7xl mx-auto">
         
-        <h1 className="text-2xl font-bold mb-6 text-gray-800">מערכת חתימות מרחוק</h1>
+        {/* אזור הכותרת וכפתור השליחה */}
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-bold text-gray-800">מערכת חתימות מרחוק</h1>
+          <Link 
+            href="/e-sign/send-document"
+            className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2 rounded-lg font-bold transition-colors shadow-sm flex items-center gap-2"
+          >
+            <span>+</span> שליחת מסמך ללקוח
+          </Link>
+        </div>
         
         <div className="flex gap-4 mb-6 border-b-2 border-gray-200 pb-0">
           <button onClick={() => setActiveTab("files")} className={getTabClass(activeTab === "files")}>
@@ -45,22 +55,3 @@ export default function Dashboard() {
     </div>
   );
 }
-
-
-
-// "use client";
-
-// import dynamic from "next/dynamic";
-
-// // הייבוא מתבצע כעת בתוך רכיב לקוח, ולכן ssr: false יעבוד ללא שגיאות
-// const SignTemplateBuilder = dynamic(
-//   () => import("./components/TemplateBuilder"), 
-//   { 
-//     ssr: false, 
-//     loading: () => <p style={{ padding: "50px", textAlign: "center", direction: "rtl" }}>טוען ממשק חתימה...</p> 
-//   }
-// );
-
-// export default function TemplateBuilderPage() {
-//   return <SignTemplateBuilder />;
-// }
