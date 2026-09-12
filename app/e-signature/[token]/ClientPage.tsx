@@ -143,7 +143,14 @@ export default function SignDocumentClient({ token }: { token: string }) {
             file={template.sign_files?.public_url} 
             onLoadSuccess={({ numPages }) => setNumPages(numPages)}
           >
-            <Page pageNumber={pageNumber} width={800} renderTextLayer={false} renderAnnotationLayer={false} />
+            
+            <Page 
+              pageNumber={pageNumber} 
+              width={typeof window !== "undefined" ? Math.min(window.innerWidth - 48, 800) : 800} 
+              renderTextLayer={false} 
+              renderAnnotationLayer={false} 
+            />
+         
           </Document>
 
           {/* רינדור השדות כאינפוטים פעילים על גבי המסמך */}
