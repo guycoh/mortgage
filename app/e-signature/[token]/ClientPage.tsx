@@ -25,10 +25,24 @@ export default function SignDocumentClient({ token }: { token: string }) {
   const [pageNumber, setPageNumber] = useState<number>(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDone, setIsDone] = useState(false);
+  const [pdfWidth, setPdfWidth] = useState<number>(800);
 
   useEffect(() => {
     fetchDocumentData();
   }, [token]);
+
+  useEffect(() => {
+      const handleResize = () => {
+        setPdfWidth(Math.min(window.innerWidth - 48, 800));
+      };
+      
+      // קריאה ראשונה בעת טעינת העמוד
+      handleResize();
+      
+      window.addEventListener("resize", handleResize);
+      return () => window.removeEventListener("resize", handleResize);
+    }, []);
+
 
   const fetchDocumentData = async () => {
     // 1. הבאת פרטי המסמך והתבנית
@@ -146,7 +160,7 @@ export default function SignDocumentClient({ token }: { token: string }) {
             
             <Page 
               pageNumber={pageNumber} 
-              width={typeof window !== "undefined" ? Math.min(window.innerWidth - 48, 800) : 800} 
+              width={pdfWidth} 
               renderTextLayer={false} 
               renderAnnotationLayer={false} 
             />
