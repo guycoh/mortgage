@@ -144,9 +144,13 @@ export default function SignDocumentClient({ token }: { token: string }) {
 
       <div className="w-full max-w-4xl bg-gray-50 p-4 md:p-6 flex flex-col items-center shadow-lg rounded-b-xl overflow-hidden">
         
-        {!pdfFileUrl ? (
-           <div className="p-8 text-red-500 font-bold bg-white rounded border border-red-200 w-full text-center">
-             שגיאה: קובץ ה-PDF אינו זמין לקריאה. אנא בדוק הרשאות מסד נתונים.
+
+       {!pdfFileUrl ? (
+           <div className="p-8 text-red-500 font-bold bg-white rounded border border-red-200 w-full text-left" dir="ltr">
+             <p className="mb-2">Error: PDF file URL is missing.</p>
+             <p className="text-sm text-gray-600 font-mono break-words">
+               Raw files data: {JSON.stringify(template.sign_files || 'null')}
+             </p>
            </div>
         ) : (
           <>
