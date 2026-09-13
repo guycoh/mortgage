@@ -1,36 +1,23 @@
-
 "use client";
 
+import React, { useState, useEffect } from "react";
 import { createClient } from '@supabase/supabase-js';
+import { PDFDocument, rgb } from 'pdf-lib';
 
 const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
-
-
-import React, { useState, useEffect } from "react";
-import { Document, Page, pdfjs } from "react-pdf";
-
-// @ts-ignore
-import 'react-pdf/dist/Page/AnnotationLayer.css';
-// @ts-ignore
-import 'react-pdf/dist/Page/TextLayer.css';
-
-pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
 export default function SignDocumentClient({ token }: { token: string }) {
   const [isMounted, setIsMounted] = useState(false);
-  const [loadingStep, setLoadingStep] = useState<string>("מאתחל רכיבים...");
+  const [status, setStatus] = useState<string>("טוען נתונים...");
   
   const [documentData, setDocumentData] = useState<any>(null);
   const [template, setTemplate] = useState<any>(null);
   const [fields, setFields] = useState<any[]>([]);
   const [fieldValues, setFieldValues] = useState<{ [key: string]: string }>({});
-  
-  const [numPages, setNumPages] = useState<number | null>(null);
-  const [pageNumber, setPageNumber] = useState<number>(1);
-  const [pdfWidth, setPdfWidth] = useState<number>(320);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDone, setIsDone] = useState(false);
@@ -38,36 +25,36 @@ export default function SignDocumentClient({ token }: { token: string }) {
 
   useEffect(() => {
     setIsMounted(true);
-    if (typeof window !== "undefined") {
-      setPdfWidth(Math.min(window.innerWidth - 32, 800));
-    }
   }, []);
 
   useEffect(() => {
     if (!isMounted) return;
-    if (!token) return setErrorMsg("שגיאה: לא התקבל מזהה מסמך (Token).");
-    
-    setLoadingStep(`מתחבר לשרת...`);
+    if (!token) return setErrorMsg("שגיאה: לא התקבל מזהה מסמך.");
     fetchDocumentData();
   }, [token, isMounted]);
 
   const fetchDocumentData = async () => {
     try {
-      if (!supabase) throw new Error("חיבור ל-Supabase לא הוגדר.");
-
       const { data: docData, error: docError } = await supabase
         .from("sign_documents")
         .select("*, sign_templates(*, sign_files(*))")
         .eq("sign_token", token)
         .single();
 
-      if (docError) return setErrorMsg(`שגיאת מסד נתונים: ${docError.message}`);
-      if (!docData) return setErrorMsg("המסמך לא נמצא.");
-      if (!docData.sign_templates) return setErrorMsg("התבנית חסומה לקריאה.");
+      if (docError) throw new Error(`שגיאת מסד נתונים: ${docError.message}`);
+      if (!docData) throw new Error("המסמך לא נמצא.");
+      if (!docData.sign_templates) throw new Error("התבנית חסומה לקריאה.");
 
       setDocumentData(docData);
       setTemplate(docData.sign_templates);
 
+      // שליפת הקישור לקובץ
+      const files = docData.sign_templates.sign_files;
+      const url = files?.public_url || (Array.isArray(files) && files[0]?.public_url) || null;
+      if (!url) throw new Error("אין קישור לקובץ ה-PDF.");
+      setPdfUrl(url);
+
+      // שליפת השדות
       const { data: fieldsData } = await supabase
         .from("sign_template_fields")
         .select("*")
@@ -77,7 +64,7 @@ export default function SignDocumentClient({ token }: { token: string }) {
       if (docData.status === 'signed') setIsDone(true);
       
     } catch (err: any) {
-      setErrorMsg(`קריסת קוד: ${err.message}`);
+      setErrorMsg(err.message);
     }
   };
 
@@ -87,92 +74,318 @@ export default function SignDocumentClient({ token }: { token: string }) {
 
   const handleSubmit = async () => {
     setIsSubmitting(true);
+    setStatus("מייצר קובץ חתום...");
+    
     try {
+      // 1. שמירת הערכים במסד הנתונים
       const valuesToInsert = fields.map(field => ({
         document_id: documentData.id,
         field_id: field.id,
         value: fieldValues[field.id] || ""
       }));
-
       await supabase.from("sign_document_field_values").insert(valuesToInsert);
-      await supabase.from("sign_documents").update({ status: 'signed', signed_at: new Date().toISOString() }).eq("id", documentData.id);
+
+      // 2. יצירת ה-PDF החתום באמצעות pdf-lib
+      setStatus("צורב חתימות על המסמך...");
+      const existingPdfBytes = await fetch(pdfUrl!).then(res => res.arrayBuffer());
+      const pdfDoc = await PDFDocument.load(existingPdfBytes);
+      const pages = pdfDoc.getPages();
+
+      fields.forEach(field => {
+        const pageIndex = (field.page_number || 1) - 1;
+        if (pageIndex < pages.length) {
+          const page = pages[pageIndex];
+          const { width, height } = page.getSize();
+          
+          // המרת האחוזים לקואורדינטות של PDF
+          const x = (field.position_x / 100) * width;
+          const y = height - ((field.position_y / 100) * height);
+          
+          const value = fieldValues[field.id] || "";
+          
+          page.drawText(value, {
+            x,
+            y,
+            size: 14,
+            color: rgb(0, 0, 0.6),
+          });
+        }
+      });
+ 
+      const signedPdfBytes = await pdfDoc.save();
+      const signedPdfBlob = new Blob([signedPdfBytes as any], { type: 'application/pdf' });
+
+      // 3. הורדת הקובץ כדי לבדוק שהשדות נצרבו כראוי
+      const downloadLink = document.createElement('a');
+      downloadLink.href = URL.createObjectURL(signedPdfBlob);
+      downloadLink.download = `signed_document_${documentData.customer_name}.pdf`;
+      downloadLink.click();
+
+      // 4. עדכון סטטוס המסמך
+      await supabase
+        .from("sign_documents")
+        .update({ status: 'signed', signed_at: new Date().toISOString() })
+        .eq("id", documentData.id);
+        
       setIsDone(true);
-    } catch (error) {
-      alert("אירעה שגיאה בעת שמירת החתימה.");
+    } catch (error: any) {
+      alert(`אירעה שגיאה בעת שמירת החתימה: ${error.message}`);
     } finally {
       setIsSubmitting(false);
     }
   };
 
   if (!isMounted) return null;
-
   if (errorMsg) return <div className="min-h-screen flex items-center justify-center p-8 bg-gray-50 text-red-600 font-bold dir-rtl" dir="rtl">{errorMsg}</div>;
   if (isDone) return <div className="min-h-screen flex items-center justify-center p-8 bg-gray-50 text-emerald-600 font-bold text-2xl dir-rtl" dir="rtl">המסמך נחתם בהצלחה!</div>;
-  if (!documentData || !template) return <div className="min-h-screen flex items-center justify-center p-8 bg-gray-50 text-gray-600 font-bold dir-rtl" dir="rtl">{loadingStep}</div>;
-
-  const pdfFileUrl = template.sign_files?.public_url || (Array.isArray(template.sign_files) ? template.sign_files[0]?.public_url : null);
+  if (!documentData || !template) return <div className="min-h-screen flex items-center justify-center p-8 bg-gray-50 text-gray-600 font-bold dir-rtl" dir="rtl">{status}</div>;
 
   return (
-    <div className="min-h-screen bg-gray-100 p-4 md:p-8 dir-rtl flex flex-col items-center" dir="rtl">
+    <div className="min-h-screen bg-gray-100 p-2 md:p-8 dir-rtl flex flex-col items-center" dir="rtl">
       
-      <div className="w-full max-w-4xl bg-white p-4 rounded-t-xl shadow-sm border-b border-gray-200 flex flex-col md:flex-row justify-between items-center gap-4 z-10">
-        <div>
-          <h1 className="text-xl font-bold text-gray-800">שלום, {documentData.customer_name}</h1>
-          <p className="text-sm text-gray-500">אנא עיין במסמך, מלא את השדות ולחץ על אישור.</p>
+      {/* כותרת עליונה */}
+      <div className="w-full max-w-4xl bg-white p-4 rounded-xl shadow-sm border-b border-gray-200 mb-4 text-center">
+        <h1 className="text-xl md:text-2xl font-bold text-gray-800">שלום, {documentData.customer_name}</h1>
+        <p className="text-sm md:text-base text-gray-500 mt-1">אנא קרא את המסמך המצורף, מלא את הפרטים הנדרשים למטה ולחץ על אישור.</p>
+      </div>
+
+      {/* תצוגת המסמך המותאמת למובייל */}
+      <div className="w-full max-w-4xl bg-white p-2 md:p-4 shadow-sm rounded-xl mb-6">
+        <h2 className="text-lg font-bold text-gray-700 mb-2 px-2">מסמך לעיון:</h2>
+        <div className="w-full h-[50vh] border-2 border-gray-200 rounded-lg overflow-hidden bg-gray-50">
+          <iframe 
+            src={`https://docs.google.com/gview?url=${encodeURIComponent(pdfUrl!)}&embedded=true`} 
+            className="w-full h-full"
+            title="PDF Viewer"
+            style={{ border: 'none' }}
+          />
         </div>
-        <button onClick={handleSubmit} disabled={isSubmitting} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-lg shadow w-full md:w-auto">
-          {isSubmitting ? "שומר..." : "אני מאשר וחותם"}
+      </div>
+
+      {/* אזור מילוי השדות */}
+      <div className="w-full max-w-4xl bg-white p-6 shadow-md rounded-xl">
+        <h2 className="text-xl font-bold text-indigo-900 mb-4 border-b pb-2">מילוי פרטים וחתימה</h2>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+          {fields.map(field => (
+            <div key={field.id} className="flex flex-col gap-1">
+              <label className="text-sm font-semibold text-gray-700">
+                {field.field_name} {field.field_type === 'signature' && '(חתימה)'}
+              </label>
+              <input 
+                type="text" 
+                placeholder={`הזן ${field.field_name}...`}
+                value={fieldValues[field.id] || ""} 
+                onChange={(e) => handleFieldChange(field.id, e.target.value)} 
+                className={`p-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition-shadow ${
+                  field.field_type === 'signature' ? 'bg-yellow-50 border-yellow-300' : 'bg-gray-50 border-gray-300'
+                }`} 
+              />
+            </div>
+          ))}
+        </div>
+
+        <button 
+          onClick={handleSubmit} 
+          disabled={isSubmitting || fields.some(f => !fieldValues[f.id])} 
+          className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white font-bold py-4 px-8 rounded-lg shadow-lg w-full text-lg transition-colors"
+        >
+          {isSubmitting ? status : "אני מאשר ומגיש חתימה"}
         </button>
       </div>
 
-      <div className="w-full max-w-4xl bg-gray-50 p-2 md:p-6 flex flex-col items-center shadow-lg rounded-b-xl overflow-hidden">
-        
-        {!pdfFileUrl ? (
-          <div className="p-8 text-red-500 font-bold bg-white rounded border border-red-200 w-full text-center" dir="ltr">
-            <p>שגיאה: קובץ ה-PDF אינו זמין.</p>
-            <p className="text-xs text-gray-500 mt-4 font-mono break-words text-left">
-              Template Data: {JSON.stringify(template || 'null')}
-            </p>
-          </div>
-        ) : (
-          <>
-            <div className="flex gap-4 mb-4 items-center">
-              <button onClick={() => setPageNumber(p => p - 1)} disabled={pageNumber <= 1} className="px-4 py-2 border rounded bg-white">הקודם</button>
-              <span className="font-semibold text-sm">עמוד {pageNumber} מתוך {numPages || '-'}</span>
-              <button onClick={() => setPageNumber(p => p + 1)} disabled={numPages !== null && pageNumber >= numPages} className="px-4 py-2 border rounded bg-white">הבא</button>
-            </div>
-
-            <div className="relative shadow-md border border-gray-300 bg-white overflow-hidden max-w-full">
-              <Document 
-                file={pdfFileUrl} 
-                onLoadSuccess={({ numPages }) => setNumPages(numPages)} 
-                onLoadError={(e) => setErrorMsg(`ה-PDF נכשל מלטעון: ${e.message}`)}
-              >
-                <Page 
-                  pageNumber={pageNumber} 
-                  width={pdfWidth} 
-                  devicePixelRatio={1} /* חוסם את מגבלת הזיכרון במובייל */
-                  renderTextLayer={false} 
-                  renderAnnotationLayer={false} 
-                />
-              </Document>
-
-              {fields.filter(f => f.page_number === pageNumber).map(field => (
-                <div key={field.id} className="absolute transform -translate-x-1/2 -translate-y-1/2" style={{ left: `${field.position_x}%`, top: `${field.position_y}%` }}>
-                  {field.field_type === 'signature' ? (
-                    <input type="text" placeholder="הקלד שם..." value={fieldValues[field.id] || ""} onChange={(e) => handleFieldChange(field.id, e.target.value)} className="px-2 py-1 bg-yellow-100 border border-yellow-400 text-indigo-900 font-bold text-center shadow-sm outline-none w-24 md:w-48 rounded text-sm md:text-base" />
-                  ) : (
-                    <input type="text" placeholder={field.field_name} value={fieldValues[field.id] || ""} onChange={(e) => handleFieldChange(field.id, e.target.value)} className="px-2 py-1 bg-blue-50 border border-blue-200 text-gray-800 text-xs md:text-sm shadow-sm outline-none w-20 md:w-32 rounded" />
-                  )}
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-      </div>
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// "use client";
+
+// import { createClient } from '@supabase/supabase-js';
+
+// const supabase = createClient(
+//     process.env.NEXT_PUBLIC_SUPABASE_URL!,
+//     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+// );
+
+
+// import React, { useState, useEffect } from "react";
+// import { Document, Page, pdfjs } from "react-pdf";
+
+// // @ts-ignore
+// import 'react-pdf/dist/Page/AnnotationLayer.css';
+// // @ts-ignore
+// import 'react-pdf/dist/Page/TextLayer.css';
+
+// pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+
+// export default function SignDocumentClient({ token }: { token: string }) {
+//   const [isMounted, setIsMounted] = useState(false);
+//   const [loadingStep, setLoadingStep] = useState<string>("מאתחל רכיבים...");
+  
+//   const [documentData, setDocumentData] = useState<any>(null);
+//   const [template, setTemplate] = useState<any>(null);
+//   const [fields, setFields] = useState<any[]>([]);
+//   const [fieldValues, setFieldValues] = useState<{ [key: string]: string }>({});
+  
+//   const [numPages, setNumPages] = useState<number | null>(null);
+//   const [pageNumber, setPageNumber] = useState<number>(1);
+//   const [pdfWidth, setPdfWidth] = useState<number>(320);
+  
+//   const [isSubmitting, setIsSubmitting] = useState(false);
+//   const [isDone, setIsDone] = useState(false);
+//   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+//   useEffect(() => {
+//     setIsMounted(true);
+//     if (typeof window !== "undefined") {
+//       setPdfWidth(Math.min(window.innerWidth - 32, 800));
+//     }
+//   }, []);
+
+//   useEffect(() => {
+//     if (!isMounted) return;
+//     if (!token) return setErrorMsg("שגיאה: לא התקבל מזהה מסמך (Token).");
+    
+//     setLoadingStep(`מתחבר לשרת...`);
+//     fetchDocumentData();
+//   }, [token, isMounted]);
+
+//   const fetchDocumentData = async () => {
+//     try {
+//       if (!supabase) throw new Error("חיבור ל-Supabase לא הוגדר.");
+
+//       const { data: docData, error: docError } = await supabase
+//         .from("sign_documents")
+//         .select("*, sign_templates(*, sign_files(*))")
+//         .eq("sign_token", token)
+//         .single();
+
+//       if (docError) return setErrorMsg(`שגיאת מסד נתונים: ${docError.message}`);
+//       if (!docData) return setErrorMsg("המסמך לא נמצא.");
+//       if (!docData.sign_templates) return setErrorMsg("התבנית חסומה לקריאה.");
+
+//       setDocumentData(docData);
+//       setTemplate(docData.sign_templates);
+
+//       const { data: fieldsData } = await supabase
+//         .from("sign_template_fields")
+//         .select("*")
+//         .eq("template_id", docData.template_id);
+
+//       if (fieldsData) setFields(fieldsData);
+//       if (docData.status === 'signed') setIsDone(true);
+      
+//     } catch (err: any) {
+//       setErrorMsg(`קריסת קוד: ${err.message}`);
+//     }
+//   };
+
+//   const handleFieldChange = (fieldId: string, value: string) => {
+//     setFieldValues(prev => ({ ...prev, [fieldId]: value }));
+//   };
+
+//   const handleSubmit = async () => {
+//     setIsSubmitting(true);
+//     try {
+//       const valuesToInsert = fields.map(field => ({
+//         document_id: documentData.id,
+//         field_id: field.id,
+//         value: fieldValues[field.id] || ""
+//       }));
+
+//       await supabase.from("sign_document_field_values").insert(valuesToInsert);
+//       await supabase.from("sign_documents").update({ status: 'signed', signed_at: new Date().toISOString() }).eq("id", documentData.id);
+//       setIsDone(true);
+//     } catch (error) {
+//       alert("אירעה שגיאה בעת שמירת החתימה.");
+//     } finally {
+//       setIsSubmitting(false);
+//     }
+//   };
+
+//   if (!isMounted) return null;
+
+//   if (errorMsg) return <div className="min-h-screen flex items-center justify-center p-8 bg-gray-50 text-red-600 font-bold dir-rtl" dir="rtl">{errorMsg}</div>;
+//   if (isDone) return <div className="min-h-screen flex items-center justify-center p-8 bg-gray-50 text-emerald-600 font-bold text-2xl dir-rtl" dir="rtl">המסמך נחתם בהצלחה!</div>;
+//   if (!documentData || !template) return <div className="min-h-screen flex items-center justify-center p-8 bg-gray-50 text-gray-600 font-bold dir-rtl" dir="rtl">{loadingStep}</div>;
+
+//   const pdfFileUrl = template.sign_files?.public_url || (Array.isArray(template.sign_files) ? template.sign_files[0]?.public_url : null);
+
+//   return (
+//     <div className="min-h-screen bg-gray-100 p-4 md:p-8 dir-rtl flex flex-col items-center" dir="rtl">
+      
+//       <div className="w-full max-w-4xl bg-white p-4 rounded-t-xl shadow-sm border-b border-gray-200 flex flex-col md:flex-row justify-between items-center gap-4 z-10">
+//         <div>
+//           <h1 className="text-xl font-bold text-gray-800">שלום, {documentData.customer_name}</h1>
+//           <p className="text-sm text-gray-500">אנא עיין במסמך, מלא את השדות ולחץ על אישור.</p>
+//         </div>
+//         <button onClick={handleSubmit} disabled={isSubmitting} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-lg shadow w-full md:w-auto">
+//           {isSubmitting ? "שומר..." : "אני מאשר וחותם"}
+//         </button>
+//       </div>
+
+//       <div className="w-full max-w-4xl bg-gray-50 p-2 md:p-6 flex flex-col items-center shadow-lg rounded-b-xl overflow-hidden">
+        
+//         {!pdfFileUrl ? (
+//           <div className="p-8 text-red-500 font-bold bg-white rounded border border-red-200 w-full text-center" dir="ltr">
+//             <p>שגיאה: קובץ ה-PDF אינו זמין.</p>
+//             <p className="text-xs text-gray-500 mt-4 font-mono break-words text-left">
+//               Template Data: {JSON.stringify(template || 'null')}
+//             </p>
+//           </div>
+//         ) : (
+//           <>
+//             <div className="flex gap-4 mb-4 items-center">
+//               <button onClick={() => setPageNumber(p => p - 1)} disabled={pageNumber <= 1} className="px-4 py-2 border rounded bg-white">הקודם</button>
+//               <span className="font-semibold text-sm">עמוד {pageNumber} מתוך {numPages || '-'}</span>
+//               <button onClick={() => setPageNumber(p => p + 1)} disabled={numPages !== null && pageNumber >= numPages} className="px-4 py-2 border rounded bg-white">הבא</button>
+//             </div>
+
+//             <div className="relative shadow-md border border-gray-300 bg-white overflow-hidden max-w-full">
+//               <Document 
+//                 file={pdfFileUrl} 
+//                 onLoadSuccess={({ numPages }) => setNumPages(numPages)} 
+//                 onLoadError={(e) => setErrorMsg(`ה-PDF נכשל מלטעון: ${e.message}`)}
+//               >
+//                 <Page 
+//                   pageNumber={pageNumber} 
+//                   width={pdfWidth} 
+//                   devicePixelRatio={1} /* חוסם את מגבלת הזיכרון במובייל */
+//                   renderTextLayer={false} 
+//                   renderAnnotationLayer={false} 
+//                 />
+//               </Document>
+
+//               {fields.filter(f => f.page_number === pageNumber).map(field => (
+//                 <div key={field.id} className="absolute transform -translate-x-1/2 -translate-y-1/2" style={{ left: `${field.position_x}%`, top: `${field.position_y}%` }}>
+//                   {field.field_type === 'signature' ? (
+//                     <input type="text" placeholder="הקלד שם..." value={fieldValues[field.id] || ""} onChange={(e) => handleFieldChange(field.id, e.target.value)} className="px-2 py-1 bg-yellow-100 border border-yellow-400 text-indigo-900 font-bold text-center shadow-sm outline-none w-24 md:w-48 rounded text-sm md:text-base" />
+//                   ) : (
+//                     <input type="text" placeholder={field.field_name} value={fieldValues[field.id] || ""} onChange={(e) => handleFieldChange(field.id, e.target.value)} className="px-2 py-1 bg-blue-50 border border-blue-200 text-gray-800 text-xs md:text-sm shadow-sm outline-none w-20 md:w-32 rounded" />
+//                   )}
+//                 </div>
+//               ))}
+//             </div>
+//           </>
+//         )}
+//       </div>
+//     </div>
+//   );
+// }
 
 
 
