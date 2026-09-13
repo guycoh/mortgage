@@ -127,13 +127,13 @@ export default function SignDocumentClient({ token }: { token: string }) {
       <div className="w-full max-w-4xl bg-gray-50 p-2 md:p-6 flex flex-col items-center shadow-lg rounded-b-xl overflow-hidden">
         
         {!pdfFileUrl ? (
-              <div className="p-8 text-red-500 font-bold bg-white rounded border border-red-200 w-full text-center" dir="ltr">
-                <p>שגיאה: קובץ ה-PDF אינו זמין.</p>
-                <p className="text-xs text-gray-500 mt-4 font-mono break-words">
-                  Debug Data: {JSON.stringify(template?.sign_files || 'null')}
-                </p>
-              </div>
-            ) : (
+          <div className="p-8 text-red-500 font-bold bg-white rounded border border-red-200 w-full text-center" dir="ltr">
+            <p>שגיאה: קובץ ה-PDF אינו זמין.</p>
+            <p className="text-xs text-gray-500 mt-4 font-mono break-words text-left">
+              Template Data: {JSON.stringify(template || 'null')}
+            </p>
+          </div>
+        ) : (
           <>
             <div className="flex gap-4 mb-4 items-center">
               <button onClick={() => setPageNumber(p => p - 1)} disabled={pageNumber <= 1} className="px-4 py-2 border rounded bg-white">הקודם</button>
