@@ -76,9 +76,10 @@ export default function MinimalTestClient({ token }: { token: string }) {
           <div className="w-full flex-grow mt-2">
             <div className="w-full h-[70vh] min-h-[500px] border-2 border-gray-300 rounded-lg overflow-hidden bg-gray-50 shadow-inner">
               <iframe 
-                src={pdfUrl} 
+                src={`https://docs.google.com/gview?url=${encodeURIComponent(pdfUrl)}&embedded=true`} 
                 className="w-full h-full"
                 title="PDF Viewer"
+                style={{ border: 'none' }}
               />
             </div>
           </div>
