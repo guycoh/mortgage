@@ -1,8 +1,13 @@
 "use client";
 
-"use client";
+import { createClient } from '@supabase/supabase-js';
 
-import { createClient } from "@supabase/supabase-js";
+const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
+
+
 import React, { useState, useEffect } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 
@@ -11,41 +16,7 @@ import 'react-pdf/dist/Page/AnnotationLayer.css';
 // @ts-ignore
 import 'react-pdf/dist/Page/TextLayer.css';
 
-pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-  "pdfjs-dist/build/pdf.worker.min.mjs",
-  import.meta.url
-).toString();
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
-
-
-
-
-
-
-
-
-
-// import { createClient } from '@supabase/supabase-js';
-
-// const supabase = createClient(
-//     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-//     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-// );
-
-
-// import React, { useState, useEffect } from "react";
-// import { Document, Page, pdfjs } from "react-pdf";
-
-// // @ts-ignore
-// import 'react-pdf/dist/Page/AnnotationLayer.css';
-// // @ts-ignore
-// import 'react-pdf/dist/Page/TextLayer.css';
-
-// pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
 export default function SignDocumentClient({ token }: { token: string }) {
   const [isMounted, setIsMounted] = useState(false);
