@@ -41,7 +41,7 @@ export default function MinimalTestClient({ token }: { token: string }) {
       const files = data.sign_templates.sign_files;
       const url = files?.public_url || (Array.isArray(files) && files[0]?.public_url) || null;
       
-      if (!url) throw new Error("אין קישור URL לקובץ במסד הנתונים (file_id חסר או שגוי)");
+      if (!url) throw new Error("אין קישור URL לקובץ במסד הנתונים");
 
       setPdfUrl(url);
       setStatus("הנתונים נמשכו בהצלחה!");
@@ -61,30 +61,20 @@ export default function MinimalTestClient({ token }: { token: string }) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 p-4 dir-rtl flex flex-col items-center" dir="rtl">
-      <div className="w-full max-w-3xl bg-white p-6 rounded-xl shadow-md text-center">
-        <h1 className="text-2xl font-bold mb-2">סביבת בדיקה מבודדת</h1>
-        <p className="text-gray-600 mb-4">סטטוס: <span className="font-bold text-blue-600">{status}</span></p>
+    <div className="min-h-screen bg-gray-100 p-2 md:p-4 dir-rtl flex flex-col items-center" dir="rtl">
+      <div className="w-full max-w-3xl bg-white p-4 md:p-6 rounded-xl shadow-md text-center flex flex-col flex-grow">
+        <h1 className="text-xl md:text-2xl font-bold mb-2">סביבת בדיקה מבודדת</h1>
+        <p className="text-gray-600 mb-2">סטטוס: <span className="font-bold text-blue-600">{status}</span></p>
         
         {customerName && (
-          <p className="text-lg font-medium text-green-700 mb-6">
+          <p className="text-md md:text-lg font-medium text-green-700 mb-4">
             זיהוי לקוח עובד: {customerName}
           </p>
         )}
 
         {pdfUrl ? (
-          <div className="flex flex-col items-center w-full gap-4">
-            <a 
-              href={pdfUrl} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-lg font-bold shadow transition-colors w-full max-w-xs"
-            >
-              פתח PDF בנייד
-            </a>
-            
-            {/* תצוגה מקדימה למחשב */}
-            <div className="hidden md:block w-full h-[600px] border-2 border-gray-200 rounded-lg overflow-hidden bg-gray-50 mt-4">
+          <div className="w-full flex-grow mt-2">
+            <div className="w-full h-[70vh] min-h-[500px] border-2 border-gray-300 rounded-lg overflow-hidden bg-gray-50 shadow-inner">
               <iframe 
                 src={pdfUrl} 
                 className="w-full h-full"
@@ -93,7 +83,7 @@ export default function MinimalTestClient({ token }: { token: string }) {
             </div>
           </div>
         ) : (
-          <div className="animate-pulse text-gray-400 mt-8">טוען קובץ...</div>
+          <div className="animate-pulse text-gray-400 mt-8 font-bold">טוען קובץ...</div>
         )}
       </div>
     </div>
