@@ -35,7 +35,7 @@ type TableRow = Partial<FundingTrack> & {
   body_name: string;
   is_new?: boolean; 
 };
-
+const filteredRows
 const AMORTIZATION_OPTIONS = ["שפיצר", "בלון חלקי", "בלון מלא", "קרן שווה", "כפי יכולתך"];
 const TRACK_OPTIONS = ["ק\"צ", "קל\"צ", "פריים", "מ\"צ", "מל\"צ"];
 const MORTGAGE_TYPE_OPTIONS = ["דרגה ראשונה", "דרגה שניה", "הלוואת סולו"];
@@ -187,8 +187,9 @@ export default function SpreadsheetPage() {
     if (filters.track_type && row.track_type !== filters.track_type) return false;
     if (filters.mortgage_type && row.mortgage_type !== filters.mortgage_type) return false;
     
-    if (filters.min_age_required && (row.max_age === null || row.max_age < Number(filters.min_age_required))) return false;
-    if (filters.min_spread_required && (row.max_spread_years === null || row.max_spread_years < Number(filters.min_spread_required))) return false;
+    // כאן התבצע התיקון - הוספת בדיקה גם ל-undefined
+    if (filters.min_age_required && (row.max_age === null || row.max_age === undefined || row.max_age < Number(filters.min_age_required))) return false;
+    if (filters.min_spread_required && (row.max_spread_years === null || row.max_spread_years === undefined || row.max_spread_years < Number(filters.min_spread_required))) return false;
 
     if (filters.restricted !== "all") {
       const wantsRestricted = filters.restricted === "yes";
@@ -201,7 +202,9 @@ export default function SpreadsheetPage() {
 
     return true;
   });
-
+  
+  
+  
   // פונקציית הייצוא לאקסל
   const exportToExcel = () => {
     // הכנת הנתונים בפורמט קריא לאקסל
