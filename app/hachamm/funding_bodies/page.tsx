@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
-import * as XLSX from "xlsx"; // ייבוא ספריית האקסל
+import * as XLSX from "xlsx"; 
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -35,7 +35,7 @@ type TableRow = Partial<FundingTrack> & {
   body_name: string;
   is_new?: boolean; 
 };
-const filteredRows
+
 const AMORTIZATION_OPTIONS = ["שפיצר", "בלון חלקי", "בלון מלא", "קרן שווה", "כפי יכולתך"];
 const TRACK_OPTIONS = ["ק\"צ", "קל\"צ", "פריים", "מ\"צ", "מל\"צ"];
 const MORTGAGE_TYPE_OPTIONS = ["דרגה ראשונה", "דרגה שניה", "הלוואת סולו"];
@@ -177,6 +177,7 @@ export default function SpreadsheetPage() {
     else fetchData();
   };
 
+  // מנגנון הסינון החכם (כולל תיקון ה-undefined)
   const filteredRows = rows.filter(row => {
     if (row.is_new && row.ui_id.startsWith("new-")) return true;
     const isFilterActive = Object.values(filters).some(val => val !== "" && val !== "all");
@@ -187,7 +188,6 @@ export default function SpreadsheetPage() {
     if (filters.track_type && row.track_type !== filters.track_type) return false;
     if (filters.mortgage_type && row.mortgage_type !== filters.mortgage_type) return false;
     
-    // כאן התבצע התיקון - הוספת בדיקה גם ל-undefined
     if (filters.min_age_required && (row.max_age === null || row.max_age === undefined || row.max_age < Number(filters.min_age_required))) return false;
     if (filters.min_spread_required && (row.max_spread_years === null || row.max_spread_years === undefined || row.max_spread_years < Number(filters.min_spread_required))) return false;
 
@@ -202,14 +202,10 @@ export default function SpreadsheetPage() {
 
     return true;
   });
-  
-  
-  
-  // פונקציית הייצוא לאקסל
+
   const exportToExcel = () => {
-    // הכנת הנתונים בפורמט קריא לאקסל
     const dataToExport = filteredRows
-      .filter((row) => !row.is_new) // מסננים שורות שטרם נשמרו
+      .filter((row) => !row.is_new)
       .map((row) => {
         const isEmptyPlaceholder = row.ui_id.startsWith("empty-");
         return {
@@ -231,16 +227,13 @@ export default function SpreadsheetPage() {
         };
       });
 
-    // יצירת גיליון עבודה וקובץ
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "מסלולי מימון");
 
-    // הגדרת הגיליון לימין-לשמאל (RTL)
     if (!worksheet["!views"]) worksheet["!views"] = [];
     worksheet["!views"].push({ rightToLeft: true });
 
-    // שמירת הקובץ
     XLSX.writeFile(workbook, "מסלולי_מימון.xlsx");
   };
 
@@ -248,9 +241,9 @@ export default function SpreadsheetPage() {
     <div className="relative w-full h-[26px] group/textarea">
       <textarea
         name={name} value={value || ""} onChange={isEditing ? onChange : undefined} readOnly={!isEditing} placeholder={isEditing ? "הקלד..." : ""}
-        className={`absolute top-0 right-0 w-full h-6.5 p-1 text-xs text-right border rounded outline-none transition-all duration-200 resize-none overflow-hidden whitespace-pre-wrap leading-relaxed
-          group-hover/textarea:w-62.5 group-hover/textarea:h-30 group-hover/textarea:z-100 group-hover/textarea:shadow-2xl group-hover/textarea:overflow-y-auto
-          focus:w-62.5 focus:h-30 focus:z-100 focus:shadow-2xl focus:overflow-y-auto focus:bg-orange-50 focus:border-orange-400 focus:ring-1 focus:ring-orange-400
+        className={`absolute top-0 right-0 w-full h-[26px] p-1 text-xs text-right border rounded outline-none transition-all duration-200 resize-none overflow-hidden whitespace-pre-wrap leading-relaxed
+          group-hover/textarea:w-[250px] group-hover/textarea:h-[120px] group-hover/textarea:z-[100] group-hover/textarea:shadow-2xl group-hover/textarea:overflow-y-auto
+          focus:w-[250px] focus:h-[120px] focus:z-[100] focus:shadow-2xl focus:overflow-y-auto focus:bg-orange-50 focus:border-orange-400 focus:ring-1 focus:ring-orange-400
           ${isEditing ? "border-blue-400 bg-white shadow-inner" : "border-transparent bg-transparent text-gray-800 cursor-text"}`}
       />
     </div>
@@ -280,7 +273,6 @@ export default function SpreadsheetPage() {
           <div className="flex items-center gap-3">
             <h2 className="text-xl font-bold text-gray-800 ml-4">ניהול מסלולי מימון</h2>
             
-            {/* כפתור סינון מתקדם */}
             <button 
               onClick={() => setShowFilters(!showFilters)} 
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 border ${showFilters ? 'bg-blue-100 text-blue-800 border-blue-200' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
@@ -289,7 +281,6 @@ export default function SpreadsheetPage() {
               סינון חכם
             </button>
 
-            {/* כפתור ייצוא לאקסל */}
             <button 
               onClick={exportToExcel}
               className="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 border bg-white text-green-700 border-green-200 hover:bg-green-50 focus:ring-2 focus:ring-green-400 outline-none shadow-sm"
@@ -365,22 +356,22 @@ export default function SpreadsheetPage() {
               )}
 
               <tr>
-                <th className="p-2 border border-gray-300 font-bold w-30 leading-tight align-bottom">גוף מימון</th>
-                <th className="p-2 border border-gray-300 font-semibold w-22.5 leading-tight align-bottom">לוח סילוקין</th>
-                <th className="p-2 border border-gray-300 font-semibold w-18.75 leading-tight align-bottom">ריביות<br/>לכל מטרה<br/>מינימום</th>
-                <th className="p-2 border border-gray-300 font-semibold w-20 leading-tight align-bottom">מסלול</th>
-                <th className="p-2 border border-gray-300 font-semibold w-17.5 leading-tight align-bottom">אחוז<br/>מימון<br/>מקסימלי</th>
-                <th className="p-2 border border-gray-300 font-semibold w-22.5 leading-tight align-bottom">סוג<br/>משכנתא</th>
-                <th className="p-2 border border-gray-300 font-semibold w-15 leading-tight align-bottom">גיל<br/>מקס'</th>
-                <th className="p-2 border border-gray-300 font-semibold w-17.5 leading-tight align-bottom">פריסה<br/>מקסימלית<br/>בשנים</th>
-                <th className="p-2 border border-gray-300 font-semibold w-17.5 leading-tight align-bottom">לקוחות<br/>מוגבלים</th>
-                <th className="p-2 border border-gray-300 font-semibold w-17.5 leading-tight align-bottom">לקוחות<br/>מורכבים</th>
-                <th className="p-2 border border-gray-300 font-semibold w-16.25 leading-tight align-bottom">פתיחת<br/>תיק ₪</th>
-                <th className="p-2 border border-gray-300 font-semibold w-16.25 leading-tight align-bottom">פתיחת<br/>תיק<br/>אחוזים</th>
-                <th className="p-2 border border-gray-300 font-semibold w-25 leading-tight align-bottom">שיטת רישום</th>
-                <th className="p-2 border border-gray-300 font-semibold w-30 leading-tight align-bottom">תוספות</th>
-                <th className="p-2 border border-gray-300 font-semibold w-35 leading-tight align-bottom">הערות</th>
-                <th className="p-2 border border-gray-300 font-semibold w-25 leading-tight align-bottom sticky left-0 bg-gray-200 z-30 shadow-[-4px_0_6px_-1px_rgba(0,0,0,0.05)]">פעולות</th>
+                <th className="p-2 border border-gray-300 font-bold w-[120px] leading-tight align-bottom">גוף מימון</th>
+                <th className="p-2 border border-gray-300 font-semibold w-[90px] leading-tight align-bottom">לוח סילוקין</th>
+                <th className="p-2 border border-gray-300 font-semibold w-[75px] leading-tight align-bottom">ריביות<br/>לכל מטרה<br/>מינימום</th>
+                <th className="p-2 border border-gray-300 font-semibold w-[80px] leading-tight align-bottom">מסלול</th>
+                <th className="p-2 border border-gray-300 font-semibold w-[70px] leading-tight align-bottom">אחוז<br/>מימון<br/>מקסימלי</th>
+                <th className="p-2 border border-gray-300 font-semibold w-[90px] leading-tight align-bottom">סוג<br/>משכנתא</th>
+                <th className="p-2 border border-gray-300 font-semibold w-[60px] leading-tight align-bottom">גיל<br/>מקס'</th>
+                <th className="p-2 border border-gray-300 font-semibold w-[70px] leading-tight align-bottom">פריסה<br/>מקסימלית<br/>בשנים</th>
+                <th className="p-2 border border-gray-300 font-semibold w-[70px] leading-tight align-bottom">לקוחות<br/>מוגבלים</th>
+                <th className="p-2 border border-gray-300 font-semibold w-[70px] leading-tight align-bottom">לקוחות<br/>מורכבים</th>
+                <th className="p-2 border border-gray-300 font-semibold w-[65px] leading-tight align-bottom">פתיחת<br/>תיק ₪</th>
+                <th className="p-2 border border-gray-300 font-semibold w-[65px] leading-tight align-bottom">פתיחת<br/>תיק<br/>אחוזים</th>
+                <th className="p-2 border border-gray-300 font-semibold w-[100px] leading-tight align-bottom">שיטת רישום</th>
+                <th className="p-2 border border-gray-300 font-semibold w-[120px] leading-tight align-bottom">תוספות</th>
+                <th className="p-2 border border-gray-300 font-semibold w-[140px] leading-tight align-bottom">הערות</th>
+                <th className="p-2 border border-gray-300 font-semibold w-[100px] leading-tight align-bottom sticky left-0 bg-gray-200 z-30 shadow-[-4px_0_6px_-1px_rgba(0,0,0,0.05)]">פעולות</th>
               </tr>
             </thead>
             
@@ -482,4 +473,3 @@ export default function SpreadsheetPage() {
     </div>
   );
 }
-
