@@ -44,6 +44,17 @@ const viewInputStyle = "w-full p-1 border border-transparent rounded text-xs tex
 const editInputStyle = "w-full p-1 border border-blue-400 rounded text-xs text-center outline-none bg-white shadow-inner focus:bg-orange-50 focus:border-orange-400 focus:ring-2 focus:ring-orange-400 transition-colors";
 const filterInputStyle = "w-full p-1 border border-gray-300 rounded text-[11px] bg-white outline-none text-gray-700 focus:bg-orange-50 focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition-colors";
 
+// עיצובים דינמיים לשדה "סוג משכנתא"
+const getMortgageTypeViewStyle = (val: string | null) => 
+  val === "דרגה שניה" 
+    ? "w-full p-1 border border-blue-600 rounded text-xs text-center bg-blue-600 text-white font-medium outline-none cursor-default transition-colors" 
+    : viewInputStyle;
+
+const getMortgageTypeEditStyle = (val: string | null | undefined) => 
+  val === "דרגה שניה" 
+    ? "w-full p-1 border border-blue-600 rounded text-xs text-center bg-blue-600 text-white font-medium outline-none shadow-inner focus:ring-2 focus:ring-blue-400 transition-colors" 
+    : editInputStyle;
+
 export default function SpreadsheetPage() {
   const [rows, setRows] = useState<TableRow[]>([]);
   const [bodies, setBodies] = useState<FundingBody[]>([]);
@@ -66,7 +77,6 @@ export default function SpreadsheetPage() {
     complex: "all",
   });
 
-  // סטייט להוספת גוף מימון חדש
   const [isAddingBody, setIsAddingBody] = useState(false);
   const [newBodyName, setNewBodyName] = useState("");
 
@@ -100,7 +110,6 @@ export default function SpreadsheetPage() {
     setLoading(false);
   };
 
-  // פונקציה לשמירת גוף המימון החדש ב-DB
   const handleAddBody = async () => {
     if (!newBodyName.trim()) return;
     setLoading(true);
@@ -114,7 +123,6 @@ export default function SpreadsheetPage() {
     } else {
       setNewBodyName("");
       setIsAddingBody(false);
-      // קריאה מחדש של הנתונים כדי שהשורה החדשה תופיע מיד בטבלה
       fetchData();
     }
   };
@@ -260,13 +268,16 @@ export default function SpreadsheetPage() {
   };
 
   const ExpandableTextarea = ({ name, value, isEditing, onChange }: any) => (
-    <div className="relative w-full h-[26px] group/textarea">
+    <div className="relative w-full h-[26px] group/textarea hover:z-[100] focus-within:z-[100]">
       <textarea
         name={name} value={value || ""} onChange={isEditing ? onChange : undefined} readOnly={!isEditing} placeholder={isEditing ? "הקלד..." : ""}
-        className={`absolute top-0 right-0 w-full h-[26px] p-1 text-xs text-right border rounded outline-none transition-all duration-200 resize-none overflow-hidden whitespace-pre-wrap leading-relaxed
+        className={`absolute top-0 left-0 w-full h-[26px] p-1 text-xs text-right border rounded outline-none transition-all duration-200 resize-none overflow-hidden whitespace-pre-wrap leading-relaxed
           group-hover/textarea:w-[250px] group-hover/textarea:h-[120px] group-hover/textarea:z-[100] group-hover/textarea:shadow-2xl group-hover/textarea:overflow-y-auto
           focus:w-[250px] focus:h-[120px] focus:z-[100] focus:shadow-2xl focus:overflow-y-auto focus:bg-orange-50 focus:border-orange-400 focus:ring-1 focus:ring-orange-400
-          ${isEditing ? "border-blue-400 bg-white shadow-inner" : "border-transparent bg-transparent text-gray-800 cursor-text"}`}
+          ${isEditing 
+            ? "border-blue-400 bg-white shadow-inner" 
+            : "border-transparent bg-transparent text-gray-800 cursor-text group-hover/textarea:bg-white group-hover/textarea:border-gray-300"
+          }`}
       />
     </div>
   );
@@ -293,15 +304,25 @@ export default function SpreadsheetPage() {
         
         <div className="p-3 bg-gray-100 border-b border-gray-300 flex justify-between items-center shrink-0">
           <div className="flex items-center gap-3">
-            <h2 className="text-xl font-bold text-gray-800 ml-4">ניהול מסלולי מימון</h2>
+            <h2 className="text-2xl font-bold text-gray-800 ml-4">גופי מימון</h2>
             
             <button 
               onClick={() => setShowFilters(!showFilters)} 
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 border ${showFilters ? 'bg-blue-100 text-blue-800 border-blue-200' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
-              סינון חכם
+              סינון מתקדם
             </button>
+
+            {/* כפתור "נקה סינון" הועבר לכאן (מופיע רק כשהסינון פתוח) */}
+            {showFilters && (
+              <button 
+                onClick={clearFilters} 
+                className="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 focus:bg-gray-300 focus:ring-2 focus:ring-orange-400 text-gray-700 font-medium rounded-lg text-sm transition-colors outline-none shadow-sm"
+              >
+                נקה סינון
+              </button>
+            )}
 
             <button 
               onClick={exportToExcel}
@@ -313,7 +334,6 @@ export default function SpreadsheetPage() {
               ייצוא לאקסל
             </button>
 
-            {/* קבוצת הוספת גוף מימון חדש */}
             <div className="border-r border-gray-300 pr-3 flex items-center gap-2">
               {isAddingBody ? (
                 <div className="flex items-center gap-2 animate-fade-in">
@@ -397,11 +417,8 @@ export default function SpreadsheetPage() {
                   <th className="p-1 border border-gray-300"></th>
                   <th className="p-1 border border-gray-300"></th>
                   <th className="p-1 border border-gray-300"></th>
-                  <th className="p-1 border border-gray-300 sticky left-0 bg-blue-50 z-30 shadow-[-4px_0_6px_-1px_rgba(0,0,0,0.05)] align-middle">
-                    <button onClick={clearFilters} className="w-full bg-white hover:bg-orange-50 focus:bg-orange-50 focus:ring-1 focus:ring-orange-400 text-gray-700 font-medium rounded text-[11px] py-1 border border-gray-300 transition-colors outline-none">
-                      נקה סינון
-                    </button>
-                  </th>
+                  {/* העמודה הזו נשארת ריקה בשורת הסינון כי הכפתור הועבר למעלה */}
+                  <th className="p-1 border border-gray-300 sticky left-0 bg-blue-50 z-30 shadow-[-4px_0_6px_-1px_rgba(0,0,0,0.05)] align-middle"></th>
                 </tr>
               )}
 
@@ -466,7 +483,7 @@ export default function SpreadsheetPage() {
                         <td className={`p-1 ${tdClasses}`}><input type="number" step="0.01" name="min_interest_all_purpose_percent" value={editFormData.min_interest_all_purpose_percent || ""} onChange={handleChange} className={editInputStyle} placeholder="%" /></td>
                         <td className={`p-1 ${tdClasses}`}><select name="track_type" value={editFormData.track_type || ""} onChange={handleChange} className={editInputStyle}><option value=""></option>{TRACK_OPTIONS.map(opt => (<option key={opt} value={opt}>{opt}</option>))}</select></td>
                         <td className={`p-1 ${tdClasses}`}><input type="number" step="0.01" name="max_financing_percent" value={editFormData.max_financing_percent || ""} onChange={handleChange} className={editInputStyle} placeholder="%" /></td>
-                        <td className={`p-1 ${tdClasses}`}><select name="mortgage_type" value={editFormData.mortgage_type || ""} onChange={handleChange} className={editInputStyle}><option value=""></option>{MORTGAGE_TYPE_OPTIONS.map(opt => (<option key={opt} value={opt}>{opt}</option>))}</select></td>
+                        <td className={`p-1 ${tdClasses}`}><select name="mortgage_type" value={editFormData.mortgage_type || ""} onChange={handleChange} className={getMortgageTypeEditStyle(editFormData.mortgage_type)}><option value=""></option>{MORTGAGE_TYPE_OPTIONS.map(opt => (<option key={opt} value={opt}>{opt}</option>))}</select></td>
                         <td className={`p-1 ${tdClasses}`}><input type="number" name="max_age" value={editFormData.max_age || ""} onChange={handleChange} className={editInputStyle} /></td>
                         <td className={`p-1 ${tdClasses}`}><input type="number" name="max_spread_years" value={editFormData.max_spread_years || ""} onChange={handleChange} className={editInputStyle} /></td>
                         <td className={`p-1 ${tdClasses}`}><CustomCheckbox name="restricted_customers" checked={!!editFormData.restricted_customers} onChange={handleChange} /></td>
@@ -488,7 +505,7 @@ export default function SpreadsheetPage() {
                         <td className={`p-1.5 ${tdClasses}`}><input readOnly value={row.min_interest_all_purpose_percent ? `${row.min_interest_all_purpose_percent}%` : ""} className={viewInputStyle} /></td>
                         <td className={`p-1.5 ${tdClasses}`}><input readOnly value={row.track_type || ""} className={viewInputStyle} /></td>
                         <td className={`p-1.5 ${tdClasses}`}><input readOnly value={row.max_financing_percent ? `${row.max_financing_percent}%` : ""} className={viewInputStyle} /></td>
-                        <td className={`p-1.5 ${tdClasses}`}><input readOnly value={row.mortgage_type || ""} className={viewInputStyle} /></td>
+                        <td className={`p-1.5 ${tdClasses}`}><input readOnly value={row.mortgage_type || ""} className={getMortgageTypeViewStyle(row.mortgage_type)} /></td>
                         <td className={`p-1.5 ${tdClasses}`}><input readOnly value={row.max_age || ""} className={viewInputStyle} /></td>
                         <td className={`p-1.5 ${tdClasses}`}><input readOnly value={row.max_spread_years || ""} className={viewInputStyle} /></td>
                         <td className={`p-1.5 ${tdClasses}`}><CustomCheckbox checked={!!row.restricted_customers} readOnly={true} /></td>
