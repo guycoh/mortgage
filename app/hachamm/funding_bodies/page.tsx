@@ -66,6 +66,10 @@ export default function SpreadsheetPage() {
     complex: "all",
   });
 
+  // סטייט להוספת גוף מימון חדש
+  const [isAddingBody, setIsAddingBody] = useState(false);
+  const [newBodyName, setNewBodyName] = useState("");
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -94,6 +98,25 @@ export default function SpreadsheetPage() {
     });
     setRows(tableData);
     setLoading(false);
+  };
+
+  // פונקציה לשמירת גוף המימון החדש ב-DB
+  const handleAddBody = async () => {
+    if (!newBodyName.trim()) return;
+    setLoading(true);
+    const { error } = await supabase
+      .from("hacamm_funding_bodies")
+      .insert([{ name: newBodyName.trim() }]);
+    
+    if (error) {
+      alert("שגיאה בהוספת גוף מימון: " + error.message);
+      setLoading(false);
+    } else {
+      setNewBodyName("");
+      setIsAddingBody(false);
+      // קריאה מחדש של הנתונים כדי שהשורה החדשה תופיע מיד בטבלה
+      fetchData();
+    }
   };
 
   const handleEdit = (row: TableRow) => {
@@ -177,7 +200,6 @@ export default function SpreadsheetPage() {
     else fetchData();
   };
 
-  // מנגנון הסינון החכם (כולל תיקון ה-undefined)
   const filteredRows = rows.filter(row => {
     if (row.is_new && row.ui_id.startsWith("new-")) return true;
     const isFilterActive = Object.values(filters).some(val => val !== "" && val !== "all");
@@ -290,6 +312,34 @@ export default function SpreadsheetPage() {
               </svg>
               ייצוא לאקסל
             </button>
+
+            {/* קבוצת הוספת גוף מימון חדש */}
+            <div className="border-r border-gray-300 pr-3 flex items-center gap-2">
+              {isAddingBody ? (
+                <div className="flex items-center gap-2 animate-fade-in">
+                  <input 
+                    type="text" 
+                    value={newBodyName} 
+                    onChange={(e) => setNewBodyName(e.target.value)} 
+                    placeholder="הזן שם גוף מימון..." 
+                    className="border border-blue-400 rounded px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-blue-500 w-48 shadow-inner"
+                    autoFocus
+                    onKeyDown={(e) => e.key === 'Enter' && handleAddBody()}
+                  />
+                  <button onClick={handleAddBody} className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-sm font-medium transition-colors outline-none focus:ring-2 focus:ring-blue-400">שמור</button>
+                  <button onClick={() => { setIsAddingBody(false); setNewBodyName(""); }} className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1.5 rounded text-sm font-medium transition-colors outline-none focus:ring-2 focus:ring-gray-400">ביטול</button>
+                </div>
+              ) : (
+                <button 
+                  onClick={() => setIsAddingBody(true)}
+                  className="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 border bg-white text-blue-700 border-blue-200 hover:bg-blue-50 focus:ring-2 focus:ring-blue-400 outline-none shadow-sm"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
+                  הוסף גוף מימון
+                </button>
+              )}
+            </div>
+            
           </div>
           {loading && <span className="text-sm text-gray-500">טוען נתונים...</span>}
         </div>
