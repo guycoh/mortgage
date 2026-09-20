@@ -56,6 +56,19 @@ const getMortgageTypeEditStyle = (val: string | null | undefined) =>
     ? "w-full min-w-0 h-6 py-0.5 px-1 border border-blue-600 rounded text-xs text-center bg-blue-600 text-white font-bold outline-none shadow-inner focus:ring-2 focus:ring-blue-400 transition-colors leading-tight" 
     : editInputStyle;
 
+// פונקציות עיצוב חדשות לשדה פנסיונית/הפוכה
+const getReversePensionViewStyle = (val: string | null | undefined) => {
+  if (val === "הפוכה") return "w-full min-w-0 h-5 py-0 px-1 border border-teal-600 rounded text-xs text-center bg-teal-600 text-white font-bold outline-none cursor-default transition-colors leading-tight";
+  if (val === "פנסיונית") return "w-full min-w-0 h-5 py-0 px-1 border border-purple-600 rounded text-xs text-center bg-purple-600 text-white font-bold outline-none cursor-default transition-colors leading-tight";
+  return viewInputStyle;
+};
+
+const getReversePensionEditStyle = (val: string | null | undefined) => {
+  if (val === "הפוכה") return "w-full min-w-0 h-6 py-0.5 px-1 border border-teal-600 rounded text-xs text-center bg-teal-600 text-white font-bold outline-none shadow-inner focus:ring-2 focus:ring-teal-400 transition-colors leading-tight";
+  if (val === "פנסיונית") return "w-full min-w-0 h-6 py-0.5 px-1 border border-purple-600 rounded text-xs text-center bg-purple-600 text-white font-bold outline-none shadow-inner focus:ring-2 focus:ring-purple-400 transition-colors leading-tight";
+  return editInputStyle;
+};
+
 export default function SpreadsheetPage() {
   const [rows, setRows] = useState<TableRow[]>([]);
   const [bodies, setBodies] = useState<FundingBody[]>([]);
@@ -226,7 +239,15 @@ export default function SpreadsheetPage() {
     if (filters.amortization_schedule && row.amortization_schedule !== filters.amortization_schedule) return false;
     if (filters.track_type && row.track_type !== filters.track_type) return false;
     if (filters.mortgage_type && row.mortgage_type !== filters.mortgage_type) return false;
-    if (filters.reverse_or_pension && row.reverse_or_pension !== filters.reverse_or_pension) return false;
+    
+    // סינון מעודכן לפנסיונית/הפוכה (כולל האופציה 'both')
+    if (filters.reverse_or_pension) {
+      if (filters.reverse_or_pension === "both") {
+        if (row.reverse_or_pension !== "הפוכה" && row.reverse_or_pension !== "פנסיונית") return false;
+      } else if (row.reverse_or_pension !== filters.reverse_or_pension) {
+        return false;
+      }
+    }
     
     if (filters.min_age_required && (row.max_age === null || row.max_age === undefined || row.max_age < Number(filters.min_age_required))) return false;
     if (filters.min_spread_required && (row.max_spread_years === null || row.max_spread_years === undefined || row.max_spread_years < Number(filters.min_spread_required))) return false;
@@ -278,7 +299,6 @@ export default function SpreadsheetPage() {
     XLSX.writeFile(workbook, "מסלולי_מימון.xlsx");
   };
 
-  // תיקון: העוגן הוחזר ל-bottom-0 left-0 כדי שהשדה יתרחב למעלה וימינה, ולא יסתיר את כפתורי הפעולות
   const ExpandableTextarea = ({ name, value, isEditing, onChange }: any) => {
     const hClass = isEditing ? 'h-6' : 'h-5';
     return (
@@ -413,7 +433,14 @@ export default function SpreadsheetPage() {
                   <th className="p-0.5 border border-gray-300 align-middle"><select name="track_type" value={filters.track_type} onChange={handleFilterChange} className={filterInputStyle}><option value="">הכל</option>{TRACK_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}</select></th>
                   <th className="p-0.5 border border-gray-300"></th>
                   <th className="p-0.5 border border-gray-300 align-middle"><select name="mortgage_type" value={filters.mortgage_type} onChange={handleFilterChange} className={filterInputStyle}><option value="">הכל</option>{MORTGAGE_TYPE_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}</select></th>
-                  <th className="p-0.5 border border-gray-300 align-middle"><select name="reverse_or_pension" value={filters.reverse_or_pension} onChange={handleFilterChange} className={filterInputStyle}><option value="">הכל</option>{REVERSE_PENSION_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}</select></th>
+                  <th className="p-0.5 border border-gray-300 align-middle">
+                    {/* נוספה כאן אופציית 'שתיהן' */}
+                    <select name="reverse_or_pension" value={filters.reverse_or_pension} onChange={handleFilterChange} className={filterInputStyle}>
+                      <option value="">הכל</option>
+                      <option value="both">שתיהן</option>
+                      {REVERSE_PENSION_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                    </select>
+                  </th>
                   <th className="p-0.5 border border-gray-300 align-middle"><input type="number" name="min_age_required" value={filters.min_age_required} onChange={handleFilterChange} placeholder="לפחות..." className={filterInputStyle} /></th>
                   <th className="p-0.5 border border-gray-300 align-middle"><input type="number" name="min_spread_required" value={filters.min_spread_required} onChange={handleFilterChange} placeholder="לפחות..." className={filterInputStyle} /></th>
                   <th className="p-0.5 border border-gray-300 align-middle"><select name="restricted" value={filters.restricted} onChange={handleFilterChange} className={filterInputStyle}><option value="all">הכל</option><option value="yes">כן</option><option value="no">לא</option></select></th>
@@ -483,7 +510,8 @@ export default function SpreadsheetPage() {
                           <td className={`${tdClasses}`}><select name="track_type" value={editFormData.track_type || ""} onChange={handleChange} className={editInputStyle}><option value=""></option>{TRACK_OPTIONS.map(opt => (<option key={opt} value={opt}>{opt}</option>))}</select></td>
                           <td className={`${tdClasses}`}><input type="number" step="0.01" name="max_financing_percent" value={editFormData.max_financing_percent || ""} onChange={handleChange} className={editInputStyle} placeholder="%" /></td>
                           <td className={`${tdClasses}`}><select name="mortgage_type" value={editFormData.mortgage_type || ""} onChange={handleChange} className={getMortgageTypeEditStyle(editFormData.mortgage_type)}><option value=""></option>{MORTGAGE_TYPE_OPTIONS.map(opt => (<option key={opt} value={opt}>{opt}</option>))}</select></td>
-                          <td className={`${tdClasses}`}><select name="reverse_or_pension" value={editFormData.reverse_or_pension || ""} onChange={handleChange} className={editInputStyle}><option value=""></option>{REVERSE_PENSION_OPTIONS.map(opt => (<option key={opt} value={opt}>{opt}</option>))}</select></td>
+                          {/* שימוש בסטייל הייעודי לשדה פנסיונית/הפוכה במצב עריכה */}
+                          <td className={`${tdClasses}`}><select name="reverse_or_pension" value={editFormData.reverse_or_pension || ""} onChange={handleChange} className={getReversePensionEditStyle(editFormData.reverse_or_pension)}><option value=""></option>{REVERSE_PENSION_OPTIONS.map(opt => (<option key={opt} value={opt}>{opt}</option>))}</select></td>
                           <td className={`${tdClasses}`}><input type="number" name="max_age" value={editFormData.max_age || ""} onChange={handleChange} className={editInputStyle} /></td>
                           <td className={`${tdClasses}`}><input type="number" name="max_spread_years" value={editFormData.max_spread_years || ""} onChange={handleChange} className={editInputStyle} /></td>
                           <td className={`${tdClasses}`}><CustomCheckbox name="restricted_customers" checked={!!editFormData.restricted_customers} onChange={handleChange} /></td>
@@ -510,7 +538,8 @@ export default function SpreadsheetPage() {
                           <td className={`${tdClasses}`}><input readOnly value={row.track_type || ""} className={viewInputStyle} /></td>
                           <td className={`${tdClasses}`}><input readOnly value={row.max_financing_percent ? `${row.max_financing_percent}%` : ""} className={viewInputStyle} /></td>
                           <td className={`${tdClasses}`}><input readOnly value={row.mortgage_type || ""} className={getMortgageTypeViewStyle(row.mortgage_type)} /></td>
-                          <td className={`${tdClasses}`}><input readOnly value={row.reverse_or_pension || ""} className={viewInputStyle} /></td>
+                          {/* שימוש בסטייל הייעודי לשדה פנסיונית/הפוכה במצב צפייה */}
+                          <td className={`${tdClasses}`}><input readOnly value={row.reverse_or_pension || ""} className={getReversePensionViewStyle(row.reverse_or_pension)} /></td>
                           <td className={`${tdClasses}`}><input readOnly value={row.max_age || ""} className={viewInputStyle} /></td>
                           <td className={`${tdClasses}`}><input readOnly value={row.max_spread_years || ""} className={viewInputStyle} /></td>
                           <td className={`${tdClasses}`}><CustomCheckbox checked={!!row.restricted_customers} readOnly={true} /></td>
