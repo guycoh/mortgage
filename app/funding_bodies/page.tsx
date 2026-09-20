@@ -42,18 +42,20 @@ const TRACK_OPTIONS = ["ק\"צ", "קל\"צ", "פריים", "מ\"צ", "מל\"צ"]
 const MORTGAGE_TYPE_OPTIONS = ["דרגה ראשונה", "דרגה שניה", "הלוואת סולו"];
 const REVERSE_PENSION_OPTIONS = ["הפוכה", "פנסיונית"];
 
-const viewInputStyle = "w-full min-w-0 p-1 border border-transparent rounded text-sm font-medium text-center bg-transparent text-gray-800 outline-none cursor-default transition-colors";
-const editInputStyle = "w-full min-w-0 p-1 border border-blue-400 rounded text-sm font-medium text-center outline-none bg-white shadow-inner focus:bg-orange-50 focus:border-orange-400 focus:ring-2 focus:ring-orange-400 transition-colors";
+// במצב צפייה: גובה השדה צומצם ל-h-5 (כ-20px) והפדינג הוקטן למינימום
+const viewInputStyle = "w-full min-w-0 h-5 py-0 px-1 border border-transparent rounded text-xs font-medium text-center bg-transparent text-gray-800 outline-none cursor-default transition-colors leading-tight";
+// במצב עריכה: השדה קופץ טיפה ל-h-6 כדי שיהיה נוח יותר להקלדה
+const editInputStyle = "w-full min-w-0 h-6 py-0.5 px-1 border border-blue-400 rounded text-xs font-medium text-center outline-none bg-white shadow-inner focus:bg-orange-50 focus:border-orange-400 focus:ring-2 focus:ring-orange-400 transition-colors leading-tight";
 const filterInputStyle = "w-full min-w-0 p-1 border border-gray-300 rounded text-xs font-medium bg-white outline-none text-gray-800 focus:bg-orange-50 focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition-colors";
 
 const getMortgageTypeViewStyle = (val: string | null | undefined) => 
   val === "דרגה שניה" 
-    ? "w-full min-w-0 p-1 border border-blue-600 rounded text-sm text-center bg-blue-600 text-white font-bold outline-none cursor-default transition-colors" 
+    ? "w-full min-w-0 h-5 py-0 px-1 border border-blue-600 rounded text-xs text-center bg-blue-600 text-white font-bold outline-none cursor-default transition-colors leading-tight" 
     : viewInputStyle;
 
 const getMortgageTypeEditStyle = (val: string | null | undefined) => 
   val === "דרגה שניה" 
-    ? "w-full min-w-0 p-1 border border-blue-600 rounded text-sm text-center bg-blue-600 text-white font-bold outline-none shadow-inner focus:ring-2 focus:ring-blue-400 transition-colors" 
+    ? "w-full min-w-0 h-6 py-0.5 px-1 border border-blue-600 rounded text-xs text-center bg-blue-600 text-white font-bold outline-none shadow-inner focus:ring-2 focus:ring-blue-400 transition-colors leading-tight" 
     : editInputStyle;
 
 export default function SpreadsheetPage() {
@@ -278,36 +280,40 @@ export default function SpreadsheetPage() {
     XLSX.writeFile(workbook, "מסלולי_מימון.xlsx");
   };
 
-  const ExpandableTextarea = ({ name, value, isEditing, onChange }: any) => (
-    <div className="relative w-full h-[26px] group/textarea hover:z-[100] focus-within:z-[100]">
-      <textarea
-        name={name} value={value || ""} onChange={isEditing ? onChange : undefined} readOnly={!isEditing} placeholder={isEditing ? "הקלד..." : ""}
-        className={`absolute top-0 right-0 w-full min-w-0 h-[26px] p-1 text-sm font-medium text-right border rounded outline-none transition-all duration-200 resize-none overflow-hidden whitespace-pre-wrap leading-relaxed
-          group-hover/textarea:w-[220px] group-hover/textarea:h-[120px] group-hover/textarea:z-[100] group-hover/textarea:shadow-2xl group-hover/textarea:overflow-y-auto
-          focus:w-[220px] focus:h-[120px] focus:z-[100] focus:shadow-2xl focus:overflow-y-auto focus:bg-orange-50 focus:border-orange-400 focus:ring-1 focus:ring-orange-400
-          ${isEditing 
-            ? "border-blue-400 bg-white shadow-inner" 
-            : "border-transparent bg-transparent text-gray-800 cursor-text group-hover/textarea:bg-white group-hover/textarea:border-gray-300"
-          }`}
-      />
-    </div>
-  );
+  const ExpandableTextarea = ({ name, value, isEditing, onChange }: any) => {
+    const hClass = isEditing ? 'h-6' : 'h-5';
+    return (
+      <div className={`relative w-full ${hClass} group/textarea hover:z-[100] focus-within:z-[100]`}>
+        <textarea
+          name={name} value={value || ""} onChange={isEditing ? onChange : undefined} readOnly={!isEditing} placeholder={isEditing ? "הקלד..." : ""}
+          className={`absolute top-0 right-0 w-full min-w-0 ${hClass} py-0 px-1 text-xs font-medium text-right border rounded outline-none transition-all duration-200 resize-none overflow-hidden whitespace-pre-wrap leading-tight
+            group-hover/textarea:w-[220px] group-hover/textarea:h-[120px] group-hover/textarea:z-[100] group-hover/textarea:shadow-2xl group-hover/textarea:overflow-y-auto
+            focus:w-[220px] focus:h-[120px] focus:z-[100] focus:shadow-2xl focus:overflow-y-auto focus:bg-orange-50 focus:border-orange-400 focus:ring-1 focus:ring-orange-400
+            ${isEditing 
+              ? "border-blue-400 bg-white shadow-inner pt-0.5" 
+              : "border-transparent bg-transparent text-gray-800 cursor-text group-hover/textarea:bg-white group-hover/textarea:border-gray-300"
+            }`}
+        />
+      </div>
+    );
+  }
 
   const CustomCheckbox = ({ checked, onChange, readOnly = false, name = "" }: { checked: boolean, onChange?: any, readOnly?: boolean, name?: string }) => (
-    <div className="flex justify-center items-center w-full min-w-0">
+    <div className="flex justify-center items-center w-full min-w-0 h-5">
       <label className={`relative flex items-center justify-center ${readOnly ? 'cursor-default' : 'cursor-pointer'}`}>
         <input 
           type="checkbox" name={name} checked={checked} onChange={readOnly ? undefined : onChange} disabled={readOnly}
-          className={`peer appearance-none w-4 h-4 md:w-5 md:h-5 border-2 rounded-sm transition-colors focus:ring-2 focus:ring-orange-400 focus:border-orange-400 focus:bg-orange-50 ${checked ? 'border-red-500 bg-red-50' : 'border-gray-300 bg-white'} ${!readOnly && 'hover:border-red-400 focus:outline-none'}`}
+          className={`peer appearance-none w-3.5 h-3.5 border-[1.5px] rounded-sm transition-colors focus:ring-2 focus:ring-orange-400 focus:border-orange-400 focus:bg-orange-50 ${checked ? 'border-red-500 bg-red-50' : 'border-gray-300 bg-white'} ${!readOnly && 'hover:border-red-400 focus:outline-none'}`}
         />
-        <svg className={`absolute w-3 h-3 md:w-3.5 md:h-3.5 text-red-500 pointer-events-none transition-opacity ${checked ? 'opacity-100' : 'opacity-0'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+        <svg className={`absolute w-3 h-3 text-red-500 pointer-events-none transition-opacity ${checked ? 'opacity-100' : 'opacity-0'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
         </svg>
       </label>
     </div>
   );
 
-  const tdBaseClasses = "border transition-colors duration-150 align-middle cursor-pointer";
+  // שינוי לפדינג 0 כדי לחסוך גובה שורה
+  const tdBaseClasses = "border transition-colors duration-150 align-middle cursor-pointer p-0";
 
   const selectedRowData = rows.find(r => r.ui_id === selectedRowId);
   const isEditingSelected = editingRowId === selectedRowId;
@@ -456,12 +462,17 @@ export default function SpreadsheetPage() {
                     onClick={() => setSelectedRowId(row.ui_id)} 
                     className={`relative transition-colors ${isSelected ? 'z-10' : ''} ${isDiffFromPrev ? 'border-t-[3px] border-t-gray-300' : 'border-t border-t-gray-200'}`}
                   >
-                    <td className={`p-0.5 md:p-1 font-extrabold text-blue-900 text-right ${firstTdBg} ${tdClasses}`}>
-                      <div className="flex flex-col items-start gap-1 pr-1 w-full overflow-hidden">
+                    <td className={`font-extrabold text-blue-900 text-right ${firstTdBg} ${tdClasses}`}>
+                      {/* הוספת מסלול מופיע באותה שורה של שם הגוף המימון */}
+                      <div className="flex items-center justify-between gap-1 w-full overflow-hidden px-1">
                         <span className="text-xs truncate w-full" title={row.body_name}>{row.body_name}</span>
                         {!isEditing && (
-                          <button onClick={(e) => { e.stopPropagation(); handleAddNewTrackToBody(row.funding_body_id, row.body_name); }} className="text-xs text-blue-600 hover:text-blue-800 focus:ring-1 focus:ring-orange-400 font-bold bg-white border border-blue-100 rounded px-1 py-0.5 whitespace-nowrap outline-none">
-                            + מסלול
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); handleAddNewTrackToBody(row.funding_body_id, row.body_name); }} 
+                            className="flex-shrink-0 bg-green-500 hover:bg-green-600 focus:ring-1 focus:ring-green-400 text-white rounded w-4 h-4 flex items-center justify-center outline-none shadow-sm transition-colors" 
+                            title="הוסף מסלול"
+                          >
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
                           </button>
                         )}
                       </div>
@@ -469,50 +480,58 @@ export default function SpreadsheetPage() {
 
                     {isEditing ? (
                       <>
-                        <td className={`p-0.5 ${tdClasses}`}><select name="amortization_schedule" value={editFormData.amortization_schedule || ""} onChange={handleChange} className={editInputStyle}><option value=""></option>{AMORTIZATION_OPTIONS.map(opt => (<option key={opt} value={opt}>{opt}</option>))}</select></td>
-                        <td className={`p-0.5 ${tdClasses}`}><input type="number" step="0.01" name="min_interest_all_purpose_percent" value={editFormData.min_interest_all_purpose_percent || ""} onChange={handleChange} className={editInputStyle} placeholder="%" /></td>
-                        <td className={`p-0.5 ${tdClasses}`}><select name="track_type" value={editFormData.track_type || ""} onChange={handleChange} className={editInputStyle}><option value=""></option>{TRACK_OPTIONS.map(opt => (<option key={opt} value={opt}>{opt}</option>))}</select></td>
-                        <td className={`p-0.5 ${tdClasses}`}><input type="number" step="0.01" name="max_financing_percent" value={editFormData.max_financing_percent || ""} onChange={handleChange} className={editInputStyle} placeholder="%" /></td>
-                        <td className={`p-0.5 ${tdClasses}`}><select name="mortgage_type" value={editFormData.mortgage_type || ""} onChange={handleChange} className={getMortgageTypeEditStyle(editFormData.mortgage_type)}><option value=""></option>{MORTGAGE_TYPE_OPTIONS.map(opt => (<option key={opt} value={opt}>{opt}</option>))}</select></td>
-                        <td className={`p-0.5 ${tdClasses}`}><select name="reverse_or_pension" value={editFormData.reverse_or_pension || ""} onChange={handleChange} className={editInputStyle}><option value=""></option>{REVERSE_PENSION_OPTIONS.map(opt => (<option key={opt} value={opt}>{opt}</option>))}</select></td>
-                        <td className={`p-0.5 ${tdClasses}`}><input type="number" name="max_age" value={editFormData.max_age || ""} onChange={handleChange} className={editInputStyle} /></td>
-                        <td className={`p-0.5 ${tdClasses}`}><input type="number" name="max_spread_years" value={editFormData.max_spread_years || ""} onChange={handleChange} className={editInputStyle} /></td>
-                        <td className={`p-0.5 ${tdClasses}`}><CustomCheckbox name="restricted_customers" checked={!!editFormData.restricted_customers} onChange={handleChange} /></td>
-                        <td className={`p-0.5 ${tdClasses}`}><CustomCheckbox name="complex_customers" checked={!!editFormData.complex_customers} onChange={handleChange} /></td>
-                        <td className={`p-0.5 ${tdClasses}`}><input type="number" name="file_opening_fee_nis" value={editFormData.file_opening_fee_nis || ""} onChange={handleChange} className={editInputStyle} placeholder="₪" /></td>
-                        <td className={`p-0.5 ${tdClasses}`}><input type="number" step="0.01" name="file_opening_fee_percent" value={editFormData.file_opening_fee_percent || ""} onChange={handleChange} className={editInputStyle} placeholder="%" /></td>
-                        <td className={`p-0.5 ${tdClasses}`}><ExpandableTextarea name="additions" value={editFormData.additions} isEditing={true} onChange={handleChange} /></td>
+                        <td className={`${tdClasses}`}><select name="amortization_schedule" value={editFormData.amortization_schedule || ""} onChange={handleChange} className={editInputStyle}><option value=""></option>{AMORTIZATION_OPTIONS.map(opt => (<option key={opt} value={opt}>{opt}</option>))}</select></td>
+                        <td className={`${tdClasses}`}><input type="number" step="0.01" name="min_interest_all_purpose_percent" value={editFormData.min_interest_all_purpose_percent || ""} onChange={handleChange} className={editInputStyle} placeholder="%" /></td>
+                        <td className={`${tdClasses}`}><select name="track_type" value={editFormData.track_type || ""} onChange={handleChange} className={editInputStyle}><option value=""></option>{TRACK_OPTIONS.map(opt => (<option key={opt} value={opt}>{opt}</option>))}</select></td>
+                        <td className={`${tdClasses}`}><input type="number" step="0.01" name="max_financing_percent" value={editFormData.max_financing_percent || ""} onChange={handleChange} className={editInputStyle} placeholder="%" /></td>
+                        <td className={`${tdClasses}`}><select name="mortgage_type" value={editFormData.mortgage_type || ""} onChange={handleChange} className={getMortgageTypeEditStyle(editFormData.mortgage_type)}><option value=""></option>{MORTGAGE_TYPE_OPTIONS.map(opt => (<option key={opt} value={opt}>{opt}</option>))}</select></td>
+                        <td className={`${tdClasses}`}><select name="reverse_or_pension" value={editFormData.reverse_or_pension || ""} onChange={handleChange} className={editInputStyle}><option value=""></option>{REVERSE_PENSION_OPTIONS.map(opt => (<option key={opt} value={opt}>{opt}</option>))}</select></td>
+                        <td className={`${tdClasses}`}><input type="number" name="max_age" value={editFormData.max_age || ""} onChange={handleChange} className={editInputStyle} /></td>
+                        <td className={`${tdClasses}`}><input type="number" name="max_spread_years" value={editFormData.max_spread_years || ""} onChange={handleChange} className={editInputStyle} /></td>
+                        <td className={`${tdClasses}`}><CustomCheckbox name="restricted_customers" checked={!!editFormData.restricted_customers} onChange={handleChange} /></td>
+                        <td className={`${tdClasses}`}><CustomCheckbox name="complex_customers" checked={!!editFormData.complex_customers} onChange={handleChange} /></td>
+                        <td className={`${tdClasses}`}><input type="number" name="file_opening_fee_nis" value={editFormData.file_opening_fee_nis || ""} onChange={handleChange} className={editInputStyle} placeholder="₪" /></td>
+                        <td className={`${tdClasses}`}><input type="number" step="0.01" name="file_opening_fee_percent" value={editFormData.file_opening_fee_percent || ""} onChange={handleChange} className={editInputStyle} placeholder="%" /></td>
+                        <td className={`${tdClasses}`}><ExpandableTextarea name="additions" value={editFormData.additions} isEditing={true} onChange={handleChange} /></td>
                         
-                        <td className={`p-1 text-center sticky left-0 shadow-[-4px_0_6px_-1px_rgba(0,0,0,0.05)] z-10 ${actionsBg} ${tdClasses}`}>
-                          <div className="flex flex-col gap-1 justify-center items-center h-full">
-                            <button onClick={(e) => { e.stopPropagation(); handleSave(); }} className="bg-green-600 hover:bg-green-700 focus:ring-2 focus:ring-orange-400 text-white px-1.5 py-1 rounded transition text-xs font-bold w-full outline-none">שמור</button>
-                            <button onClick={(e) => { e.stopPropagation(); handleCancel(row.ui_id, row.is_new); }} className="bg-gray-200 hover:bg-gray-300 focus:ring-2 focus:ring-orange-400 text-gray-800 px-1.5 py-1 rounded transition text-xs font-bold w-full outline-none">בטל</button>
+                        <td className={`text-center sticky left-0 shadow-[-4px_0_6px_-1px_rgba(0,0,0,0.05)] z-10 ${actionsBg} ${tdClasses}`}>
+                          {/* אייקונים של שמירה וביטול בשורה אחת */}
+                          <div className="flex flex-row gap-1 justify-center items-center h-full px-1">
+                            <button onClick={(e) => { e.stopPropagation(); handleSave(); }} className="bg-green-500 hover:bg-green-600 focus:ring-2 focus:ring-green-400 text-white p-1 rounded transition w-full flex justify-center items-center outline-none" title="שמור">
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                            </button>
+                            <button onClick={(e) => { e.stopPropagation(); handleCancel(row.ui_id, row.is_new); }} className="bg-gray-400 hover:bg-gray-500 focus:ring-2 focus:ring-gray-400 text-white p-1 rounded transition w-full flex justify-center items-center outline-none" title="בטל">
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
                           </div>
                         </td>
                       </>
                     ) : (
                       <>
-                        <td className={`p-0.5 ${tdClasses}`}><input readOnly value={row.amortization_schedule || ""} className={viewInputStyle} /></td>
-                        <td className={`p-0.5 ${tdClasses}`}><input readOnly value={row.min_interest_all_purpose_percent ? `${row.min_interest_all_purpose_percent}%` : ""} className={viewInputStyle} /></td>
-                        <td className={`p-0.5 ${tdClasses}`}><input readOnly value={row.track_type || ""} className={viewInputStyle} /></td>
-                        <td className={`p-0.5 ${tdClasses}`}><input readOnly value={row.max_financing_percent ? `${row.max_financing_percent}%` : ""} className={viewInputStyle} /></td>
-                        <td className={`p-0.5 ${tdClasses}`}><input readOnly value={row.mortgage_type || ""} className={getMortgageTypeViewStyle(row.mortgage_type)} /></td>
-                        <td className={`p-0.5 ${tdClasses}`}><input readOnly value={row.reverse_or_pension || ""} className={viewInputStyle} /></td>
-                        <td className={`p-0.5 ${tdClasses}`}><input readOnly value={row.max_age || ""} className={viewInputStyle} /></td>
-                        <td className={`p-0.5 ${tdClasses}`}><input readOnly value={row.max_spread_years || ""} className={viewInputStyle} /></td>
-                        <td className={`p-0.5 ${tdClasses}`}><CustomCheckbox checked={!!row.restricted_customers} readOnly={true} /></td>
-                        <td className={`p-0.5 ${tdClasses}`}><CustomCheckbox checked={!!row.complex_customers} readOnly={true} /></td>
-                        <td className={`p-0.5 ${tdClasses}`}><input readOnly value={row.file_opening_fee_nis ? `₪${row.file_opening_fee_nis}` : ""} className={viewInputStyle} /></td>
-                        <td className={`p-0.5 ${tdClasses}`}><input readOnly value={row.file_opening_fee_percent ? `${row.file_opening_fee_percent}%` : ""} className={viewInputStyle} /></td>
-                        <td className={`p-0.5 ${tdClasses}`}><ExpandableTextarea name="additions" value={row.additions} isEditing={false} /></td>
+                        <td className={`${tdClasses}`}><input readOnly value={row.amortization_schedule || ""} className={viewInputStyle} /></td>
+                        <td className={`${tdClasses}`}><input readOnly value={row.min_interest_all_purpose_percent ? `${row.min_interest_all_purpose_percent}%` : ""} className={viewInputStyle} /></td>
+                        <td className={`${tdClasses}`}><input readOnly value={row.track_type || ""} className={viewInputStyle} /></td>
+                        <td className={`${tdClasses}`}><input readOnly value={row.max_financing_percent ? `${row.max_financing_percent}%` : ""} className={viewInputStyle} /></td>
+                        <td className={`${tdClasses}`}><input readOnly value={row.mortgage_type || ""} className={getMortgageTypeViewStyle(row.mortgage_type)} /></td>
+                        <td className={`${tdClasses}`}><input readOnly value={row.reverse_or_pension || ""} className={viewInputStyle} /></td>
+                        <td className={`${tdClasses}`}><input readOnly value={row.max_age || ""} className={viewInputStyle} /></td>
+                        <td className={`${tdClasses}`}><input readOnly value={row.max_spread_years || ""} className={viewInputStyle} /></td>
+                        <td className={`${tdClasses}`}><CustomCheckbox checked={!!row.restricted_customers} readOnly={true} /></td>
+                        <td className={`${tdClasses}`}><CustomCheckbox checked={!!row.complex_customers} readOnly={true} /></td>
+                        <td className={`${tdClasses}`}><input readOnly value={row.file_opening_fee_nis ? `₪${row.file_opening_fee_nis}` : ""} className={viewInputStyle} /></td>
+                        <td className={`${tdClasses}`}><input readOnly value={row.file_opening_fee_percent ? `${row.file_opening_fee_percent}%` : ""} className={viewInputStyle} /></td>
+                        <td className={`${tdClasses}`}><ExpandableTextarea name="additions" value={row.additions} isEditing={false} /></td>
                         
-                        <td className={`p-1 text-center sticky left-0 backdrop-blur-sm shadow-[-4px_0_6px_-1px_rgba(0,0,0,0.05)] z-10 flex justify-center items-center h-full gap-1 ${actionsBg} ${tdClasses}`}>
-                          <div className="flex flex-col gap-1 justify-center items-center h-full w-full">
-                            <button onClick={(e) => { e.stopPropagation(); handleEdit(row); }} className="text-blue-600 hover:text-blue-800 bg-blue-50 focus:bg-orange-100 focus:ring-1 focus:ring-orange-400 px-1.5 py-1 rounded transition text-xs font-bold border border-blue-100 w-full outline-none">
-                              {row.is_new ? "הוסף" : "ערוך"}
+                        <td className={`text-center sticky left-0 backdrop-blur-sm shadow-[-4px_0_6px_-1px_rgba(0,0,0,0.05)] z-10 ${actionsBg} ${tdClasses}`}>
+                          {/* אייקונים של עיפרון ופח בשורה אחת במצב צפייה */}
+                          <div className="flex flex-row gap-1 justify-center items-center h-full px-1">
+                            <button onClick={(e) => { e.stopPropagation(); handleEdit(row); }} className="bg-blue-500 hover:bg-blue-600 text-white focus:ring-1 focus:ring-blue-400 p-1 rounded transition w-full flex justify-center items-center outline-none" title="ערוך">
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                             </button>
                             {!row.is_new && (
-                              <button onClick={(e) => { e.stopPropagation(); handleDelete(row); }} className="text-red-600 hover:text-red-800 bg-red-50 focus:bg-orange-100 focus:ring-1 focus:ring-orange-400 px-1.5 py-1 rounded transition text-xs font-bold border border-red-100 w-full outline-none">מחק</button>
+                              <button onClick={(e) => { e.stopPropagation(); handleDelete(row); }} className="bg-red-500 hover:bg-red-600 text-white focus:ring-1 focus:ring-red-400 p-1 rounded transition w-full flex justify-center items-center outline-none" title="מחק">
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                              </button>
                             )}
                           </div>
                         </td>
@@ -548,7 +567,7 @@ export default function SpreadsheetPage() {
                       name="registration_method" 
                       value={bottomPaneData?.registration_method || ''} 
                       onChange={handleChange} 
-                      className={`${editInputStyle} h-full resize-none text-right text-sm`} 
+                      className="w-full h-full p-2 border border-blue-400 rounded text-sm text-right outline-none bg-white shadow-inner focus:bg-orange-50 focus:border-orange-400 focus:ring-2 focus:ring-orange-400 transition-colors resize-none" 
                       placeholder="הזן שיטת רישום..."
                     />
                   ) : (
@@ -565,7 +584,7 @@ export default function SpreadsheetPage() {
                       name="notes" 
                       value={bottomPaneData?.notes || ''} 
                       onChange={handleChange} 
-                      className={`${editInputStyle} h-full resize-none text-right leading-relaxed text-sm`} 
+                      className="w-full h-full p-2 border border-blue-400 rounded text-sm text-right leading-relaxed outline-none bg-white shadow-inner focus:bg-orange-50 focus:border-orange-400 focus:ring-2 focus:ring-orange-400 transition-colors resize-none" 
                       placeholder="הזן הערות (ניתן לרדת שורות)..."
                     />
                   ) : (
@@ -587,7 +606,6 @@ export default function SpreadsheetPage() {
     </div>
   );
 }
-
 
 
 // "use client";
