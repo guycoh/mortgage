@@ -166,7 +166,6 @@ export default function SpreadsheetPage() {
     setEditingRowId(newUiId);
     setSelectedRowId(newUiId);
     setEditFormData(newRow);
-    // הסרנו את clearFilters() כדי לשמור על הטבלה מסוננת בעת הוספת מסלול חדש
   };
 
   const handleCancel = (ui_id: string, is_new?: boolean) => {
@@ -279,13 +278,14 @@ export default function SpreadsheetPage() {
     XLSX.writeFile(workbook, "מסלולי_מימון.xlsx");
   };
 
+  // תיקון: העוגן הוחזר ל-bottom-0 left-0 כדי שהשדה יתרחב למעלה וימינה, ולא יסתיר את כפתורי הפעולות
   const ExpandableTextarea = ({ name, value, isEditing, onChange }: any) => {
     const hClass = isEditing ? 'h-6' : 'h-5';
     return (
       <div className={`relative w-full ${hClass} group/textarea hover:z-[100] focus-within:z-[100]`}>
         <textarea
           name={name} value={value || ""} onChange={isEditing ? onChange : undefined} readOnly={!isEditing} placeholder={isEditing ? "הקלד..." : ""}
-          className={`absolute top-0 right-0 w-full min-w-0 ${hClass} py-0 px-1 text-xs font-medium text-right border rounded outline-none transition-all duration-200 resize-none overflow-hidden whitespace-pre-wrap leading-tight
+          className={`absolute bottom-0 left-0 w-full min-w-0 ${hClass} py-0 px-1 text-xs font-medium text-right border rounded outline-none transition-all duration-200 resize-none overflow-hidden whitespace-pre-wrap leading-tight
             group-hover/textarea:w-[220px] group-hover/textarea:h-[120px] group-hover/textarea:z-[100] group-hover/textarea:shadow-2xl group-hover/textarea:overflow-y-auto
             focus:w-[220px] focus:h-[120px] focus:z-[100] focus:shadow-2xl focus:overflow-y-auto focus:bg-orange-50 focus:border-orange-400 focus:ring-1 focus:ring-orange-400
             ${isEditing 

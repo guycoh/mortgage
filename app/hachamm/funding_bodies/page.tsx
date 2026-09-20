@@ -189,7 +189,7 @@ export default function SpreadsheetPage() {
       file_opening_fee_percent: dataToSave.file_opening_fee_percent ? Number(dataToSave.file_opening_fee_percent) : null,
       max_financing_percent: dataToSave.max_financing_percent ? Number(dataToSave.max_financing_percent) : null,
       reverse_or_pension: dataToSave.reverse_or_pension || null, 
-      registration_method: dataToSave.registration_method?.substring(0, 25) || null, // וידוא נוסף שרת
+      registration_method: dataToSave.registration_method?.substring(0, 25) || null,
       restricted_customers: !!dataToSave.restricted_customers,
       complex_customers: !!dataToSave.complex_customers,
     };
@@ -279,13 +279,14 @@ export default function SpreadsheetPage() {
     XLSX.writeFile(workbook, "מסלולי_מימון.xlsx");
   };
 
+  // הרכיב המעודכן - עכשיו נפתח שמאלה ולמעלה (לצד ימין ולמעלה מבחינת ממשק RTL)
   const ExpandableTextarea = ({ name, value, isEditing, onChange }: any) => {
     const hClass = isEditing ? 'h-6' : 'h-5';
     return (
       <div className={`relative w-full ${hClass} group/textarea hover:z-[100] focus-within:z-[100]`}>
         <textarea
           name={name} value={value || ""} onChange={isEditing ? onChange : undefined} readOnly={!isEditing} placeholder={isEditing ? "הקלד..." : ""}
-          className={`absolute top-0 right-0 w-full min-w-0 ${hClass} py-0 px-1 text-xs font-medium text-right border rounded outline-none transition-all duration-200 resize-none overflow-hidden whitespace-pre-wrap leading-tight
+          className={`absolute bottom-0 left-0 w-full min-w-0 ${hClass} py-0 px-1 text-xs font-medium text-right border rounded outline-none transition-all duration-200 resize-none overflow-hidden whitespace-pre-wrap leading-tight
             group-hover/textarea:w-[220px] group-hover/textarea:h-[120px] group-hover/textarea:z-[100] group-hover/textarea:shadow-2xl group-hover/textarea:overflow-y-auto
             focus:w-[220px] focus:h-[120px] focus:z-[100] focus:shadow-2xl focus:overflow-y-auto focus:bg-orange-50 focus:border-orange-400 focus:ring-1 focus:ring-orange-400
             ${isEditing 
@@ -310,6 +311,8 @@ export default function SpreadsheetPage() {
       </label>
     </div>
   );
+
+  const tdBaseClasses = "border transition-colors duration-150 align-middle cursor-pointer p-0";
 
   const selectedRowData = rows.find(r => r.ui_id === selectedRowId);
   const isEditingSelected = editingRowId === selectedRowId;
@@ -380,7 +383,6 @@ export default function SpreadsheetPage() {
           {loading && <span className="text-sm font-medium text-gray-500">טוען...</span>}
         </div>
 
-        {/* האזור של הטבלה גדל על חשבון האזור התחתון שהוקטן */}
         <div className="overflow-auto flex-1 relative bg-white">
           <table className="w-full table-fixed text-center border-collapse">
             
@@ -449,12 +451,8 @@ export default function SpreadsheetPage() {
                 const isSelected = selectedRowId === row.ui_id;
                 const isDiffFromPrev = idx > 0 && filteredRows[idx - 1].funding_body_id !== row.funding_body_id;
 
-                // יצירת גבול עבה סביב כל תאי השורה שנבחרה (גם למעלה/למטה וגם בצדדים)
                 const baseBorderClasses = isSelected ? 'border-orange-500 bg-orange-100/60' : 'border-gray-200 hover:bg-orange-50/30';
-                
-                // במצב עריכה מסירים את הגבול התחתון כדי שהרשומה תתחבר יפה עם תיבת ההרחבה
                 const tdClasses = `p-0.5 align-middle cursor-pointer transition-all duration-150 border-solid border ${baseBorderClasses} ${isSelected && !isEditing ? 'border-y-[3px]' : ''} ${isSelected && isEditing ? 'border-t-[3px] border-b-0' : ''}`;
-                
                 const firstTdClasses = `${tdClasses} ${isSelected ? 'border-r-[3px]' : ''}`;
                 const lastTdClasses = `p-1 text-center sticky left-0 shadow-[-4px_0_6px_-1px_rgba(0,0,0,0.05)] z-10 transition-all duration-150 border-solid border ${isSelected ? 'bg-orange-100 border-orange-500 border-l-[3px]' : 'bg-white hover:bg-orange-50/30 border-gray-200'} ${isSelected && !isEditing ? 'border-y-[3px]' : ''} ${isSelected && isEditing ? 'border-t-[3px] border-b-0' : ''}`;
 
@@ -580,7 +578,6 @@ export default function SpreadsheetPage() {
           )}
         </div>
 
-        {/* --- אזור הפרטים התחתון המצומצם (מופיע באופן קבוע, ללא כותרת, מציג את השורה הנבחרת במצב קריאה בלבד) --- */}
         <div className="h-[12vh] min-h-[90px] bg-gray-50 border-t border-gray-300 p-2 md:p-3 shrink-0 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-30 relative flex flex-col">
           {selectedRowData || (editingRowId && editFormData.ui_id === selectedRowId) ? (
             <div className="flex gap-4 h-full overflow-hidden">
