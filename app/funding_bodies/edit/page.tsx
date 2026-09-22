@@ -37,6 +37,11 @@ type TableRow = Partial<FundingTrack> & {
   is_new?: boolean; 
 };
 
+type SortConfig = {
+  key: keyof TableRow | null;
+  direction: 'asc' | 'desc';
+};
+
 const AMORTIZATION_OPTIONS = ["שפיצר", "בלון חלקי", "בלון מלא", "קרן שווה", "כפי יכולתך"];
 const TRACK_OPTIONS = ["ק\"צ", "קל\"צ", "פריים", "מ\"צ", "מל\"צ"];
 const MORTGAGE_TYPE_OPTIONS = ["דרגה ראשונה", "דרגה שניה", "הלוואת סולו"];
@@ -56,7 +61,6 @@ const getMortgageTypeEditStyle = (val: string | null | undefined) =>
     ? "w-full min-w-0 h-6 py-0.5 px-1 border border-blue-600 rounded text-xs text-center bg-blue-600 text-white font-bold outline-none shadow-inner focus:ring-2 focus:ring-blue-400 transition-colors leading-tight" 
     : editInputStyle;
 
-// פונקציות עיצוב חדשות לשדה פנסיונית/הפוכה
 const getReversePensionViewStyle = (val: string | null | undefined) => {
   if (val === "הפוכה") return "w-full min-w-0 h-5 py-0 px-1 border border-teal-600 rounded text-xs text-center bg-teal-600 text-white font-bold outline-none cursor-default transition-colors leading-tight";
   if (val === "פנסיונית") return "w-full min-w-0 h-5 py-0 px-1 border border-purple-600 rounded text-xs text-center bg-purple-600 text-white font-bold outline-none cursor-default transition-colors leading-tight";
@@ -79,18 +83,22 @@ export default function SpreadsheetPage() {
   
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
 
-  const [showFilters, setShowFilters] = useState(false);
+  const [showFilters, setShowFilters] = useState(true);
   const [filters, setFilters] = useState({
     funding_body_id: "",
     amortization_schedule: "",
     track_type: "",
     mortgage_type: "",
     reverse_or_pension: "",
+    min_financing_percent: "",
     min_age_required: "",
     min_spread_required: "",
     restricted: "all",
     complex: "all",
   });
+
+  // מנגנון מיון חדש (ברירת מחדל: מיון לפי שם גוף מימון)
+  const [sortConfig, setSortConfig] = useState<SortConfig>({ key: "body_name", direction: "asc" });
 
   const [isAddingBody, setIsAddingBody] = useState(false);
   const [newBodyName, setNewBodyName] = useState("");
@@ -164,7 +172,18 @@ export default function SpreadsheetPage() {
   };
 
   const clearFilters = () => {
-    setFilters({ funding_body_id: "", amortization_schedule: "", track_type: "", mortgage_type: "", reverse_or_pension: "", min_age_required: "", min_spread_required: "", restricted: "all", complex: "all" });
+    setFilters({ 
+      funding_body_id: "", 
+      amortization_schedule: "", 
+      track_type: "", 
+      mortgage_type: "", 
+      reverse_or_pension: "", 
+      min_financing_percent: "",
+      min_age_required: "", 
+      min_spread_required: "", 
+      restricted: "all", 
+      complex: "all" 
+    });
   };
 
   const handleAddNewTrackToBody = (body_id: string, body_name: string) => {
@@ -230,6 +249,7 @@ export default function SpreadsheetPage() {
     }
   };
 
+  // הפעלת סינון
   const filteredRows = rows.filter(row => {
     if (row.is_new && row.ui_id.startsWith("new-")) return true;
     const isFilterActive = Object.values(filters).some(val => val !== "" && val !== "all");
@@ -240,7 +260,6 @@ export default function SpreadsheetPage() {
     if (filters.track_type && row.track_type !== filters.track_type) return false;
     if (filters.mortgage_type && row.mortgage_type !== filters.mortgage_type) return false;
     
-    // סינון מעודכן לפנסיונית/הפוכה (כולל האופציה 'both')
     if (filters.reverse_or_pension) {
       if (filters.reverse_or_pension === "both") {
         if (row.reverse_or_pension !== "הפוכה" && row.reverse_or_pension !== "פנסיונית") return false;
@@ -249,6 +268,7 @@ export default function SpreadsheetPage() {
       }
     }
     
+    if (filters.min_financing_percent && (row.max_financing_percent === null || row.max_financing_percent === undefined || row.max_financing_percent < Number(filters.min_financing_percent))) return false;
     if (filters.min_age_required && (row.max_age === null || row.max_age === undefined || row.max_age < Number(filters.min_age_required))) return false;
     if (filters.min_spread_required && (row.max_spread_years === null || row.max_spread_years === undefined || row.max_spread_years < Number(filters.min_spread_required))) return false;
 
@@ -264,8 +284,61 @@ export default function SpreadsheetPage() {
     return true;
   });
 
+  // הפעלת מיון על הרשומות המסוננות
+  const sortedRows = [...filteredRows].sort((a, b) => {
+    if (!sortConfig.key) return 0;
+
+    let aValue = a[sortConfig.key];
+    let bValue = b[sortConfig.key];
+
+    if (aValue === bValue) return 0;
+    
+    // ערכים ריקים תמיד יידחפו לסוף
+    if (aValue === null || aValue === undefined || aValue === "") return sortConfig.direction === "asc" ? 1 : -1;
+    if (bValue === null || bValue === undefined || bValue === "") return sortConfig.direction === "asc" ? -1 : 1;
+
+    if (typeof aValue === "string" && typeof bValue === "string") {
+      return sortConfig.direction === "asc" 
+        ? aValue.localeCompare(bValue, "he") 
+        : bValue.localeCompare(aValue, "he");
+    }
+
+    if (aValue < bValue) return sortConfig.direction === "asc" ? -1 : 1;
+    if (aValue > bValue) return sortConfig.direction === "asc" ? 1 : -1;
+    return 0;
+  });
+
+  const handleSort = (key: keyof TableRow) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  // רכיב ייעודי לכותרת ניתנת למיון
+  const SortableHeader = ({ label, sortKey }: { label: React.ReactNode, sortKey: keyof TableRow }) => {
+    const isActive = sortConfig.key === sortKey;
+    return (
+      <th 
+        className="p-1 border border-gray-300 font-bold leading-tight align-middle break-words whitespace-normal text-[11px] cursor-pointer hover:bg-gray-200 transition-colors select-none group"
+        onClick={() => handleSort(sortKey)}
+        title="לחץ למיון"
+      >
+        <div className="flex items-center justify-center gap-1">
+          <span>{label}</span>
+          <div className="flex flex-col text-[8px] leading-[8px] text-gray-300 group-hover:text-gray-400">
+            <span className={isActive && sortConfig.direction === 'asc' ? '!text-blue-600' : ''}>▲</span>
+            <span className={isActive && sortConfig.direction === 'desc' ? '!text-blue-600' : ''}>▼</span>
+          </div>
+        </div>
+      </th>
+    );
+  };
+
   const exportToExcel = () => {
-    const dataToExport = filteredRows
+    // הייצוא משתמש ב-sortedRows כדי לשמור על סדר המיון באקסל
+    const dataToExport = sortedRows
       .filter((row) => !row.is_new)
       .map((row) => {
         const isEmptyPlaceholder = row.ui_id.startsWith("empty-");
@@ -350,7 +423,7 @@ export default function SpreadsheetPage() {
               className={`px-2 md:px-3 py-1.5 rounded-lg text-sm font-bold transition-colors flex items-center gap-1 md:gap-2 border ${showFilters ? 'bg-blue-100 text-blue-800 border-blue-200' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
             >
               <svg className="w-3.5 h-3.5 md:w-4 md:h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
-              סינון מתקדם
+              {showFilters ? 'כיבוי סינון' : 'הפעל סינון'}
             </button>
 
             {showFilters && (
@@ -431,16 +504,9 @@ export default function SpreadsheetPage() {
                   <th className="p-0.5 border border-gray-300 align-middle"><select name="amortization_schedule" value={filters.amortization_schedule} onChange={handleFilterChange} className={filterInputStyle}><option value="">הכל</option>{AMORTIZATION_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}</select></th>
                   <th className="p-0.5 border border-gray-300"></th>
                   <th className="p-0.5 border border-gray-300 align-middle"><select name="track_type" value={filters.track_type} onChange={handleFilterChange} className={filterInputStyle}><option value="">הכל</option>{TRACK_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}</select></th>
-                  <th className="p-0.5 border border-gray-300"></th>
+                  <th className="p-0.5 border border-gray-300 align-middle"><input type="number" name="min_financing_percent" value={filters.min_financing_percent} onChange={handleFilterChange} placeholder="לפחות..." className={filterInputStyle} /></th>
                   <th className="p-0.5 border border-gray-300 align-middle"><select name="mortgage_type" value={filters.mortgage_type} onChange={handleFilterChange} className={filterInputStyle}><option value="">הכל</option>{MORTGAGE_TYPE_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}</select></th>
-                  <th className="p-0.5 border border-gray-300 align-middle">
-                    {/* נוספה כאן אופציית 'שתיהן' */}
-                    <select name="reverse_or_pension" value={filters.reverse_or_pension} onChange={handleFilterChange} className={filterInputStyle}>
-                      <option value="">הכל</option>
-                      <option value="both">שתיהן</option>
-                      {REVERSE_PENSION_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                    </select>
-                  </th>
+                  <th className="p-0.5 border border-gray-300 align-middle"><select name="reverse_or_pension" value={filters.reverse_or_pension} onChange={handleFilterChange} className={filterInputStyle}><option value="">הכל</option><option value="both">שתיהן</option>{REVERSE_PENSION_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}</select></th>
                   <th className="p-0.5 border border-gray-300 align-middle"><input type="number" name="min_age_required" value={filters.min_age_required} onChange={handleFilterChange} placeholder="לפחות..." className={filterInputStyle} /></th>
                   <th className="p-0.5 border border-gray-300 align-middle"><input type="number" name="min_spread_required" value={filters.min_spread_required} onChange={handleFilterChange} placeholder="לפחות..." className={filterInputStyle} /></th>
                   <th className="p-0.5 border border-gray-300 align-middle"><select name="restricted" value={filters.restricted} onChange={handleFilterChange} className={filterInputStyle}><option value="all">הכל</option><option value="yes">כן</option><option value="no">לא</option></select></th>
@@ -453,29 +519,30 @@ export default function SpreadsheetPage() {
               )}
 
               <tr>
-                <th className="p-1 border border-gray-300 font-bold leading-tight align-middle break-words whitespace-normal text-[11px]">גוף מימון</th>
-                <th className="p-1 border border-gray-300 font-bold leading-tight align-middle break-words whitespace-normal text-[11px]">לוח סילוקין</th>
-                <th className="p-1 border border-gray-300 font-bold leading-tight align-middle break-words whitespace-normal text-[11px]">ריביות מינימום</th>
-                <th className="p-1 border border-gray-300 font-bold leading-tight align-middle break-words whitespace-normal text-[11px]">מסלול</th>
-                <th className="p-1 border border-gray-300 font-bold leading-tight align-middle break-words whitespace-normal text-[11px]">אחוז מימון</th>
-                <th className="p-1 border border-gray-300 font-bold leading-tight align-middle break-words whitespace-normal text-[11px]">סוג משכנתא</th>
-                <th className="p-1 border border-gray-300 font-bold leading-tight align-middle break-words whitespace-normal text-[11px]">פנסיונית / הפוכה</th>
-                <th className="p-1 border border-gray-300 font-bold leading-tight align-middle break-words whitespace-normal text-[11px]">גיל מקס'</th>
-                <th className="p-1 border border-gray-300 font-bold leading-tight align-middle break-words whitespace-normal text-[11px]">פריסה בשנים</th>
-                <th className="p-1 border border-gray-300 font-bold leading-tight align-middle break-words whitespace-normal text-[11px]">לקוחות מוגבלים</th>
-                <th className="p-1 border border-gray-300 font-bold leading-tight align-middle break-words whitespace-normal text-[11px]">לקוחות מורכבים</th>
-                <th className="p-1 border border-gray-300 font-bold leading-tight align-middle break-words whitespace-normal text-[11px]">פתיחת תיק ₪</th>
-                <th className="p-1 border border-gray-300 font-bold leading-tight align-middle break-words whitespace-normal text-[11px]">פתיחת תיק %</th>
+                <SortableHeader label="גוף מימון" sortKey="body_name" />
+                <SortableHeader label="לוח סילוקין" sortKey="amortization_schedule" />
+                <SortableHeader label={<span>ריביות<br/>מינימום</span>} sortKey="min_interest_all_purpose_percent" />
+                <SortableHeader label="מסלול" sortKey="track_type" />
+                <SortableHeader label={<span>אחוז<br/>מימון</span>} sortKey="max_financing_percent" />
+                <SortableHeader label="סוג משכנתא" sortKey="mortgage_type" />
+                <SortableHeader label={<span>פנסיונית /<br/>הפוכה</span>} sortKey="reverse_or_pension" />
+                <SortableHeader label="גיל מקס'" sortKey="max_age" />
+                <SortableHeader label={<span>פריסה<br/>בשנים</span>} sortKey="max_spread_years" />
+                <SortableHeader label={<span>לקוחות<br/>מוגבלים</span>} sortKey="restricted_customers" />
+                <SortableHeader label={<span>לקוחות<br/>מורכבים</span>} sortKey="complex_customers" />
+                <SortableHeader label="פתיחת תיק ₪" sortKey="file_opening_fee_nis" />
+                <SortableHeader label="פתיחת תיק %" sortKey="file_opening_fee_percent" />
                 <th className="p-1 border border-gray-300 font-bold leading-tight align-middle break-words whitespace-normal text-[11px]">תוספות</th>
                 <th className="p-1 border border-gray-300 bg-gray-200 font-bold leading-tight align-middle sticky left-0 z-30 shadow-[-4px_0_6px_-1px_rgba(0,0,0,0.05)] text-[11px]">פעולות</th>
               </tr>
             </thead>
             
             <tbody>
-              {filteredRows.map((row, idx) => {
+              {sortedRows.map((row, idx) => {
                 const isEditing = editingRowId === row.ui_id;
                 const isSelected = selectedRowId === row.ui_id;
-                const isDiffFromPrev = idx > 0 && filteredRows[idx - 1].funding_body_id !== row.funding_body_id;
+                // מפריד ויזואלי כאשר יש שינוי בשם גוף המימון (עוזר מאוד בזמן מיון לפי עמודות אחרות)
+                const isDiffFromPrev = idx > 0 && sortedRows[idx - 1].body_name !== row.body_name;
 
                 const baseBorderClasses = isSelected ? 'border-orange-500 bg-orange-100/60' : 'border-gray-200 hover:bg-orange-50/30';
                 const tdClasses = `p-0.5 align-middle cursor-pointer transition-all duration-150 border-solid border ${baseBorderClasses} ${isSelected && !isEditing ? 'border-y-[3px]' : ''} ${isSelected && isEditing ? 'border-t-[3px] border-b-0' : ''}`;
@@ -510,7 +577,6 @@ export default function SpreadsheetPage() {
                           <td className={`${tdClasses}`}><select name="track_type" value={editFormData.track_type || ""} onChange={handleChange} className={editInputStyle}><option value=""></option>{TRACK_OPTIONS.map(opt => (<option key={opt} value={opt}>{opt}</option>))}</select></td>
                           <td className={`${tdClasses}`}><input type="number" step="0.01" name="max_financing_percent" value={editFormData.max_financing_percent || ""} onChange={handleChange} className={editInputStyle} placeholder="%" /></td>
                           <td className={`${tdClasses}`}><select name="mortgage_type" value={editFormData.mortgage_type || ""} onChange={handleChange} className={getMortgageTypeEditStyle(editFormData.mortgage_type)}><option value=""></option>{MORTGAGE_TYPE_OPTIONS.map(opt => (<option key={opt} value={opt}>{opt}</option>))}</select></td>
-                          {/* שימוש בסטייל הייעודי לשדה פנסיונית/הפוכה במצב עריכה */}
                           <td className={`${tdClasses}`}><select name="reverse_or_pension" value={editFormData.reverse_or_pension || ""} onChange={handleChange} className={getReversePensionEditStyle(editFormData.reverse_or_pension)}><option value=""></option>{REVERSE_PENSION_OPTIONS.map(opt => (<option key={opt} value={opt}>{opt}</option>))}</select></td>
                           <td className={`${tdClasses}`}><input type="number" name="max_age" value={editFormData.max_age || ""} onChange={handleChange} className={editInputStyle} /></td>
                           <td className={`${tdClasses}`}><input type="number" name="max_spread_years" value={editFormData.max_spread_years || ""} onChange={handleChange} className={editInputStyle} /></td>
@@ -538,7 +604,6 @@ export default function SpreadsheetPage() {
                           <td className={`${tdClasses}`}><input readOnly value={row.track_type || ""} className={viewInputStyle} /></td>
                           <td className={`${tdClasses}`}><input readOnly value={row.max_financing_percent ? `${row.max_financing_percent}%` : ""} className={viewInputStyle} /></td>
                           <td className={`${tdClasses}`}><input readOnly value={row.mortgage_type || ""} className={getMortgageTypeViewStyle(row.mortgage_type)} /></td>
-                          {/* שימוש בסטייל הייעודי לשדה פנסיונית/הפוכה במצב צפייה */}
                           <td className={`${tdClasses}`}><input readOnly value={row.reverse_or_pension || ""} className={getReversePensionViewStyle(row.reverse_or_pension)} /></td>
                           <td className={`${tdClasses}`}><input readOnly value={row.max_age || ""} className={viewInputStyle} /></td>
                           <td className={`${tdClasses}`}><input readOnly value={row.max_spread_years || ""} className={viewInputStyle} /></td>
@@ -601,7 +666,7 @@ export default function SpreadsheetPage() {
             </tbody>
           </table>
           
-          {filteredRows.length === 0 && !loading && (
+          {sortedRows.length === 0 && !loading && (
             <div className="text-center p-8 text-gray-500 font-medium bg-white">לא נמצאו מסלולים התואמים לסינון</div>
           )}
         </div>
