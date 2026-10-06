@@ -32,6 +32,7 @@ import {
   type ExtractedLoan,
   type LiabilityCategory,
 } from "@/lib/credit-parser/loan-mapping";
+import { instalmentCredit } from "./cards";
 import {
   APPLICATIONS_IN_WINDOW_TRIGGER,
   INQUIRY_WINDOW_MONTHS,
@@ -190,6 +191,12 @@ export interface DebtLine {
    *  A limit that looks calm on the statement date can still be run to the
    *  ceiling mid-month, which is the number a lender actually reacts to. */
   peak: number;
+  /**
+   * A card facility that is really instalment credit (lib/cards#instalmentCredit):
+   * its charge is a repayment, not a card bill. The board imports these as loans,
+   * and the summary counts them with the loans for the same reason.
+   */
+  instalment: boolean;
   /** The same debt appeared in more than one report (a joint household debt). */
   shared: boolean;
   /** Which report(s) it came from, by client name. */
@@ -242,6 +249,13 @@ export interface Behaviour {
   checksReturned: number;
   debitsPresented: number;
   debitsDishonored: number;
+  /**
+   * The months ("mm/yyyy", oldest first) in which those failures happened.
+   * A count alone cannot tell ten bounced debits in one frozen-account month
+   * from ten spread across three years, and the two are different stories.
+   */
+  checksReturnedWhen: string[];
+  debitsDishonoredWhen: string[];
   /** Months in arrears, worst bucket per month, newest year first. */
   arrears: { year: string; months: (number | null)[] }[];
   arrearsMonths: number;
@@ -269,7 +283,19 @@ export interface Inquiries {
   /** The client's own requests for their report, counted separately. */
   selfPulls: number;
   total: number;
+  /** Every new-credit request the report lists — the advisor's table. */
   pending: NewCreditInquiry[];
+  /**
+   * The client's own requests with no matching debt on the report. The report
+   * never says whether a request was approved; these are the ones nothing on
+   * the report shows having become credit.
+   */
+  pendingOpen: NewCreditInquiry[];
+  /** Own requests that match a debt the report already lists (same lender and
+   *  kind, opened within 90 days after the request). Already in the totals. */
+  pendingMatched: NewCreditInquiry[];
+  /** Requests where the client is the GUARANTOR, not the borrower. */
+  pendingGuarantor: NewCreditInquiry[];
   byPurpose: { purpose: string; count: number }[];
 }
 
@@ -348,6 +374,13 @@ export interface Analysis {
     monthly: number;
     /** Every 201-046 added up, including charges nobody is servicing. */
     monthlyContractual: number;
+    /**
+     * `monthly`, split in two. A card bill is not a loan repayment: on a real
+     * report ₪52,043 of a ₪60,882 "monthly" was one credit card's statement, and
+     * headlining the sum told the client their debts cost seven times what they do.
+     */
+    monthlyRepayment: number;
+    monthlyCardBills: number;
     overdue: number;
     limit: number;
     rate: number | null;
@@ -475,6 +508,8 @@ export interface ClientRow {
   rolled: number;
   reported: { limit: boolean; monthly: boolean; paid: boolean; peak: boolean };
   remarks: string[];
+  /** A card facility that is instalment credit — its charge is a repayment. */
+  instalment: boolean;
 }
 
 export interface ClientSection {
@@ -507,7 +542,12 @@ export interface ClientView {
   sections: ClientSection[];
   /** Grouped (act → check → info), overlapping findings folded — see buildClientView. */
   worries: ClientWorry[];
-  footer: { balance: number; monthly: number };
+  /**
+   * `monthly` is what the debts cost: mortgages, loans and instalment credit on
+   * cards. `cards` is the ordinary card and current-account bill, stated beside
+   * it and never added in — see Analysis.totals.monthlyRepayment.
+   */
+  footer: { balance: number; monthly: number; cards: number };
   /**
    * What `footer.monthly` is made of — never a different total, only its parts
    * named. `computed` is inside it; `notPaid` and the unreported debts are not;
@@ -521,6 +561,8 @@ export interface ClientView {
     notPaid: number;
     unreportedCount: number;
   };
+  /** The same, for `footer.cards`. */
+  cardParts: { count: number; unreportedCount: number };
   /**
    * Guaranteed, not owed.
    *
@@ -533,7 +575,7 @@ export interface ClientView {
   shownBalance: number;
   /** footer.balance − shownBalance. Zero, or the page says so out loud. */
   unshownBalance: number;
-  /** footer.monthly − Σ rows.monthly. Zero, for the same reason. */
+  /** (footer.monthly + footer.cards) − Σ rows.monthly. Zero, for the same reason. */
   unshownMonthly: number;
 }
 
@@ -780,6 +822,7 @@ function toLine(
       const paid = num(f["201-048"]);
       return !!end && end.getTime() < Date.now() && paid <= 0 && num(f["201-046"]) > 0;
     })(),
+    instalment: false,
     shared: false,
     reportedBy: [reporter],
   };
@@ -901,9 +944,13 @@ function mortgageTracks(lines: DebtLine[]): TrackSlice[] {
       bucket.set("לא מסווג", cur);
       continue;
     }
+    // On a mortgage tranche the track's printed "utilization" is the principal
+    // BEFORE CPI indexation, so summing it dropped ₪75,546 of a real ₪815,552
+    // mortgage and understated the linked share (69% for 71.5%). It is used for
+    // the split between tracks only; the money is the tranche's balance.
     const stated = tracks.reduce((s, tr) => s + num(tr.utilization), 0);
     for (const tr of tracks) {
-      const amount = stated > 0 ? num(tr.utilization) : l.balance / tracks.length;
+      const amount = stated > 0 ? (l.balance * num(tr.utilization)) / stated : l.balance / tracks.length;
       if (amount <= 0) continue;
       const label = trackSliceLabel(tr);
       const nominal = Number(tr.nominal);
@@ -941,6 +988,13 @@ function behaviour(reports: CreditReport[], lines: DebtLine[]): Behaviour {
 
   const sumGrid = (g: MonthlyGrid) =>
     g.rows.reduce((s, r) => s + r.months.reduce((a, m) => a + (m ? num(m) : 0), 0), 0);
+  // The grid's twelve cells are January..December of the row's year.
+  const whenOf = (g: MonthlyGrid) =>
+    g.rows.flatMap((r) =>
+      r.months.flatMap((m, i) => (m && num(m) > 0 ? [`${String(i + 1).padStart(2, "0")}/${r.year}`] : []))
+    );
+  const returnedWhen = new Set<string>();
+  const dishonoredWhen = new Set<string>();
 
   // One population per figure, and it is stated: the client's own open accounts.
   // A closed account's instrument history is not current conduct, and a guaranteed
@@ -951,8 +1005,13 @@ function behaviour(reports: CreditReport[], lines: DebtLine[]): Behaviour {
       const into = t.role === "guarantor" ? guaranteed : own;
       for (const g of t.grids) {
         if (g.label.includes("שיקים שהוצגו")) into.checksPresented += sumGrid(g);
-        else if (g.label.includes("שיקים שחזרו")) into.checksReturned += sumGrid(g);
-        else if (g.label.includes("הוראות לחיוב חשבון שלא")) into.debitsDishonored += sumGrid(g);
+        else if (g.label.includes("שיקים שחזרו")) {
+          into.checksReturned += sumGrid(g);
+          if (into === own) whenOf(g).forEach((w) => returnedWhen.add(w));
+        } else if (g.label.includes("הוראות לחיוב חשבון שלא")) {
+          into.debitsDishonored += sumGrid(g);
+          if (into === own) whenOf(g).forEach((w) => dishonoredWhen.add(w));
+        }
         else if (g.label.includes("הוראות לחיוב חשבון")) into.debitsPresented += sumGrid(g);
       }
     }
@@ -989,7 +1048,21 @@ function behaviour(reports: CreditReport[], lines: DebtLine[]): Behaviour {
     }
   }
 
-  return { ...own, arrears, arrearsMonths, worstBucket, guaranteed };
+  const chrono = (set: Set<string>) =>
+    Array.from(set).sort((x, y) => {
+      const [xm, xy] = x.split("/").map(Number);
+      const [ym, yy] = y.split("/").map(Number);
+      return xy - yy || xm - ym;
+    });
+  return {
+    ...own,
+    checksReturnedWhen: chrono(returnedWhen),
+    debitsDishonoredWhen: chrono(dishonoredWhen),
+    arrears,
+    arrearsMonths,
+    worstBucket,
+    guaranteed,
+  };
 }
 
 /** Map a תמצית block heading onto the same families the detail pages use. */
@@ -1100,9 +1173,39 @@ function reconcile(reports: CreditReport[]): Reconciliation {
   };
 }
 
-function inquiries(reports: CreditReport[], now: Date): Inquiries {
+function inquiries(reports: CreditReport[], now: Date, lines: DebtLine[]): Inquiries {
   const all = reports.flatMap((r) => r.inquiriesByDate ?? []);
   const pending = reports.flatMap((r) => r.newCreditInquiries ?? []);
+
+  // "בקשות שטרם אושרו" was a claim the report does not make — it lists requests,
+  // not outcomes. On a real report Max's ₪4,940 loan request of 02/03 was the
+  // ₪5,101 Max loan opened on 14/03, already in the table and the totals; and two
+  // ₪350k+ current-account requests were ones the client GUARANTEES, presented as
+  // borrowing of their own.
+  const guarantor = (q: NewCreditInquiry) => /ערב/.test(q.relation ?? "");
+  const kindOf = (t: string) =>
+    /משכנת|לדיור/.test(t) ? "mortgage" : /הלוואה/.test(t) ? "loan" : /עו"?ש|עובר/.test(t) ? "overdraft" : /מסגרת|כרטיס/.test(t) ? "card" : "other";
+  const used = new Set<string>();
+  const matches = (q: NewCreditInquiry) => {
+    const at = dmy(q.date);
+    if (!at) return false;
+    const who = lenderLabel(q.user) || q.user;
+    const hit = lines.find((l) => {
+      if (used.has(l.uid) || l.role !== "debtor") return false;
+      if ((lenderLabel(l.bank) || l.bank) !== who) return false;
+      if (kindOf(l.type) !== kindOf(q.transactionType ?? "")) return false;
+      const opened = dmy(l.startDate);
+      if (!opened) return false;
+      const days = (opened.getTime() - at.getTime()) / 864e5;
+      return days >= -7 && days <= 90;
+    });
+    if (hit) used.add(hit.uid);
+    return !!hit;
+  };
+  const own = pending.filter((q) => !guarantor(q));
+  const pendingMatched = own.filter(matches);
+  const pendingOpen = own.filter((q) => !pendingMatched.includes(q));
+  const pendingGuarantor = pending.filter(guarantor);
 
   const purposes = new Map<string, number>();
   for (const q of all) {
@@ -1145,6 +1248,9 @@ function inquiries(reports: CreditReport[], now: Date): Inquiries {
     last3: applications.filter((q) => monthsAgo(q.at, now) <= INQUIRY_WINDOW_MONTHS).length,
     last12: applications.filter((q) => monthsAgo(q.at, now) <= 12).length,
     pending,
+    pendingOpen,
+    pendingMatched,
+    pendingGuarantor,
     byPurpose: Array.from(purposes.entries())
       .map(([purpose, count]) => ({ purpose, count }))
       .sort((a, b) => b.count - a.count),
@@ -1159,6 +1265,9 @@ function inquiries(reports: CreditReport[], now: Date): Inquiries {
  * Each flag names its own evidence — the bank, the amount, the count — because
  * "high utilization" without the number is not a finding, it is a mood.
  */
+/** A card or current account whose charge is a bill, not a loan repayment. */
+const isCardBill = (l: DebtLine) => (l.category === "card" || l.category === "overdraft") && !l.instalment;
+
 /** Which section a given debt is rendered in, so a finding can point at it. */
 function sectionOf(l?: DebtLine): string {
   if (!l) return "picture";
@@ -1197,6 +1306,7 @@ const EMPTY_ROW = (bank: string, family: ClientRow["family"], type: string): Cli
   rolled: 0,
   reported: { limit: false, monthly: false, paid: false, peak: false },
   remarks: [],
+  instalment: false,
 });
 
 /** Fold one liability into a row. */
@@ -1231,6 +1341,7 @@ function absorb(row: ClientRow, l: DebtLine): ClientRow {
   for (const k of ["limit", "monthly", "paid", "peak"] as const)
     if (l.reported[k]) row.reported[k] = true;
   for (const r of l.remarks) if (!row.remarks.includes(r)) row.remarks.push(r);
+  if (l.instalment) row.instalment = true;
   return row;
 }
 
@@ -1301,35 +1412,50 @@ function buildClientView(a: Omit<Analysis, "flags" | "clientView">, flags: Flag[
   }
 
   const shownBalance = sections.reduce((s, sec) => s + sec.rows.reduce((t, r) => t + r.balance, 0), 0);
-  const shownMonthly = sections.reduce((s, sec) => s + sec.rows.reduce((t, r) => t + r.monthly, 0), 0);
+  const isBillRow = (sec: ClientSection, r: ClientRow) => sec.key === "card" && !r.instalment;
+  const shownRepayment = sections.reduce(
+    (s, sec) => s + sec.rows.reduce((t, r) => t + (isBillRow(sec, r) ? 0 : r.monthly), 0),
+    0
+  );
+  const shownCards = sections.reduce(
+    (s, sec) => s + sec.rows.reduce((t, r) => t + (isBillRow(sec, r) ? r.monthly : 0), 0),
+    0
+  );
 
   // Grouped, then by severity; each sentence's rows are on the page by construction.
   const worries = clientWorries(a, flags);
 
-  // The footer's monthly figure, taken apart — the same population as
-  // totals.monthly (own debts, charges being serviced), so the parts cannot
-  // describe a different number than the one printed above them.
-  const serviced = own.filter((l) => !l.chargeNotPaid);
+  // The footer's figures, taken apart — the same populations as the totals
+  // (own debts, charges being serviced), so the parts cannot describe a
+  // different number than the one printed above them.
+  const repaying = own.filter((l) => !isCardBill(l));
+  const billing = own.filter(isCardBill);
+  const serviced = repaying.filter((l) => !l.chargeNotPaid);
   const computed = serviced.filter((l) => l.monthlySource === "computed" && l.monthly > 0);
-  const paidRows = own.filter((l) => l.reported.paid);
+  const paidRows = repaying.filter((l) => l.reported.paid);
   const monthlyParts = {
     computed: computed.reduce((s, l) => s + l.monthly, 0),
     computedCount: computed.length,
     paid: paidRows.reduce((s, l) => s + l.paidActually, 0),
     paidCount: paidRows.length,
-    notPaid: own.filter((l) => l.chargeNotPaid).reduce((s, l) => s + l.monthly, 0),
+    notPaid: repaying.filter((l) => l.chargeNotPaid).reduce((s, l) => s + l.monthly, 0),
     unreportedCount: serviced.filter((l) => l.monthlySource === "none" && l.balance > 0).length,
+  };
+  const cardParts = {
+    count: billing.filter((l) => !l.chargeNotPaid && l.monthly > 0).length,
+    unreportedCount: billing.filter((l) => !l.chargeNotPaid && l.monthlySource === "none" && l.balance > 0).length,
   };
 
   return {
     sections,
     worries,
-    footer: { balance: a.totals.balance, monthly: a.totals.monthly },
+    footer: { balance: a.totals.balance, monthly: a.totals.monthlyRepayment, cards: a.totals.monthlyCardBills },
     monthlyParts,
+    cardParts,
     guaranteedBalance: a.totals.guaranteedBalance,
     shownBalance,
     unshownBalance: Math.round(a.totals.balance - shownBalance),
-    unshownMonthly: Math.round(a.totals.monthly - shownMonthly),
+    unshownMonthly: Math.round(a.totals.monthly - shownRepayment - shownCards),
   };
 }
 
@@ -1415,7 +1541,7 @@ function clientWorries(a: Omit<Analysis, "flags" | "clientView">, flags: Flag[])
   return orderWorries(
     mergeWorries(merged, [
       { ids: ["revolving", "revolving-peak"], title: "ניצול מסגרות" },
-      { ids: ["card-charge", "card-rolled"], title: "חיוב חודשי בכרטיסים ובמסגרות" },
+      { ids: ["card-charge", "card-rolled"], title: "חיוב שוטף בכרטיסים" },
     ])
   );
 }
@@ -1427,6 +1553,11 @@ function buildFlags(a: Omit<Analysis, "flags" | "clientView">): Flag[] {
   const money = (n: number) => Math.round(n).toLocaleString("en-US");
   /** "התחייבות אחת" / "3 התחייבויות" — Hebrew does not say "1 התחייבויות". */
   const debts = (n: number) => (n === 1 ? "התחייבות אחת" : `${n} התחייבויות`);
+  /** When a run of failures happened: "ב-02/2026", or "בין 08/2022 ל-04/2024". */
+  const when = (months: string[]) =>
+    !months.length ? "" : months.length === 1 ? ` ב-${months[0]}` : ` בין ${months[0]} ל-${months[months.length - 1]}`;
+  /** 201-050's buckets, 1=30-59 … 6=180+, as the floor of the range. */
+  const bucketDays = (b: number) => [0, 30, 60, 90, 120, 150, 180][Math.min(6, Math.max(0, b))];
 
   /* ---- legal proceedings: the file-stoppers */
   if (a.legal.insolvency.length) {
@@ -1545,11 +1676,11 @@ function buildFlags(a: Omit<Analysis, "flags" | "clientView">): Flag[] {
       severity: a.behaviour.worstBucket >= 4 ? "high" : "medium",
       title: "היסטוריית פיגורים",
       detail: `${a.behaviour.arrearsMonths} חודשים עם פיגור בהיסטוריה${
-        a.behaviour.worstBucket >= 4 ? `, כולל פיגור של 120 יום ומעלה` : ""
+        a.behaviour.worstBucket >= 4 ? `, כולל פיגור של ${bucketDays(a.behaviour.worstBucket)} יום ומעלה` : ""
       }. יש לברר מתי היו הפיגורים ואם הוסדרו.`,
       client: show(
         `${a.behaviour.arrearsMonths === 1 ? "בדוח מופיע חודש אחד" : `בדוח מופיעים ${a.behaviour.arrearsMonths} חודשים`} עם פיגור בתשלומים בעבר${
-          a.behaviour.worstBucket >= 4 ? ", כולל פיגור של 120 יום ומעלה" : ""
+          a.behaviour.worstBucket >= 4 ? `, כולל פיגור של ${bucketDays(a.behaviour.worstBucket)} יום ומעלה` : ""
         }.`,
         undefined,
         { title: "היסטוריית פיגורים", next: "כדאי לברר מתי היו הפיגורים ואם הוסדרו." }
@@ -1591,11 +1722,11 @@ function buildFlags(a: Omit<Analysis, "flags" | "clientView">): Flag[] {
       target: { section: "behaviour" },
       severity: a.behaviour.checksReturned >= 3 ? "high" : "medium",
       title: 'שיקים שחזרו (אכ"מ)',
-      detail: `${a.behaviour.checksReturned} שיקים חזרו מתוך ${a.behaviour.checksPresented || "—"} שהוצגו.`,
+      detail: `${a.behaviour.checksReturned} שיקים חזרו מתוך ${a.behaviour.checksPresented || "—"} שהוצגו${when(a.behaviour.checksReturnedWhen)}.`,
       client: show(
         `${a.behaviour.checksReturned === 1 ? "שיק אחד חזר" : `${a.behaviour.checksReturned} שיקים חזרו`}${
           a.behaviour.checksPresented ? ` מתוך ${a.behaviour.checksPresented} שהוצגו` : ""
-        }, לפי הדוח.`,
+        }${when(a.behaviour.checksReturnedWhen)}, לפי הדוח.`,
         undefined,
         { title: "שיקים שחזרו", next: "כדאי לברר את הסיבה ואם החוב הוסדר." }
       ),
@@ -1607,10 +1738,14 @@ function buildFlags(a: Omit<Analysis, "flags" | "clientView">): Flag[] {
       target: { section: "behaviour" },
       severity: a.behaviour.debitsDishonored >= 3 ? "high" : "medium",
       title: "הוראות קבע שלא כובדו",
-      detail: `${a.behaviour.debitsDishonored} הוראות לחיוב חשבון לא כובדו מתוך ${a.behaviour.debitsPresented || "—"}.`,
+      detail: `${a.behaviour.debitsDishonored} הוראות לחיוב חשבון לא כובדו מתוך ${a.behaviour.debitsPresented || "—"}${when(a.behaviour.debitsDishonoredWhen)}.`,
       client: show(
         `${a.behaviour.debitsDishonored === 1 ? "הוראת קבע אחת לא כובדה" : `${a.behaviour.debitsDishonored} הוראות קבע לא כובדו`}${
           a.behaviour.debitsPresented ? ` מתוך ${a.behaviour.debitsPresented}` : ""
+        }${
+          a.behaviour.debitsDishonoredWhen.length === 1 && a.behaviour.debitsDishonored > 1
+            ? `, כולן ב-${a.behaviour.debitsDishonoredWhen[0]}`
+            : when(a.behaviour.debitsDishonoredWhen)
         }, לפי הדוח.`,
         undefined,
         { title: "הוראות קבע שלא כובדו", next: "כדאי לברר לאילו חיובים הן שייכות ואם הוסדרו." }
@@ -1749,27 +1884,24 @@ function buildFlags(a: Omit<Analysis, "flags" | "clientView">): Flag[] {
   /* ---- what the plastic costs every month */
   if (a.cards.monthlyCharge > 0) {
     const share = a.totals.monthly > 0 ? a.cards.monthlyCharge / a.totals.monthly : 0;
+    const billUids = a.lines.filter((l) => l.role === "debtor" && isCardBill(l)).map((l) => l.uid);
     push({
       id: "card-charge",
       target: {
         section: "revolving",
-        uids: a.lines
-          .filter((l) => l.role === "debtor" && (l.category === "card" || l.category === "overdraft") && l.monthly > 0)
-          .map((l) => l.uid),
+        uids: billUids,
       },
       severity: share >= 0.3 ? "medium" : "info",
-      title: "חיוב חודשי בכרטיסי אשראי ומסגרות",
+      title: "חיוב שוטף בכרטיסי אשראי ומסגרות",
       detail: `${Math.round(a.cards.monthlyCharge).toLocaleString("en-US")} ₪ בחודש על פני ${a.cards.count} מסגרות${
         share > 0 ? ` — ${Math.round(share * 100)}% מסך ההחזר החודשי` : ""
       }. חיוב שאינו מופיע בתמהיל.`,
       // A CHARGE, as the report prints it (201-046) — not "יוצאים": what was paid
       // is 201-048, and the rolled part is its own line.
       client: show(
-        `לפי הדוח, החיוב החודשי בכרטיסי אשראי ובמסגרות הוא ${money(a.cards.monthlyCharge)} ₪.`,
-        a.lines
-          .filter((l) => l.role === "debtor" && (l.category === "card" || l.category === "overdraft"))
-          .map((l) => l.uid),
-        { title: "חיוב חודשי בכרטיסים ובמסגרות", next: "כדאי לבדוק אילו חיובים כלולים בו." }
+        `לפי הדוח, החיוב השוטף בכרטיסי אשראי ובמסגרות הוא ${money(a.cards.monthlyCharge)} ₪ בחודש. הוא מוצג בנפרד מהחזרי ההלוואות והמשכנתא.`,
+        billUids,
+        { title: "חיוב שוטף בכרטיסים", next: "כדאי לבדוק אילו חיובים כלולים בו." }
       ),
       amount: a.cards.monthlyCharge,
     });
@@ -1794,7 +1926,14 @@ function buildFlags(a: Omit<Analysis, "flags" | "clientView">): Flag[] {
   }
 
   /* ---- price of the consumer debt */
-  const expensive = own.filter((l) => l.category === "loan" && (l.rate ?? 0) >= DEAR_RATE_CONSUMER);
+  // A loan in arrears is not one to "improve the terms" of — it is in the
+  // arrears line already, and a ₪32,274 debt 180+ days late does not reprice.
+  const expensive = own.filter(
+    (l) =>
+      l.category === "loan" &&
+      (l.rate ?? 0) >= DEAR_RATE_CONSUMER &&
+      !(l.overdue > 0 || l.arrearsRange || l.chargeNotPaid)
+  );
   if (expensive.length) {
     const worst = Math.max(...expensive.map((l) => l.rate ?? 0));
     const cheapest = Math.min(...expensive.map((l) => l.rate ?? 0));
@@ -1954,35 +2093,68 @@ function buildFlags(a: Omit<Analysis, "flags" | "clientView">): Flag[] {
     // Two mortgage applications are one purchase shopped at two banks, not
     // ₪4m of intended borrowing — so the largest per type is the honest
     // headline and summing everything is not.
-    const byType = new Map<string, { n: number; max: number }>();
-    for (const q of a.inquiries.pending) {
-      const t = q.transactionType?.trim() || "אשראי";
-      const cur = byType.get(t) ?? { n: 0, max: 0 };
-      byType.set(t, { n: cur.n + 1, max: Math.max(cur.max, num(q.amount)) });
-    }
-    const parts = Array.from(byType.entries()).map(
-      ([t, v]) => `${v.n} ${t}${v.max > 0 ? ` עד ₪${Math.round(v.max).toLocaleString("en-US")}` : ""}`
-    );
-    const mortgageAsk = byType.get("משכנתה")?.max ?? 0;
+    const summarise = (qs: NewCreditInquiry[]) => {
+      const byType = new Map<string, { n: number; max: number }>();
+      for (const q of qs) {
+        const t = q.transactionType?.trim() || "אשראי";
+        const cur = byType.get(t) ?? { n: 0, max: 0 };
+        byType.set(t, { n: cur.n + 1, max: Math.max(cur.max, num(q.amount)) });
+      }
+      return {
+        byType,
+        text: Array.from(byType.entries())
+          .map(([t, v]) => `${v.n} ${t}${v.max > 0 ? ` עד ₪${Math.round(v.max).toLocaleString("en-US")}` : ""}`)
+          .join(" · "),
+      };
+    };
+    const { pendingOpen: open, pendingMatched: matched, pendingGuarantor: guar } = a.inquiries;
+    const mine = summarise(open);
+    const theirs = summarise(guar);
+    const mortgageAsk = mine.byType.get("משכנתה")?.max ?? 0;
+
+    // The report lists requests, not outcomes — it never says one is pending.
+    const sentences: string[] = [];
+    if (open.length)
+      sentences.push(
+        mortgageAsk > 0
+          ? `בדוח מופיעה בקשת משכנתה אצל מלווה אחר, עד ${money(mortgageAsk)} ₪. הדוח אינו מציין אם אושרה.`
+          : `${open.length === 1 ? "בדוח מופיעה בקשה אחת" : `בדוח מופיעות ${open.length} בקשות`} לאשראי חדש: ${mine.text}. הדוח אינו מציין אם ${open.length === 1 ? "אושרה" : "אושרו"}.`
+      );
+    if (matched.length)
+      sentences.push(
+        matched.length === 1
+          ? "בקשה נוספת כבר מופיעה בדוח כהתחייבות פעילה, ונכללת בסכומים שלמעלה."
+          : `${matched.length} בקשות נוספות כבר מופיעות בדוח כהתחייבויות פעילות, ונכללות בסכומים שלמעלה.`
+      );
+    if (guar.length)
+      sentences.push(`${guar.length === 1 ? "בקשה אחת שבה אתם ערבים" : `${guar.length} בקשות שבהן אתם ערבים`} ולא הלווים: ${theirs.text}.`);
+
     push({
       id: "pending",
       target: { section: "inquiries" },
-      severity: mortgageAsk > 0 ? "high" : "medium",
-      title: mortgageAsk > 0 ? "בקשות משכנתה פתוחות אצל מלווים אחרים" : "בקשות אשראי פתוחות",
-      detail: `${parts.join(" · ")}. ${
+      severity: mortgageAsk > 0 ? "high" : open.length ? "medium" : "info",
+      title: mortgageAsk > 0 ? "בקשות משכנתה אצל מלווים אחרים" : "בקשות לאשראי חדש",
+      detail: `${[
+        open.length ? `פתוחות: ${mine.text}` : "",
+        matched.length ? `${matched.length} כבר הפכו לעסקה בדוח` : "",
+        guar.length ? `כערב: ${theirs.text}` : "",
+      ]
+        .filter(Boolean)
+        .join(" · ")}. ${
         mortgageAsk > 0
           ? "הלקוח כבר נבדק במקום אחר — כדאי לברר מה הוצע לו לפני שמציעים."
-          : "אשראי שיאושר יופיע כחוב נוסף."
+          : "הדוח אינו מציין אם הבקשות אושרו."
       }`,
-      client: show(
-        mortgageAsk > 0
-          ? `בדוח מופיעה בקשת משכנתה פתוחה אצל מלווה אחר, עד ${money(mortgageAsk)} ₪.`
-          : `בדוח מופיעות בקשות אשראי שטרם אושרו: ${parts.join(" · ")}. אם יאושרו, הן יתווספו להתחייבויות.`,
-        undefined,
-        mortgageAsk > 0
-          ? { title: "בקשת משכנתה פתוחה", next: "כדאי לברר מה הוצע שם." }
-          : { title: "בקשות אשראי פתוחות", next: "כדאי לברר את מצב הבקשות." }
-      ),
+      client:
+        open.length || guar.length
+          ? show(
+              sentences.join(" "),
+              undefined,
+              mortgageAsk > 0
+                ? { title: "בקשת משכנתה", next: "כדאי לברר מה הוצע שם." }
+                : { title: "בקשות לאשראי חדש", next: "כדאי לברר אם אושרו ובאיזה סכום." }
+            )
+          : silent("every request already shows on the report as a debt"),
       amount: mortgageAsk || undefined,
       where: Array.from(new Set(a.inquiries.pending.map((q) => q.user).filter(Boolean))),
     });
@@ -2126,6 +2298,16 @@ export function analyseReports(rawReports: CreditReport[], rawNames: string[] = 
       .filter((d): d is Date => d !== null)
       .sort((a, b) => b.getTime() - a.getTime())[0] ?? new Date();
   const lines = buildLines(reports);
+  for (const l of lines)
+    l.instalment = instalmentCredit({
+      category: l.category,
+      role: l.role,
+      balance: l.balance,
+      overdue: l.overdue,
+      payment: l.monthlySource === "reported" ? l.monthly : 0,
+      rate: l.rate ?? 0,
+      months: l.months ?? 0,
+    }).ok;
   const own = lines.filter((l) => l.role === "debtor");
   /**
    * Guarantees, minus the ones the household already owes.
@@ -2155,6 +2337,9 @@ export function analyseReports(rawReports: CreditReport[], rawNames: string[] = 
   const monthlyAll = own.reduce((s, l) => s + cash(l), 0);
   const monthlyContractual = own.reduce((s, l) => s + l.monthly, 0);
   const consumerMonthly = consumer.reduce((s, l) => s + cash(l), 0);
+  const cardBills = own.filter(isCardBill);
+  const monthlyCardBills = cardBills.reduce((s, l) => s + cash(l), 0);
+  const monthlyRepayment = monthlyAll - monthlyCardBills;
 
   // One property, several mortgages on it. Each deal restates the same
   // collateral, so summing across deals inflates the security and understates
@@ -2202,6 +2387,8 @@ export function analyseReports(rawReports: CreditReport[], rawNames: string[] = 
       balance: own.reduce((s, l) => s + l.balance, 0),
       monthly: monthlyAll,
       monthlyContractual,
+      monthlyRepayment,
+      monthlyCardBills,
       overdue: own.reduce((s, l) => s + l.overdue, 0),
       limit: own.reduce((s, l) => s + l.limit, 0),
       rate: weightedRate(own),
@@ -2232,7 +2419,9 @@ export function analyseReports(rawReports: CreditReport[], rawNames: string[] = 
         (m, l) => (l.rate !== null && (m === null || l.rate > m) ? l.rate : m),
         null
       ),
-      shareOfMonthly: monthlyAll > 0 ? consumerMonthly / monthlyAll : 0,
+      // Of what the debts cost — a card bill in the denominator made a household
+      // whose loans are most of its repayment look like they were a sliver of it.
+      shareOfMonthly: monthlyRepayment > 0 ? consumerMonthly / monthlyRepayment : 0,
     },
     revolving: {
       limit: revolvingLimit,
@@ -2251,16 +2440,17 @@ export function analyseReports(rawReports: CreditReport[], rawNames: string[] = 
       totalBalance: revolvingRows.reduce((s, l) => s + l.balance, 0),
     },
     cards: {
-      monthlyCharge: revolvingRows.reduce((s, l) => s + l.monthly, 0),
+      // The bills only: an instalment card's charge is a repayment (see DebtLine.instalment).
+      monthlyCharge: cardBills.reduce((s, l) => s + l.monthly, 0),
       paidActually: revolvingRows.reduce((s, l) => s + l.paidActually, 0),
       rolled: Math.max(
         0,
         revolvingRows.reduce((s, l) => s + Math.max(0, l.monthly - l.paidActually), 0)
       ),
-      count: revolvingRows.filter((l) => l.monthly > 0).length,
+      count: cardBills.filter((l) => l.monthly > 0).length,
     },
     behaviour: behaviour(reports, lines),
-    inquiries: inquiries(reports, asOf),
+    inquiries: inquiries(reports, asOf, lines),
     legal: (() => {
       const execution = reports.flatMap((r) => (r.execution ?? []).map((c) => c.fields));
       // A file with a closing date and nothing left owing is history. Calling

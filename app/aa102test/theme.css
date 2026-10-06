@@ -3084,6 +3084,7 @@ html:has(.lgr-root) {
 
 /* Footer captions read as labels, not fine print. */
 .lgr-cs-foot-cap { font-size: 11.5px; font-weight: 500; color: var(--lgr-3); margin-bottom: 2px; }
+.lgr-cs-foot-cards { margin-top: 8px; padding-top: 7px; border-top: 1px solid var(--line); font-size: 12px; font-weight: 500; color: var(--lgr-3); }
 
 /* ---------------------------------- a finding points at its own evidence */
 /* A finding that states a number without showing the rows behind it asks to be

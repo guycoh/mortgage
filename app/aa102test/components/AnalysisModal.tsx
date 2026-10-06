@@ -634,11 +634,12 @@ export default function AnalysisModal({
           />
           <Kpi
             label="החזר חודשי"
-            value={<Money value={a.totals.monthly} size={24} weight={800} />}
+            // Repayments only — the card bill is the next figure, not part of this one.
+            value={<Money value={a.totals.monthlyRepayment} size={24} weight={800} />}
             sub={
               a.consumer.shareOfMonthly > 0
                 ? `${pct(a.consumer.shareOfMonthly)} מזה הלוואות צרכניות`
-                : "משכנתאות, הלוואות ומסגרות"
+                : "משכנתאות והלוואות"
             }
           />
           {/* The number an advisor asks for first, and the one the mix cannot

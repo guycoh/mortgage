@@ -40,6 +40,8 @@ import type { Analysis, ClientRow, ClientSection } from "../lib/analysis";
 const MAX_ROWS = 5;
 
 const ils = (n: number) => Math.round(n).toLocaleString("en-US");
+/** One decimal, rounded half-up as printed: 13.85 is 13.9, not toFixed's 13.8. */
+const pct1 = (n: number) => (Math.round(n * 10 + 1e-9) / 10).toFixed(1).replace(/\.0$/, "");
 
 /**
  * How much longer this runs, said properly.
@@ -70,8 +72,8 @@ const NOUN: Record<ClientRow["family"], [string, string]> = {
 /** "ריבית 5.2%" — or the spread, when one lender holds several at once. */
 function rateText(r: ClientRow): string {
   if (r.minRate === null || r.maxRate === null || r.maxRate <= 0) return "";
-  const lo = r.minRate.toFixed(1).replace(/\.0$/, "");
-  const hi = r.maxRate.toFixed(1).replace(/\.0$/, "");
+  const lo = pct1(r.minRate);
+  const hi = pct1(r.maxRate);
   return lo === hi ? `ריבית ${lo}%` : `ריבית ${lo}%–${hi}%`;
 }
 
@@ -218,6 +220,8 @@ function CardRow({ r }: { r: ClientRow }) {
   if (r.reported.peak && r.peak > r.balance * 1.15)
     meta.push(<span key="peak">שיא בחודש {ils(r.peak)} ₪</span>);
   if (price) meta.push(<span key="rate" className={price.hot ? "lgr-cs-warn" : undefined}>{price.text}</span>);
+  // Counted with the loans in the footer, so the row says why.
+  if (r.instalment) meta.push(<span key="inst">אשראי בתשלומים</span>);
   if (r.late)
     meta.push(
       <span key="late" className="lgr-cs-warn">
@@ -330,8 +334,12 @@ export function Worries({
 /* -------------------------------------------------------------- the page */
 
 function Section({ sec }: { sec: ClientSection }) {
-  const shown = sec.rows.slice(0, MAX_ROWS);
-  const rest = sec.rows.slice(MAX_ROWS);
+  // Lenders fold past five — the smallest go, by balance. Card facilities never
+  // do: sorted by charge, the fold once swallowed a ₪46,629 overdraft at 99% of
+  // its limit while an unused ₪16,000 line kept a row of its own.
+  const cap = sec.key === "card" ? sec.rows.length : MAX_ROWS;
+  const shown = sec.rows.slice(0, cap);
+  const rest = sec.rows.slice(cap);
   const restMonthly = rest.reduce((s, r) => s + r.monthly, 0);
   const restBalance = rest.reduce((s, r) => s + r.balance, 0);
   const total = sec.rows.reduce((s, r) => s + r.balance, 0);
@@ -353,8 +361,10 @@ function Section({ sec }: { sec: ClientSection }) {
           sec.key === "card" ? <CardRow key={r.uids.join()} r={r} /> : <LenderRow key={r.uids.join()} r={r} />
         )}
         {sec.unused && (
-          <li className="lgr-cs-more" title="מסגרות פתוחות ללא יתרה וללא חיוב — נספרות אצל המלווה, לא אצלכם">
-            {sec.unused.count === 1 ? "מסגרת אחת" : `${sec.unused.count} מסגרות`} ללא ניצול
+          <li className="lgr-cs-more" title="מסגרות פתוחות ללא יתרה וללא חיוב ביום הדוח">
+            {/* "ללא יתרה", not "ללא ניצול": a line at ₪0 on the report date can
+                still have peaked at ₪10,250 during the month. */}
+            {sec.unused.count === 1 ? "מסגרת אחת" : `${sec.unused.count} מסגרות`} ללא יתרה
             {sec.unused.limit > 0 && (
               <>
                 {" · "}
@@ -518,14 +528,15 @@ export default function ClientSummaryModal({
               </div>
             )}
           </div>
-          {/* The same figure as before, called what it is. It is the charge the
-              report prints for every debt being serviced, plus a monthly average
-              worked out here where the report prints none (a yearly loan) — not
-              cash that left the account. What WAS paid is 201-048, and is said
-              beside it; charges nobody is servicing and debts with no charge on
-              record are named rather than silently left out. */}
+          {/* What the debts cost each month, and — beside it, never added in —
+              what the cards bill. A card statement is not a loan repayment: one
+              real report headlined ₪60,882 of which ₪52,043 was a single card's
+              bill. Instalment credit on a card IS a repayment and is counted
+              here (its row says "אשראי בתשלומים"). Computed averages, charges
+              nobody is servicing and debts with no charge on record are named
+              rather than silently left out. */}
           <div className="text-end">
-            <div className="lgr-cs-foot-cap">חיוב חודשי לפי הדוח</div>
+            <div className="lgr-cs-foot-cap">החזר חודשי על הלוואות ומשכנתא</div>
             <Money value={v.footer.monthly} size={22} weight={800} style={{ textAlign: "start" }} block={false} />
             {v.monthlyParts.computed > 0 && (
               <div className="lgr-cs-none">מזה {ils(v.monthlyParts.computed)} ₪ ממוצע חודשי מחושב</div>
@@ -540,6 +551,18 @@ export default function ClientSummaryModal({
               <div className="lgr-cs-none">
                 הסכום חלקי: לא דווח חיוב עבור{" "}
                 {v.monthlyParts.unreportedCount === 1 ? "התחייבות אחת" : `${v.monthlyParts.unreportedCount} התחייבויות`}
+              </div>
+            )}
+            {(v.footer.cards > 0 || v.cardParts.unreportedCount > 0) && (
+              <div className="lgr-cs-foot-cards">
+                חיוב שוטף בכרטיסי אשראי ומסגרות:{" "}
+                <Money value={v.footer.cards} block={false} weight={700} />
+                {v.cardParts.unreportedCount > 0 && (
+                  <span className="lgr-cs-none">
+                    {" "}
+                    · לא דווח חיוב ל{v.cardParts.unreportedCount === 1 ? "מסגרת אחת" : `-${v.cardParts.unreportedCount} מסגרות`}
+                  </span>
+                )}
               </div>
             )}
           </div>

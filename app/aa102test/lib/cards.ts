@@ -27,17 +27,40 @@ import { lenderOf } from "./lenders";
  * list's own words, so it is written for the screen.
  */
 export function loanLikeCard(l: ExtractedLoan): { ok: boolean; reason: string } {
-  if (l.category !== "card") return { ok: false, reason: "" };
-  if (l.role === "guarantor") return { ok: false, reason: "הלקוח ערב לחוב" };
-  if (l.balance <= 0) return { ok: false, reason: "אין יתרה" };
-  if (l.overdue > 0) return { ok: false, reason: "בפיגור — אין לוח תשלומים מדווח" };
-  if (!(l.knownPayment > 0)) return { ok: false, reason: "לא דווח חיוב חודשי" };
-  const rate = Number(l.interest) || 0;
-  const months = Number(l.months) || 0;
-  if (l.knownPayment >= l.balance * 0.5 || months <= 2)
+  return instalmentCredit({
+    category: l.category,
+    role: l.role,
+    balance: l.balance,
+    overdue: l.overdue,
+    payment: l.knownPayment,
+    rate: Number(l.interest) || 0,
+    months: Number(l.months) || 0,
+  });
+}
+
+/**
+ * The rule itself, on plain figures — so the board's import (ExtractedLoan) and
+ * the client summary (analysis DebtLine) cannot disagree about which card is a
+ * loan. `payment` is the PRINTED 201-046 only; a computed figure is not evidence.
+ */
+export function instalmentCredit(x: {
+  category: string;
+  role: "debtor" | "guarantor";
+  balance: number;
+  overdue: number;
+  payment: number;
+  rate: number;
+  months: number;
+}): { ok: boolean; reason: string } {
+  if (x.category !== "card") return { ok: false, reason: "" };
+  if (x.role === "guarantor") return { ok: false, reason: "הלקוח ערב לחוב" };
+  if (x.balance <= 0) return { ok: false, reason: "אין יתרה" };
+  if (x.overdue > 0) return { ok: false, reason: "בפיגור — אין לוח תשלומים מדווח" };
+  if (!(x.payment > 0)) return { ok: false, reason: "לא דווח חיוב חודשי" };
+  if (x.payment >= x.balance * 0.5 || x.months <= 2)
     return { ok: false, reason: "חיוב שוטף — החיוב החודשי קרוב ליתרה כולה" };
-  if (rate <= 0) return { ok: false, reason: "היתרה בריבית אפס" };
-  return { ok: true, reason: `תשלומים בריבית — כ־${months} חודשים לסיום` };
+  if (x.rate <= 0) return { ok: false, reason: "היתרה בריבית אפס" };
+  return { ok: true, reason: `תשלומים בריבית — כ־${x.months} חודשים לסיום` };
 }
 
 export interface CardItem {
