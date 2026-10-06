@@ -7,8 +7,9 @@
 // exactly as it stands, what is worth moving, and what would moving it cost?
 //
 // The statement is the only document that can answer both halves. It prices every
-// tranche and states what breaking each one costs today — so the recycle case is
-// a comparison it contains outright, rather than one that has to be guessed at.
+// tranche and states what breaking each one costs on its date — enough for a first
+// screen of which tranches to look at. Whether moving one SAVES anything needs an
+// alternative offer the statement does not hold, and the copy below says so.
 //
 // Same shape as the credit analysis on purpose: findings first, each pointing at
 // its own evidence, then the material those findings were drawn from.
@@ -164,8 +165,10 @@ function FlagRow({ flag, onGo }: { flag: Finding; onGo: (f: Finding) => void }) 
         <p className="mt-0.5 text-[12px] leading-[1.55]" style={{ color: "var(--lgr-3)" }}>
           {flag.detail}
         </p>
+        {/* It scrolls to the evidence table in this window — it does not open
+            the source PDF, which "הצג במסמך" promised. */}
         <span className="lgr-flag-go">
-          הצג במסמך
+          הצג את הנתונים בניתוח
           <ArrowLeft size={11} weight="bold" />
         </span>
       </div>
@@ -196,6 +199,17 @@ function ShareBar({ parts }: { parts: { label: string; share: number; color: str
       </ul>
     </div>
   );
+}
+
+/**
+ * A tranche's break fee as the letter states it. A blank is "לא דווח", never
+ * "ללא" — the engine keeps the two apart (feeUnreported vs freeToBreak), and so
+ * does every cell that shows one.
+ */
+function feeCell(t: BankTranche, zero: string) {
+  if (t.breakFee === null) return <span className="lgr-cs-none">לא דווח</span>;
+  if (t.breakFee === 0) return zero;
+  return <Money value={t.breakFee} block={false} />;
 }
 
 /** A tranche's own name for itself, falling back to its classification. */
@@ -265,7 +279,7 @@ export default function StatementAnalysisModal({
     a.findings.length ? { id: "findings", label: "ממצאים" } : null,
     { id: "mix", label: "תמהיל" },
     { id: "tranches", label: "מסלולים" },
-    a.recycle.length ? { id: "recycle", label: "כדאיות מיחזור" } : null,
+    a.recycle.length ? { id: "recycle", label: "בדיקת מיחזור" } : null,
     a.totals.breakFee > 0 ? { id: "fees", label: "עמלות יציאה" } : null,
     a.upcomingResets.length ? { id: "resets", label: "שינויי ריבית" } : null,
     a.totals.indexation !== 0 ? { id: "index", label: "הצמדה" } : null,
@@ -284,8 +298,11 @@ export default function StatementAnalysisModal({
           <span className="font-semibold">{trackName(t)}</span>
         </span>
         {t.balanceApportioned && (
-          <span className="lgr-chip !ms-1.5 !h-[17px] !px-1 !text-[9.5px]" title="הבנק אינו מפרט יתרה למסלול; חולקה לפי לוח הסילוקין">
-            מחולק
+          <span
+            className="lgr-chip !ms-1.5 !h-[17px] !px-1 !text-[9.5px]"
+            title="חושבה מתוך יתרת ההלוואה; אינה יתרה נפרדת שהבנק דיווח."
+          >
+            יתרה מוערכת
           </span>
         )}
       </td>
@@ -297,7 +314,7 @@ export default function StatementAnalysisModal({
       <td className="lgr-fig">{t.months ?? "—"}{t.monthsDerived && t.months ? "*" : ""}</td>
       <td className="lgr-fig">{t.endDate || "—"}</td>
       <td className="lgr-fig">{t.anchor ? `${t.anchor}${t.margin !== null ? ` ${t.margin > 0 ? "+" : ""}${t.margin}%` : ""}` : "—"}</td>
-      <td>{t.breakFee !== null && t.breakFee > 0 ? <Money value={t.breakFee} block={false} /> : "—"}</td>
+      <td>{feeCell(t, "ללא")}</td>
     </tr>
   );
 
@@ -373,7 +390,11 @@ export default function StatementAnalysisModal({
           <Kpi
             label="החזר חודשי"
             value={<Money value={a.totals.monthly} size={24} weight={800} />}
-            sub={a.totals.longestMonths ? `המסלול הארוך: ${Math.round(a.totals.longestMonths / 12)} שנים` : undefined}
+            sub={
+              a.totals.longestMonths
+                ? `המסלול האחרון מסתיים בעוד כ-${Math.round(a.totals.longestMonths / 12)} שנים`
+                : undefined
+            }
           />
           <Kpi
             label="ריבית ממוצעת משוקללת"
@@ -381,9 +402,9 @@ export default function StatementAnalysisModal({
             sub={a.totals.forecastRate !== null ? `ריבית כוללת חזויה ${rate(a.totals.forecastRate)}` : undefined}
           />
           <Kpi
-            label="לסילוק מלא היום"
+            label="סכום לסילוק לפי המסמך"
             value={<Money value={a.totals.payoff} size={24} weight={800} />}
-            sub={`כולל ריבית ועמלות`}
+            sub={st.statementDate ? `נכון ל-${st.statementDate} · כולל ריבית ועמלות` : "כולל ריבית ועמלות"}
           />
           <Kpi
             label="עמלת פירעון מוקדם"
@@ -391,7 +412,11 @@ export default function StatementAnalysisModal({
             value={<Money value={a.totals.breakFee} size={24} weight={800} />}
             sub={
               a.totals.balance > 0
-                ? `${((a.totals.breakFee / a.totals.balance) * 100).toFixed(2)}% מהיתרה`
+                ? `${((a.totals.breakFee / a.totals.balance) * 100).toFixed(2)}% מהיתרה${
+                    a.feeUnreported.length
+                      ? ` · לא דווחה ל-${a.feeUnreported.length === 1 ? "מסלול אחד" : `${a.feeUnreported.length} מסלולים`}`
+                      : ""
+                  }`
                 : undefined
             }
           />
@@ -449,19 +474,20 @@ export default function StatementAnalysisModal({
                 share: t.share,
                 amount: t.balance,
                 color: TRACK_COLOR[t.key] ?? "#8b93a7",
-                note: t.rate !== null ? rate(t.rate) : undefined,
+                // A group's rate is balance-weighted; a single tranche's is its own.
+                note: t.rate !== null ? (t.count > 1 ? `ממוצע משוקלל ${rate(t.rate)}` : rate(t.rate)) : undefined,
               }))}
             />
             <div className="mt-3 overflow-x-auto">
               <table className="lgr-table lgr-mini">
                 <thead>
                   <tr>
-                    <th>מסלול</th>
-                    <th>מסלולים</th>
+                    <th>סוג מסלול</th>
+                    <th>מספר מסלולים</th>
                     <th>יתרה</th>
-                    <th>חלק</th>
+                    <th>שיעור מהיתרה</th>
                     <th>החזר חודשי</th>
-                    <th>ריבית</th>
+                    <th>ריבית ממוצעת משוקללת</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -527,13 +553,17 @@ export default function StatementAnalysisModal({
             <Section
               id="recycle"
               icon={<TrendUp size={15} weight="bold" />}
-              title="כדאיות מיחזור לפי מסלול"
+              title="מסלולים לבדיקת מיחזור"
               lit={lit?.section === "recycle"}
-              note="מדורג לפי ריבית, ואז לפי כמה זול לצאת"
+              note="ממוינים לפי ריבית מהגבוהה לנמוכה; בריביות דומות, לפי יחס העמלה לריבית החודשית."
             >
+              {/* "כדאיות מיחזור" promised a saving the table never computes — there
+                  is no alternative offer here to compare against. What it does show
+                  is a first screen, and the paragraph says exactly that. */}
               <p className="mb-2.5 text-[12px] leading-relaxed" style={{ color: "var(--lgr-3)" }}>
-                עמלת יציאה נמדדת כאן בחודשי ריבית של אותו מסלול, ולא בשקלים: עמלה בגובה חודשיים ריבית על
-                מסלול ב-7% היא זולה, אותה עמלה על מסלול ב-2% אינה. כך אפשר להשוות בין מסלולים בגדלים שונים.
+                הטבלה מסייעת לבחור אילו מסלולים לבדוק למיחזור. העמלה מוצגת בשקלים וגם ביחס לריבית של חודש
+                אחד, לפי היתרה והריבית הנוכחיות. היחס אינו מספר החודשים להחזרת עלות המיחזור. לבדיקת חיסכון יש
+                להשוות להצעה חלופית, כולל התקופה והעלויות הנלוות.
               </p>
               <div className="overflow-x-auto">
                 <table className="lgr-table lgr-mini">
@@ -543,8 +573,8 @@ export default function StatementAnalysisModal({
                       <th>יתרה</th>
                       <th>ריבית</th>
                       <th>עמלת יציאה</th>
-                      <th>שווה ל-</th>
-                      <th>ריבית שנותרה לשלם</th>
+                      <th>עמלה במונחי חודשי ריבית</th>
+                      <th>אומדן יתרת ריבית בהנחת החזר קבוע</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -560,20 +590,31 @@ export default function StatementAnalysisModal({
                         <td className="lgr-fig" data-heat={(c.tranche.rate ?? 0) >= 6 ? "hot" : (c.tranche.rate ?? 0) >= 4.5 ? "warm" : undefined}>
                           {rate(c.tranche.rate)}
                         </td>
-                        <td>{c.tranche.breakFee ? <Money value={c.tranche.breakFee} block={false} /> : "ללא"}</td>
+                        <td>{feeCell(c.tranche, "ללא")}</td>
                         <td className="lgr-fig">
-                          {c.feeInMonthsOfInterest === null
+                          {c.feeInMonthsOfInterest === null || c.feeInMonthsOfInterest === 0
                             ? "—"
-                            : c.feeInMonthsOfInterest === 0
-                              ? "—"
-                              : `${c.feeInMonthsOfInterest} חודשי ריבית`}
+                            : c.feeInMonthsOfInterest}
                         </td>
-                        <td>{c.remainingInterest !== null ? <Money value={c.remainingInterest} block={false} /> : "—"}</td>
+                        <td title={c.remainingInterestWhy}>
+                          {c.remainingInterest !== null ? (
+                            <Money value={c.remainingInterest} block={false} />
+                          ) : c.remainingInterestWhy ? (
+                            <span className="lgr-cs-none">לא חושב</span>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
+              {/* The assumption, beside the figure it qualifies. */}
+              <p className="mt-2 text-[11.5px] leading-relaxed" style={{ color: "var(--lgr-4)" }}>
+                אומדן יתרת הריבית: ההחזר החודשי הנוכחי כפול מספר החודשים שנותרו, פחות היתרה — לא מהוון, ובהנחה
+                שההחזר אינו משתנה. לא חושב למסלולי בלון, לקרן שווה, או כשההחזר הנוכחי אינו מכסה את היתרה.
+              </p>
             </Section>
           )}
 
@@ -597,15 +638,17 @@ export default function StatementAnalysisModal({
                   </thead>
                   <tbody>
                     {a.live
-                      .filter((t) => (t.breakFee ?? 0) > 0)
+                      .filter((t) => (t.breakFee ?? 0) > 0 || t.breakFee === null)
                       .map((t) => (
                         <tr key={t.uid} data-hl={lit?.uids.has(t.uid) || undefined}>
                           <td className="font-semibold">{trackName(t)}</td>
-                          <td><Money value={t.breakFee ?? 0} block={false} /></td>
+                          <td>{feeCell(t, "ללא")}</td>
                           <td style={{ color: "var(--lgr-3)" }}>
-                            {t.breakFeeParts.length
-                              ? t.breakFeeParts.map((p) => `${p.label} ₪${fmt(p.amount)}`).join(" · ")
-                              : "—"}
+                            {t.breakFee === null
+                              ? "המסמך אינו מציין עמלה למסלול זה"
+                              : t.breakFeeParts.length
+                                ? t.breakFeeParts.map((p) => `${p.label} ₪${fmt(p.amount)}`).join(" · ")
+                                : "—"}
                           </td>
                         </tr>
                       ))}
@@ -623,7 +666,16 @@ export default function StatementAnalysisModal({
               </div>
               {a.freeToBreak.length > 0 && (
                 <p className="mt-2.5 text-[12px]" style={{ color: "var(--pos)" }}>
-                  {a.freeToBreak.length} מסלולים ללא עמלת יציאה כלל — ₪{fmt(a.freeToBreak.reduce((s, t) => s + (t.balance ?? 0), 0))} שניתן להזיז בלי עלות.
+                  {a.freeToBreak.length === 1 ? "במסלול אחד" : `ב-${a.freeToBreak.length} מסלולים`} המסמך מציין
+                  עמלה של 0 ₪ (יתרה של ₪{fmt(a.freeToBreak.reduce((s, t) => s + (t.balance ?? 0), 0))}). היעדר עמלה
+                  למסלול אינו כולל עלויות נלוות של העברה.
+                </p>
+              )}
+              {a.feeUnreported.length > 0 && (
+                <p className="mt-1.5 text-[12px]" style={{ color: "var(--lgr-3)" }}>
+                  {a.feeUnreported.length === 1 ? "למסלול אחד" : `ל-${a.feeUnreported.length} מסלולים`} לא דווחה
+                  עמלה (יתרה של ₪{fmt(a.feeUnreported.reduce((s, t) => s + (t.balance ?? 0), 0))}); אין להניח שהיא 0,
+                  והסכום הכולל חלקי.
                 </p>
               )}
             </Section>
@@ -634,7 +686,7 @@ export default function StatementAnalysisModal({
             <Section
               id="resets"
               icon={<CalendarBlank size={15} weight="fill" />}
-              title="שינויי ריבית בשנה הקרובה"
+              title="עדכוני ריבית ב-12 החודשים שלאחר תאריך המסמך"
               lit={lit?.section === "resets"}
               note={`₪${fmt(a.exposure.resettingWithinYear)} מהיתרה`}
             >
@@ -662,9 +714,11 @@ export default function StatementAnalysisModal({
                   </tbody>
                 </table>
               </div>
+              {/* Was: "…עמלת ההיוון מתאפסת… חוסך את מרכיב ההיוון במלואו" — a promise
+                  about a fee the document does not quote for that date. */}
               <p className="mt-2.5 text-[12px] leading-relaxed" style={{ color: "var(--lgr-3)" }}>
-                מועד שינוי הריבית הוא גם המועד שבו עמלת ההיוון מתאפסת. פירעון או מיחזור באותו מועד חוסך את
-                מרכיב ההיוון של העמלה במלואו.
+                לפני כל מועד עדכון יש לבדוק מול הבנק את עמלת הפירעון הצפויה בו, ולהשוות לעמלה המופיעה
+                במסמך.
               </p>
             </Section>
           )}
@@ -676,15 +730,15 @@ export default function StatementAnalysisModal({
               icon={<TrendUp size={15} weight="fill" />}
               title="הצמדה ומדדים"
               lit={lit?.section === "index"}
-              note={`${(a.exposure.indexationDrag * 100).toFixed(1)}% מעל הקרן`}
+              note={`הפרשי הצמדה ביחס ליתרת הקרן: ${(a.exposure.indexationDrag * 100).toFixed(1)}%`}
             >
               <div className="lgr-facts mb-3">
                 <div>
-                  <Label>קרן</Label>
+                  <Label>יתרת קרן</Label>
                   <Money value={a.totals.principal} size={17} weight={800} />
                 </div>
                 <div>
-                  <Label>הצמדה שנצברה</Label>
+                  <Label>הפרשי הצמדה</Label>
                   <Money value={a.totals.indexation} size={17} weight={800} color={a.totals.indexation > 0 ? "var(--neg)" : undefined} />
                 </div>
                 <div>

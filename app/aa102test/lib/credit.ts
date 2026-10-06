@@ -15,6 +15,7 @@ import { calculateLoan } from "@/app/private/crm/leads/simulators/components/cal
 import type { Loan } from "@/app/private/crm/leads/simulators/components/LoanTable";
 import { creditReportPurpose } from "@/lib/bank-parser/purpose";
 import { purposeFrom, type PurposeId } from "./purposes";
+import { loanLikeCard } from "./cards";
 
 /** Which family a row belongs to. */
 export type DebtGroup = "mortgage" | "loan";
@@ -175,6 +176,16 @@ export type ImportedLoan = Loan & {
    * guess which pair of documents agreed.
    */
   shared_with?: string[];
+  /**
+   * Which document transactions this row stands for — `docKey#uid`, one per
+   * report that listed it (a merged row carries both spouses').
+   *
+   * Session-only, like shared_with: it is what lets the credit-card list under
+   * the charts say which of its entries are already rows, and take a row back
+   * out when the advisor unticks it. A hand-added row has none and is never
+   * touched by that list.
+   */
+  source_refs?: string[];
 
   /* --- THE MASTER'S SPLIT — what the client owes, the way the bank prints it.
 
@@ -519,7 +530,15 @@ function toIso(dmy: string | undefined): string | null {
   return `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
 }
 
-function toLoanRow(src: ExtractedLoan, mixId: string, group: DebtGroup): ImportedLoan {
+/**
+ * One document's identity, for `source_refs`: the same client's reading of the
+ * same day — the definition applyImport already uses to refuse a re-drop.
+ */
+export function docKey(doc: { clientId?: string; clientName?: string; reportDate?: string }): string {
+  return `${(doc.clientId || doc.clientName || "").replace(/\s+/g, "")}|${doc.reportDate ?? ""}`;
+}
+
+export function toLoanRow(src: ExtractedLoan, mixId: string, group: DebtGroup, ref?: string): ImportedLoan {
   const guarantor = src.role === "guarantor";
   const pathId = pathIdFromTrack(src.trackLabel, group === "mortgage");
   const iso = toIso(src.endDate);
@@ -584,6 +603,7 @@ function toLoanRow(src: ExtractedLoan, mixId: string, group: DebtGroup): Importe
     // mortgage's צריכה פרטית is כל מטרה), then placed on the board's list.
     purpose: purposeFrom(creditReportPurpose(src.purpose, src.type), src.purpose, group),
     source_eligibility: src.eligibility,
+    ...(ref ? { source_refs: [ref] } : {}),
   };
 }
 
@@ -636,6 +656,16 @@ export function importReportToLoans(
   fileName = ""
 ): ImportSummary {
   const extracted = extractLoans(report).filter((l) => l.balance > 0);
+  const key = docKey({
+    clientId: report.client?.idNumber,
+    clientName: report.client?.name,
+    reportDate: report.meta?.reportDate,
+  });
+  const ref = (l: ExtractedLoan) => `${key}#${l.uid}`;
+  // A card facility that is really an instalment loan comes in as a loan — see
+  // loanLikeCard. The plain monthly card bill stays out, as before; the card
+  // list under the charts lets the advisor overrule either call.
+  const asLoan = (l: ExtractedLoan) => l.category === "loan" || loanLikeCard(l).ok;
 
   // The client's own debts first, guaranteed ones after, each biggest-first.
   const byOwnThenSize = (a: ExtractedLoan, b: ExtractedLoan) =>
@@ -644,16 +674,16 @@ export function importReportToLoans(
   const mortgages = extracted
     .filter((l) => l.category === "mortgage")
     .sort(byOwnThenSize)
-    .map((l) => toLoanRow(l, mixId, "mortgage"));
+    .map((l) => toLoanRow(l, mixId, "mortgage", ref(l)));
 
   const others = extracted
-    .filter((l) => l.category === "loan")
+    .filter(asLoan)
     .sort(byOwnThenSize)
-    .map((l) => toLoanRow(l, mixId, "loan"));
+    .map((l) => toLoanRow(l, mixId, "loan", ref(l)));
 
   const skippedMap = new Map<string, { count: number; balance: number }>();
   for (const l of extracted) {
-    if (l.category === "mortgage" || l.category === "loan") continue;
+    if (l.category === "mortgage" || asLoan(l)) continue;
     const key =
       l.category === "card"
         ? "מסגרות אשראי וכרטיסים"
@@ -679,7 +709,7 @@ export function importReportToLoans(
     guaranteed: loans.filter((l) => l.is_guarantor).length,
     totalBalance: loans.reduce((s, l) => s + l.amount, 0),
     totalMonthly: extracted
-      .filter((l) => l.category === "mortgage" || l.category === "loan")
+      .filter((l) => l.category === "mortgage" || asLoan(l))
       .reduce((s, l) => s + l.displayMonthly, 0),
   };
 }
@@ -801,11 +831,13 @@ export function mergeReportLoans(
     // household's loan silently vanished from the board's balance and monthly.
     // A debt anybody in the household OWES is owed.
     const owed = !l.is_guarantor || !merged[i].is_guarantor;
+    const refs = merged[i].source_refs ?? [];
     merged[i] = {
       ...merged[i],
       is_guarantor: !owed,
       is_shared: true,
       shared_with: from && !seen.includes(from) ? [...seen, from] : seen,
+      source_refs: [...refs, ...(l.source_refs ?? []).filter((r) => !refs.includes(r))],
     };
   };
 

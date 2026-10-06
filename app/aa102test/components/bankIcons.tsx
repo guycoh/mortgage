@@ -242,6 +242,23 @@ const CUSTOM: { test: RegExp; render: Renderer }[] = [
     ),
   },
   {
+    // Cal: blue field, the white "Cal." wordmark drawn as strokes. Same test as
+    // lenders.ts — the report prints the legal name, כרטיסי אשראי לישראל.
+    test: /כרטיסי\s*אשראי\s*לישראל|(?<![א-ת])כאל(?![א-ת])|\bcal\b/i,
+    render: (s) => (
+      <Svg size={s}>
+        <circle cx="16" cy="16" r="16" fill="#1c5fcd" />
+        <g transform="translate(16 16) scale(1.12) translate(-17.1 -16)" fill="none" stroke="#fff">
+          <path d="M13 13.1A3.4 3.4 0 1 0 13 18.9" strokeWidth="2.3" />
+          <path d="M15.9 15.3C16.9 14.3 19.7 14.2 19.7 16.4V20.4" strokeWidth="2" />
+          <ellipse cx="17.7" cy="18.5" rx="1.7" ry="1.3" strokeWidth="1.9" />
+          <path d="M22.7 11.5V20.4" strokeWidth="2.1" />
+          <circle cx="25.7" cy="19.3" r="1.15" fill="#fff" stroke="none" />
+        </g>
+      </Svg>
+    ),
+  },
+  {
     // Triya: violet field, white spark.
     test: /טריא|triya/i,
     render: (s) => (

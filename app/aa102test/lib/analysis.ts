@@ -47,13 +47,18 @@ import {
   UTILISATION_PEAK_RATIO,
   isDearRate,
   linkedIsHigh,
-  noteOf,
+  mergeWorries,
+  orderWorries,
   show,
   silent,
   utilisationHeat,
   variableSeverity,
+  worryGroup,
+  worryOf,
   type ClientDisposition,
+  type ClientWorry,
 } from "@/lib/verdicts";
+import { lenderLabel } from "./lenders";
 
 /* --------------------------------------------------------------- vocabulary */
 
@@ -161,6 +166,16 @@ export interface DebtLine {
   interestFree: boolean;
   /** Which money fields the document actually printed — see toLine. */
   reported: { limit: boolean; monthly: boolean; paid: boolean; peak: boolean };
+  /**
+   * Where `monthly` came from, because the page has to say so.
+   *
+   * "reported" — 201-046 as printed (a printed 0 included). "computed" — the report
+   * printed no payment (or 0 on a debt that is not repaid monthly) and the figure is
+   * an amortised monthly equivalent worked out here. "none" — neither: no charge on
+   * record. Summing all three under one "יוצא מהחשבון כל חודש" mixed a stated charge,
+   * an average and a silence into one number that claimed to be cash.
+   */
+  monthlySource: "reported" | "computed" | "none";
   /**
    * True when `monthly` is a contractual charge rather than money leaving the
    * account: the debt is in default and nothing is actually being paid against it.
@@ -437,6 +452,10 @@ export interface ClientRow {
   monthly: number;
   /** Contractual charges on this row that are not being paid. */
   monthlyNotPaid: number;
+  /** The part of `monthly` that is a computed equivalent, not a printed charge. */
+  monthlyComputed: number;
+  /** Debts folded here with a balance and no charge on record at all. */
+  monthlyUnreported: number;
   months: number | null;
   late: boolean;
   overdue: number;
@@ -486,8 +505,22 @@ export interface ClientSection {
  */
 export interface ClientView {
   sections: ClientSection[];
-  worries: { say: string; severity: Severity }[];
+  /** Grouped (act → check → info), overlapping findings folded — see buildClientView. */
+  worries: ClientWorry[];
   footer: { balance: number; monthly: number };
+  /**
+   * What `footer.monthly` is made of — never a different total, only its parts
+   * named. `computed` is inside it; `notPaid` and the unreported debts are not;
+   * `paid` is 201-048, over the debts that printed it.
+   */
+  monthlyParts: {
+    computed: number;
+    computedCount: number;
+    paid: number;
+    paidCount: number;
+    notPaid: number;
+    unreportedCount: number;
+  };
   /**
    * Guaranteed, not owed.
    *
@@ -724,6 +757,19 @@ function toLine(
       paid: f["201-048"] !== undefined,
       peak: f["201-072"] !== undefined,
     },
+    // extractLoans displays the printed payment when there is one and its own
+    // amortised figure otherwise; only the knownPayment tells the two apart.
+    monthlySource: loan
+      ? loan.knownPayment > 0
+        ? "reported"
+        : loan.displayMonthly > 0
+          ? "computed"
+          : f["201-046"] !== undefined
+            ? "reported"
+            : "none"
+      : f["201-046"] !== undefined
+        ? "reported"
+        : "none",
     // Two independent signs that the charge is notional: the arrears cover the
     // whole balance, or the term is over and the report shows nothing paid.
     chargeNotPaid: (() => {
@@ -1134,6 +1180,8 @@ const EMPTY_ROW = (bank: string, family: ClientRow["family"], type: string): Cli
   balance: 0,
   monthly: 0,
   monthlyNotPaid: 0,
+  monthlyComputed: 0,
+  monthlyUnreported: 0,
   months: null,
   late: false,
   overdue: 0,
@@ -1158,7 +1206,11 @@ function absorb(row: ClientRow, l: DebtLine): ClientRow {
   row.balance += l.balance;
   // Cash and notional charges kept apart — see ClientRow.monthly.
   if (l.chargeNotPaid) row.monthlyNotPaid += l.monthly;
-  else row.monthly += l.monthly;
+  else {
+    row.monthly += l.monthly;
+    if (l.monthlySource === "computed") row.monthlyComputed += l.monthly;
+    if (l.monthlySource === "none" && l.balance > 0) row.monthlyUnreported += 1;
+  }
   row.limit += l.limit;
   row.peak += l.peak;
   row.overdue += l.overdue;
@@ -1251,16 +1303,29 @@ function buildClientView(a: Omit<Analysis, "flags" | "clientView">, flags: Flag[
   const shownBalance = sections.reduce((s, sec) => s + sec.rows.reduce((t, r) => t + r.balance, 0), 0);
   const shownMonthly = sections.reduce((s, sec) => s + sec.rows.reduce((t, r) => t + r.monthly, 0), 0);
 
-  // Ordered by severity, and each sentence's rows are on the page by construction.
-  const worries = flags
-    .map((f) => ({ note: noteOf(f.client), severity: f.severity }))
-    .filter((x): x is { note: { say: string; uids?: string[] }; severity: Severity } => x.note !== null)
-    .map((x) => ({ say: x.note.say, severity: x.severity }));
+  // Grouped, then by severity; each sentence's rows are on the page by construction.
+  const worries = clientWorries(a, flags);
+
+  // The footer's monthly figure, taken apart — the same population as
+  // totals.monthly (own debts, charges being serviced), so the parts cannot
+  // describe a different number than the one printed above them.
+  const serviced = own.filter((l) => !l.chargeNotPaid);
+  const computed = serviced.filter((l) => l.monthlySource === "computed" && l.monthly > 0);
+  const paidRows = own.filter((l) => l.reported.paid);
+  const monthlyParts = {
+    computed: computed.reduce((s, l) => s + l.monthly, 0),
+    computedCount: computed.length,
+    paid: paidRows.reduce((s, l) => s + l.paidActually, 0),
+    paidCount: paidRows.length,
+    notPaid: own.filter((l) => l.chargeNotPaid).reduce((s, l) => s + l.monthly, 0),
+    unreportedCount: serviced.filter((l) => l.monthlySource === "none" && l.balance > 0).length,
+  };
 
   return {
     sections,
     worries,
     footer: { balance: a.totals.balance, monthly: a.totals.monthly },
+    monthlyParts,
     guaranteedBalance: a.totals.guaranteedBalance,
     shownBalance,
     unshownBalance: Math.round(a.totals.balance - shownBalance),
@@ -1268,10 +1333,100 @@ function buildClientView(a: Omit<Analysis, "flags" | "clientView">, flags: Flag[
   };
 }
 
+/** Three findings that describe one debt from different sides. */
+const DISTRESS = ["arrears-now", "remark-enforced", "remark-nopay"];
+
+/**
+ * The client page's findings: one line each, grouped, with overlaps folded.
+ *
+ * Arrears, an enforcement remark and "no payment received" were three separate
+ * lines that could all be about the same card — "יש פיגור בתשלומים", "חלק
+ * מההתחייבויות מטופלות בהוצאה לפועל", "יש התחייבויות שלא שולם בהן דבר" — none
+ * naming the lender or the amount. They are rebuilt here per lender, from the
+ * debts themselves, so each line says whose debt, how much and since when.
+ */
+function clientWorries(a: Omit<Analysis, "flags" | "clientView">, flags: Flag[]): ClientWorry[] {
+  const money = (n: number) => Math.round(n).toLocaleString("en-US");
+  const items = flags.map(worryOf).filter((w): w is ClientWorry => w !== null);
+  const distress = items.filter((w) => DISTRESS.includes(w.id));
+  const rest = items.filter((w) => !DISTRESS.includes(w.id));
+
+  const perLender: ClientWorry[] = [];
+  if (distress.length) {
+    const uids = new Set(distress.flatMap((w) => w.uids ?? []));
+    const by = new Map<string, DebtLine[]>();
+    for (const l of a.lines) {
+      if (!uids.has(l.uid)) continue;
+      const k = lenderLabel(l.bank) || l.bank;
+      by.set(k, [...(by.get(k) ?? []), l]);
+    }
+    for (const [lender, ls] of Array.from(by.entries())) {
+      const late = ls.filter((l) => l.overdue > 0 || l.arrearsRange);
+      const enforced = ls.filter((l) => l.remarks.some((r) => r.includes("הוצאה לפועל")));
+      const nopay = ls.filter((l) => l.remarks.some((r) => r.includes("לא התקבל כל תשלום")));
+      const overdue = late.reduce((s, l) => s + l.overdue, 0);
+      const range = late.map((l) => l.arrearsRange).filter(Boolean).sort().reverse()[0] ?? "";
+      const facts: string[] = [];
+      if (late.length)
+        facts.push(
+          `${overdue > 0 ? `בדוח מופיע סכום של ${money(overdue)} ₪ בפיגור` : "בדוח מופיע פיגור"}${
+            range ? ` של ${range}` : ""
+          }${late.length > 1 ? `, ב-${late.length} התחייבויות` : ""}.`
+        );
+      if (enforced.length)
+        facts.push(
+          enforced.length === 1
+            ? "התחייבות אחת מסומנת כמטופלת בהוצאה לפועל."
+            : `${enforced.length} התחייבויות מסומנות כמטופלות בהוצאה לפועל.`
+        );
+      if (nopay.length)
+        facts.push(
+          nopay.length === 1
+            ? "בהתחייבות אחת מצוין שלא התקבל כל תשלום."
+            : `ב-${nopay.length} התחייבויות מצוין שלא התקבל כל תשלום.`
+        );
+      const mine = new Set(ls.map((l) => l.uid));
+      const severity =
+        distress
+          .filter((w) => (w.uids ?? []).some((u) => mine.has(u)))
+          .map((w) => w.severity)
+          .sort((x, y) => SEVERITY_ORDER.indexOf(x) - SEVERITY_ORDER.indexOf(y))[0] ?? "high";
+      perLender.push({
+        id: `distress:${lender}`,
+        title: `${late.length ? "פיגור בתשלומים" : enforced.length ? "הוצאה לפועל" : "לא התקבל תשלום"} — ${lender}`,
+        say: facts.join(" "),
+        next: late.length
+          ? "יש לברר אם הפיגור הוסדר מאז תאריך הדוח."
+          : enforced.length
+            ? "יש לברר את מצב הטיפול ואת יתרת החוב."
+            : "יש לברר את מצב החוב מול המלווה.",
+        severity,
+        group: worryGroup("arrears-now", severity),
+        uids: ls.map((l) => l.uid),
+      });
+    }
+  }
+
+  // The per-lender lines take the place of the first distress finding.
+  const at = items.findIndex((w) => DISTRESS.includes(w.id));
+  const merged = rest.slice();
+  if (perLender.length) merged.splice(Math.max(0, items.slice(0, at).filter((w) => !DISTRESS.includes(w.id)).length), 0, ...perLender);
+
+  return orderWorries(
+    mergeWorries(merged, [
+      { ids: ["revolving", "revolving-peak"], title: "ניצול מסגרות" },
+      { ids: ["card-charge", "card-rolled"], title: "חיוב חודשי בכרטיסים ובמסגרות" },
+    ])
+  );
+}
+
 function buildFlags(a: Omit<Analysis, "flags" | "clientView">): Flag[] {
   const flags: Flag[] = [];
   const own = a.lines.filter((l) => l.role === "debtor");
   const push = (f: Flag) => flags.push(f);
+  const money = (n: number) => Math.round(n).toLocaleString("en-US");
+  /** "התחייבות אחת" / "3 התחייבויות" — Hebrew does not say "1 התחייבויות". */
+  const debts = (n: number) => (n === 1 ? "התחייבות אחת" : `${n} התחייבויות`);
 
   /* ---- legal proceedings: the file-stoppers */
   if (a.legal.insolvency.length) {
@@ -1281,7 +1436,16 @@ function buildFlags(a: Omit<Analysis, "flags" | "clientView">): Flag[] {
       severity: "critical",
       title: "הליך חדלות פירעון",
       detail: `נמצאו ${a.legal.insolvency.length} הליכי חדלות פירעון או שיקום כלכלי. יש לברר סטטוס והכרעות לפני כל המשך טיפול.`,
-      client: show("קיים הליך חדלות פירעון — זה הפריט הראשון שכל בנק יבדוק"),
+      client: (() => {
+        const sum = a.legal.insolvency.reduce((s, c) => s + num(c["151-009"] || c["151-007"]), 0);
+        return show(
+          `${a.legal.insolvency.length === 1 ? "בדוח מופיע הליך" : `בדוח מופיעים ${a.legal.insolvency.length} הליכי`} חדלות פירעון או שיקום כלכלי${
+            sum > 0 ? `, בסכום מדווח של ${money(sum)} ₪` : ""
+          }.`,
+          undefined,
+          { title: "הליך חדלות פירעון", next: "יש לברר את מצב ההליך ואת ההחלטות שניתנו בו." }
+        );
+      })(),
       amount: a.legal.insolvency.reduce((s, c) => s + num(c["151-009"] || c["151-007"]), 0),
     });
   }
@@ -1291,11 +1455,16 @@ function buildFlags(a: Omit<Analysis, "flags" | "clientView">): Flag[] {
       target: { section: "legal" },
       severity: "critical",
       title: "תיקים פתוחים בהוצאה לפועל",
-      detail: `${a.legal.executionOpen.length} תיקים פתוחים. חוב פתוח בהוצאה לפועל נחשב חוב לכל דבר וחוסם כמעט כל מסלול.`,
+      detail: `${a.legal.executionOpen.length === 1 ? "תיק פתוח אחד" : `${a.legal.executionOpen.length} תיקים פתוחים`}. יש לברר את מצב התיקים ואת יתרת החוב העדכנית לפני המשך הטיפול.`,
       client: show(
-        a.legal.executionOpen.length === 1
-          ? "קיים תיק פתוח בהוצאה לפועל — חוב לכל דבר, שחוסם כמעט כל מסלול"
-          : `קיימים ${a.legal.executionOpen.length} תיקים פתוחים בהוצאה לפועל — חוב לכל דבר, שחוסם כמעט כל מסלול`
+        `${a.legal.executionOpen.length === 1 ? "בדוח מופיע תיק פתוח" : `בדוח מופיעים ${a.legal.executionOpen.length} תיקים פתוחים`} בהוצאה לפועל${
+          a.legal.executionDebt > 0 ? `, עם יתרת חוב מדווחת של ${money(a.legal.executionDebt)} ₪` : ""
+        }.`,
+        undefined,
+        {
+          title: a.legal.executionOpen.length === 1 ? "תיק פתוח בהוצאה לפועל" : "תיקים פתוחים בהוצאה לפועל",
+          next: a.legal.executionOpen.length === 1 ? "יש לברר את מצבו ואת יתרת החוב." : "יש לברר את מצבם ואת יתרת החוב.",
+        }
       ),
       amount: a.legal.executionDebt,
     });
@@ -1326,12 +1495,14 @@ function buildFlags(a: Omit<Analysis, "flags" | "clientView">): Flag[] {
       severity: toBureau ? "critical" : "high",
       title: "נתונים המעידים על אי עמידה בפירעון",
       detail: toBureau
-        ? `${a.legal.nonPayment.length} רשומות, מתוכן ${toBureau} ניתנות להעברה ללשכה ומופיעות בחיווי האשראי שהבנק מושך. זהו הפריט הראשון שייבחן.`
+        ? `${a.legal.nonPayment.length} רשומות, מתוכן ${toBureau} ניתנות להעברה ללשכה ומופיעות בחיווי האשראי. יש לברר את מקור כל רשומה ואם הוסדרה.`
         : `${a.legal.nonPayment.length} רשומות שאינן מועברות ללשכה, אך מופיעות בדוח ויידרש עליהן הסבר.`,
       client: show(
         toBureau
-          ? "קיים רישום על אי עמידה בתשלומים שמופיע בדירוג האשראי שהבנק מושך"
-          : "קיים רישום על אי עמידה בתשלומים בדוח, שיידרש עליו הסבר"
+          ? `בדוח מופיעות ${a.legal.nonPayment.length} רשומות על אי עמידה בתשלומים, ${toBureau === a.legal.nonPayment.length ? "וכולן ניתנות" : `${toBureau} מהן ניתנות`} להעברה ללשכת נתוני אשראי.`
+          : `בדוח מופיעות ${a.legal.nonPayment.length} רשומות על אי עמידה בתשלומים, שאינן מועברות ללשכת נתוני אשראי.`,
+        undefined,
+        { title: "רישום על אי עמידה בתשלומים", next: "יש לברר את מקור הרשומות ואם הוסדרו." }
       ),
       where: a.legal.nonPayment.map((n) => n.source).filter(Boolean),
     });
@@ -1361,6 +1532,7 @@ function buildFlags(a: Omit<Analysis, "flags" | "clientView">): Flag[] {
       detail: `${inArrears.length} התחייבויות בפיגור${
         inArrears.some((l) => l.arrearsRange) ? ` (הטווח החמור: ${inArrears.map((l) => l.arrearsRange).filter(Boolean).sort().reverse()[0]})` : ""
       }.`,
+      // Rebuilt per lender on the client page — see clientWorries.
       client: show("יש פיגור בתשלומים", inArrears.map((l) => l.uid)),
       amount: inArrears.reduce((s, l) => s + l.overdue, 0),
       where: Array.from(new Set(inArrears.map((l) => l.bank))),
@@ -1374,11 +1546,13 @@ function buildFlags(a: Omit<Analysis, "flags" | "clientView">): Flag[] {
       title: "היסטוריית פיגורים",
       detail: `${a.behaviour.arrearsMonths} חודשים עם פיגור בהיסטוריה${
         a.behaviour.worstBucket >= 4 ? `, כולל פיגור של 120 יום ומעלה` : ""
-      }. בנקים בוחנים את הדפוס, לא רק את המצב הנוכחי.`,
+      }. יש לברר מתי היו הפיגורים ואם הוסדרו.`,
       client: show(
-        a.behaviour.arrearsMonths === 1
-          ? "בעבר היה חודש אחד עם פיגור בתשלומים — הבנק מסתכל על הדפוס, לא רק על היום"
-          : `בעבר היו ${a.behaviour.arrearsMonths} חודשים עם פיגור בתשלומים — הבנק מסתכל על הדפוס, לא רק על היום`
+        `${a.behaviour.arrearsMonths === 1 ? "בדוח מופיע חודש אחד" : `בדוח מופיעים ${a.behaviour.arrearsMonths} חודשים`} עם פיגור בתשלומים בעבר${
+          a.behaviour.worstBucket >= 4 ? ", כולל פיגור של 120 יום ומעלה" : ""
+        }.`,
+        undefined,
+        { title: "היסטוריית פיגורים", next: "כדאי לברר מתי היו הפיגורים ואם הוסדרו." }
       ),
     });
   }
@@ -1393,7 +1567,7 @@ function buildFlags(a: Omit<Analysis, "flags" | "clientView">): Flag[] {
       severity: "high",
       title: "עסקאות בטיפול ההוצאה לפועל",
       detail: `${enforced.length} עסקאות מסומנות כמטופלות בהוצאה לפועל.`,
-      client: show("חלק מההתחייבויות מטופלות בהוצאה לפועל", enforced.map((l) => l.uid)),
+      client: show("חלק מההתחייבויות מטופלות בהוצאה לפועל", enforced.map((l) => l.uid)), // per lender — see clientWorries
       where: Array.from(new Set(enforced.map((l) => l.bank))),
     });
   }
@@ -1405,7 +1579,7 @@ function buildFlags(a: Omit<Analysis, "flags" | "clientView">): Flag[] {
       severity: "high",
       title: "עסקאות בפיגור ללא תשלום כלל",
       detail: `${noPayment.length} עסקאות שלא התקבל בהן תשלום.`,
-      client: show("יש התחייבויות שלא שולם בהן דבר", noPayment.map((l) => l.uid)),
+      client: show("יש התחייבויות שלא שולם בהן דבר", noPayment.map((l) => l.uid)), // per lender — see clientWorries
       where: Array.from(new Set(noPayment.map((l) => l.bank))),
     });
   }
@@ -1419,9 +1593,11 @@ function buildFlags(a: Omit<Analysis, "flags" | "clientView">): Flag[] {
       title: 'שיקים שחזרו (אכ"מ)',
       detail: `${a.behaviour.checksReturned} שיקים חזרו מתוך ${a.behaviour.checksPresented || "—"} שהוצגו.`,
       client: show(
-        a.behaviour.checksReturned === 1
-          ? "שיק אחד חזר — פוגע בדירוג ומורגש בכל בקשה חדשה"
-          : `${a.behaviour.checksReturned} שיקים חזרו — פוגע בדירוג ומורגש בכל בקשה חדשה`
+        `${a.behaviour.checksReturned === 1 ? "שיק אחד חזר" : `${a.behaviour.checksReturned} שיקים חזרו`}${
+          a.behaviour.checksPresented ? ` מתוך ${a.behaviour.checksPresented} שהוצגו` : ""
+        }, לפי הדוח.`,
+        undefined,
+        { title: "שיקים שחזרו", next: "כדאי לברר את הסיבה ואם החוב הוסדר." }
       ),
     });
   }
@@ -1433,9 +1609,11 @@ function buildFlags(a: Omit<Analysis, "flags" | "clientView">): Flag[] {
       title: "הוראות קבע שלא כובדו",
       detail: `${a.behaviour.debitsDishonored} הוראות לחיוב חשבון לא כובדו מתוך ${a.behaviour.debitsPresented || "—"}.`,
       client: show(
-        a.behaviour.debitsDishonored === 1
-          ? "הוראת קבע אחת לא כובדה — סימן לתזרים לחוץ בחשבון"
-          : `${a.behaviour.debitsDishonored} הוראות קבע לא כובדו — סימן לתזרים לחוץ בחשבון`
+        `${a.behaviour.debitsDishonored === 1 ? "הוראת קבע אחת לא כובדה" : `${a.behaviour.debitsDishonored} הוראות קבע לא כובדו`}${
+          a.behaviour.debitsPresented ? ` מתוך ${a.behaviour.debitsPresented}` : ""
+        }, לפי הדוח.`,
+        undefined,
+        { title: "הוראות קבע שלא כובדו", next: "כדאי לברר לאילו חיובים הן שייכות ואם הוסדרו." }
       ),
     });
   }
@@ -1454,7 +1632,18 @@ function buildFlags(a: Omit<Analysis, "flags" | "clientView">): Flag[] {
         .filter(Boolean)
         .join(" ו")} בחשבונות שהלקוח ערב להם ואינו הבעלים. אינם התנהלותו, אך הם מצב החוב שהוא ערב לו.`,
       client: show(
-        "יש כשלי תשלום בחשבונות שאתם ערבים להם — לא ההתנהלות שלכם, אבל החוב שאתם ערבים לו"
+        `${[
+          gb.checksReturned > 0 ? (gb.checksReturned === 1 ? "שיק אחד חזר" : `${gb.checksReturned} שיקים חזרו`) : "",
+          gb.debitsDishonored > 0
+            ? gb.debitsDishonored === 1
+              ? "הוראת קבע אחת לא כובדה"
+              : `${gb.debitsDishonored} הוראות קבע לא כובדו`
+            : "",
+        ]
+          .filter(Boolean)
+          .join(" ו")} בחשבונות שאתם ערבים להם ואינם שלכם.`,
+        undefined,
+        { title: "כשלי תשלום בחשבונות בערבותכם", next: "כדאי לברר את מצב החוב שאתם ערבים לו." }
       ),
     });
   }
@@ -1483,16 +1672,27 @@ function buildFlags(a: Omit<Analysis, "flags" | "clientView">): Flag[] {
     const stretched = a.lines.filter(
       (l) => utilisationHeat(l.utilization === null ? null : l.utilization / 100) !== null
     );
+    // A balance above its own ceiling is a different fact from a high ratio, and
+    // is said separately, in shekels — the aggregate ratio can hide it.
+    const over = own.filter(
+      (l) => (l.category === "card" || l.category === "overdraft") && l.reported.limit && l.limit > 0 && l.balance > l.limit
+    );
+    const excess = over.reduce((s, l) => s + (l.balance - l.limit), 0);
+    const excessText =
+      excess > 0
+        ? ` ${over.length === 1 ? "במסגרת אחת" : `ב-${over.length} מסגרות`} היתרה גבוהה מהמסגרת המאושרת, ב-${money(excess)} ₪.`
+        : "";
     push({
       id: "revolving",
       target: { section: "revolving", uids: stretched.map((l) => l.uid) },
       severity: utilHeat === "hot" ? "high" : "medium",
       title: "ניצול מסגרות גבוה",
-      detail: `${a.revolving.utilization}% מהמסגרות המאושרות מנוצלות. ניצול מתמשך בשיעור כזה נקרא כמצוקת נזילות.`,
+      detail: `${a.revolving.utilization}% מהמסגרות המאושרות מנוצלות (${money(a.revolving.used)} ₪ מתוך ${money(a.revolving.limit)} ₪).${excessText}`,
       amount: a.revolving.used,
       client: show(
-        `המסגרות מנוצלות ב-${Math.round(a.revolving.utilization ?? 0)}% — כמעט ללא אוויר לנשימה בחשבון`,
-        stretched.map((l) => l.uid)
+        `נוצלו ${Math.round(a.revolving.utilization ?? 0)}% מהמסגרות המאושרות (${money(a.revolving.used)} ₪ מתוך ${money(a.revolving.limit)} ₪).${excessText}`,
+        stretched.map((l) => l.uid),
+        { title: "ניצול מסגרות", next: "כדאי לבדוק את הריבית על היתרה המנוצלת." }
       ),
     });
   }
@@ -1514,11 +1714,12 @@ function buildFlags(a: Omit<Analysis, "flags" | "clientView">): Flag[] {
       target: { section: "revolving", uids: noCeiling.map((l) => l.uid) },
       severity: "high",
       title: "יתרה ללא מסגרת מאושרת בדוח",
-      detail: `${Math.round(a.revolving.unlimitedBalance).toLocaleString("en-US")} ₪ נמצאים בחשבונות שהדוח אינו מציין להם מסגרת מאושרת. אין מול מה למדוד את הניצול, והיתרה עצמה היא חוב לכל דבר.`,
+      detail: `${Math.round(a.revolving.unlimitedBalance).toLocaleString("en-US")} ₪ נמצאים בחשבונות שהדוח אינו מציין להם מסגרת מאושרת. אין מול מה למדוד את הניצול; היתרה נספרת בסך ההתחייבויות.`,
       amount: a.revolving.unlimitedBalance,
       client: show(
-        `${Math.round(a.revolving.unlimitedBalance).toLocaleString("en-US")} ₪ ביתרת חובה בחשבון, בלי מסגרת מאושרת בדוח`,
-        noCeiling.map((l) => l.uid)
+        `${money(a.revolving.unlimitedBalance)} ₪ ביתרת חובה ${noCeiling.length === 1 ? "בחשבון שאין לו" : "בחשבונות שאין להם"} מסגרת מאושרת בדוח.`,
+        noCeiling.map((l) => l.uid),
+        { title: "יתרה ללא מסגרת מאושרת", next: "יש לברר אם קיימת מסגרת ומה הריבית על היתרה." }
       ),
     });
   }
@@ -1537,7 +1738,9 @@ function buildFlags(a: Omit<Analysis, "flags" | "clientView">): Flag[] {
       title: "שיא ניצול גבוה מהיתרה המוצגת",
       detail: `שיא הניצול במסגרות המאושרות היה ${Math.round(a.revolving.peak).toLocaleString("en-US")} ₪ מול יתרה מוצגת של ${Math.round(a.revolving.used).toLocaleString("en-US")} ₪ — המסגרת נוצלה כמעט במלואה במהלך החודש.`,
       client: show(
-        `במהלך החודש המסגרת נוצלה עד ${Math.round(a.revolving.peak).toLocaleString("en-US")} ₪ — גם אם ביום הדוח היא נראית פנויה`
+        `במהלך החודש נוצלו המסגרות עד ${money(a.revolving.peak)} ₪, לעומת יתרה של ${money(a.revolving.used)} ₪ ביום הדוח.`,
+        undefined,
+        { title: "שיא ניצול במהלך החודש", next: "כדאי לבדוק את התנועות בחשבון באותו חודש." }
       ),
       amount: a.revolving.peak,
     });
@@ -1558,12 +1761,15 @@ function buildFlags(a: Omit<Analysis, "flags" | "clientView">): Flag[] {
       title: "חיוב חודשי בכרטיסי אשראי ומסגרות",
       detail: `${Math.round(a.cards.monthlyCharge).toLocaleString("en-US")} ₪ בחודש על פני ${a.cards.count} מסגרות${
         share > 0 ? ` — ${Math.round(share * 100)}% מסך ההחזר החודשי` : ""
-      }. חיוב שאינו מופיע בתמהיל, אך יוצא מהחשבון בכל חודש.`,
+      }. חיוב שאינו מופיע בתמהיל.`,
+      // A CHARGE, as the report prints it (201-046) — not "יוצאים": what was paid
+      // is 201-048, and the rolled part is its own line.
       client: show(
-        `${Math.round(a.cards.monthlyCharge).toLocaleString("en-US")} ₪ בחודש יוצאים על כרטיסי אשראי ומסגרות`,
+        `לפי הדוח, החיוב החודשי בכרטיסי אשראי ובמסגרות הוא ${money(a.cards.monthlyCharge)} ₪.`,
         a.lines
           .filter((l) => l.role === "debtor" && (l.category === "card" || l.category === "overdraft"))
-          .map((l) => l.uid)
+          .map((l) => l.uid),
+        { title: "חיוב חודשי בכרטיסים ובמסגרות", next: "כדאי לבדוק אילו חיובים כלולים בו." }
       ),
       amount: a.cards.monthlyCharge,
     });
@@ -1577,10 +1783,11 @@ function buildFlags(a: Omit<Analysis, "flags" | "clientView">): Flag[] {
       },
       severity: "high",
       title: "חיוב שלא נפרע במלואו",
-      detail: `${Math.round(a.cards.rolled).toLocaleString("en-US")} ₪ מהחיוב החודשי לא שולמו בפועל וגולגלו קדימה. גלגול אשראי צרכני הוא האשראי היקר ביותר שיש.`,
+      detail: `${Math.round(a.cards.rolled).toLocaleString("en-US")} ₪ מהחיוב החודשי לא שולמו בפועל וגולגלו קדימה. יש לבדוק את הריבית החלה על הסכום שנותר.`,
       client: show(
-        `${Math.round(a.cards.rolled).toLocaleString("en-US")} ₪ מהחיוב בכרטיס לא נפרעו והתגלגלו לחודש הבא — זה האשראי היקר ביותר שיש`,
-        a.lines.filter((l) => l.monthly - l.paidActually > 1 && l.paidActually > 0).map((l) => l.uid)
+        `${money(a.cards.rolled)} ₪ מהחיוב בכרטיס לא נפרעו.`,
+        a.lines.filter((l) => l.monthly - l.paidActually > 1 && l.paidActually > 0).map((l) => l.uid),
+        { title: "חיוב שלא נפרע במלואו", next: "יש לבדוק את הריבית החלה על הסכום שנותר." }
       ),
       amount: a.cards.rolled,
     });
@@ -1600,12 +1807,13 @@ function buildFlags(a: Omit<Analysis, "flags" | "clientView">): Flag[] {
       // was the MAXIMUM of the set said the opposite of what it meant.
       detail: `${expensive.length} הלוואות בריבית ${
         cheapest === worst ? `${worst.toFixed(2)}%` : `${cheapest.toFixed(2)}%–${worst.toFixed(2)}%`
-      } — מועמדות ראשונות למיחזור לתוך המשכנתא.`,
+      }. כדאי לבדוק אם ניתן לשפר את התנאים, כולל מיחזור לתוך המשכנתא.`,
       client: show(
-        `${expensive.length === 1 ? "הלוואה אחת" : `${expensive.length} הלוואות`} בריבית ${
-          cheapest === worst ? `${worst.toFixed(1)}%` : `${cheapest.toFixed(1)}%–${worst.toFixed(1)}%`
-        } — ${expensive.length === 1 ? "אפשר למחזר אותה" : "אפשר למחזר אותן"} לריבית נמוכה בהרבה`,
-        expensive.map((l) => l.uid)
+        `${expensive.length === 1 ? "הלוואה אחת" : `${expensive.length} הלוואות`}, ביתרה של ${money(
+          expensive.reduce((s, l) => s + l.balance, 0)
+        )} ₪, בריבית של ${cheapest === worst ? `${worst.toFixed(1)}%` : `${cheapest.toFixed(1)}%–${worst.toFixed(1)}%`}.`,
+        expensive.map((l) => l.uid),
+        { title: "ריבית ההלוואות", next: "כדאי לבדוק אם ניתן לשפר את התנאים." }
       ),
       amount: expensive.reduce((s, l) => s + l.balance, 0),
       where: Array.from(new Set(expensive.map((l) => l.bank))),
@@ -1622,8 +1830,9 @@ function buildFlags(a: Omit<Analysis, "flags" | "clientView">): Flag[] {
       title: "הלוואות בלון",
       detail: `${balloons.length} התחייבויות שהקרן בהן נפרעת בסוף התקופה. ההחזר החודשי הנוכחי אינו משקף את החבות.`,
       client: show(
-        `${balloons.length === 1 ? "הלוואה אחת" : `${balloons.length} הלוואות`} מסוג בלון — הקרן כולה נפרעת בסוף, וההחזר החודשי היום אינו משקף את החוב`,
-        balloons.map((l) => l.uid)
+        `${debts(balloons.length)} מסוג בלון, ביתרה של ${money(balloons.reduce((s, l) => s + l.balance, 0))} ₪: הקרן נפרעת בסוף התקופה, וההחזר החודשי אינו כולל אותה.`,
+        balloons.map((l) => l.uid),
+        { title: "הלוואות בלון", next: "כדאי לבדוק את מועד הפירעון ואת הסכום שיידרש בו." }
       ),
       amount: balloons.reduce((s, l) => s + l.balance, 0),
       where: Array.from(new Set(balloons.map((l) => l.bank))),
@@ -1641,9 +1850,14 @@ function buildFlags(a: Omit<Analysis, "flags" | "clientView">): Flag[] {
       severity: "medium",
       title: "התחייבות שאינה נפרעת חודשית",
       detail: `${offCadence.length === 1 ? "התחייבות אחת נפרעת" : `${offCadence.length} התחייבויות נפרעות`} בתדירות ${Array.from(new Set(offCadence.map((l) => l.frequency.trim()))).join(", ")}. שדה 201-046 מציג 0 משום שאין תשלום חודשי — לא משום שהנתון חסר. ההחזר החודשי המוצג עבורן הוא שקילות חודשית שחושבה כאן.`,
+      // The cadence the report printed — it used to say "פעם בשנה" for every
+      // non-monthly debt, quarterly ones included.
       client: show(
-        `${offCadence.length === 1 ? "הלוואה אחת נפרעת" : `${offCadence.length} הלוואות נפרעות`} פעם בשנה ולא כל חודש — הסכום החודשי המוצג הוא ממוצע, בפועל התשלום יוצא במרוכז`,
-        offCadence.map((l) => l.uid)
+        `${offCadence.length === 1 ? "התחייבות אחת נפרעת" : `${offCadence.length} התחייבויות נפרעות`} שלא כל חודש (תדירות לפי הדוח: ${Array.from(
+          new Set(offCadence.map((l) => l.frequency.trim()))
+        ).join(", ")}). הסכום החודשי המוצג עבורן הוא ממוצע חודשי מחושב.`,
+        offCadence.map((l) => l.uid),
+        { title: "תשלום שאינו חודשי", next: "כדאי לוודא את מועד התשלום הבא ואת גובהו." }
       ),
       amount: offCadence.reduce((s, l) => s + l.balance, 0),
       where: Array.from(new Set(offCadence.map((l) => l.bank))),
@@ -1660,8 +1874,11 @@ function buildFlags(a: Omit<Analysis, "flags" | "clientView">): Flag[] {
       title: "מסלולים בריבית בלבד",
       detail: `${interestOnly.length} התחייבויות משלמות ריבית ללא קרן — היתרה אינה קטנה מדי חודש. הדוח אינו מציין עד מתי (201-055 ריק), ולכן מועד המעבר להחזר מלא וגובהו אינם ידועים מהמסמך.`,
       client: show(
-        `${interestOnly.length === 1 ? "מסלול אחד משלם" : `${interestOnly.length} מסלולים משלמים`} ריבית בלבד — הקרן לא יורדת, וההחזר צפוי לעלות כשתתחיל להיפרע`,
-        interestOnly.map((l) => l.uid)
+        `${interestOnly.length === 1 ? "התחייבות אחת משלמת" : `${interestOnly.length} התחייבויות משלמות`} ריבית בלבד, ביתרה של ${money(
+          interestOnly.reduce((s, l) => s + l.balance, 0)
+        )} ₪, והקרן אינה יורדת. הדוח אינו מציין מתי תתחיל פריעת הקרן.`,
+        interestOnly.map((l) => l.uid),
+        { title: "ריבית בלבד", next: "כדאי לברר זאת מול המלווה, ואת גובה ההחזר שיחול אז." }
       ),
       amount: interestOnly.reduce((s, l) => s + l.balance, 0),
       where: Array.from(new Set(interestOnly.map((l) => l.bank))),
@@ -1677,10 +1894,11 @@ function buildFlags(a: Omit<Analysis, "flags" | "clientView">): Flag[] {
         target: { section: "mortgage" },
         severity: varSeverity,
         title: "חשיפה גבוהה לריבית משתנה",
-        detail: `${Math.round(a.mortgage.variableShare * 100)}% מהמשכנתא במסלולים משתנים. כל עליית ריבית מתגלגלת כמעט במלואה להחזר.`,
-        client: show(
-          `${Math.round(a.mortgage.variableShare * 100)}% מהמשכנתא נע עם הריבית — אם הריבית תעלה, ההחזר יעלה`
-        ),
+        detail: `${Math.round(a.mortgage.variableShare * 100)}% מהמשכנתא במסלולים משתנים. ההחזר עשוי להשתנות במועדי עדכון הריבית.`,
+        client: show(`${Math.round(a.mortgage.variableShare * 100)}% מיתרת המשכנתא במסלולים בריבית משתנה.`, undefined, {
+          title: "ריבית משתנה",
+          next: "ההחזר עשוי להשתנות במועדי עדכון הריבית.",
+        }),
         amount: Math.round(a.mortgage.balance * a.mortgage.variableShare),
       });
     }
@@ -1690,10 +1908,11 @@ function buildFlags(a: Omit<Analysis, "flags" | "clientView">): Flag[] {
         target: { section: "mortgage" },
         severity: "medium",
         title: "חשיפה גבוהה למדד",
-        detail: `${Math.round(a.mortgage.linkedShare * 100)}% מהמשכנתא צמוד למדד — הקרן עצמה גדלה עם האינפלציה.`,
-        client: show(
-          `${Math.round(a.mortgage.linkedShare * 100)}% מהמשכנתא צמוד למדד — הקרן עצמה גדלה עם האינפלציה, לא רק ההחזר`
-        ),
+        detail: `${Math.round(a.mortgage.linkedShare * 100)}% מהמשכנתא צמודים למדד. עליית המדד מגדילה את הסכום הצמוד, לצד הפחתת החוב בתשלומים.`,
+        client: show(`${Math.round(a.mortgage.linkedShare * 100)}% מיתרת המשכנתא צמודים למדד.`, undefined, {
+          title: "הצמדה למדד",
+          next: "עליית המדד מגדילה את הסכום הצמוד, לצד הפחתת החוב בתשלומים.",
+        }),
         amount: Math.round(a.mortgage.balance * a.mortgage.linkedShare),
       });
     }
@@ -1703,9 +1922,11 @@ function buildFlags(a: Omit<Analysis, "flags" | "clientView">): Flag[] {
         target: { section: "mortgage" },
         severity: a.mortgage.ltv >= LTV_HIGH ? "high" : "medium",
         title: `יחס מימון ${Math.round(a.mortgage.ltv * 100)}%`,
-        detail: "יחס מימון גבוה מצמצם מאוד את מרחב המיחזור ואת הנכונות של בנקים להגדיל.",
+        detail: `יתרת המשכנתא ${money(a.mortgage.balance)} ₪ מול שווי בטוחות של ${money(a.mortgage.collateralValue)} ₪ בדוח. יש לבדוק את השווי העדכני ואת יחס המימון המותר במיחזור.`,
         client: show(
-          `המשכנתא מכסה ${Math.round((a.mortgage.ltv ?? 0) * 100)}% משווי הנכס — יחס גבוה שמצמצם את מרחב התמרון`
+          `יתרת המשכנתא היא ${Math.round((a.mortgage.ltv ?? 0) * 100)}% משווי הנכס הרשום בדוח.`,
+          undefined,
+          { title: "יחס מימון", next: "כדאי לוודא שהשווי בדוח עדכני." }
         ),
       });
     }
@@ -1718,9 +1939,11 @@ function buildFlags(a: Omit<Analysis, "flags" | "clientView">): Flag[] {
       target: { section: "consumer" },
       severity: "medium",
       title: "משקל גבוה להלוואות צרכניות",
-      detail: `${Math.round(a.consumer.shareOfMonthly * 100)}% מההחזר החודשי הולך להלוואות צרכניות ולא למשכנתא — הפוטנציאל הגדול ביותר לשיפור תזרים.`,
+      detail: `${Math.round(a.consumer.shareOfMonthly * 100)}% מההחזר החודשי הולך להלוואות צרכניות ולא למשכנתא. כדאי לבדוק את תנאי ההלוואות האלה.`,
       client: show(
-        `${Math.round(a.consumer.shareOfMonthly * 100)}% מההחזר החודשי הולך להלוואות צרכניות ולא למשכנתא`
+        `${Math.round(a.consumer.shareOfMonthly * 100)}% מההחזר החודשי (${money(a.consumer.monthly)} ₪) מיועדים להלוואות שאינן משכנתא.`,
+        undefined,
+        { title: "החזר על הלוואות", next: "כדאי לבדוק את תנאי ההלוואות האלה." }
       ),
       amount: a.consumer.monthly,
     });
@@ -1753,8 +1976,12 @@ function buildFlags(a: Omit<Analysis, "flags" | "clientView">): Flag[] {
       }`,
       client: show(
         mortgageAsk > 0
-          ? "קיימת בקשת משכנתה פתוחה אצל מלווה אחר — כדאי לברר מה הוצע שם לפני שמחליטים"
-          : "קיימות בקשות אשראי פתוחות שטרם אושרו — אם יאושרו, הן יתווספו לחוב"
+          ? `בדוח מופיעה בקשת משכנתה פתוחה אצל מלווה אחר, עד ${money(mortgageAsk)} ₪.`
+          : `בדוח מופיעות בקשות אשראי שטרם אושרו: ${parts.join(" · ")}. אם יאושרו, הן יתווספו להתחייבויות.`,
+        undefined,
+        mortgageAsk > 0
+          ? { title: "בקשת משכנתה פתוחה", next: "כדאי לברר מה הוצע שם." }
+          : { title: "בקשות אשראי פתוחות", next: "כדאי לברר את מצב הבקשות." }
       ),
       amount: mortgageAsk || undefined,
       where: Array.from(new Set(a.inquiries.pending.map((q) => q.user).filter(Boolean))),
@@ -1789,9 +2016,12 @@ function buildFlags(a: Omit<Analysis, "flags" | "clientView">): Flag[] {
       title: "ריבוי פניות בזמן קצר",
       detail: `${a.inquiries.last3} בקשות אשראי מטעם מלווים ב-${INQUIRY_WINDOW_MONTHS} החודשים האחרונים (${a.inquiries.last12} בשנה)${
         a.inquiries.selfPulls > 0 ? `, לא כולל ${a.inquiries.selfPulls} בקשות שהלקוח עצמו יזם` : ""
-      }. דפוס שנקרא כחיפוש אשראי.`,
+      }.`,
+      // Requests, not lenders: one lender can ask twice, and the count says so.
       client: show(
-        `${a.inquiries.last3} מלווים בדקו את הדוח בחודשים האחרונים — דפוס שנקרא כחיפוש אשראי ומוריד דירוג`
+        `${a.inquiries.last3} בקשות לעיון בדוח ב-${INQUIRY_WINDOW_MONTHS} החודשים שלפני תאריך הדוח (${a.inquiries.last12} ב-12 החודשים).`,
+        undefined,
+        { title: "בקשות לעיון בדוח", next: "כדאי לברר אילו מהבקשות הבשילו לאשראי." }
       ),
     });
   }
@@ -1808,7 +2038,9 @@ function buildFlags(a: Omit<Analysis, "flags" | "clientView">): Flag[] {
       title: "ערבויות",
       detail: `הלקוח ערב ל-${a.totals.guaranteedCount} התחייבויות. אינן החזר שלו, אך נחשבות חשיפה בבדיקת בנק.`,
       client: show(
-        `אתם ערבים ל-${a.totals.guaranteedCount} התחייבויות בסך ${Math.round(a.totals.guaranteedBalance).toLocaleString("en-US")} ₪ — לא ההחזר שלכם, אך הבנק מביא אותן בחשבון`
+        `אתם ערבים ל${a.totals.guaranteedCount === 1 ? "התחייבות אחת" : `-${a.totals.guaranteedCount} התחייבויות`} בסך ${money(a.totals.guaranteedBalance)} ₪, שאינן נכללות בסך ההתחייבויות.`,
+        undefined,
+        { title: "ערבויות", next: "כדאי לבדוק את מצב ההחזר שלהן." }
       ),
       amount: a.totals.guaranteedBalance,
     });
@@ -1826,7 +2058,9 @@ function buildFlags(a: Omit<Analysis, "flags" | "clientView">): Flag[] {
       title: "ערבות הדדית בתוך המשק",
       detail: `${a.totals.guaranteedInternalCount} התחייבויות שהלקוח ערב להן נלקחו על ידי אדם אחר בדוחות שנטענו. הן כבר נספרות כחוב של המשק, ולא נוספו שוב כחשיפה.`,
       client: show(
-        `${a.totals.guaranteedInternalCount === 1 ? "התחייבות אחת שאתם ערבים לה נלקחה" : `${a.totals.guaranteedInternalCount} התחייבויות שאתם ערבים להן נלקחו`} על ידי בן/בת הזוג — הן כבר נכללות בסכומים למעלה ולא נספרו פעמיים`
+        `${a.totals.guaranteedInternalCount === 1 ? "התחייבות אחת שאתם ערבים לה נלקחה" : `${a.totals.guaranteedInternalCount} התחייבויות שאתם ערבים להן נלקחו`} על ידי בן/בת הזוג. הן כבר נכללות בסכומים שלמעלה ולא נספרו פעמיים.`,
+        undefined,
+        { title: "ערבות בתוך המשפחה" }
       ),
     });
   }

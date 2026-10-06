@@ -8,8 +8,8 @@
 // much is fixed and safe.
 //
 // Two numbers a client asks for that the credit report can never answer: what it
-// would cost to close this mortgage today, and how much of that is a penalty.
-// Both are stated here.
+// would cost to close this mortgage, and how much of that is a penalty. Both are
+// stated here — as of the document's date, which is the only date they are true on.
 
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
@@ -18,7 +18,7 @@ import { Printer, X } from "@phosphor-icons/react";
 import { Worries } from "./ClientSummaryModal";
 import { BankIcon } from "./bankIcons";
 import Money, { fmt } from "./Money";
-import { noteOf, rateHeat } from "@/lib/verdicts";
+import { rateHeat } from "@/lib/verdicts";
 import {
   TRACK_COLOR,
   TRACK_LABEL,
@@ -76,11 +76,10 @@ export default function StatementSummaryModal({
   // it first to the advisor.
   const rows = a.tracks;
 
-  // Projected from the engine's own findings, severity-ordered, rather than a
-  // second list written here with its own thresholds.
-  const worries = a.findings
-    .map((f) => ({ note: noteOf(f.client), severity: f.severity }))
-    .filter((x): x is { note: { say: string }; severity: typeof x.severity } => x.note !== null);
+  // Projected from the engine's own findings — grouped, overlaps folded — rather
+  // than a second list written here with its own thresholds.
+  const worries = a.clientWorries;
+  const asOf = st.statementDate ? `נכון ל-${st.statementDate}` : "נכון לתאריך המסמך";
 
   return createPortal(
     <div
@@ -151,9 +150,12 @@ export default function StatementSummaryModal({
                   <div className="min-w-0 flex-1">
                     <div className="lgr-cs-bank">{TRACK_LABEL[r.key] ?? r.label}</div>
                     <div className="lgr-cs-meta">
+                      {/* A slice of several tranches carries the LONGEST term and a
+                          balance-weighted rate — said as such, not as if every
+                          tranche ran that long at that rate. */}
                       {[
                         TRACK_PLAIN[r.key],
-                        r.years ? `עוד כ-${r.years} שנים` : "",
+                        r.years ? (r.count > 1 ? `המסלול האחרון מסתיים בעוד כ-${r.years} שנים` : `עוד כ-${r.years} שנים`) : "",
                         r.count > 1 ? `${r.count} מסלולים` : "",
                       ]
                         .filter(Boolean)
@@ -161,7 +163,9 @@ export default function StatementSummaryModal({
                       {r.rate !== null && (
                         <>
                           {" · "}
-                          <span className={r.dear ? "lgr-cs-warn" : undefined}>ריבית {r.rate.toFixed(2)}%</span>
+                          <span className={r.dear ? "lgr-cs-warn" : undefined}>
+                            {r.count > 1 ? "ריבית ממוצעת משוקללת" : "ריבית"} {r.rate.toFixed(2)}%
+                          </span>
                         </>
                       )}
                       {/* When only some of the slice is expensive, the average rate
@@ -188,15 +192,19 @@ export default function StatementSummaryModal({
           </section>
 
           {/* The two questions a client always asks, and the credit report cannot
-              answer: what would it cost to end this today, and how much of that
-              is a penalty rather than the debt itself. */}
+              answer: what would it cost to end this, and how much of that is a
+              penalty rather than the debt itself. Dated to the document — a
+              payoff figure moves every day, and "היום" on a letter weeks old
+              promised a number nobody had quoted. */}
           <section className="lgr-cs-group">
             <h3 className="lgr-cs-title" style={{ ["--fam" as string]: "#0d8b9b" }}>
-              אם תרצו לסלק את המשכנתא היום
+              סילוק המשכנתא לפי המסמך
             </h3>
             <div className="lgr-facts" style={{ padding: "6px 2px 2px" }}>
               <div>
-                <div className="lgr-cs-foot-cap">סכום לסילוק מלא</div>
+                <div className="lgr-cs-foot-cap">
+                  {st.statementDate ? `סכום לסילוק נכון ל-${st.statementDate}` : "סכום לסילוק לפי המסמך"}
+                </div>
                 <Money value={a.totals.payoff} size={19} weight={800} />
               </div>
               {/* The payoff is more than the balance by two things — the fee, and
@@ -217,22 +225,36 @@ export default function StatementSummaryModal({
                   weight={800}
                   color={a.totals.breakFee > 0 ? "var(--neg)" : undefined}
                 />
+                {/* A blank fee cell is not a zero fee; the total says it is short. */}
+                {a.feeUnreported.length > 0 && (
+                  <div className="lgr-cs-note">
+                    הסכום חלקי: לא דווחה עמלה עבור{" "}
+                    {a.feeUnreported.length === 1 ? "מסלול אחד" : `${a.feeUnreported.length} מסלולים`}
+                  </div>
+                )}
               </div>
+              {/* Only tranches whose fee the letter PRINTS as zero. The breakFee
+                  is the tranche's whole early-repayment fee (סה"כ עמלת פרעון
+                  מוקדם), not just its היוון part, so the label can say so; the
+                  loan-level operational fee is separate and named. */}
               {a.freeToBreak.length > 0 && (
                 <div>
-                  <div className="lgr-cs-foot-cap">ניתן להזיז בלי עמלה</div>
+                  <div className="lgr-cs-foot-cap">יתרה ללא עמלת פירעון מוקדם לפי המסמך</div>
                   <Money
                     value={a.freeToBreak.reduce((s, t) => s + (t.balance ?? 0), 0)}
                     size={19}
                     weight={800}
                     color="var(--pos)"
                   />
+                  {a.totals.operationalFee > 0 && (
+                    <div className="lgr-cs-note">לא כולל עמלה תפעולית של {fmt(a.totals.operationalFee)} ₪ להלוואה</div>
+                  )}
                 </div>
               )}
             </div>
           </section>
 
-          {worries.length > 0 && <Worries items={worries.map((w) => ({ say: w.note.say, severity: w.severity }))} />}
+          {worries.length > 0 && <Worries items={worries} />}
         </div>
 
         <footer className="lgr-cs-foot">
@@ -240,9 +262,18 @@ export default function StatementSummaryModal({
             <div className="lgr-cs-foot-cap">יתרת המשכנתא</div>
             <Money value={a.totals.balance} size={19} weight={800} style={{ textAlign: "start" }} block={false} />
           </div>
+          {/* The scheduled instalment the letter prints, as of its date — not a
+              statement about what left the account. */}
           <div className="text-end">
-            <div className="lgr-cs-foot-cap">יוצא מהחשבון כל חודש</div>
+            <div className="lgr-cs-foot-cap">החזר חודשי לפי המסמך</div>
             <Money value={a.totals.monthly} size={22} weight={800} style={{ textAlign: "start" }} block={false} />
+            <div className="lgr-cs-none">{asOf}</div>
+            {a.monthlyUnreported > 0 && (
+              <div className="lgr-cs-none">
+                הסכום חלקי: לא דווח החזר עבור{" "}
+                {a.monthlyUnreported === 1 ? "מסלול אחד" : `${a.monthlyUnreported} מסלולים`}
+              </div>
+            )}
           </div>
         </footer>
       </motion.div>

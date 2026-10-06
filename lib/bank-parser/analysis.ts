@@ -16,7 +16,15 @@ import {
   type Linkage,
   type RateKind,
 } from "./types";
-import { show, silent, type ClientDisposition } from "@/lib/verdicts";
+import {
+  mergeWorries,
+  orderWorries,
+  show,
+  silent,
+  worryOf,
+  type ClientDisposition,
+  type ClientWorry,
+} from "@/lib/verdicts";
 import { toDate, monthsBetween } from "./text";
 import {
   BREAK_FEE_RATIO_HIGH,
@@ -95,18 +103,26 @@ export interface TrackSlice {
 
 export interface RecycleCandidate {
   tranche: BankTranche;
-  /** Break fee as a share of the tranche balance. */
-  feeRatio: number;
+  /** Break fee as a share of the tranche balance. null when no fee was printed. */
+  feeRatio: number | null;
   /**
    * Months of the current rate that the break fee is worth.
    *
    * The honest way to rank a recycle: a fee equal to two months of interest on
    * a 7% tranche is cheap, the same fee on a 2% tranche is not. Comparing fees
    * in shekels across tranches of different sizes and rates says nothing.
+   *
+   * null when the statement prints no fee for the tranche. That is a gap, not a
+   * zero: it used to be read as 0 and ranked the tranche among the cheapest exits.
    */
   feeInMonthsOfInterest: number | null;
-  /** How much interest the tranche still has left to run, undiscounted. */
+  /**
+   * An ESTIMATE of the interest still to run, assuming the current instalment
+   * holds to term — see remainingInterest(). null where that assumption does not
+   * fit the schedule; `remainingInterestWhy` then says why.
+   */
   remainingInterest: number | null;
+  remainingInterestWhy?: string;
 }
 
 export const TRACK_LABEL: Record<string, string> = {
@@ -172,11 +188,34 @@ export interface StatementAnalysis {
   };
   /** Ranked best-first: high rate, cheap to break. */
   recycle: RecycleCandidate[];
-  /** Tranches with no break fee at all — free to move. */
+  /**
+   * Tranches whose break fee the statement prints as zero.
+   *
+   * ONLY a printed zero. A tranche with no fee on the page at all used to land
+   * here too, so a letter that simply left the cell blank told the client those
+   * shekels could move "בלי עמלה" — a claim the document never made.
+   */
   freeToBreak: BankTranche[];
+  /** Tranches with no break fee printed at all. Not free — unknown. */
+  feeUnreported: BankTranche[];
+  /**
+   * Whether the lender's own loan-level fee total already equals the fees it did
+   * print per tranche (plus the operational fee) for every loan holding an
+   * unreported tranche — i.e. its own arithmetic leaves nothing for the blanks.
+   * Evidence worth stating beside the gap; still not a reason to call them zero.
+   */
+  feeUnreportedCovered: boolean;
+  /** Tranches with no monthly repayment printed — the monthly total is partial. */
+  monthlyUnreported: number;
   /** Rate resets inside a year, soonest first. */
   upcomingResets: BankTranche[];
   findings: Finding[];
+  /**
+   * The findings as the client page reads them: grouped, overlapping ones folded
+   * together, each a heading + the figure + the next check. Built here so the
+   * page selects nothing.
+   */
+  clientWorries: ClientWorry[];
   warnings: string[];
 }
 
@@ -197,14 +236,20 @@ function weighted(rows: { balance: number | null; value: number | null }[]): num
 /**
  * Interest still to be paid if the tranche runs to term, undiscounted.
  *
- * Total payments minus the balance. Rough by construction — it assumes the rate
- * holds, which for a variable tranche it will not — but it is the right order of
- * magnitude for weighing a break fee against what the tranche still costs.
+ * Current instalment × months left, minus the balance. Rough by construction — it
+ * assumes the instalment holds, which for a variable or linked tranche it will not
+ * — and the page says so beside the figure. Where the schedule itself says the
+ * instalment is not level (a balloon repays the principal at the end, קרן שווה
+ * shrinks every month) the same arithmetic is not rough but wrong, so it is not
+ * offered at all; nor where the instalments would not even cover the balance.
  */
-function remainingInterest(t: BankTranche): number | null {
-  if (!t.monthly || !t.months || !t.balance) return null;
+function remainingInterest(t: BankTranche): { value: number | null; why?: string } {
+  if (!t.monthly || !t.months || !t.balance) return { value: null };
+  if (/בלון|בולט/.test(t.amortization)) return { value: null, why: "מסלול בלון — ההחזר החודשי אינו כולל את הקרן" };
+  if (/קרן\s*שווה/.test(t.amortization)) return { value: null, why: "קרן שווה — ההחזר יורד מחודש לחודש" };
   const total = t.monthly * t.months;
-  return Math.max(0, Math.round(total - t.balance));
+  if (total < t.balance) return { value: null, why: "ההחזר הנוכחי אינו מכסה את היתרה בתקופה שנותרה" };
+  return { value: Math.round(total - t.balance) };
 }
 
 /** Where a mortgage rate stops being ordinary, by track. */
@@ -281,14 +326,19 @@ export function analyseStatement(st: BankStatement): StatementAnalysis {
   /* ---- recycle ranking */
   const recycle: RecycleCandidate[] = live
     .map((t) => {
-      const fee = t.breakFee ?? 0;
+      // An unprinted fee stays unknown all the way down — no ratio, no ranking
+      // as a cheap exit. It sorts after every priced tranche of a similar rate.
+      const fee = t.breakFee;
       const b = t.balance ?? 0;
       const monthlyInterest = b && t.rate ? (b * (t.rate / 100)) / 12 : 0;
+      const ri = remainingInterest(t);
       return {
         tranche: t,
-        feeRatio: b > 0 ? fee / b : 0,
-        feeInMonthsOfInterest: monthlyInterest > 0 ? Math.round((fee / monthlyInterest) * 10) / 10 : null,
-        remainingInterest: remainingInterest(t),
+        feeRatio: fee === null ? null : b > 0 ? fee / b : 0,
+        feeInMonthsOfInterest:
+          fee === null || monthlyInterest <= 0 ? null : Math.round((fee / monthlyInterest) * 10) / 10,
+        remainingInterest: ri.value,
+        remainingInterestWhy: ri.why,
       };
     })
     // Worth moving = expensive money that is cheap to escape. Sorted by rate
@@ -334,14 +384,51 @@ export function analyseStatement(st: BankStatement): StatementAnalysis {
       indexationDrag: principal > 0 ? indexation / principal : 0,
     },
     recycle,
-    freeToBreak: live.filter((t) => (t.breakFee ?? 0) === 0),
+    freeToBreak: live.filter((t) => t.breakFee === 0),
+    feeUnreported: live.filter((t) => t.breakFee === null),
+    feeUnreportedCovered: (() => {
+      const loans = st.loans.filter((l) => l.tranches.some((t) => (t.balance ?? 0) > 0 && t.breakFee === null));
+      return (
+        loans.length > 0 &&
+        loans.every((l) => {
+          if (l.printed.breakFee === null) return false;
+          const printedFees = l.tranches.reduce((s, t) => s + (t.breakFee ?? 0), 0);
+          const op = l.printed.operationalFee ?? 0;
+          return (
+            Math.abs(l.printed.breakFee - printedFees) <= 1 ||
+            Math.abs(l.printed.breakFee - printedFees - op) <= 1
+          );
+        })
+      );
+    })(),
+    monthlyUnreported: live.filter((t) => !t.monthly).length,
     upcomingResets,
     findings: [],
+    clientWorries: [],
     warnings: st.warnings,
   };
 
   analysis.findings = buildFindings(analysis);
+  analysis.clientWorries = buildClientWorries(analysis);
   return analysis;
+}
+
+/**
+ * The client page's list, from the findings.
+ *
+ * Two pairs describe the same tranches from two sides and read as repetition on
+ * a page a client takes in at a glance: the variable share and the resets inside
+ * it, and the linked share and the indexation already accrued on it. Each pair
+ * becomes one line, every figure kept.
+ */
+function buildClientWorries(a: StatementAnalysis): ClientWorry[] {
+  const items = a.findings.map(worryOf).filter((w): w is ClientWorry => w !== null);
+  return orderWorries(
+    mergeWorries(items, [
+      { ids: ["variable", "resets"], title: "ריבית משתנה" },
+      { ids: ["linked", "indexation"], title: "הצמדה למדד" },
+    ])
+  );
 }
 
 /* ---------------------------------------------------------------- findings */
@@ -351,23 +438,50 @@ function buildFindings(a: StatementAnalysis): Finding[] {
   const push = (f: Finding) => out.push(f);
   const money = (n: number) => Math.round(n).toLocaleString("en-US");
   const pc = (n: number) => `${Math.round(n * 100)}%`;
+  const date = a.statement.statementDate;
+  // Every balance and fee on the page is as of the document, never "today" —
+  // a fee quoted on a letter three weeks old is not what closing costs now.
+  const asOf = date ? `נכון ל-${date}` : "נכון לתאריך המסמך";
+  const tranches = (n: number) => (n === 1 ? "מסלול אחד" : `${n} מסלולים`);
+  const inTranches = (n: number) => (n === 1 ? "במסלול אחד" : `ב-${n} מסלולים`);
+  const forTranches = (n: number) => (n === 1 ? "למסלול אחד" : `ל-${n} מסלולים`);
+  const noFee = (n: number) => (n === 1 ? "מסלול אחד שלא דווחה לו עמלה" : `${n} מסלולים שלא דווחה להם עמלה`);
+  const rateRange = (rs: number[]) => {
+    const lo = Math.min(...rs);
+    const hi = Math.max(...rs);
+    return lo === hi ? `${lo.toFixed(2)}%` : `${lo.toFixed(2)}%–${hi.toFixed(2)}%`;
+  };
+  const balanceOf = (ts: BankTranche[]) => ts.reduce((s, t) => s + (t.balance ?? 0), 0);
+  const soonest = (ts: BankTranche[]) =>
+    ts
+      .map((t) => t.nextReset)
+      .filter((d) => !!toDate(d))
+      .sort((x, y) => (toDate(x)?.getTime() ?? 0) - (toDate(y)?.getTime() ?? 0))[0] ?? "";
 
   /* ---- arrears first: nothing else matters until it is cleared */
   if (a.totals.arrears > 0) {
     const late = a.live.filter((t) => (t.arrears ?? 0) > 0);
     push({
       id: "arrears",
-      client: show(`יש פיגור בתשלומים — ${money(a.totals.arrears)} ₪ שלא שולמו`, late.map((t) => t.uid)),
+      client: show(
+        `במסמך מופיע סכום של ${money(a.totals.arrears)} ₪ בפיגור ${inTranches(late.length)}, ${asOf}.`,
+        late.map((t) => t.uid),
+        { title: `פיגור בתשלומים — ${a.statement.bankLabel}`, next: "יש לברר אם הפיגור הוסדר מאז תאריך המסמך." }
+      ),
       severity: "critical",
       section: "tranches",
       title: "פיגור בתשלומים",
-      detail: `${money(a.totals.arrears)} ₪ בפיגור על ${late.length === 1 ? "מסלול אחד" : `${late.length} מסלולים`}. פיגור פתוח חוסם מיחזור ומופיע בדירוג האשראי.`,
+      // The amount sits beside the title; the sentence says where and what to check.
+      // "פיגור פתוח חוסם מיחזור" was a verdict the statement cannot support.
+      detail: `הפיגור רשום ${inTranches(late.length)}, ${asOf}. יש לברר אם הוסדר מאז, ולבדוק את השפעתו על אפשרות המיחזור.`,
       amount: a.totals.arrears,
       uids: late.map((t) => t.uid),
     });
   }
 
   /* ---- the recycle case, stated in the terms it is actually decided on */
+  // A first screen, not a verdict: the rate and the fee-to-interest ratio are on
+  // the page; the saving depends on an alternative offer the statement does not hold.
   const dear = a.recycle.filter((c) => isDear(c.tranche));
   if (dear.length) {
     const cheap = dear.filter((c) => (c.feeInMonthsOfInterest ?? 99) <= FEE_MONTHS_OF_INTEREST_CHEAP);
@@ -376,51 +490,109 @@ function buildFindings(a: StatementAnalysis): Finding[] {
     // ומעלה" — every tranche it counted was at or below that figure.
     const set = cheap.length ? cheap : dear;
     const rates = set.map((c) => c.tranche.rate ?? 0).filter((r) => r > 0);
-    const from = rates.length ? Math.min(...rates) : 0;
+    const range = rates.length ? rateRange(rates) : "";
+    const unreported = set.filter((c) => c.tranche.breakFee === null).length;
+    const next = soonest(set.map((c) => c.tranche));
+    const feeClause =
+      unreported === 0
+        ? `שעמלת הפירעון בהם גבוהה מ-${FEE_MONTHS_OF_INTEREST_CHEAP} חודשי ריבית`
+        : unreported === set.length
+          ? "שלא דווחה להם עמלת פירעון"
+          : `שעמלת הפירעון בהם גבוהה מ-${FEE_MONTHS_OF_INTEREST_CHEAP} חודשי ריבית או לא דווחה`;
     push({
       id: "recycle",
       client: show(
-        `${set.length === 1 ? "מסלול אחד" : `${set.length} מסלולים`} בריבית גבוהה — כדאי לבדוק מיחזור`,
-        set.map((c) => c.tranche.uid)
+        `${tranches(set.length)}, ביתרה של ${money(balanceOf(set.map((c) => c.tranche)))} ₪, בריבית של ${range}.`,
+        set.map((c) => c.tranche.uid),
+        { title: "מסלולים בריבית גבוהה", next: "כדאי לבדוק אם ניתן לשפר את התנאים." }
       ),
       severity: cheap.length ? "high" : "medium",
       section: "recycle",
-      title: cheap.length ? "מסלולים יקרים שזול לצאת מהם" : "מסלולים בריבית גבוהה",
+      title: cheap.length ? "מסלולים בריבית גבוהה ובעמלת פירעון יחסית נמוכה" : "מסלולים בריבית גבוהה",
       detail: cheap.length
-        ? `${set.length === 1 ? "מסלול אחד" : `${set.length} מסלולים`} בריבית ${from.toFixed(2)}% ומעלה שעמלת היציאה מהם שווה עד ${FEE_MONTHS_OF_INTEREST_CHEAP} חודשי ריבית — המועמדים הראשונים למיחזור.`
-        : `${set.length === 1 ? "מסלול אחד" : `${set.length} מסלולים`} בריבית ${from.toFixed(2)}% ומעלה, אך עמלת היציאה מהם משמעותית. כדאי לבדוק מיחזור סמוך למועד שינוי ריבית, שבו העמלה יורדת.`,
-      amount: set.reduce((s, c) => s + (c.tranche.balance ?? 0), 0),
+        ? `${tranches(set.length)} בריבית ${range}, שעמלת הפירעון בכל אחד מהם היא עד ${FEE_MONTHS_OF_INTEREST_CHEAP} חודשי ריבית, לפי היתרה והריבית הנוכחיות. לבדיקת חיסכון יש להשוות להצעה חלופית, כולל התקופה והעלויות הנלוות.`
+        : `${tranches(set.length)} בריבית ${range}, ${feeClause}. ${
+            next
+              ? `מועד עדכון הריבית הבא הוא ${next}; יש לבדוק מול הבנק את עמלת הפירעון הצפויה במועד זה.`
+              : "יש לבדוק מול הבנק את עמלת הפירעון הצפויה במועדי עדכון הריבית."
+          }`,
+      amount: balanceOf(set.map((c) => c.tranche)),
       uids: set.map((c) => c.tranche.uid),
     });
   }
 
-  /* ---- free exits are pure opportunity and easy to miss */
+  /* ---- a printed zero fee — and only a printed one */
   if (a.freeToBreak.length) {
-    const b = a.freeToBreak.reduce((s, t) => s + (t.balance ?? 0), 0);
+    const b = balanceOf(a.freeToBreak);
+    const op = a.totals.operationalFee;
     push({
       id: "free",
-      client: show(`${money(b)} ₪ מהמשכנתא ניתן להזיז לבנק אחר בלי עמלת יציאה`, a.freeToBreak.map((t) => t.uid)),
+      client: show(
+        `לפי המסמך, ${money(b)} ₪ מהמשכנתא ${inTranches(a.freeToBreak.length)} ללא עמלת פירעון מוקדם.`,
+        a.freeToBreak.map((t) => t.uid),
+        {
+          title: "יתרה ללא עמלת פירעון מוקדם",
+          next: op
+            ? `עמלה תפעולית של ${money(op)} ₪ חלה ברמת ההלוואה; עלויות אחרות של העברה, אם יש, אינן מופיעות במסמך.`
+            : "עלויות אחרות של העברה, אם יש, אינן מופיעות במסמך.",
+        }
+      ),
       severity: "info",
       section: "fees",
-      title: "מסלולים בלי עמלת פירעון",
-      detail: `${money(b)} ₪ ב-${a.freeToBreak.length} מסלולים שאין עליהם עמלת פירעון מוקדם — ניתן להזיז אותם ללא עלות יציאה.`,
+      title: "מסלולים ללא עמלת פירעון לפי המסמך",
+      detail: `המסמך מציין עמלת פירעון מוקדם של 0 ₪ ${inTranches(a.freeToBreak.length)}${
+        op ? `; עמלה תפעולית של ${money(op)} ₪ חלה ברמת ההלוואה` : ""
+      }. היעדר עמלה למסלול אינו מכסה עלויות נלוות של העברה; יש לבדוק אותן לפני החלטה.`,
       amount: b,
       uids: a.freeToBreak.map((t) => t.uid),
+    });
+  }
+
+  /* ---- a fee the statement does not state is not a zero fee */
+  if (a.feeUnreported.length) {
+    const b = balanceOf(a.feeUnreported);
+    push({
+      id: "fee-unreported",
+      client: show(
+        `במסמך לא מופיעה עמלת פירעון מוקדם ${forTranches(a.feeUnreported.length)}, ביתרה של ${money(b)} ₪, ולכן סכום העמלה הכולל חלקי.`,
+        a.feeUnreported.map((t) => t.uid),
+        {
+          title: "עמלת פירעון שלא דווחה",
+          next: a.feeUnreported.length === 1 ? "כדאי לבקש מהבנק את העמלה למסלול זה." : "כדאי לבקש מהבנק את העמלה למסלולים אלה.",
+        }
+      ),
+      severity: "info",
+      section: "tranches",
+      title: "עמלת פירעון שלא דווחה",
+      detail: `במסמך לא מופיעה עמלת פירעון ${forTranches(a.feeUnreported.length)}, ולכן אין להניח שהעמלה ${
+        a.feeUnreported.length === 1 ? "בו" : "בהם"
+      } היא 0${
+        a.feeUnreportedCovered
+          ? ". סך העמלה שהבנק הדפיס להלוואה שווה לסכום העמלות שדווחו, כך שייתכן שהעמלה אכן 0"
+          : ""
+      }. יש לאמת את הסכום מול הבנק.`,
+      amount: b,
+      uids: a.feeUnreported.map((t) => t.uid),
     });
   }
 
   /* ---- what it costs to get out, as a whole */
   if (a.totals.breakFee > 0) {
     const ratio = a.totals.balance > 0 ? a.totals.breakFee / a.totals.balance : 0;
+    const partial = a.feeUnreported.length;
     push({
       id: "breakfee",
-      client: show(`סילוק מלא היום יעלה ${money(a.totals.breakFee)} ₪ בעמלת פירעון מוקדם`),
+      client: show(
+        `עמלת הפירעון המוקדם לסילוק מלא היא ${money(a.totals.breakFee)} ₪, ${asOf}${partial ? `, לא כולל ${noFee(partial)}` : ""}.`,
+        undefined,
+        { title: "עמלת פירעון מוקדם", next: "העמלה משתנה מיום ליום; לפני החלטה יש לבקש מהבנק סכום מעודכן." }
+      ),
       severity: ratio >= BREAK_FEE_RATIO_HIGH ? "high" : ratio >= BREAK_FEE_RATIO_MEDIUM ? "medium" : "info",
       section: "fees",
       title: "עמלת פירעון מוקדם",
-      detail: `${money(a.totals.breakFee)} ₪ לסילוק מלא היום — ${(ratio * 100).toFixed(2)}% מהיתרה${
+      detail: `${(ratio * 100).toFixed(2)}% מהיתרה, ${asOf}${
         a.totals.operationalFee ? `, כולל עמלה תפעולית של ${money(a.totals.operationalFee)} ₪` : ""
-      }.`,
+      }${partial ? `; לא כולל ${noFee(partial)}` : ""}. העמלה משתנה מיום ליום; לפני החלטה יש לבקש מהבנק סכום מעודכן.`,
       amount: a.totals.breakFee,
     });
   }
@@ -430,49 +602,56 @@ function buildFindings(a: StatementAnalysis): Finding[] {
   if (varSeverity) {
     push({
       id: "variable",
-      client: show(
-        `${pc(a.exposure.variableShare)} מהמשכנתא נע עם הריבית — אם הריבית תעלה, ההחזר יעלה`
-      ),
+      client: show(`${pc(a.exposure.variableShare)} מיתרת המשכנתא במסלולים בריבית משתנה.`, undefined, {
+        title: "ריבית משתנה",
+        next: "ההחזר עשוי להשתנות במועדי עדכון הריבית.",
+      }),
       severity: varSeverity,
       section: "mix",
-      title: "חשיפה גבוהה לריבית משתנה",
+      title: "חשיפה לריבית משתנה",
       detail: `${pc(a.exposure.variableShare)} מהיתרה במסלולים משתנים${
         a.exposure.primeShare > 0 ? ` (מהם ${pc(a.exposure.primeShare)} פריים)` : ""
-      }. כל עליית ריבית מתגלגלת כמעט במלואה להחזר.`,
+      }. ההחזר עשוי להשתנות במועדי עדכון הריבית.`,
       amount: Math.round(a.totals.balance * a.exposure.variableShare),
     });
   }
 
   if (a.exposure.resettingWithinYear > 0) {
-    const soonest = a.upcomingResets[0];
+    const first = soonest(a.upcomingResets) || a.upcomingResets[0]?.nextReset || "";
     push({
       id: "resets",
       client: show(
-        `${money(a.exposure.resettingWithinYear)} ₪ מהמשכנתא יתעדכנו בריבית חדשה בשנה הקרובה${
-          a.upcomingResets[0]?.nextReset ? `, הראשון ב-${a.upcomingResets[0].nextReset}` : ""
-        }`,
-        a.upcomingResets.map((t) => t.uid)
+        `${money(a.exposure.resettingWithinYear)} ₪ מהמשכנתא יעברו עדכון ריבית ב-${RESET_HORIZON_MONTHS} החודשים שלאחר תאריך המסמך${
+          first ? `, הראשון ב-${first}` : ""
+        }.`,
+        a.upcomingResets.map((t) => t.uid),
+        { title: "עדכון ריבית", next: "כדאי לבדוק לפני מועד העדכון את עמלת הפירעון הצפויה בו." }
       ),
       severity: a.exposure.resettingWithinYear / (a.totals.balance || 1) >= RESET_SHARE_HIGH ? "high" : "medium",
       section: "resets",
-      title: "שינוי ריבית בתוך שנה",
-      detail: `${money(a.exposure.resettingWithinYear)} ₪ מהיתרה יעברו עדכון ריבית בשנה הקרובה${
-        soonest?.nextReset ? `, הראשון ב-${soonest.nextReset}` : ""
-      }. מועד שינוי הריבית הוא גם המועד שבו עמלת ההיוון מתאפסת — חלון המיחזור הזול.`,
+      title: `עדכון ריבית ב-${RESET_HORIZON_MONTHS} החודשים שלאחר תאריך המסמך`,
+      // Was: "…עמלת ההיוון מתאפסת — חלון המיחזור הזול." The date is a fact on the
+      // page; what the fee will be on it is a question for the bank.
+      detail: `${tranches(a.upcomingResets.length)} עם עדכון ריבית בתקופה זו.${
+        first ? ` מועד העדכון הקרוב הוא ${first}; יש לבדוק מול הבנק את עמלת הפירעון הצפויה במועד זה.` : ""
+      }`,
       amount: a.exposure.resettingWithinYear,
       uids: a.upcomingResets.map((t) => t.uid),
     });
   }
 
-  /* ---- inflation risk, and what it has already cost */
+  /* ---- inflation risk, and what it has already added */
   if (linkedIsHigh(a.exposure.linkedShare)) {
     push({
       id: "linked",
-      client: show(`${pc(a.exposure.linkedShare)} מהמשכנתא צמוד למדד — הקרן עצמה גדלה עם האינפלציה, לא רק ההחזר`),
+      client: show(`${pc(a.exposure.linkedShare)} מיתרת המשכנתא צמודים למדד.`, undefined, {
+        title: "הצמדה למדד",
+        next: "עליית המדד מגדילה את הסכום הצמוד, לצד הפחתת החוב בתשלומים.",
+      }),
       severity: "medium",
       section: "index",
-      title: "חשיפה גבוהה למדד",
-      detail: `${pc(a.exposure.linkedShare)} מהיתרה צמוד למדד — הקרן עצמה גדלה עם האינפלציה, לא רק ההחזר.`,
+      title: "חשיפה למדד",
+      detail: `${pc(a.exposure.linkedShare)} מהיתרה צמודים למדד. עליית המדד מגדילה את הסכום הצמוד, לצד הפחתת החוב בתשלומים.`,
       amount: Math.round(a.totals.balance * a.exposure.linkedShare),
     });
   }
@@ -480,23 +659,31 @@ function buildFindings(a: StatementAnalysis): Finding[] {
     push({
       id: "indexation",
       client: show(
-        `ההצמדה למדד הוסיפה עד היום ${money(a.totals.indexation)} ₪ לקרן — חוב שנוצר בלי שנלקחה הלוואה חדשה`
+        `לפי המסמך, הפרשי ההצמדה על יתרת הקרן הם ${money(a.totals.indexation)} ₪, והם כלולים ביתרת המשכנתא.`,
+        undefined,
+        { title: "הפרשי הצמדה" }
       ),
       severity: a.exposure.indexationDrag >= INDEXATION_DRAG_HIGH ? "high" : "medium",
       section: "index",
-      title: "הצמדה שנצברה על הקרן",
-      detail: `${money(a.totals.indexation)} ₪ נוספו לקרן בגין הצמדה — ${pc(a.exposure.indexationDrag)} מעל הקרן המקורית. זה חוב שנוצר בלי שנלקחה הלוואה חדשה.`,
+      title: "הפרשי הצמדה על הקרן",
+      // The ratio's denominator is the principal outstanding today, not the
+      // original advance — so it is not "above the original principal", and it
+      // is not the indexation paid over the life of the loan.
+      detail: `הפרשי הצמדה ביחס ליתרת הקרן: ${(a.exposure.indexationDrag * 100).toFixed(1)}%, ${asOf}. זהו הסכום הצמוד שנוסף ליתרת הקרן הנוכחית, ולא סך ההצמדה ששולמה לאורך חיי ההלוואה.`,
       amount: a.totals.indexation,
     });
   }
   if (fxIsHigh(a.exposure.fxShare)) {
     push({
       id: "fx",
-      client: show("חלק מהמשכנתא צמוד למטבע חוץ — שער החליפין משנה את הקרן ואת ההחזר, גם בלי שינוי ריבית"),
+      client: show(`${pc(a.exposure.fxShare)} מיתרת המשכנתא צמודים למטבע חוץ.`, undefined, {
+        title: "הצמדה למטבע חוץ",
+        next: "שינוי בשער החליפין משנה את היתרה ואת ההחזר, גם בלי שינוי ריבית.",
+      }),
       severity: "high",
       section: "mix",
-      title: 'חשיפה למטבע חוץ',
-      detail: `${pc(a.exposure.fxShare)} מהיתרה צמוד למטבע חוץ. שינוי בשער החליפין משנה את הקרן ואת ההחזר גם בלי שינוי ריבית.`,
+      title: "חשיפה למטבע חוץ",
+      detail: `${pc(a.exposure.fxShare)} מהיתרה צמודים למטבע חוץ. שינוי בשער החליפין משנה את היתרה ואת ההחזר, גם בלי שינוי ריבית.`,
       amount: Math.round(a.totals.balance * a.exposure.fxShare),
     });
   }
@@ -507,26 +694,33 @@ function buildFindings(a: StatementAnalysis): Finding[] {
     push({
       id: "balloon",
       client: show(
-        "יש מסלול בלון — הקרן כולה נפרעת בסוף התקופה, וההחזר החודשי היום אינו משקף אותה",
-        balloon.map((t) => t.uid)
+        `${tranches(balloon.length)} מסוג בלון, ביתרה של ${money(balanceOf(balloon))} ₪: הקרן נפרעת בסוף התקופה, וההחזר החודשי אינו כולל אותה.`,
+        balloon.map((t) => t.uid),
+        { title: "מסלולי בלון", next: "כדאי לבדוק את מועד הפירעון ואת הסכום שיידרש בו." }
       ),
       severity: "high",
       section: "tranches",
       title: "מסלולי בלון",
-      detail: `${balloon.length} מסלולים שהקרן בהם נפרעת בסוף התקופה. ההחזר החודשי הנוכחי אינו משקף את החבות.`,
-      amount: balloon.reduce((s, t) => s + (t.balance ?? 0), 0),
+      detail: `${tranches(balloon.length)} שהקרן בהם נפרעת בסוף התקופה; ההחזר החודשי הנוכחי אינו כולל את פירעון הקרן. יש לבדוק את מועד הפירעון ואת הסכום שיידרש בו.`,
+      amount: balanceOf(balloon),
       uids: balloon.map((t) => t.uid),
     });
   }
 
-  if (a.totals.longestMonths && a.totals.longestMonths >= 300) {
+  if (a.totals.longestMonths && a.totals.longestMonths >= LONG_TERM_MONTHS) {
+    const years = Math.round(a.totals.longestMonths / 12);
     push({
       id: "term",
-      client: show("המשכנתא ארוכה מאוד — ככל שהתקופה ארוכה, סך הריבית שתשולם גדול יותר"),
+      client: show(`המסלול האחרון מסתיים בעוד כ-${years} שנים.`, undefined, {
+        title: "תקופה ארוכה",
+        next: "כדאי לבדוק כיצד קיצור התקופה ישפיע על ההחזר החודשי ועל סך הריבית.",
+      }),
       severity: "info",
       section: "tranches",
       title: "טווח ארוך",
-      detail: `המסלול הארוך רץ עוד ${Math.round(a.totals.longestMonths / 12)} שנים. קיצור טווח על מסלול אחד הוא לרוב זול יותר מהורדת ריבית על כולם.`,
+      // Was "קיצור טווח על מסלול אחד הוא לרוב זול יותר…" — a rule of thumb stated
+      // as a finding. Which is cheaper depends on the alternatives compared.
+      detail: `המסלול האחרון מסתיים בעוד כ-${years} שנים. לבדיקת קיצור התקופה יש להשוות את ההחזר ואת סך הריבית בחלופות השונות.`,
     });
   }
 
@@ -535,11 +729,11 @@ function buildFindings(a: StatementAnalysis): Finding[] {
   if (apportioned.length) {
     push({
       id: "apportioned",
-      client: silent("מסביר איך חולקה יתרה שהבנק לא פירט לפי מרכיב — פרט קריאה, לא מצב הלקוח"),
+      client: silent("מסביר איך חושבה יתרה שהבנק לא פירט לפי מרכיב — פרט קריאה, לא מצב הלקוח"),
       severity: "info",
       section: "tranches",
-      title: "יתרה מחולקת בין מסלולים",
-      detail: `הבנק אינו מפרט יתרה לכל מסלול, ולכן היתרה חולקה בין ${apportioned.length} המסלולים לפי לוח הסילוקין של כל אחד. סך החלקים שווה ליתרה המודפסת, אך יתרת מסלול בודד היא הערכה.`,
+      title: "יתרה מוערכת למסלול",
+      detail: `הבנק מדווח יתרה להלוואה ולא לכל מסלול. היתרה של ${apportioned.length} המסלולים חושבה מתוך יתרת ההלוואה, לפי לוח הסילוקין של כל מסלול; סך החלקים שווה ליתרה המודפסת. יתרת מסלול בודד היא הערכה, ולא יתרה נפרדת שהבנק דיווח.`,
       uids: apportioned.map((t) => t.uid),
     });
   }

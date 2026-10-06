@@ -189,14 +189,153 @@ export interface ClientNote {
    * ₪372,873 of arrears above rows that account for ₪33,825.
    */
   uids?: string[];
+  /**
+   * A factual heading for the line — what it is about, not how bad it is.
+   * Falls back to the finding's own title when absent.
+   */
+  title?: string;
+  /**
+   * The next check, as its own sentence. `say` carries the figure; this says
+   * what to find out about it. Kept apart so two findings about the same debt
+   * can be merged into one line without repeating "יש לברר…" twice.
+   */
+  next?: string;
 }
 
 export type ClientDisposition =
   | { show: ClientNote }
   | { silent: true; because: string };
 
-export const show = (say: string, uids?: string[]): ClientDisposition => ({ show: { say, uids } });
+export const show = (
+  say: string,
+  uids?: string[],
+  extra?: { title?: string; next?: string }
+): ClientDisposition => ({ show: { say, uids, ...extra } });
 export const silent = (because: string): ClientDisposition => ({ silent: true, because });
 
 /** Reads on a disposition without every call site unpacking the union. */
 export const noteOf = (d: ClientDisposition): ClientNote | null => ("show" in d ? d.show : null);
+
+/* ------------------------------------------------- how the client page groups them */
+
+/**
+ * Which group a client line sits in.
+ *
+ * Severity is not urgency. "100% of the mortgage is variable" is a high-severity
+ * fact about how the debt is built — worth checking, not something to resolve this
+ * week — while an open enforcement file is both. So the group starts from the
+ * severity and is then capped at "check" for findings that describe the shape of
+ * the debt rather than something that went wrong with it.
+ */
+export type WorryGroup = "act" | "check" | "info";
+
+export const WORRY_GROUP_ORDER: WorryGroup[] = ["act", "check", "info"];
+export const WORRY_GROUP_LABEL: Record<WorryGroup, string> = {
+  act: "לטיפול בעדיפות גבוהה",
+  check: "לבדיקה",
+  info: "מידע נוסף",
+};
+
+/** Findings about how the debt is structured or priced — never "act" on their own. */
+const STRUCTURAL = new Set([
+  "variable",
+  "linked",
+  "ltv",
+  "fx",
+  "balloon",
+  "interest-only",
+  "non-monthly",
+  "resets",
+  "recycle",
+  "expensive",
+  "consumer-weight",
+  "pending",
+  "indexation",
+  "breakfee",
+  "term",
+  "free",
+  "fee-unreported",
+  "card-charge",
+  "shopping",
+]);
+
+export function worryGroup(id: string, severity: Severity): WorryGroup {
+  const bySeverity: WorryGroup = severity === "critical" || severity === "high" ? "act" : severity === "medium" ? "check" : "info";
+  return bySeverity === "act" && STRUCTURAL.has(id) ? "check" : bySeverity;
+}
+
+/** One line on a client page: a heading, the figure, and what to check next. */
+export interface ClientWorry {
+  id: string;
+  title: string;
+  say: string;
+  next?: string;
+  severity: Severity;
+  group: WorryGroup;
+  uids?: string[];
+}
+
+const SEV_RANK: Severity[] = ["critical", "high", "medium", "info"];
+
+/** A finding with a client note, as a client line. Silent findings give null. */
+export function worryOf(f: { id: string; title: string; severity: Severity; client: ClientDisposition }): ClientWorry | null {
+  const n = noteOf(f.client);
+  if (!n) return null;
+  return {
+    id: f.id,
+    title: n.title ?? f.title,
+    say: n.say,
+    next: n.next,
+    severity: f.severity,
+    group: worryGroup(f.id, f.severity),
+    uids: n.uids,
+  };
+}
+
+/**
+ * Fold findings that describe the same debts into one line, keeping every fact.
+ *
+ * Each spec names findings that overlap; when two or more of them are present
+ * they become a single line at the position of the first, under the spec's
+ * heading, with their figures in order and each distinct next-check once. The
+ * worst severity and the most urgent group win — merging must never quieten a
+ * finding.
+ */
+export function mergeWorries(items: ClientWorry[], specs: { ids: string[]; title: string }[]): ClientWorry[] {
+  let out = items.slice();
+  for (const spec of specs) {
+    // In the spec's order, so the merged sentence reads the same way on every
+    // document regardless of which finding happened to rank higher.
+    const hit = spec.ids
+      .map((id) => out.find((w) => w.id === id))
+      .filter((w): w is ClientWorry => w !== undefined);
+    if (hit.length < 2) continue;
+    const nexts = hit.map((w) => w.next).filter((x): x is string => !!x);
+    const merged: ClientWorry = {
+      id: hit.map((w) => w.id).join("+"),
+      title: spec.title,
+      say: hit.map((w) => w.say).join(" "),
+      next: nexts.filter((x, i) => nexts.indexOf(x) === i).join(" ") || undefined,
+      severity: hit.map((w) => w.severity).sort((a, b) => SEV_RANK.indexOf(a) - SEV_RANK.indexOf(b))[0],
+      group: hit.map((w) => w.group).sort((a, b) => WORRY_GROUP_ORDER.indexOf(a) - WORRY_GROUP_ORDER.indexOf(b))[0],
+      uids: Array.from(new Set(hit.flatMap((w) => w.uids ?? []))),
+    };
+    const at = Math.min(...hit.map((w) => out.indexOf(w)));
+    out = out.filter((w) => !hit.includes(w));
+    out.splice(Math.min(at, out.length), 0, merged);
+  }
+  return out;
+}
+
+/** Group first, then severity; stable inside each, so the engine's order holds. */
+export function orderWorries(items: ClientWorry[]): ClientWorry[] {
+  return items
+    .map((w, i) => ({ w, i }))
+    .sort(
+      (a, b) =>
+        WORRY_GROUP_ORDER.indexOf(a.w.group) - WORRY_GROUP_ORDER.indexOf(b.w.group) ||
+        SEV_RANK.indexOf(a.w.severity) - SEV_RANK.indexOf(b.w.severity) ||
+        a.i - b.i
+    )
+    .map((x) => x.w);
+}

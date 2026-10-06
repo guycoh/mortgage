@@ -3299,3 +3299,90 @@ html:has(.lgr-root) {
    loudest thing in it. */
 .lgr-yield-npv[data-sign="pos"] { color: var(--neg, #b4442e); }
 .lgr-yield-npv[data-sign="neg"] { color: var(--pos, #2f7d5b); }
+
+/* ================================================================ כרטיסי אשראי */
+/* The card list under the charts. A plain ruled table in the card's own
+   material: a ticked line is a loan row on the master, so it takes the loan
+   family's spine and wash; an unticked one steps back to caption ink but stays
+   fully legible — it is still a debt the client has. */
+.lgr-cc { overflow: hidden; }
+.lgr-cc-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13px;
+}
+.lgr-cc-table th {
+  padding: 8px 10px;
+  text-align: start;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--lgr-3);
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+.lgr-cc-table td {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--line);
+  color: var(--lgr-3);
+  vertical-align: middle;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lgr-cc-table tbody tr:last-child td { border-bottom: 0; }
+.lgr-cc-table tbody tr { cursor: pointer; transition: background-color 120ms ease; }
+.lgr-cc-table tbody tr:hover td { background: var(--card-2); }
+.lgr-cc-table tbody tr[data-on] td { background: #fdf8f4; color: var(--ink); }
+.lgr-cc-table tbody tr[data-on]:hover td { background: var(--loan-tint); }
+/* the family spine, on the leading edge of a ticked line */
+.lgr-cc-table tbody tr td:first-child { box-shadow: inset -3px 0 0 transparent; }
+.lgr-cc-table tbody tr[data-on] td:first-child { box-shadow: inset -3px 0 0 var(--loan); }
+.lgr-cc-table tbody tr:not([data-on]) .lgr-money { color: var(--lgr-3); }
+.lgr-cc-box {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  border: 1.5px solid var(--line-2);
+  background: #fff;
+  color: #fff;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+.lgr-cc-box:hover { border-color: var(--edge); }
+.lgr-cc-box[aria-checked="true"] { background: var(--loan); border-color: var(--loan); }
+.lgr-cc-box:focus-visible { outline: none; box-shadow: 0 0 0 2px rgba(224, 123, 57, 0.5); }
+.lgr-cc-lender { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.lgr-cc-name { font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; }
+.lgr-cc-kind { font-size: 11.5px; color: var(--lgr-4); overflow: hidden; text-overflow: ellipsis; }
+.lgr-cc-quiet { color: var(--lgr-4); }
+.lgr-cc-note { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.lgr-cc-reason { font-size: 12px; color: var(--lgr-3); overflow: hidden; text-overflow: ellipsis; }
+.lgr-cc-tag {
+  flex: none;
+  padding: 1px 7px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+}
+.lgr-cc-tag[data-tone="loan"] { background: var(--loan-tint); color: var(--warn); }
+.lgr-cc-tag[data-tone="neg"] { background: var(--neg-tint); color: var(--neg); }
+
+/* ---- wording audit ---- */
+/* The client page's findings, grouped (לטיפול בעדיפות גבוהה / לבדיקה / מידע
+   נוסף) — see worryGroup in lib/verdicts. One small label per group, ruled by a
+   hairline from the group above; each line opens with its factual heading. */
+.lgr-cs-worry-group { margin-top: 9px; }
+.lgr-cs-worry-group + .lgr-cs-worry-group { padding-top: 8px; border-top: 1px solid var(--line-2); }
+.lgr-cs-worry-label {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.01em;
+  color: var(--lgr-3);
+}
+.lgr-cs-worry-group ul { margin-top: 5px; }
+.lgr-cs-worry-title { font-weight: 700; }
+/* Where a figure came from: a computed average, a debt with no charge on record,
+   a fee the letter left blank. Quiet, under the figure it qualifies. */
+.lgr-cs-note { margin-top: 1px; font-family: var(--ui); font-size: 10.5px; font-weight: 600; line-height: 1.3; color: var(--lgr-4); }

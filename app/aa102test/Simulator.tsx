@@ -61,14 +61,18 @@ import {
   FAMILY,
   PATH_LABEL,
   TRACK_HEX,
+  docKey,
   foldMasterRow,
   masterTotals,
   mergeReportLoans,
   owedOnly,
   perShekel,
   type ImportedLoan,
+  toLoanRow,
   type ImportSummary,
 } from "./lib/credit";
+import { cardItems, type CardItem } from "./lib/cards";
+import CardsPanel from "./components/CardsPanel";
 import DuplicateMasterModal from "./components/DuplicateMasterModal";
 import Ask from "./components/Ask";
 import { asPurposeId } from "./lib/purposes";
@@ -535,6 +539,40 @@ export default function Simulator({
    * isSurety in lib/credit.
    */
   const owed = useMemo(() => owedOnly(loans), [loans]);
+
+  /* --- כרטיסי אשראי: the cards the reports list, and which are rows ---------
+     The rows belong to the master, whichever mix is on screen — a report is
+     what the client owes today, the same reason applyImport fills it. */
+  const master = list.find((m) => m.is_base) ?? list[0] ?? null;
+  const cards = useMemo(
+    () =>
+      cardItems(
+        reports
+          .filter((r) => r.report)
+          .map((r) => ({ report: r.report!, clientName: r.clientName, key: docKey(r) }))
+      ),
+    [reports]
+  );
+  const cardsOnBoard = useMemo(
+    () => new Set((master?.loans ?? []).flatMap((l) => l.source_refs ?? [])),
+    [master]
+  );
+  const toggleCard = useCallback(
+    (item: CardItem, on: boolean) => {
+      if (!master) return;
+      const row = on ? toLoanRow(item.loan, master.id, "loan", item.ref) : null;
+      setMixes((prev) =>
+        (prev ?? []).map((m) => {
+          if (m.id !== master.id) return m;
+          if (row) return { ...m, loans: [...m.loans, row] };
+          return { ...m, loans: m.loans.filter((l) => !(l.source_refs ?? []).includes(item.ref)) };
+        })
+      );
+      // A row the list put back is the document's own figure, not an edit.
+      if (row) setBaseline((b) => ({ ...b, [row.id]: { ...row } }));
+    },
+    [master]
+  );
   const dirty = mixes !== null && snapshot(mixes) !== saved;
 
   const rebaseline = (ms: Mix[]) => {
@@ -1675,6 +1713,20 @@ export default function Simulator({
               judged on four. */}
           <Charts loans={owed} annualInflation={annualInflation} isBase={isPrimaryMix} />
         </motion.div>
+
+        {/* ------------------------------------------------- כרטיסי אשראי */}
+        {/* Under the charts, because it is a decision about the master's rows
+            rather than a reading of the mix: which card debts are loans. */}
+        {master && cards.length > 0 && (
+          <motion.div {...enter(4)} className="mt-5">
+            <CardsPanel
+              items={cards}
+              onBoard={cardsOnBoard}
+              onToggle={toggleCard}
+              multiDoc={reports.filter((r) => r.report).length > 1}
+            />
+          </motion.div>
+        )}
         </motion.div>
         )}
         </AnimatePresence>

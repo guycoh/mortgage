@@ -26,7 +26,13 @@ import { motion } from "motion/react";
 import { Printer, WarningCircle, X } from "@phosphor-icons/react";
 import { BankIcon } from "./bankIcons";
 import { lenderLabel } from "../lib/lenders";
-import { rateHeat, utilisationHeat } from "@/lib/verdicts";
+import {
+  WORRY_GROUP_LABEL,
+  WORRY_GROUP_ORDER,
+  rateHeat,
+  utilisationHeat,
+  type WorryGroup,
+} from "@/lib/verdicts";
 import Money from "./Money";
 import type { Analysis, ClientRow, ClientSection } from "../lib/analysis";
 
@@ -41,12 +47,18 @@ const ils = (n: number) => Math.round(n).toLocaleString("en-US");
  * Only amortising debts have a remaining term — a revolving facility rolls
  * indefinitely, and the report's "months" for one is an artefact, not a fact to
  * tell a client. And Hebrew does not say "נותרו 1 תשלומים".
+ *
+ * A folded row's months are its LONGEST part's, so on a row of several it is
+ * said as when the last one ends — "עוד כ-27 שנים" beside "14 מסלולים" read as
+ * if all fourteen ran that long.
  */
 function remaining(r: ClientRow): string {
   if (r.family === "card" || !r.months || r.months <= 0) return "";
-  if (r.months === 1) return "נותר תשלום אחד";
-  if (r.months < 24) return `נותרו ${r.months} תשלומים`;
-  return `עוד כ-${Math.round(r.months / 12)} שנים`;
+  const last =
+    r.parts > 1 ? (r.family === "mortgage" ? "המסלול האחרון מסתיים " : "ההלוואה האחרונה מסתיימת ") : "";
+  if (r.months === 1) return last ? `${last}בתשלום הבא` : "נותר תשלום אחד";
+  if (r.months < 24) return last ? `${last}בעוד ${r.months} חודשים` : `נותרו ${r.months} תשלומים`;
+  return `${last ? `${last}בעוד` : "עוד"} כ-${Math.round(r.months / 12)} שנים`;
 }
 
 const NOUN: Record<ClientRow["family"], [string, string]> = {
@@ -101,13 +113,18 @@ function LenderRow({ r }: { r: ClientRow }) {
 }
 
 /**
- * The לחודש cell — what leaves the account for this row.
+ * The לחודש cell — the row's monthly charge, and where that figure came from.
  *
  * A charge the report shows nobody is servicing is not printed as a payment:
  * a client reading "₪2,018 לחודש" beside a loan that has been in default for
  * two years would be told the opposite of the truth. The cell says what is
- * paid (₪0, when nothing is) and names the charge that is not, so the section
- * subtotal and the footer — both cash — add up on the page.
+ * charged and serviced (₪0, when nothing is) and names the charge that is not,
+ * so the section subtotal and the footer add up on the page.
+ *
+ * Two more distinctions, because the figure is not always a printed charge: a
+ * part worked out here as a monthly average (a debt repaid yearly prints 0) is
+ * labelled as such, and a debt with no charge on record says "לא דווח" rather
+ * than passing for ₪0.
  */
 function MonthlyCell({ r }: { r: ClientRow }) {
   if (r.monthly === 0 && r.monthlyNotPaid > 0) {
@@ -118,10 +135,28 @@ function MonthlyCell({ r }: { r: ClientRow }) {
       </div>
     );
   }
+  if (r.monthly === 0 && r.monthlyUnreported > 0) {
+    return (
+      <div className="lgr-cs-amt">
+        <span className="lgr-cs-none">לא דווח</span>
+      </div>
+    );
+  }
+  const allComputed = r.monthlyComputed > 0 && Math.abs(r.monthlyComputed - r.monthly) < 1;
   return (
     <div className="lgr-cs-amt">
       <Money value={r.monthly} size={17} weight={800} color={r.late ? "var(--neg)" : undefined} />
       {r.monthlyNotPaid > 0 && <div className="lgr-cs-rolled">ועוד {ils(r.monthlyNotPaid)} ₪ שאינם משולמים</div>}
+      {r.monthlyComputed > 0 && (
+        <div className="lgr-cs-note">
+          {allComputed ? "ממוצע חודשי מחושב" : `מזה ${ils(r.monthlyComputed)} ₪ ממוצע מחושב`}
+        </div>
+      )}
+      {r.monthlyUnreported > 0 && (
+        <div className="lgr-cs-note">
+          {r.monthlyUnreported === 1 ? "ללא חיוב מדווח להתחייבות אחת" : `ללא חיוב מדווח ל-${r.monthlyUnreported}`}
+        </div>
+      )}
     </div>
   );
 }
@@ -247,29 +282,47 @@ function CardRow({ r }: { r: ClientRow }) {
  * mortgage is index-linked" shouted exactly as loud as "eleven standing orders
  * bounced", and a reader had no way to tell the alarm from the aside. The box is
  * quiet now and each line carries its own colour: the critical and high ones in
- * red, the medium ones in the warm tone, the rest in ink. Same list, same order
- * (the engine sorts by severity); only the reading changed.
+ * red, the medium ones in the warm tone, the rest in ink.
+ *
+ * Each line is a heading, the figure, and the next check; the lines come in three
+ * groups the engine assigns (see worryGroup — severity is not urgency, so a
+ * high-severity fact about how the mortgage is built still sits under "לבדיקה").
+ * Grouping and order are decided upstream; this only renders them.
  */
-export function Worries({ items }: { items: { say: string; severity: string }[] }) {
-  const alarms = items.filter((w) => w.severity === "critical" || w.severity === "high").length;
+export function Worries({
+  items,
+}: {
+  items: { id?: string; title?: string; say: string; next?: string; severity: string; group?: WorryGroup }[];
+}) {
+  const alarms = items.filter((w) => (w.group ?? "check") === "act").length;
+  const groups = WORRY_GROUP_ORDER.map((g) => ({ g, rows: items.filter((w) => (w.group ?? "check") === g) })).filter(
+    (x) => x.rows.length > 0
+  );
   return (
     <section className="lgr-cs-worry" data-alarm={alarms > 0 || undefined}>
       <div className="lgr-cs-worry-head">
         <WarningCircle size={16} weight="fill" />
-        מה חשוב לשים לב אליו
+        נקודות שחשוב לבדוק
         {alarms > 0 && (
           <span className="lgr-cs-worry-n">
-            {alarms === 1 ? "נושא אחד דחוף" : `${alarms} נושאים דחופים`}
+            {alarms === 1 ? "נושא אחד בעדיפות גבוהה" : `${alarms} נושאים בעדיפות גבוהה`}
           </span>
         )}
       </div>
-      <ul>
-        {items.map((w) => (
-          <li key={w.say} data-sev={w.severity}>
-            {w.say}
-          </li>
-        ))}
-      </ul>
+      {groups.map(({ g, rows }) => (
+        <div key={g} className="lgr-cs-worry-group">
+          <div className="lgr-cs-worry-label">{WORRY_GROUP_LABEL[g]}</div>
+          <ul>
+            {rows.map((w) => (
+              <li key={w.id ?? w.say} data-sev={w.severity}>
+                {w.title && <span className="lgr-cs-worry-title">{w.title}: </span>}
+                {w.say}
+                {w.next && <> {w.next}</>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
     </section>
   );
 }
@@ -312,7 +365,15 @@ function Section({ sec }: { sec: ClientSection }) {
         )}
         {rest.length > 0 && (
           <li className="lgr-cs-more">
-            ועוד {rest.length} {rest.length === 1 ? "מלווה" : "מלווים"}
+            {/* Cards are one row per facility, not per lender — two מזרחי
+                limits are two rows — so what the overflow counts there is
+                facilities. */}
+            ועוד{" "}
+            {sec.key === "card"
+              ? rest.length === 1
+                ? "מסגרת נוספת"
+                : `${rest.length} מסגרות נוספות`
+              : `${rest.length} ${rest.length === 1 ? "מלווה" : "מלווים"}`}
             {restBalance > 0 && (
               <>
                 {" · "}
@@ -435,7 +496,7 @@ export default function ClientSummaryModal({
 
         <footer className="lgr-cs-foot">
           <div>
-            <div className="lgr-cs-foot-cap">סך ההתחייבויות</div>
+            <div className="lgr-cs-foot-cap">סך יתרות ההתחייבויות</div>
             <Money value={v.footer.balance} size={19} weight={800} style={{ textAlign: "start" }} block={false} />
             {/* Cannot normally fire — the engine asserts it. Rendered rather than
                 trusted, so a future regression is visible instead of silent. */}
@@ -457,9 +518,30 @@ export default function ClientSummaryModal({
               </div>
             )}
           </div>
+          {/* The same figure as before, called what it is. It is the charge the
+              report prints for every debt being serviced, plus a monthly average
+              worked out here where the report prints none (a yearly loan) — not
+              cash that left the account. What WAS paid is 201-048, and is said
+              beside it; charges nobody is servicing and debts with no charge on
+              record are named rather than silently left out. */}
           <div className="text-end">
-            <div className="lgr-cs-foot-cap">יוצא מהחשבון כל חודש</div>
+            <div className="lgr-cs-foot-cap">חיוב חודשי לפי הדוח</div>
             <Money value={v.footer.monthly} size={22} weight={800} style={{ textAlign: "start" }} block={false} />
+            {v.monthlyParts.computed > 0 && (
+              <div className="lgr-cs-none">מזה {ils(v.monthlyParts.computed)} ₪ ממוצע חודשי מחושב</div>
+            )}
+            {v.monthlyParts.paidCount > 0 && (
+              <div className="lgr-cs-none">שולם בפועל לפי הדוח: {ils(v.monthlyParts.paid)} ₪</div>
+            )}
+            {v.monthlyParts.notPaid > 0 && (
+              <div className="lgr-cs-none">לא כולל {ils(v.monthlyParts.notPaid)} ₪ חיובים שאינם משולמים</div>
+            )}
+            {v.monthlyParts.unreportedCount > 0 && (
+              <div className="lgr-cs-none">
+                הסכום חלקי: לא דווח חיוב עבור{" "}
+                {v.monthlyParts.unreportedCount === 1 ? "התחייבות אחת" : `${v.monthlyParts.unreportedCount} התחייבויות`}
+              </div>
+            )}
           </div>
         </footer>
       </motion.div>
