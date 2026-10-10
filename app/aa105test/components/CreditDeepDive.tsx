@@ -27,7 +27,8 @@ import { lenderLabel } from "@/app/aa102test/lib/lenders";
 import { CATEGORY_LABEL, type Analysis, type DebtLine } from "@/app/aa102test/lib/analysis";
 import { BankIcon } from "@/app/aa102test/components/bankIcons";
 import Stage from "./Stage";
-import { Flow } from "./BriefView";
+import { ShareTable } from "./BriefView";
+import Logo from "@/app/aa102test/components/Logo";
 import { docFromCredit } from "../lib/brief";
 import {
   Bars,
@@ -66,7 +67,7 @@ const BENIGN_STATUS = /כסדרה|תקין|שוטף/;
 
 function Ident({ l }: { l: DebtLine }) {
   const bad = l.overdue > 0 || !!l.arrearsRange;
-  const sub = [l.category === "mortgage" ? l.track : l.type, l.category === "mortgage" ? "" : l.track].filter(Boolean).join(" · ");
+  const sub = [l.category === "mortgage" ? l.track : l.type, l.category === "mortgage" ? "" : l.track].filter(Boolean).join(", ");
   return (
     <span className="brf-ident">
       <BankIcon source={l.bank} size={32} />
@@ -75,10 +76,10 @@ function Ident({ l }: { l: DebtLine }) {
         {sub && <span className="brf-ident-sub">{sub}</span>}
         {(bad || l.shared || l.balloon || (l.status && !BENIGN_STATUS.test(l.status))) && (
           <span className="brf-ident-chips">
-            {bad && <span className="brf-chip brf-chip-xs" data-tone="neg">{l.arrearsRange || "בפיגור"}{l.overdue > 0 ? ` · ₪${l.overdue.toLocaleString("he-IL")}` : ""}</span>}
-            {l.balloon && <span className="brf-chip brf-chip-xs" data-tone="warn">בלון</span>}
-            {l.shared && <span className="brf-chip brf-chip-xs" title="הופיע ביותר מדוח אחד ונספר פעם אחת">משותף</span>}
-            {l.status && !BENIGN_STATUS.test(l.status) && <span className="brf-chip brf-chip-xs" data-tone="neg">{l.status}</span>}
+            {bad && <span data-tone="neg">{l.arrearsRange || "בפיגור"}{l.overdue > 0 ? `, ₪${l.overdue.toLocaleString("he-IL")}` : ""}</span>}
+            {l.balloon && <span data-tone="warn">בלון</span>}
+            {l.shared && <span title="הופיע ביותר מדוח אחד ונספר פעם אחת">מופיע בשני הדוחות, נספר פעם אחת</span>}
+            {l.status && !BENIGN_STATUS.test(l.status) && <span data-tone="neg">{l.status}</span>}
           </span>
         )}
       </span>
@@ -182,7 +183,7 @@ function ArrearsGrid({ rows }: { rows: { year: string; months: (number | null)[]
             <tr key={r.year}>
               <th className="brf-num">{r.year}</th>
               {r.months.map((v, i) => (
-                <td key={i} data-b={v ? Math.min(v, 6) : undefined} title={v ? `${r.year} · ${MONTHS_HE[i]} · דרגת פיגור ${v}` : `${r.year} · ${MONTHS_HE[i]} · ללא פיגור`}>
+                <td key={i} data-b={v ? Math.min(v, 6) : undefined} title={v ? `${r.year}, ${MONTHS_HE[i]}, דרגת פיגור ${v}` : `${r.year}, ${MONTHS_HE[i]}, ללא פיגור`}>
                   {v ? <span className="brf-num">{v}</span> : null}
                 </td>
               ))}
@@ -254,28 +255,31 @@ export default function CreditDeepDive({ analysis: a, onClose }: { analysis: Ana
       tabs={tabs}
       who={
         <>
-          ניתוח חיווי אשראי
-          {names.length ? ` · ${names.join(" ו")}` : ""}
-          {a.clients[0]?.reportDate ? ` · ${a.clients[0].reportDate}` : ""}
+          {names.length ? names.join(" ו") : "ניתוח חיווי אשראי"}
+          {a.clients[0]?.reportDate && <span className="brf-bar-date">{a.clients[0].reportDate}</span>}
         </>
       }
       onClose={onClose}
     >
-      <div className="brf-page brf-page-dd">
-        {/* ---------------------------------------------------- the head */}
-        <header className="brf-dd-head">
-          <h1 className="brf-h1">ניתוח חיווי אשראי</h1>
-          <div className="brf-dd-who">
-            {a.clients.map((c, i) => (
-              <span key={`${c.idNumber}-${i}`} className="brf-chip brf-chip-id">
-                <IdentificationCard size={15} />
-                {c.name || "ללא שם"}
-                {c.idNumber && <span className="brf-num">{c.idNumber}</span>}
-              </span>
-            ))}
-            {a.clients[0]?.reportDate && <span className="brf-chip">דוח מ-{a.clients[0].reportDate}</span>}
-          </div>
+      <article className="brf-sheet brf-sheet-dd">
+        <header className="brf-mast">
+          <span className="brf-mark">
+            <Logo size={24} />
+            <span>מורגי</span>
+          </span>
+          <span className="brf-mast-doc">
+            ניתוח חיווי אשראי
+            {a.clients[0]?.reportDate && <span className="brf-num">{a.clients[0].reportDate}</span>}
+          </span>
         </header>
+        <div className="brf-who">
+          <h1>{a.clients.map((c) => c.name).filter(Boolean).join(" ו") || "ניתוח חיווי אשראי"}</h1>
+          {a.clients.some((c) => c.idNumber) && (
+            <span className="brf-who-meta">
+              ת״ז <span className="brf-num">{a.clients.map((c) => c.idNumber).filter(Boolean).join(", ")}</span>
+            </span>
+          )}
+        </div>
 
         <Kpis
           items={[
@@ -295,7 +299,7 @@ export default function CreditDeepDive({ analysis: a, onClose }: { analysis: Ana
                 a.cards.rolled > 0
                   ? `₪${a.cards.rolled.toLocaleString("he-IL")} לא נפרעו וגולגלו`
                   : a.cards.count
-                    ? `${a.cards.count} מסגרות · נפרע במלואו`
+                    ? `${a.cards.count} מסגרות, נפרע במלואו`
                     : "אין חיוב מדווח",
             },
             {
@@ -304,7 +308,7 @@ export default function CreditDeepDive({ analysis: a, onClose }: { analysis: Ana
               kind: "rate",
               sub:
                 a.mortgage.rate !== null
-                  ? `משכנתא ${rate2(a.mortgage.rate)}${a.consumer.rate !== null ? ` · צרכני ${rate2(a.consumer.rate)}` : ""}`
+                  ? `משכנתא ${rate2(a.mortgage.rate)}${a.consumer.rate !== null ? `, צרכני ${rate2(a.consumer.rate)}` : ""}`
                   : a.consumer.rate !== null
                     ? `צרכני ${rate2(a.consumer.rate)}`
                     : undefined,
@@ -334,7 +338,7 @@ export default function CreditDeepDive({ analysis: a, onClose }: { analysis: Ana
           aside={a.lines.some((l) => l.shared) ? "התחייבויות משותפות נספרו פעם אחת" : undefined}
           lit={lit?.section === "picture"}
         >
-          <Flow doc={doc} bare />
+          <ShareTable doc={doc} />
           <div className="brf-tablewrap">
             <table className="brf-table">
               <thead>
@@ -387,7 +391,7 @@ export default function CreditDeepDive({ analysis: a, onClose }: { analysis: Ana
             id="mortgage"
             icon={<Bank size={18} weight="fill" />}
             title="משכנתאות"
-            aside={`${pct(a.mortgage.variableShare)} משתנה · ${pct(a.mortgage.linkedShare)} צמוד${a.mortgage.ltv !== null ? ` · יחס מימון ${pct(a.mortgage.ltv)}` : ""}`}
+            aside={`${pct(a.mortgage.variableShare)} משתנה, ${pct(a.mortgage.linkedShare)} צמוד${a.mortgage.ltv !== null ? `, יחס מימון ${pct(a.mortgage.ltv)}` : ""}`}
             lit={lit?.section === "mortgage"}
           >
             {a.mortgage.tracks.length > 0 && (
@@ -420,7 +424,7 @@ export default function CreditDeepDive({ analysis: a, onClose }: { analysis: Ana
             id="consumer"
             icon={<Pulse size={18} weight="bold" />}
             title="הלוואות צרכניות"
-            aside={`ריבית ממוצעת ${rate2(a.consumer.rate)}${a.consumer.worstRate !== null ? ` · הגבוהה ${rate2(a.consumer.worstRate)}` : ""}`}
+            aside={`ריבית ממוצעת ${rate2(a.consumer.rate)}${a.consumer.worstRate !== null ? `, הגבוהה ${rate2(a.consumer.worstRate)}` : ""}`}
             lit={lit?.section === "consumer"}
           >
             <DebtRows lit={L("consumer")} lines={consumer} kind="amort" asOf={a.clients[0]?.reportDate} />
@@ -435,7 +439,7 @@ export default function CreditDeepDive({ analysis: a, onClose }: { analysis: Ana
             title='מסגרות אשראי וחשבונות עו"ש'
             aside={
               a.revolving.utilization !== null
-                ? `ניצול ${a.revolving.utilization}%${a.revolving.peak > 0 ? ` · שיא בחודש הדיווח ₪${a.revolving.peak.toLocaleString("he-IL")}` : ""}`
+                ? `ניצול ${a.revolving.utilization}%${a.revolving.peak > 0 ? `, שיא בחודש הדיווח ₪${a.revolving.peak.toLocaleString("he-IL")}` : ""}`
                 : undefined
             }
             lit={lit?.section === "revolving"}
@@ -488,7 +492,7 @@ export default function CreditDeepDive({ analysis: a, onClose }: { analysis: Ana
             />
             {a.behaviour.arrears.length > 0 && (
               <>
-                <Sub>היסטוריית פיגורים · 1 = 30–59 ימים … 6 = 180 ימים ומעלה</Sub>
+                <Sub>היסטוריית פיגורים, 1 = 30–59 ימים … 6 = 180 ימים ומעלה</Sub>
                 <ArrearsGrid rows={a.behaviour.arrears} />
               </>
             )}
@@ -501,7 +505,7 @@ export default function CreditDeepDive({ analysis: a, onClose }: { analysis: Ana
             id="inquiries"
             icon={<MagnifyingGlass size={18} weight="bold" />}
             title="פניות ובקשות אשראי"
-            aside={`${a.inquiries.last3} ב-3 החודשים האחרונים · ${a.inquiries.last12} בשנה`}
+            aside={`${a.inquiries.last3} ב-3 החודשים האחרונים, ${a.inquiries.last12} בשנה`}
             lit={lit?.section === "inquiries"}
           >
             {a.inquiries.pending.length > 0 && (
@@ -534,14 +538,14 @@ export default function CreditDeepDive({ analysis: a, onClose }: { analysis: Ana
               </>
             )}
             {a.inquiries.byPurpose.length > 0 && (
-              <div className="brf-chips brf-chips-lg">
-                {a.inquiries.byPurpose.map((p) => (
-                  <span key={p.purpose} className="brf-chip">
-                    {p.purpose}
-                    <b className="brf-num">{p.count}</b>
+              <p className="brf-sec-note">
+                {a.inquiries.byPurpose.map((p, i) => (
+                  <span key={p.purpose}>
+                    {p.purpose} <b className="brf-num">{p.count}</b>
+                    {i < a.inquiries.byPurpose.length - 1 ? ", " : ""}
                   </span>
                 ))}
-              </div>
+              </p>
             )}
           </Sec>
         )}
@@ -653,7 +657,7 @@ export default function CreditDeepDive({ analysis: a, onClose }: { analysis: Ana
             aside={
               disagrees ? (
                 <span className="brf-neg">
-                  פער מול הפירוט: ₪{a.reconcile.balanceGap.toLocaleString("he-IL")} יתרה · ₪{a.reconcile.limitGap.toLocaleString("he-IL")} מסגרת · ₪
+                  פער מול הפירוט: ₪{a.reconcile.balanceGap.toLocaleString("he-IL")} יתרה, ₪{a.reconcile.limitGap.toLocaleString("he-IL")} מסגרת, ₪
                   {a.reconcile.originalGap.toLocaleString("he-IL")} סכום מקורי
                 </span>
               ) : (
@@ -795,7 +799,7 @@ export default function CreditDeepDive({ analysis: a, onClose }: { analysis: Ana
             בית נספרים פעם אחת בלבד.
           </p>
         </Sec>
-      </div>
+      </article>
     </Stage>
   );
 }

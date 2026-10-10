@@ -498,10 +498,10 @@ function cardPricing(r: ClientRow): DebtFact | null {
   const max = r.rateMaxQuoted;
   const heat = (x: number) => (rateHeat(x, "card") === "hot" ? ("hot" as const) : undefined);
   if (drawn !== null && drawn > 0) {
-    const tail = max !== null && max > drawn ? ` · עד ${max.toFixed(2)}% על יתר המסגרת` : "";
+    const tail = max !== null && max > drawn ? `, עד ${max.toFixed(2)}% על יתר המסגרת` : "";
     return { text: `ריבית ${drawn.toFixed(2)}% על היתרה${tail}`, heat: heat(drawn) };
   }
-  if (r.interestFree && max !== null) return { text: `היתרה ללא ריבית · עד ${max.toFixed(2)}% על יתר המסגרת`, heat: heat(max) };
+  if (r.interestFree && max !== null) return { text: `היתרה ללא ריבית, עד ${max.toFixed(2)}% על יתר המסגרת`, heat: heat(max) };
   if (max !== null) return { text: `עד ${max.toFixed(2)}%`, heat: heat(max) };
   return null;
 }
@@ -522,7 +522,7 @@ function cardRow(r: ClientRow): DebtRow {
   if (r.instalment) facts.push({ text: "אשראי בתשלומים" });
   if (r.late)
     facts.push({
-      text: `בפיגור${r.overdue > 0 ? ` ${ils(r.overdue)} ₪` : ""}${r.arrearsRange ? ` · ${r.arrearsRange}` : ""}`,
+      text: `בפיגור${r.overdue > 0 ? ` ${ils(r.overdue)} ₪` : ""}${r.arrearsRange ? `, ${r.arrearsRange}` : ""}`,
       heat: "hot",
     });
   if (enforced) facts.push({ text: "בטיפול ההוצאה לפועל", heat: "hot" });
@@ -557,7 +557,7 @@ function creditGroups(v: ClientView): DebtGroup[] {
     if (sec.unused)
       lines.push(
         `${sec.unused.count === 1 ? "מסגרת אחת" : `${sec.unused.count} מסגרות`} ללא יתרה${
-          sec.unused.limit > 0 ? ` · מסגרת כוללת ${ils(sec.unused.limit)} ₪` : ""
+          sec.unused.limit > 0 ? `, מסגרת כוללת ${ils(sec.unused.limit)} ₪` : ""
         }`
       );
     if (rest.length) {
@@ -566,7 +566,7 @@ function creditGroups(v: ClientView): DebtGroup[] {
       lines.push(
         [`ועוד ${rest.length} ${rest.length === 1 ? "מלווה" : "מלווים"}`, rb > 0 ? `${ils(rb)} ₪ יתרה` : "", rm > 0 ? `${ils(rm)} ₪ לחודש` : ""]
           .filter(Boolean)
-          .join(" · ")
+          .join(", ")
       );
     }
     return {

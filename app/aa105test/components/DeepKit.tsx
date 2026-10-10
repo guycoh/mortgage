@@ -1,15 +1,15 @@
 "use client";
 
 // The pieces the two advisor deep-dives are built from — the credit report's
-// and the bank letter's. Same reading as the board's analysis modals (findings
-// first, every finding pointing at the evidence it was drawn from), set in the
-// brief's visual language: one sheet per section, ink text, colour for
-// severity and identity only.
+// and the bank letter's. The same reading as the board's analysis modals
+// (findings first, each pointing at the evidence it was drawn from), typeset
+// like the client brief: one sheet, sections opened by a rule, ledger rows,
+// colour for severity and identity only.
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import NumberFlow from "@number-flow/react";
 import { motion, useInView, useReducedMotion } from "motion/react";
-import { ArrowLeft, CaretDown } from "@phosphor-icons/react";
+import { CaretDown } from "@phosphor-icons/react";
 import { useStageGo } from "./Stage";
 
 export type Sev = "critical" | "high" | "medium" | "info";
@@ -41,6 +41,7 @@ export interface Kpi {
   tone?: "neg" | "warn" | "primary";
 }
 
+/** The headline figures as one ruled row — the statement's summary line. */
 export function Kpis({ items }: { items: Kpi[] }) {
   const reduce = useReducedMotion();
   const [on, setOn] = useState(false);
@@ -53,7 +54,7 @@ export function Kpis({ items }: { items: Kpi[] }) {
     transformTiming: { duration: reduce ? 0 : 800, easing: "cubic-bezier(0.16, 1, 0.3, 1)" },
   };
   return (
-    <dl className="brf-kpis">
+    <dl className="brf-kpis" style={{ ["--n" as string]: items.length }}>
       {items.map((k) => (
         <div key={k.label} className="brf-kpi" data-tone={k.tone}>
           <dt>{k.label}</dt>
@@ -80,9 +81,9 @@ export function Kpis({ items }: { items: Kpi[] }) {
 
 /* ----------------------------------------------------------------- sections */
 
+/** A section of the file: opened by a rule, named on it, the evidence below. */
 export function Sec({
   id,
-  icon,
   title,
   aside,
   lit,
@@ -91,6 +92,7 @@ export function Sec({
   children,
 }: {
   id: string;
+  /** Accepted for call-site compatibility; sections are named, not iconed. */
   icon?: ReactNode;
   title: string;
   aside?: ReactNode;
@@ -106,13 +108,12 @@ export function Sec({
   return (
     <section id={id} className="brf-sec" data-lit={lit || undefined}>
       <header className="brf-sec-head">
-        {icon && <span className="brf-sec-ico">{icon}</span>}
         <h2 className="brf-sec-title">{title}</h2>
         {aside && <span className="brf-sec-aside">{aside}</span>}
         {fold && (
           <button className="brf-fold" onClick={() => setOpen((o) => !o)} aria-expanded={shown}>
-            <CaretDown size={13} weight="bold" style={{ transform: shown ? "rotate(180deg)" : undefined, transition: "transform .18s ease" }} />
             {shown ? "הסתרה" : fold}
+            <CaretDown size={12} weight="bold" style={{ transform: shown ? "rotate(180deg)" : undefined, transition: "transform .18s ease" }} />
           </button>
         )}
       </header>
@@ -137,14 +138,7 @@ export interface FindingItem {
   uids?: string[];
 }
 
-export function Findings({
-  items,
-  onGo,
-}: {
-  items: FindingItem[];
-  /** Light the rows behind a finding; the stage scrolls to them. */
-  onGo: (f: FindingItem) => void;
-}) {
+export function Findings({ items, onGo }: { items: FindingItem[]; onGo: (f: FindingItem) => void }) {
   const go = useStageGo();
   return (
     <ol className="brf-finds">
@@ -171,56 +165,47 @@ function FindingRow({ f, i, onGo }: { f: FindingItem; i: number; onGo?: () => vo
   const ref = useRef<HTMLLIElement>(null);
   const seen = useInView(ref, { once: true, margin: "0px 0px -6% 0px" });
   const reduce = useReducedMotion();
+  const where = f.where?.length ? Array.from(new Set(f.where)).slice(0, 4) : [];
   return (
     <motion.li
       ref={ref}
       className="brf-find"
       data-tone={f.severity}
-      initial={{ opacity: 0, y: reduce ? 0 : 10 }}
-      animate={seen ? { opacity: 1, y: 0 } : undefined}
-      transition={{ duration: reduce ? 0 : 0.45, ease: [0.16, 1, 0.3, 1], delay: reduce ? 0 : Math.min(i, 6) * 0.04 }}
+      initial={{ opacity: 0 }}
+      animate={seen ? { opacity: 1 } : undefined}
+      transition={{ duration: reduce ? 0 : 0.4, delay: reduce ? 0 : Math.min(i, 6) * 0.03 }}
     >
       <span className="brf-find-sev">{SEV_LABEL[f.severity]}</span>
       <div className="brf-find-body">
-        <div className="brf-find-head">
-          <h3>{f.title}</h3>
+        <h3>
+          {f.title}
           {f.amount !== undefined && f.amount > 0 && <Shekel value={f.amount} className="brf-find-amt" />}
-        </div>
+        </h3>
         <p>{f.detail}</p>
-        {f.where?.length ? (
-          <div className="brf-chips">
-            {Array.from(new Set(f.where))
-              .slice(0, 6)
-              .map((w) => (
-                <span key={w} className="brf-chip">
-                  {w}
-                </span>
-              ))}
-          </div>
-        ) : null}
+        {where.length > 0 && <p className="brf-find-where">{where.join(", ")}</p>}
       </div>
       {onGo && (
         <button className="brf-find-go" onClick={onGo}>
           לנתונים
-          <ArrowLeft size={13} weight="bold" />
         </button>
       )}
     </motion.li>
   );
 }
 
-/** "3 מהותי · 4 לתשומת לב" — the findings' weight at a glance. */
+/** "2 מהותי, 4 לתשומת לב" — the findings' weight, in words. */
 export function SevCounts({ items }: { items: { severity: Sev }[] }) {
+  const parts = (["critical", "high", "medium", "info"] as Sev[])
+    .map((s) => ({ s, n: items.filter((x) => x.severity === s).length }))
+    .filter((x) => x.n > 0);
   return (
     <span className="brf-sevs">
-      {(["critical", "high", "medium", "info"] as Sev[]).map((s) => {
-        const n = items.filter((x) => x.severity === s).length;
-        return n ? (
-          <span key={s} className="brf-sev" data-tone={s}>
-            {n} {SEV_LABEL[s]}
-          </span>
-        ) : null;
-      })}
+      {parts.map(({ s, n }, i) => (
+        <span key={s} data-tone={s}>
+          {n} {SEV_LABEL[s]}
+          {i < parts.length - 1 ? "," : ""}
+        </span>
+      ))}
     </span>
   );
 }
@@ -250,17 +235,14 @@ export function Bars({
           />
         ))}
       </div>
-      <ul className="brf-key brf-key-sm">
+      <ul className="brf-bars-key">
         {shown.map((p) => (
           <li key={p.key} style={{ ["--c" as string]: p.color }}>
-            <span className="brf-key-label">{p.label}</span>
-            <span className="brf-key-figs">
-              <span className="brf-key-pct" dir="ltr">
-                {pct(p.share)}
-              </span>
-              <Shekel value={p.amount} className="brf-key-amt" />
-              {p.note && <span className="brf-key-note">ריבית {p.note}</span>}
-            </span>
+            <i />
+            <span className="brf-bars-label">{p.label}</span>
+            <b>{pct(p.share)}</b>
+            <Shekel value={p.amount} />
+            {p.note && <span>ריבית {p.note}</span>}
           </li>
         ))}
       </ul>

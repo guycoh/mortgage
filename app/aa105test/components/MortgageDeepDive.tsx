@@ -29,7 +29,8 @@ import { FREQ_PRIME, freqLabel } from "@/lib/rate-frequency";
 import { FEE_MONTHS_OF_INTEREST_CHEAP } from "@/lib/verdicts";
 import { BankIcon } from "@/app/aa102test/components/bankIcons";
 import { docFromStatement } from "../lib/brief";
-import { Flow } from "./BriefView";
+import { ShareTable } from "./BriefView";
+import Logo from "@/app/aa102test/components/Logo";
 import Stage from "./Stage";
 import {
   Dash,
@@ -69,9 +70,9 @@ function TrancheIdent({ t }: { t: BankTranche }) {
         <b title={t.rawTrack}>{trackName(t)}</b>
         {(t.balanceApportioned || (t.arrears ?? 0) > 0) && (
           <span className="brf-ident-chips">
-            {(t.arrears ?? 0) > 0 && <span className="brf-chip brf-chip-xs" data-tone="neg">בפיגור ₪{(t.arrears ?? 0).toLocaleString("he-IL")}</span>}
+            {(t.arrears ?? 0) > 0 && <span data-tone="neg">בפיגור ₪{(t.arrears ?? 0).toLocaleString("he-IL")}</span>}
             {t.balanceApportioned && (
-              <span className="brf-chip brf-chip-xs" title="חושבה מתוך יתרת ההלוואה; אינה יתרה נפרדת שהבנק דיווח.">
+              <span title="חושבה מתוך יתרת ההלוואה; אינה יתרה נפרדת שהבנק דיווח.">
                 יתרה מוערכת
               </span>
             )}
@@ -157,7 +158,7 @@ function RecycleMap({ a }: { a: StatementAnalysis }) {
           <div className="brf-map-tip" style={{ left: `${(X(hp.x) / W) * 100}%`, top: `${(Y(hp.y) / H) * 100}%` }}>
             <b>{trackName(hp.c.tranche)}</b>
             <span>
-              <Shekel value={hp.b} /> · ריבית {rate2(hp.x)}
+              <Shekel value={hp.b} />, ריבית {rate2(hp.x)}
             </span>
             <span>עמלה: {hp.y === 0 ? "ללא" : `${hp.y} חודשי ריבית`}</span>
           </div>
@@ -174,55 +175,69 @@ function RecycleMap({ a }: { a: StatementAnalysis }) {
           <i data-k="sweet" />
           ריבית מ-{dear}% ועמלה עד {cheap} חודשי ריבית
         </span>
-        <span>אנכי: עמלה בחודשי ריבית · אופקי: ריבית · גודל: יתרה</span>
+        <span>אנכי: עמלה בחודשי ריבית, אופקי: ריבית, גודל: יתרה</span>
         {missing > 0 && <span>{missing === 1 ? "מסלול אחד שלא דווחה בו עמלה אינו במפה" : `${missing} מסלולים שלא דווחה בהם עמלה אינם במפה`}</span>}
       </figcaption>
     </figure>
   );
 }
 
-/* ------------------------------------------------ resets on a twelve-month line */
+/* ---------------------------------------------- resets, as the dates they fall on */
 
-function ResetLine({ a }: { a: StatementAnalysis }) {
-  const reduce = useReducedMotion();
+/**
+ * Each date a rate is reset, with what resets on it. Tracks of one loan usually
+ * share the date, so they are said once under it rather than drawn as dots that
+ * land on top of each other.
+ */
+function ResetDates({ a, lit }: { a: StatementAnalysis; lit?: Set<string> }) {
   const parse = (d: string) => {
     const m = /(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(d || "");
     return m ? new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1])) : null;
   };
   const from = parse(a.statement.statementDate) ?? new Date();
-  const to = new Date(from.getFullYear(), from.getMonth() + 12, from.getDate());
-  const items = a.upcomingResets
-    .map((t) => ({ t, d: parse(t.nextReset) }))
-    .filter((x): x is { t: BankTranche; d: Date } => !!x.d);
-  if (!items.length) return null;
-  const span = to.getTime() - from.getTime();
-  const at = (d: Date) => Math.min(1, Math.max(0, (d.getTime() - from.getTime()) / span));
-  const maxB = Math.max(...items.map((x) => x.t.balance ?? 0), 1);
-  const months = Array.from({ length: 13 }, (_, i) => new Date(from.getFullYear(), from.getMonth() + i, 1));
+  const byDate = new Map<string, { d: Date; items: BankTranche[] }>();
+  for (const t of a.upcomingResets) {
+    const d = parse(t.nextReset);
+    if (!d) continue;
+    const k = t.nextReset;
+    byDate.set(k, { d, items: [...(byDate.get(k)?.items ?? []), t] });
+  }
+  const dates = Array.from(byDate.values()).sort((x, y) => x.d.getTime() - y.d.getTime());
+  if (!dates.length) return null;
+  const inMonths = (d: Date) => Math.max(0, (d.getFullYear() - from.getFullYear()) * 12 + d.getMonth() - from.getMonth());
   return (
-    <div className="brf-resets">
-      <div className="brf-resets-line">
-        {months.map((m, i) => (
-          <span key={i} className="brf-resets-tick" style={{ insetInlineStart: `${(i / 12) * 100}%` }}>
-            {i % 3 === 0 && <em>{`${String(m.getMonth() + 1).padStart(2, "0")}/${String(m.getFullYear()).slice(2)}`}</em>}
-          </span>
-        ))}
-        {items.map(({ t, d }, i) => {
-          const size = 14 + 22 * Math.sqrt((t.balance ?? 0) / maxB);
-          return (
-            <motion.span
-              key={t.uid}
-              className="brf-resets-dot"
-              style={{ insetInlineStart: `${at(d) * 100}%`, width: size, height: size, background: TRACK_COLOR[trackKey(t)] ?? "#8b93a7" }}
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ type: "spring", stiffness: 260, damping: 18, delay: reduce ? 0 : 0.15 + i * 0.07 }}
-              title={`${trackName(t)} · ${t.nextReset} · ₪${(t.balance ?? 0).toLocaleString("he-IL")}`}
-            />
-          );
-        })}
-      </div>
-    </div>
+    <ol className="brf-rd">
+      {dates.map(({ d, items }) => {
+        const n = inMonths(d);
+        const sum = items.reduce((s, t) => s + (t.balance ?? 0), 0);
+        return (
+          <li key={d.toISOString()} className="brf-rd-row">
+            <div className="brf-rd-date">
+              <b className="brf-num">{`${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}`}</b>
+              <span className="brf-num">{d.getFullYear()}</span>
+              <em>{n === 0 ? "החודש" : n === 1 ? "בעוד חודש" : `בעוד ${n} חודשים`}</em>
+            </div>
+            <ul className="brf-rd-items">
+              {items.map((t) => (
+                <li key={t.uid} data-lit={lit?.has(t.uid) || undefined}>
+                  <i style={{ background: TRACK_COLOR[trackKey(t)] ?? "#8b93a7" }} />
+                  <span className="brf-rd-name">{trackName(t)}</span>
+                  <span className="brf-rd-rate">{t.rate !== null ? `ריבית כיום ${rate2(t.rate)}` : ""}</span>
+                  <span className="brf-rd-freq">{freqLabel(t.resetMonths) || (t.rateKind === "prime" ? FREQ_PRIME : "")}</span>
+                  <Shekel value={t.balance ?? 0} />
+                </li>
+              ))}
+            </ul>
+            {items.length > 1 && (
+              <div className="brf-rd-sum">
+                <span>סה״כ במועד זה</span>
+                <Shekel value={sum} />
+              </div>
+            )}
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 
@@ -386,42 +401,35 @@ export default function MortgageDeepDive({ analysis: a, onClose }: { analysis: S
       tabs={tabs}
       who={
         <>
-          ניתוח משכנתא · {st.bankLabel}
-          {st.client.name ? ` · ${st.client.name}` : ""}
+          {st.client.name || st.bankLabel}
+          {st.statementDate && <span className="brf-bar-date">{st.statementDate}</span>}
         </>
       }
       onClose={onClose}
     >
-      <div className="brf-page brf-page-dd">
-        <header className="brf-dd-head">
-          <h1 className="brf-h1">ניתוח משכנתא</h1>
-          <div className="brf-dd-who">
-            <span className="brf-chip brf-chip-id">
-              <BankIcon source={st.bankLabel} size={18} />
-              {st.bankLabel}
-            </span>
-            {st.client.name && (
-              <span className="brf-chip brf-chip-id">
-                <IdentificationCard size={15} />
-                {st.client.name}
-                {st.client.idNumber && <span className="brf-num">{st.client.idNumber}</span>}
-              </span>
-            )}
-            {purposes.length > 0 && (
-              <span className="brf-chip">
-                <Target size={14} />
-                {purposes.join(" · ")}
-              </span>
-            )}
-            {eligibility && (
-              <span className="brf-chip">
-                <SealCheck size={14} weight="fill" />
-                זכאות
-              </span>
-            )}
-            {st.statementDate && <span className="brf-chip">נכון ל-{st.statementDate}</span>}
-          </div>
+      <article className="brf-sheet brf-sheet-dd">
+        <header className="brf-mast">
+          <span className="brf-mark">
+            <Logo size={24} />
+            <span>מורגי</span>
+          </span>
+          <span className="brf-mast-doc">
+            ניתוח משכנתא
+            {st.statementDate && <span className="brf-num">{st.statementDate}</span>}
+          </span>
         </header>
+        <div className="brf-who">
+          <h1>{st.client.name || "ניתוח משכנתא"}</h1>
+          <span className="brf-who-bank">
+            <BankIcon source={st.bankLabel} size={20} />
+            {st.bankLabel}
+          </span>
+          {(purposes.length > 0 || eligibility || st.client.idNumber) && (
+            <span className="brf-who-meta">
+              {[purposes.join(", "), eligibility ? "זכאות" : "", st.client.idNumber ? `ת״ז ${st.client.idNumber}` : ""].filter(Boolean).join(", ")}
+            </span>
+          )}
+        </div>
 
         <Kpis
           items={[
@@ -430,7 +438,7 @@ export default function MortgageDeepDive({ analysis: a, onClose }: { analysis: S
               value: a.totals.balance,
               kind: "money",
               tone: "primary",
-              sub: `${a.live.length} מסלולים · ${st.loans.length > 1 ? `${st.loans.length} הלוואות` : "הלוואה אחת"}`,
+              sub: `${a.live.length} מסלולים, ${st.loans.length > 1 ? `${st.loans.length} הלוואות` : "הלוואה אחת"}`,
             },
             {
               label: "החזר חודשי",
@@ -458,7 +466,7 @@ export default function MortgageDeepDive({ analysis: a, onClose }: { analysis: S
               sub:
                 a.totals.balance > 0
                   ? `${((a.totals.breakFee / a.totals.balance) * 100).toFixed(2)}% מהיתרה${
-                      a.feeUnreported.length ? ` · לא דווחה ל-${a.feeUnreported.length === 1 ? "מסלול אחד" : `${a.feeUnreported.length} מסלולים`}` : ""
+                      a.feeUnreported.length ? `, לא דווחה ל-${a.feeUnreported.length === 1 ? "מסלול אחד" : `${a.feeUnreported.length} מסלולים`}` : ""
                     }`
                   : undefined,
             },
@@ -475,10 +483,10 @@ export default function MortgageDeepDive({ analysis: a, onClose }: { analysis: S
           id="mix"
           icon={<ChartPieSlice size={18} weight="fill" />}
           title="תמהיל המסלולים"
-          aside={`${pct(a.exposure.variableShare)} משתנה · ${pct(a.exposure.linkedShare)} צמוד${a.exposure.fxShare > 0 ? ` · ${pct(a.exposure.fxShare)} מט"ח` : ""}`}
+          aside={`${pct(a.exposure.variableShare)} משתנה, ${pct(a.exposure.linkedShare)} צמוד${a.exposure.fxShare > 0 ? `, ${pct(a.exposure.fxShare)} מט"ח` : ""}`}
           lit={lit?.section === "mix"}
         >
-          <Flow doc={doc} bare />
+          <ShareTable doc={doc} />
         </Sec>
 
         <Sec
@@ -523,7 +531,7 @@ export default function MortgageDeepDive({ analysis: a, onClose }: { analysis: S
                     <span className="brf-cell-sub">
                       {t.breakFee === null
                         ? "המסמך אינו מציין עמלה"
-                        : t.breakFeeParts.map((p) => `${p.label} ₪${Math.round(p.amount).toLocaleString("he-IL")}`).join(" · ")}
+                        : t.breakFeeParts.map((p) => `${p.label} ₪${Math.round(p.amount).toLocaleString("he-IL")}`).join(", ")}
                     </span>
                   </span>
                 </li>
@@ -566,19 +574,7 @@ export default function MortgageDeepDive({ analysis: a, onClose }: { analysis: S
             aside={<Shekel value={a.exposure.resettingWithinYear} />}
             lit={lit?.section === "resets"}
           >
-            <ResetLine a={a} />
-            <RowList
-              rows={a.upcomingResets}
-              rowKey={(t) => t.uid}
-              lit={L("resets")}
-              cols={[
-                { key: "who", head: "", w: "minmax(0, 1.9fr)", lead: true, cell: (t) => <TrancheIdent t={t} /> },
-                { key: "bal", head: "יתרה", w: "minmax(0, 1fr)", cell: (t) => <Shekel value={t.balance ?? 0} /> },
-                { key: "rate", head: "ריבית כיום", w: "minmax(0, 0.9fr)", cell: (t) => <RateCell rate={t.rate} heat={rateHeat(t.rate)} max={8} /> },
-                { key: "when", head: "מועד העדכון", w: "minmax(0, 0.9fr)", cell: (t) => <b className="brf-num">{t.nextReset || "—"}</b> },
-                { key: "freq", head: "תדירות", w: "minmax(0, 0.9fr)", cell: (t) => <span>{freqLabel(t.resetMonths) || (t.rateKind === "prime" ? FREQ_PRIME : "—")}</span> },
-              ]}
-            />
+            <ResetDates a={a} lit={L("resets")} />
             <p className="brf-sec-note">לפני כל מועד עדכון יש לבדוק מול הבנק את עמלת הפירעון הצפויה בו, ולהשוות לעמלה שבמסמך.</p>
           </Sec>
         )}
@@ -650,7 +646,7 @@ export default function MortgageDeepDive({ analysis: a, onClose }: { analysis: S
                         <td data-text><span className="brf-num">{l.loanNumber}</span></td>
                         <td data-text>
                           {l.purpose || PURPOSE_LABEL[l.purposeKind]}
-                          {l.funding === "eligibility" ? " · זכאות" : ""}
+                          {l.funding === "eligibility" ? ", זכאות" : ""}
                         </td>
                         <td><span className="brf-num">{l.tranches.length}</span></td>
                         <td>{l.printed.balance ? <Shekel value={l.printed.balance} /> : <Dash />}</td>
@@ -675,7 +671,7 @@ export default function MortgageDeepDive({ analysis: a, onClose }: { analysis: S
             הניתוח נגזר אוטומטית מתדפיס הבנק ואינו תחליף לקריאת המסמך המקורי. עמלות פירעון מוקדם משתנות מדי יום ותקפות למועד המסמך בלבד.
           </p>
         </Sec>
-      </div>
+      </article>
     </Stage>
   );
 }
