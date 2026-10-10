@@ -93,7 +93,7 @@ function Fee({ t }: { t: BankTranche }) {
 
 /* --------------------------------------------- the recycle map: rate × fee */
 
-function RecycleMap({ a }: { a: StatementAnalysis }) {
+export function RecycleMap({ a }: { a: StatementAnalysis }) {
   const reduce = useReducedMotion();
   const [hover, setHover] = useState<string | null>(null);
   const pts = a.recycle
@@ -190,7 +190,7 @@ function RecycleMap({ a }: { a: StatementAnalysis }) {
  * share the date, so they are said once under it rather than drawn as dots that
  * land on top of each other.
  */
-function ResetDates({ a, lit }: { a: StatementAnalysis; lit?: Set<string> }) {
+export function ResetDates({ a, lit }: { a: StatementAnalysis; lit?: Set<string> }) {
   const parse = (d: string) => {
     const m = /(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(d || "");
     return m ? new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1])) : null;
@@ -244,7 +244,7 @@ function ResetDates({ a, lit }: { a: StatementAnalysis; lit?: Set<string> }) {
 
 /* ---------------------------------------------- principal and what the CPI added */
 
-function IndexBars({ a, lit }: { a: StatementAnalysis; lit?: Set<string> }) {
+export function IndexBars({ a, lit }: { a: StatementAnalysis; lit?: Set<string> }) {
   const rows = a.live.filter((t) => (t.indexation ?? 0) !== 0 || t.baseIndex);
   const max = Math.max(...rows.map((t) => (t.principal ?? 0) + Math.max(0, t.indexation ?? 0)), 1);
   return (

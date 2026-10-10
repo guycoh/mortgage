@@ -407,6 +407,161 @@ export function ShareTable({ doc }: { doc: BriefDoc }) {
   );
 }
 
+
+/* ------------------------------------------------------- the pain sheet */
+//
+// What the customer is told, debt by debt: each mortgage and loan from the
+// report with the one number that hurts — the interest still to come, a dear
+// rate, an arrear. Then one line for everything else that needs attention.
+
+const pc = (n: number) => roundTo(n, n >= 100000 ? 1000 : 100);
+
+function Headline({ doc }: { doc: BriefDoc }) {
+  const on = useMounted(500);
+  const book = doc.book ?? [];
+  const future = book.reduce((s, g) => s + g.rows.reduce((t, r) => t + (r.future ?? 0), 0), 0);
+  return (
+    <div className="brf-ps-head">
+      {doc.monthly !== null ? (
+        <div className="brf-ps-big">
+          <span className="brf-op-label">כל חודש</span>
+          <Rolling kind="money" value={doc.monthly} shown />
+        </div>
+      ) : (
+        <div className="brf-ps-big">
+          <span className="brf-op-label">יתרת המשכנתא</span>
+          <Rolling kind="money" value={doc.balance} shown />
+        </div>
+      )}
+      {future > 0 && (
+        <div className="brf-ps-big" data-pain>
+          <span className="brf-op-label">ריבית שעוד תשלמו</span>
+          <Mark show={on} delay={0.2}>
+            <span className="brf-approx">כ-</span>
+            <Rolling kind="money" value={pc(future)} shown duration={1500} />
+          </Mark>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LoanPains({ doc }: { doc: BriefDoc }) {
+  const ref = useRef<HTMLOListElement>(null);
+  const seen = useInView(ref, { once: true, margin: "0px 0px -8% 0px" });
+  const credit = doc.source === "credit";
+  const rows = (doc.book ?? []).flatMap((g) => g.rows.map((r) => ({ ...r, group: g.key })));
+  let k = 0;
+  return (
+    <ol ref={ref} className="brf-ps-list">
+      {rows.map((r) => {
+        const i = k++;
+        const loan = r.group === "loan";
+        return (
+          <li key={r.key} className="brf-ps-row" data-late={r.late || undefined}>
+            <div className="brf-ps-top">
+              <span className="brf-ps-who">
+                {r.dot ? <i className="brf-bk-dot" style={{ background: r.dot }} /> : <BankIcon source={r.source} size={22} />}
+                <b>{credit ? `${r.kind} · ${r.name}` : r.kind}</b>
+              </span>
+              <Shekel value={r.balance} className="brf-ps-bal" />
+            </div>
+            <p className="brf-ps-pain">
+              {r.late ? (
+                <Mark show={seen} tone="pen" delay={0.1 + i * 0.06}>
+                  {r.overdue ? (
+                    <>
+                      בפיגור <Shekel value={r.overdue} />
+                    </>
+                  ) : (
+                    "בפיגור"
+                  )}
+                </Mark>
+              ) : (
+                <>
+                  {r.rate && (loan || r.hot || !credit) && (
+                    <span>
+                      ריבית{" "}
+                      {r.hot ? (
+                        <Mark show={seen} delay={0.1 + i * 0.06}>
+                          <span dir="ltr">{r.rate}</span>
+                        </Mark>
+                      ) : (
+                        <span dir="ltr">{r.rate}</span>
+                      )}
+                    </span>
+                  )}
+                  {r.future !== undefined && (
+                    <span>
+                      עוד{" "}
+                      <Mark show={seen} tone={loan && !r.hot ? "soft" : "marker"} delay={0.2 + i * 0.06}>
+                        כ-<Shekel value={pc(r.future)} />
+                      </Mark>{" "}
+                      ריבית{r.endYear && !loan ? ` עד ${r.endYear}` : ""}
+                    </span>
+                  )}
+                  {loan && r.monthly !== null && (
+                    <span>
+                      <Shekel value={r.monthly} /> בחודש
+                    </span>
+                  )}
+                </>
+              )}
+            </p>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+/** Pains the list does not already say — rates and arrears are on the rows. */
+const ON_ROWS = new Set(["expensive", "consumer-weight", "recycle", "arrears", "arrears-now"]);
+
+function figText(f: BriefFigure): string {
+  switch (f.kind) {
+    case "money":
+      return `₪${ils(f.value)}`;
+    case "share":
+      return pct(f.value);
+    case "rate":
+      return `${(Math.round(f.value * 100) / 100).toString()}%`;
+    case "years":
+      return `${Math.round(f.value)} שנים`;
+    default:
+      return String(Math.round(f.value));
+  }
+}
+
+function Extras({ doc }: { doc: BriefDoc }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const seen = useInView(ref, { once: true });
+  const items = doc.pains
+    .filter((p) => p.group !== "info" && !p.good && !p.id.startsWith("distress:") && !p.id.split("+").some((x) => ON_ROWS.has(x)))
+    .slice(0, 6);
+  if (!items.length) return null;
+  return (
+    <div ref={ref} className="brf-ps-extra">
+      <span className="brf-op-label">בנוסף</span>
+      <p>
+        {items.map((p, i) => (
+          <span key={p.id} className="brf-ps-chip" data-tone={p.tone}>
+            {p.title}
+            {p.figure && (
+              <>
+                {" "}
+                <Mark show={seen} tone={p.tone === "critical" ? "pen" : "soft"} delay={0.1 + i * 0.05}>
+                  <span dir="ltr">{figText(p.figure)}</span>
+                </Mark>
+              </>
+            )}
+          </span>
+        ))}
+      </p>
+    </div>
+  );
+}
+
 /* --------------------------------------------------------------- page */
 
 export default function BriefView({
@@ -432,7 +587,7 @@ export default function BriefView({
 
   return (
     <div className="brf-desk" data-mode={mode}>
-      <article className="brf-sheet brf-op">
+      <article className="brf-sheet brf-op brf-ps">
         <header className="brf-mast">
           <span className="brf-mark">
             <Logo size={mode === "client" ? 28 : 24} />
@@ -454,12 +609,9 @@ export default function BriefView({
           )}
         </div>
 
-        <Figures doc={doc} />
-
-        <div className="brf-op-cols">
-          <Book doc={doc} />
-          <Pains doc={doc} />
-        </div>
+        <Headline doc={doc} />
+        <LoanPains doc={doc} />
+        <Extras doc={doc} />
 
         {mode === "client" && (advisor?.name || phone) && (
           <section className="brf-op-contact" aria-label="יצירת קשר">

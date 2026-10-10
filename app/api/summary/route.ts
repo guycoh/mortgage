@@ -52,6 +52,10 @@ const BookRow = z.object({
   rate: text(40).nullable(),
   hot: z.boolean().optional(),
   late: z.boolean().optional(),
+  overdue: money.optional(),
+  future: money.optional(),
+  endYear: z.number().int().optional(),
+  kind: text(60),
 });
 const BookGroup = z.object({
   key: text(20),

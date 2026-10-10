@@ -126,8 +126,8 @@ const AbilityTool = dynamic(() => import("./ability/AbilityCalculator"), { loadi
 // /aa105test's full-screen client brief and deep-dives. Loaded only on that
 // route (variant "v105"), so /aa102test ships none of it.
 const ClientBrief = dynamic(() => import("@/app/aa105test/components/ClientBrief"), { ssr: false });
-const CreditDeepDive = dynamic(() => import("@/app/aa105test/components/CreditDeepDive"), { ssr: false });
-const MortgageDeepDive = dynamic(() => import("@/app/aa105test/components/MortgageDeepDive"), { ssr: false });
+const CreditDeepDive = dynamic(() => import("@/app/aa105test/components/CreditModal"), { ssr: false });
+const MortgageDeepDive = dynamic(() => import("@/app/aa105test/components/MortgageModal"), { ssr: false });
 
 type Mix = {
   id: string;

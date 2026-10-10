@@ -445,6 +445,14 @@ export interface BookRow {
   /** The rate is dear for its family. */
   hot?: boolean;
   late?: boolean;
+  /** Overdue amount the report prints. */
+  overdue?: number;
+  /** Interest still to come at today's rate, without indexation (an estimate). */
+  future?: number;
+  /** The year the last part of it ends. */
+  endYear?: number;
+  /** "משכנתא" / "הלוואה" / "5 הלוואות" / a track's plain name. */
+  kind: string;
 }
 
 export interface BookGroup {
@@ -614,7 +622,18 @@ function creditGroups(v: ClientView): DebtGroup[] {
 }
 
 /** Mortgages and loans from the client view's own rows — one line per lender. */
-function bookFromCredit(v: ClientView): BookGroup[] {
+/** Interest to come and the last end year over a set of report lines. */
+function ahead(lines: { balance: number; rate: number | null; months: number | null; endDate: string }[]) {
+  const future = sum(lines, (l) => annuityInterest(l.balance, l.rate ?? 0, l.months ?? 0));
+  const years = lines
+    .filter((l) => (l.months ?? 0) > 0)
+    .map((l) => ym(l.endDate)?.[0] ?? 0)
+    .filter((y) => y > 0);
+  return { future: future > 0 ? future : undefined, endYear: years.length ? Math.max(...years) : undefined };
+}
+
+function bookFromCredit(v: ClientView, lines: Analysis["lines"]): BookGroup[] {
+  const byUid = new Map(lines.map((l) => [l.uid, l]));
   return v.sections
     .filter((sec) => sec.key !== "card" && sec.rows.length > 0)
     .map((sec) => ({
@@ -626,6 +645,7 @@ function bookFromCredit(v: ClientView): BookGroup[] {
         .sort((x, y) => y.balance - x.balance)
         .map((r) => {
           const m = monthlyOf(r);
+          const own = r.uids.map((u) => byUid.get(u)).filter((l): l is NonNullable<typeof l> => !!l);
           const lo = r.minRate !== null && r.minRate > 0 ? pct1(r.minRate) : null;
           const hi = r.maxRate !== null && r.maxRate > 0 ? pct1(r.maxRate) : null;
           return {
@@ -638,6 +658,9 @@ function bookFromCredit(v: ClientView): BookGroup[] {
             rate: hi ? (lo && lo !== hi ? `${lo}%–${hi}%` : `${hi}%`) : null,
             hot: rateHeat(r.maxRate, r.family) === "hot" || undefined,
             late: r.late || undefined,
+            overdue: r.overdue > 0 ? r.overdue : undefined,
+            ...ahead(own),
+            kind: sec.key === "mortgage" ? "משכנתא" : r.parts > 1 ? `${r.parts} הלוואות` : "הלוואה",
           };
         }),
       total: { balance: sum(sec.rows, (r) => r.balance), monthly: sum(sec.rows, (r) => r.monthly) },
@@ -656,7 +679,7 @@ export function docFromCredit(a: Analysis): BriefDoc {
   // (the row; the ערבויות line) — repeating them here is only more text.
   if (v.cardParts.unreportedCount > 0)
     notes.push(`לא דווח חיוב עבור ${v.cardParts.unreportedCount === 1 ? "מסגרת אחת" : `${v.cardParts.unreportedCount} מסגרות`}.`);
-  return { ...briefFromCredit(a), book: bookFromCredit(v), groups: creditGroups(v), cards: v.footer.cards, payoff: null, notes };
+  return { ...briefFromCredit(a), book: bookFromCredit(v, a.lines), groups: creditGroups(v), cards: v.footer.cards, payoff: null, notes };
 }
 
 /* ------------------------------------------------------------- bank rows */
@@ -719,6 +742,8 @@ export function docFromStatement(a: StatementAnalysis): BriefDoc {
           rate: t.rate !== null ? `${t.rate.toFixed(2)}%` : null,
           hot: t.dear || undefined,
           late: t.late || undefined,
+          ...ahead(a.live.filter((x) => trackKey(x) === t.key).map((x) => ({ balance: x.balance ?? 0, rate: x.rate, months: x.months, endDate: x.endDate }))),
+          kind: TRACK_LABEL[t.key] ?? t.label,
         })),
         total: { balance: a.totals.balance, monthly: a.totals.monthly },
       },
