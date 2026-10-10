@@ -41,6 +41,25 @@ const Row = z.object({
   monthlyNotes: z.array(text(120)).max(4),
   alarm: z.boolean().optional(),
 });
+const OweItem = z.object({
+  label: text(80),
+  balance: money,
+  monthly: money.nullable(),
+  monthlyLabel: text(40).optional(),
+  tags: z.array(Fact).max(8),
+});
+const OweBlock = z.object({
+  key: text(120),
+  source: text(160),
+  name: text(120),
+  dot: text(20).optional(),
+  balance: money,
+  monthly: money,
+  parts: z.array(z.object({ key: text(40), color: text(20), balance: money })).max(6),
+  items: z.array(OweItem).max(20),
+  tags: z.array(Fact).max(10),
+  alarm: z.boolean().optional(),
+});
 const Slice = z.object({ key: text(40), label: text(60), color: text(20), balance: money, monthly: money, interest: money });
 const Doc = z.object({
   source: z.enum(["credit", "bank"]),
@@ -59,6 +78,7 @@ const Doc = z.object({
     .object({ label: text(60), color: text(20), balanceShare: money, lens: z.enum(["monthly", "interest"]), lensShare: money })
     .nullable(),
   pains: z.array(Pain).max(40),
+  owed: z.array(OweBlock).max(30),
   groups: z
     .array(
       z.object({

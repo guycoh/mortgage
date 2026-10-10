@@ -1,29 +1,28 @@
 "use client";
 
-// סיכום ללקוח — the household's debts as one statement, marked by their advisor.
+// סיכום ללקוח — one page: what the household owes, to whom, and what hurts.
 //
 // One page, two hosts: the advisor turns the screen around inside the board
 // (Stage), and the client opens the same page later from a link (/summary/<id>).
 // Both draw a frozen BriefDoc, so the shared page says exactly what was shown.
 //
-// It is typeset as a statement, not assembled from cards: a masthead, then rows
-// with their name in the margin and the figures beside it, hairlines between,
-// a double rule under the totals. The only colour that carries emphasis is the
-// advisor's marker — yellow highlighter on what needs attention, red pen on what
-// is critical, green on relief. Order is pain first: the total, what it costs,
-// what was marked, where the money goes, then every debt.
-//
-// The drama is in emphasis, never in the numbers: every figure is the
-// document's own or plain arithmetic on it, and the estimates say "כ-".
+// Three things, nothing else:
+//   - the line of figures: total owed, the monthly payment, what the interest
+//     costs per day and until the end, how many years are left;
+//   - who is owed what: one bar per lender (per track on a bank letter), with
+//     each loan or facility under it in a single line;
+//   - what needs attention: tiles of figure + title. The sentence behind each
+//     opens on tap — the page itself stays short.
+// Every figure is the document's own or plain arithmetic on it; estimates say
+// "כ-". Colour is the advisor's marker: yellow highlighter, red pen, green.
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import NumberFlow from "@number-flow/react";
-import { motion, useInView, useReducedMotion } from "motion/react";
-import { Phone, WhatsappLogo } from "@phosphor-icons/react";
+import { AnimatePresence, motion, useInView, useReducedMotion } from "motion/react";
+import { Phone, Plus, WhatsappLogo } from "@phosphor-icons/react";
 import { BankIcon } from "@/app/aa102test/components/bankIcons";
 import Logo from "@/app/aa102test/components/Logo";
-import { WORRY_GROUP_LABEL, WORRY_GROUP_ORDER } from "@/lib/verdicts";
-import type { BriefDoc, BriefFigure, BriefPain, BriefSlice, DebtGroup, DebtRow, Lens } from "../lib/brief";
+import type { BriefDoc, BriefFigure, BriefPain, BriefSlice, Lens, OweBlock } from "../lib/brief";
 import "@fontsource/ibm-plex-sans-hebrew/200.css";
 import "@fontsource/ibm-plex-sans-hebrew/300.css";
 import "@fontsource/ibm-plex-sans-hebrew/400.css";
@@ -38,11 +37,8 @@ const pct = (n: number) => `${Math.round(n * 100)}%`;
 /** Estimates are rounded to what they can honestly claim. */
 const roundTo = (n: number, step: number) => Math.round(n / step) * step;
 
-export const SECTIONS = [
-  { id: "brf-picture", label: "סיכום" },
-  { id: "brf-pains", label: "מה סימנו" },
-  { id: "brf-debts", label: "כל ההתחייבויות" },
-] as const;
+/** Kept for hosts that index the page; the one-pager has no chapters. */
+export const SECTIONS = [] as { id: string; label: string }[];
 
 /* ------------------------------------------------------------ figures */
 
@@ -139,130 +135,258 @@ function useMounted(delay = 140) {
   return on;
 }
 
-/** One statement row: its name in the margin, its content beside it. */
-function Row({ id, label, note, children, className }: { id?: string; label: string; note?: ReactNode; children: ReactNode; className?: string }) {
-  return (
-    <section id={id} className={`brf-r ${className ?? ""}`} aria-label={label}>
-      <h2 className="brf-r-label">
-        {label}
-        {note && <span className="brf-r-note">{note}</span>}
-      </h2>
-      <div className="brf-r-body">{children}</div>
-    </section>
-  );
-}
+/* ---------------------------------------------------- the line of figures */
 
-/* ------------------------------------------------------- the total + costs */
-
-function Total({ doc }: { doc: BriefDoc }) {
+function Figures({ doc }: { doc: BriefDoc }) {
   const on = useMounted();
+  const marks = useMounted(800);
   const reduce = useReducedMotion();
   const credit = doc.source === "credit";
-  return (
-    <Row id="brf-picture" label={credit ? "סך החובות" : "יתרת המשכנתא"} className="brf-r-total">
-      <div className="brf-total" dir="ltr">
-        <span className="brf-total-cur">₪</span>
-        <NumberFlow
-          value={on || reduce ? Math.round(doc.balance) : 0}
-          locales="he-IL"
-          spinTiming={{ duration: reduce ? 0 : 1600, easing: "cubic-bezier(0.16, 1, 0.3, 1)" }}
-          transformTiming={{ duration: reduce ? 0 : 900, easing: "cubic-bezier(0.16, 1, 0.3, 1)" }}
-        />
-      </div>
-      <p className="brf-total-of">
-        {credit
-          ? `${doc.count.debts} התחייבויות אצל ${doc.count.lenders === 1 ? "מלווה אחד" : `${doc.count.lenders} מלווים`}`
-          : `${doc.count.debts === 1 ? "מסלול אחד" : `${doc.count.debts} מסלולים`}`}
-      </p>
-    </Row>
-  );
-}
-
-function Costs({ doc }: { doc: BriefDoc }) {
-  const on = useMounted(700);
-  const reduce = useReducedMotion();
   const cells: { key: string; label: string; fig: ReactNode; foot?: ReactNode }[] = [];
-  if (doc.monthly !== null) {
+  if (doc.monthly !== null)
     cells.push({
       key: "monthly",
       label: "החזר חודשי",
       fig: <Rolling kind="money" value={doc.monthly} shown />,
-      foot:
-        doc.interestShare !== null ? (
-          <>
-            <span className="brf-split" aria-hidden>
-              <motion.span initial={{ scaleX: 0 }} animate={{ scaleX: on ? doc.interestShare : 0 }} transition={{ duration: reduce ? 0 : 1, ease: EASE }} />
-            </span>
-            <span>
-              מזה{" "}
-              <Mark show={on} tone="soft" delay={0.5}>
-                כ-{pct(doc.interestShare)} ריבית
-              </Mark>
-            </span>
-          </>
-        ) : null,
+      foot: doc.interestShare !== null ? <>כ-{pct(doc.interestShare)} הם ריבית</> : undefined,
     });
-  }
-  if (doc.yearlyInterest !== null && doc.yearlyInterest > 0) {
+  if (doc.yearlyInterest !== null && doc.yearlyInterest > 0)
     cells.push({
       key: "day",
       label: "ריבית ליום",
       fig: (
-        <Mark show={on} delay={0.1}>
+        <Mark show={marks} delay={0}>
           <span className="brf-approx">כ-</span>
           <Rolling kind="money" value={doc.yearlyInterest / 365} shown />
         </Mark>
       ),
-      foot: (
-        <span>
-          <Shekel value={roundTo(doc.yearlyInterest, 100)} /> בשנה
-        </span>
-      ),
     });
-  }
-  if (doc.futureInterest !== null && doc.futureInterest > 0) {
+  if (doc.futureInterest !== null && doc.futureInterest > 0)
     cells.push({
       key: "future",
       label: "ריבית עד סוף התקופה",
       fig: (
-        <Mark show={on} delay={0.3}>
+        <Mark show={marks} delay={0.25}>
           <span className="brf-approx">כ-</span>
           <Rolling kind="money" value={roundTo(doc.futureInterest, 1000)} shown duration={1500} />
         </Mark>
       ),
-      foot: <span>לפי הריבית כיום, ללא הצמדה למדד</span>,
     });
-  }
-  if (doc.ends) {
+  if (doc.ends)
     cells.push({
       key: "ends",
       label: "עד סיום התשלומים",
       fig: <Rolling kind="years" value={doc.ends.years} shown />,
-      foot: <span>התשלום האחרון ב-{doc.ends.label}</span>,
+      foot: <>עד {doc.ends.label}</>,
     });
-  }
-  if (!cells.length) return null;
+
   return (
-    <Row label="כמה זה עולה לכם">
-      <dl className="brf-costs" style={{ ["--n" as string]: cells.length }}>
+    <div className="brf-op-figs">
+      <div className="brf-op-total">
+        <span className="brf-op-label">{credit ? "סך החובות" : "יתרת המשכנתא"}</span>
+        <span className="brf-op-total-fig" dir="ltr">
+          <span className="brf-cur">₪</span>
+          <NumberFlow
+            value={on || reduce ? Math.round(doc.balance) : 0}
+            locales="he-IL"
+            spinTiming={{ duration: reduce ? 0 : 1500, easing: "cubic-bezier(0.16, 1, 0.3, 1)" }}
+            transformTiming={{ duration: reduce ? 0 : 800, easing: "cubic-bezier(0.16, 1, 0.3, 1)" }}
+          />
+        </span>
+      </div>
+      <dl className="brf-op-cells">
         {cells.map((c) => (
-          <div key={c.key} className="brf-cost">
-            <dt>{c.label}</dt>
-            <dd className="brf-cost-fig">{c.fig}</dd>
-            {c.foot && <dd className="brf-cost-foot">{c.foot}</dd>}
+          <div key={c.key} className="brf-op-cell">
+            <dt className="brf-op-label">{c.label}</dt>
+            <dd className="brf-op-fig">{c.fig}</dd>
+            {c.foot && <dd className="brf-op-foot">{c.foot}</dd>}
           </div>
         ))}
       </dl>
-    </Row>
+    </div>
   );
 }
 
-/* ------------------------------------------------- where the money goes */
+/* ------------------------------------------------------- who is owed what */
+
+function Tags({ tags }: { tags: { text: string; heat?: "hot" | "warm" }[] }) {
+  if (!tags.length) return null;
+  return (
+    <span className="brf-ow-tags">
+      {tags.map((t, i) => (
+        <span key={i} data-heat={t.heat}>
+          {t.text}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+function Owe({ b, max, i }: { b: OweBlock; max: number; i: number }) {
+  const ref = useRef<HTMLLIElement>(null);
+  const seen = useInView(ref, { once: true });
+  const reduce = useReducedMotion();
+  return (
+    <li ref={ref} className="brf-ow" data-alarm={b.alarm || undefined}>
+      <div className="brf-ow-head">
+        <span className="brf-ow-mark">{b.dot ? <i style={{ background: b.dot }} /> : <BankIcon source={b.source} size={26} />}</span>
+        <span className="brf-ow-name">{b.name}</span>
+        <Shekel value={b.balance} className="brf-ow-bal" />
+        <span className="brf-ow-mon">{b.monthly > 0 ? <><Shekel value={b.monthly} /> לחודש</> : null}</span>
+      </div>
+      {/* The bar: this lender's share of the largest debt, by family. */}
+      <div className="brf-ow-bar" aria-hidden>
+        <motion.div
+          className="brf-ow-fill"
+          style={{ width: `${Math.max(1.2, (b.balance / (max || 1)) * 100)}%` }}
+          initial={{ scaleX: 0 }}
+          animate={{ scaleX: seen ? 1 : 0 }}
+          transition={{ duration: reduce ? 0 : 0.8, ease: EASE, delay: reduce ? 0 : 0.15 + i * 0.07 }}
+        >
+          {b.parts.map((p) => (
+            <span key={p.key} style={{ flexGrow: p.balance, background: p.color }} />
+          ))}
+        </motion.div>
+      </div>
+      {b.tags.length > 0 && <Tags tags={b.tags} />}
+      {b.items.length > 0 && (
+        <ul className="brf-ow-items">
+          {b.items.map((it, k) => (
+            <li key={k}>
+              <span className="brf-ow-item-name">
+                {it.label}
+                <Tags tags={it.tags} />
+              </span>
+              <Shekel value={it.balance} />
+              <span className="brf-ow-item-mon">
+                {it.monthly !== null ? <Shekel value={it.monthly} /> : <span>{it.monthlyLabel}</span>}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </li>
+  );
+}
+
+function Owed({ doc }: { doc: BriefDoc }) {
+  const credit = doc.source === "credit";
+  // A link frozen before the list existed has none; it still opens.
+  const owed = doc.owed ?? [];
+  const max = Math.max(...owed.map((b) => b.balance), 1);
+  const p = doc.payoff;
+  return (
+    <section className="brf-op-col" aria-label={credit ? "למי אתם חייבים" : "המשכנתא לפי מסלולים"}>
+      <h2 className="brf-op-h">{credit ? "למי אתם חייבים" : "המשכנתא לפי מסלולים"}</h2>
+      <ol className="brf-ow-list">
+        {owed.map((b, i) => (
+          <Owe key={b.key} b={b} max={max} i={i} />
+        ))}
+      </ol>
+      <div className="brf-ow-total">
+        <span>{credit ? "סך הכול" : "יתרת המשכנתא"}</span>
+        <Shekel value={doc.balance} className="brf-ow-bal" />
+        <span className="brf-ow-mon">{doc.monthly !== null ? <><Shekel value={doc.monthly} /> לחודש</> : null}</span>
+      </div>
+      {doc.cards > 0 && (
+        <p className="brf-ow-aside">
+          חיוב חודשי בכרטיסים ובמסגרות אשראי, לא כלול בהחזר: <Shekel value={doc.cards} />
+        </p>
+      )}
+      {p && p.payoff > 0 && (
+        <p className="brf-ow-aside">
+          {doc.asOf ? `לסילוק ב-${doc.asOf}: ` : "לסילוק לפי המסמך: "}
+          <Shekel value={p.payoff} />
+          {p.fee > 0 && (
+            <>
+              , מזה עמלת פירעון מוקדם <Shekel value={p.fee} />
+            </>
+          )}
+        </p>
+      )}
+      {doc.notes.map((n) => (
+        <p key={n} className="brf-ow-aside">
+          {n}
+        </p>
+      ))}
+    </section>
+  );
+}
+
+/* ------------------------------------------------------------ the marks */
+
+const toneOf = (p: BriefPain): "marker" | "soft" | "pen" | "good" | null =>
+  p.good ? "good" : p.tone === "critical" ? "pen" : p.tone === "high" ? "marker" : p.tone === "medium" ? "soft" : null;
+
+function Tile({ p, i }: { p: BriefPain; i: number }) {
+  const ref = useRef<HTMLLIElement>(null);
+  const seen = useInView(ref, { once: true, margin: "0px 0px -8% 0px" });
+  const reduce = useReducedMotion();
+  const [open, setOpen] = useState(false);
+  const tone = toneOf(p);
+  return (
+    <li ref={ref} className="brf-tile" data-tone={p.good ? "good" : p.tone} data-open={open || undefined}>
+      <button className="brf-tile-btn" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+        <span className="brf-tile-fig">
+          {p.figure ? (
+            tone ? (
+              <Mark show={seen} tone={tone} delay={0.2 + Math.min(i, 6) * 0.06}>
+                <Rolling kind={p.figure.kind} value={p.figure.value} shown={seen} />
+              </Mark>
+            ) : (
+              <Rolling kind={p.figure.kind} value={p.figure.value} shown={seen} />
+            )
+          ) : (
+            <span className="brf-tile-dot" aria-hidden />
+          )}
+        </span>
+        <span className="brf-tile-title">{p.title}</span>
+        <Plus className="brf-tile-plus" size={13} weight="bold" aria-hidden />
+      </button>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            className="brf-tile-more"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: reduce ? 0 : 0.28, ease: EASE }}
+          >
+            <p>{p.say}</p>
+            {p.next && <p className="brf-tile-next">{p.next}</p>}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </li>
+  );
+}
+
+function Pains({ doc }: { doc: BriefDoc }) {
+  return (
+    <section className="brf-op-col" aria-label="מה דורש תשומת לב">
+      <h2 className="brf-op-h">
+        מה דורש תשומת לב
+        {doc.pains.length > 0 && <span className="brf-op-n">{doc.pains.length}</span>}
+      </h2>
+      {doc.pains.length === 0 ? (
+        <p className="brf-calm">לא נמצאו בדוח נושאים שדורשים טיפול.</p>
+      ) : (
+        <ol className="brf-tiles">
+          {doc.pains.map((p, i) => (
+            <Tile key={p.id} p={p} i={i} />
+          ))}
+        </ol>
+      )}
+    </section>
+  );
+}
+
+/* ------------------------------------- shares (used by the advisor files) */
 
 /**
- * Each part of the debt, as a share of three things: what is owed, what is paid
- * each month, and the interest it costs. A part small in the first column and
- * large in the others is the story — the eye finds it across the row.
+ * Each part of the debt as a share of what is owed, what is paid each month,
+ * and the interest it costs — a part small in the first column and large in
+ * the others is the story.
  */
 export function ShareTable({ doc }: { doc: BriefDoc }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -324,216 +448,6 @@ export function ShareTable({ doc }: { doc: BriefDoc }) {
   );
 }
 
-/* ------------------------------------------------------------ the marks */
-
-const toneOf = (p: BriefPain): "marker" | "soft" | "pen" | "good" | null =>
-  p.good ? "good" : p.tone === "critical" ? "pen" : p.tone === "high" ? "marker" : p.tone === "medium" ? "soft" : null;
-
-function Pain({ p, i, withNext }: { p: BriefPain; i: number; withNext: boolean }) {
-  const ref = useRef<HTMLLIElement>(null);
-  const seen = useInView(ref, { once: true, margin: "0px 0px -15% 0px" });
-  const tone = toneOf(p);
-  return (
-    <li ref={ref} className="brf-pt" data-tone={p.good ? "good" : p.tone}>
-      <div className="brf-pt-fig">
-        {p.figure &&
-          (tone ? (
-            <Mark show={seen} tone={tone} delay={0.15 + Math.min(i, 4) * 0.05}>
-              <Rolling kind={p.figure.kind} value={p.figure.value} shown={seen} />
-            </Mark>
-          ) : (
-            <Rolling kind={p.figure.kind} value={p.figure.value} shown={seen} />
-          ))}
-      </div>
-      <div className="brf-pt-text">
-        <h3>{p.title}</h3>
-        <p>{p.say}</p>
-        {withNext && p.next && <p className="brf-pt-next">{p.next}</p>}
-      </div>
-    </li>
-  );
-}
-
-function Pains({ doc }: { doc: BriefDoc }) {
-  const groups = WORRY_GROUP_ORDER.map((g) => ({ g, rows: doc.pains.filter((p) => p.group === g) })).filter((x) => x.rows.length > 0);
-  return (
-    <Row id="brf-pains" label="מה סימנו לכם" note={doc.pains.length ? (doc.pains.length === 1 ? "נושא אחד" : `${doc.pains.length} נושאים`) : undefined}>
-      {groups.length === 0 ? (
-        <p className="brf-calm">לא נמצאו בדוח נושאים שדורשים טיפול.</p>
-      ) : (
-        groups.map(({ g, rows }) => (
-          <div key={g} className="brf-pg" data-group={g}>
-            <h3 className="brf-pg-title">{WORRY_GROUP_LABEL[g]}</h3>
-            <ol className="brf-pts">
-              {rows.map((p, i) => (
-                <Pain key={p.id} p={p} i={i} withNext={g === "act"} />
-              ))}
-            </ol>
-          </div>
-        ))
-      )}
-    </Row>
-  );
-}
-
-/* ---------------------------------------------------------- the ledger */
-
-function LedgerRow({ r }: { r: DebtRow }) {
-  return (
-    <li className="brf-lr" data-alarm={r.alarm || undefined}>
-      <span className="brf-lr-mark">{r.dot ? <i style={{ background: r.dot }} /> : <BankIcon source={r.source} size={26} />}</span>
-      <div className="brf-lr-id">
-        <div className="brf-lr-name">
-          {r.name}
-          {r.kind && <span className="brf-lr-kind">{r.kind}</span>}
-        </div>
-        {r.facts.length > 0 && (
-          <p className="brf-lr-facts">
-            {r.facts.map((f, i) => (
-              <span key={i} data-heat={f.heat}>
-                {f.text}
-              </span>
-            ))}
-          </p>
-        )}
-      </div>
-      <div className="brf-lr-amt" data-heat={r.balanceHeat}>
-        <span className="brf-lr-cap">יתרה</span>
-        <Shekel value={r.balance} />
-      </div>
-      <div className="brf-lr-amt" data-heat={r.monthlyHeat}>
-        <span className="brf-lr-cap">לחודש</span>
-        {r.monthly !== null ? <Shekel value={r.monthly} /> : <span className="brf-lr-none">{r.monthlyLabel}</span>}
-        {r.monthlyNotes.map((n) => (
-          <span key={n} className="brf-lr-note">
-            {n}
-          </span>
-        ))}
-      </div>
-    </li>
-  );
-}
-
-function Group({ g, solo, noMonthly }: { g: DebtGroup; solo: boolean; noMonthly: boolean }) {
-  const many = g.rows.length + g.lines.length > 1;
-  return (
-    <div className="brf-lg" style={{ ["--fam" as string]: g.color }}>
-      {!solo && (
-        <h3 className="brf-lg-title">
-          <i />
-          {g.title}
-        </h3>
-      )}
-      <ul>
-        {g.rows.map((r) => (
-          <LedgerRow key={r.key} r={r} />
-        ))}
-        {g.lines.map((l) => (
-          <li key={l} className="brf-lr-line">
-            {l}
-          </li>
-        ))}
-      </ul>
-      {many && !solo && (
-        <div className="brf-lsum">
-          <span>סה״כ {g.title}</span>
-          <Shekel value={g.total.balance} />
-          {!noMonthly && (g.total.monthly > 0 ? <Shekel value={g.total.monthly} /> : <span />)}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function Payoff({ doc }: { doc: BriefDoc }) {
-  const p = doc.payoff;
-  if (!p || p.payoff <= 0) return null;
-  return (
-    <div className="brf-payoff">
-      <h3 className="brf-lg-title">{doc.asOf ? `סילוק המשכנתא, נכון ל-${doc.asOf}` : "סילוק המשכנתא לפי המסמך"}</h3>
-      <dl>
-        <div>
-          <dt>סכום לסילוק</dt>
-          <dd>
-            <Shekel value={p.payoff} />
-          </dd>
-        </div>
-        {p.accrued > 0 && (
-          <div>
-            <dt>מזה ריבית שנצברה</dt>
-            <dd>
-              <Shekel value={p.accrued} />
-            </dd>
-          </div>
-        )}
-        <div data-heat={p.fee > 0 ? "hot" : undefined}>
-          <dt>מזה עמלת פירעון מוקדם</dt>
-          <dd>
-            <Shekel value={p.fee} />
-            {p.feeMissing > 0 && (
-              <span className="brf-lr-note">
-                {p.feeMissing === 1 ? "לא כולל מסלול אחד שלא דווחה בו עמלה" : `לא כולל עמלות ב-${p.feeMissing} מסלולים שלא דווחה בהם עמלה`}
-              </span>
-            )}
-          </dd>
-        </div>
-        {p.free > 0 && (
-          <div data-heat="good">
-            <dt>במסלולים ללא עמלת פירעון מוקדם</dt>
-            <dd>
-              <Shekel value={p.free} />
-              {p.operational > 0 && <span className="brf-lr-note">למעט עמלה תפעולית של {ils(p.operational)} ₪</span>}
-            </dd>
-          </div>
-        )}
-      </dl>
-    </div>
-  );
-}
-
-function Debts({ doc }: { doc: BriefDoc }) {
-  const credit = doc.source === "credit";
-  const solo = doc.groups.length === 1;
-  // A letter that prints no instalment anywhere gets no column of "לא דווח".
-  const noMonthly = doc.groups.every((g) => g.rows.every((r) => r.monthly === null && r.monthlyLabel === "לא דווח" && !r.monthlyNotes.length));
-  return (
-    <Row id="brf-debts" label={credit ? "כל ההתחייבויות" : "המסלולים"}>
-      <div className="brf-ledger" data-nomonthly={noMonthly || undefined}>
-        <div className="brf-lhead" aria-hidden>
-          <span />
-          <span>יתרה</span>
-          {!noMonthly && <span>לחודש</span>}
-        </div>
-        {doc.groups.map((g) => (
-          <Group key={g.key} g={g} solo={solo} noMonthly={noMonthly} />
-        ))}
-        {!doc.groups.length && <p className="brf-calm">לא נמצאו התחייבויות פעילות בדוח.</p>}
-
-        <div className="brf-grand">
-          <span>{credit ? "סך החובות" : "יתרת המשכנתא"}</span>
-          <Shekel value={doc.balance} />
-          {!noMonthly && (doc.monthly !== null ? <Shekel value={doc.monthly} /> : <span />)}
-        </div>
-        {doc.cards > 0 && (
-          <div className="brf-grand-sub">
-            <span>חיוב חודשי בכרטיסים ובמסגרות אשראי, לא כלול בהחזר</span>
-            <span />
-            <Shekel value={doc.cards} />
-          </div>
-        )}
-      </div>
-      <Payoff doc={doc} />
-      {doc.notes.length > 0 && (
-        <ul className="brf-notes">
-          {doc.notes.map((n) => (
-            <li key={n}>{n}</li>
-          ))}
-        </ul>
-      )}
-    </Row>
-  );
-}
-
 /* --------------------------------------------------------------- page */
 
 export default function BriefView({
@@ -559,7 +473,7 @@ export default function BriefView({
 
   return (
     <div className="brf-desk" data-mode={mode}>
-      <article className="brf-sheet">
+      <article className="brf-sheet brf-op">
         <header className="brf-mast">
           <span className="brf-mark">
             <Logo size={mode === "client" ? 28 : 24} />
@@ -581,37 +495,32 @@ export default function BriefView({
           )}
         </div>
 
-        <Total doc={doc} />
-        <Costs doc={doc} />
-        <Pains doc={doc} />
-        {doc.slices.length > 1 && (
-          <Row label="איך מתחלק החוב">
-            <ShareTable doc={doc} />
-          </Row>
-        )}
-        <Debts doc={doc} />
+        <Figures doc={doc} />
+
+        <div className="brf-op-cols">
+          <Owed doc={doc} />
+          <Pains doc={doc} />
+        </div>
 
         {mode === "client" && (advisor?.name || phone) && (
-          <Row label="שאלות?" className="brf-r-contact">
-            <div className="brf-contact">
-              <div>
-                <p>נשמח לעבור איתכם על הנתונים.</p>
-                {advisor?.name && <p className="brf-contact-name">{advisor.name}</p>}
-              </div>
-              {phone && (
-                <div className="brf-contact-acts">
-                  <a className="brf-btn" data-primary href={`tel:${phone}`}>
-                    <Phone size={17} weight="fill" />
-                    התקשרו
-                  </a>
-                  <a className="brf-btn" href={`https://wa.me/${intl}`} target="_blank" rel="noopener noreferrer">
-                    <WhatsappLogo size={18} weight="fill" />
-                    וואטסאפ
-                  </a>
-                </div>
-              )}
+          <section className="brf-op-contact" aria-label="יצירת קשר">
+            <div>
+              <p>שאלות? נשמח לעבור איתכם על הנתונים.</p>
+              {advisor?.name && <p className="brf-contact-name">{advisor.name}</p>}
             </div>
-          </Row>
+            {phone && (
+              <div className="brf-contact-acts">
+                <a className="brf-btn" data-primary href={`tel:${phone}`}>
+                  <Phone size={17} weight="fill" />
+                  התקשרו
+                </a>
+                <a className="brf-btn" href={`https://wa.me/${intl}`} target="_blank" rel="noopener noreferrer">
+                  <WhatsappLogo size={18} weight="fill" />
+                  וואטסאפ
+                </a>
+              </div>
+            )}
+          </section>
         )}
 
         <footer className="brf-fine">

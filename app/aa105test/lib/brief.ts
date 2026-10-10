@@ -424,7 +424,38 @@ export interface Payoff {
   free: number;
 }
 
+/** One line under a lender: a loan, a mortgage, a card facility — or a mortgage track. */
+export interface OweItem {
+  label: string;
+  balance: number;
+  monthly: number | null;
+  /** Said instead of a figure: "לא משולם", "לא דווח". */
+  monthlyLabel?: string;
+  tags: DebtFact[];
+}
+
+/** Everything owed to one lender (or, on a bank letter, one kind of track). */
+export interface OweBlock {
+  key: string;
+  /** The document's own name for the lender — BankIcon reads it. */
+  source: string;
+  name: string;
+  /** A track colour, drawn instead of a lender's mark. */
+  dot?: string;
+  balance: number;
+  /** Repayments only; a card's ordinary bill is not one. */
+  monthly: number;
+  /** The balance by family, for the bar. */
+  parts: { key: string; color: string; balance: number }[];
+  /** Lines worth listing — empty when the block is a single debt said in its tags. */
+  items: OweItem[];
+  tags: DebtFact[];
+  alarm?: boolean;
+}
+
 export interface BriefDoc extends Brief {
+  /** Who is owed what, largest first — the one-pager's main list. */
+  owed: OweBlock[];
   groups: DebtGroup[];
   /** The ordinary card bill, beside the repayment and never added to it. */
   cards: number;
@@ -580,6 +611,69 @@ function creditGroups(v: ClientView): DebtGroup[] {
   });
 }
 
+/** The client view's rows, regrouped by lender — what is owed to whom. */
+function owedFromCredit(v: ClientView): OweBlock[] {
+  const by = new Map<string, OweBlock>();
+  for (const sec of v.sections) {
+    for (const r of sec.rows) {
+      const name = lenderLabel(r.bank) || r.bank;
+      let b = by.get(name);
+      if (!b) {
+        b = { key: name, source: r.bank, name, balance: 0, monthly: 0, parts: [], items: [], tags: [] };
+        by.set(name, b);
+      }
+      b.balance += r.balance;
+      if (sec.key !== "card" || r.instalment) b.monthly += r.monthly;
+      let part = b.parts.find((x) => x.key === sec.key);
+      if (!part) {
+        part = { key: sec.key, color: FAMILY_SLICE[sec.key].color, balance: 0 };
+        b.parts.push(part);
+      }
+      part.balance += r.balance;
+
+      const tags: DebtFact[] = [];
+      if (sec.key === "card") {
+        if (r.reported.limit && r.limit > 0 && r.utilization !== null) {
+          const h = utilisationHeat(r.utilization / 100);
+          tags.push({ text: `נוצלו ${Math.round(r.utilization)}%`, heat: h ?? undefined });
+        }
+        const drawn = r.rate !== null && r.rate > 0 ? r.rate : null;
+        if (drawn !== null) tags.push({ text: `ריבית ${pct1(drawn)}%`, heat: rateHeat(drawn, "card") === "hot" ? "hot" : undefined });
+        else if (r.interestFree) tags.push({ text: "ללא ריבית" });
+      } else {
+        const rate = rateText(r);
+        if (rate) tags.push({ text: rate, heat: rateHeat(r.maxRate, r.family) === "hot" ? "hot" : undefined });
+        const left = r.months && r.months > 0 ? (r.months >= 24 ? `עוד כ-${Math.round(r.months / 12)} שנים` : `עוד ${r.months} חודשים`) : "";
+        if (left) tags.push({ text: left });
+      }
+      if (r.late) tags.push({ text: r.overdue > 0 ? `בפיגור ${ils(r.overdue)} ₪` : "בפיגור", heat: "hot" });
+      if (r.late) b.alarm = true;
+
+      const label =
+        sec.key === "card"
+          ? r.type || "מסגרת אשראי"
+          : sec.key === "mortgage"
+            ? r.parts > 1
+              ? `משכנתא, ${r.parts} מסלולים`
+              : "משכנתא"
+            : r.parts > 1
+              ? `${r.parts} הלוואות`
+              : "הלוואה";
+      const m = monthlyOf(r);
+      b.items.push({ label, balance: r.balance, monthly: m.monthly, monthlyLabel: m.monthlyLabel, tags });
+    }
+  }
+  const out = Array.from(by.values()).sort((x, y) => y.balance - x.balance);
+  // A lender holding one debt says it in its own line; the item list is for two or more.
+  for (const b of out) {
+    if (b.items.length === 1) {
+      b.tags = [{ text: b.items[0].label }, ...b.items[0].tags];
+      b.items = [];
+    }
+  }
+  return out;
+}
+
 export function docFromCredit(a: Analysis): BriefDoc {
   const v = a.clientView;
   const notes: string[] = [];
@@ -592,7 +686,7 @@ export function docFromCredit(a: Analysis): BriefDoc {
   // (the row; the ערבויות line) — repeating them here is only more text.
   if (v.cardParts.unreportedCount > 0)
     notes.push(`לא דווח חיוב עבור ${v.cardParts.unreportedCount === 1 ? "מסגרת אחת" : `${v.cardParts.unreportedCount} מסגרות`}.`);
-  return { ...briefFromCredit(a), groups: creditGroups(v), cards: v.footer.cards, payoff: null, notes };
+  return { ...briefFromCredit(a), owed: owedFromCredit(v), groups: creditGroups(v), cards: v.footer.cards, payoff: null, notes };
 }
 
 /* ------------------------------------------------------------- bank rows */
@@ -638,6 +732,24 @@ export function docFromStatement(a: StatementAnalysis): BriefDoc {
     notes.push(`לא דווח החזר חודשי עבור ${a.monthlyUnreported === 1 ? "מסלול אחד" : `${a.monthlyUnreported} מסלולים`}, ולכן ההחזר החודשי חלקי.`);
   return {
     ...briefFromStatement(a),
+    // On a bank letter there is one lender; what the client owes divides by track.
+    owed: a.tracks.map((t) => ({
+      key: t.key,
+      source: st.bankLabel,
+      name: TRACK_LABEL[t.key] ?? t.label,
+      dot: TRACK_COLOR[t.key] ?? "#8b93a7",
+      balance: t.balance,
+      monthly: t.monthly,
+      parts: [{ key: t.key, color: TRACK_COLOR[t.key] ?? "#8b93a7", balance: t.balance }],
+      items: [],
+      tags: [
+        ...(TRACK_PLAIN[t.key] ? [{ text: TRACK_PLAIN[t.key] }] : []),
+        ...(t.rate !== null ? [{ text: `${t.count > 1 ? "ריבית ממוצעת" : "ריבית"} ${t.rate.toFixed(2)}%`, heat: t.dear ? ("hot" as const) : undefined }] : []),
+        ...(t.years ? [{ text: `עוד כ-${t.years} שנים` }] : []),
+        ...(t.late ? [{ text: "בפיגור", heat: "hot" as const }] : []),
+      ],
+      alarm: t.late || undefined,
+    })),
     groups: [
       {
         key: "tracks",

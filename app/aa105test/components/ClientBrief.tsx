@@ -44,7 +44,7 @@ export default function ClientBrief({
           {doc.asOf && <span className="brf-bar-date">{doc.asOf}</span>}
         </>
       }
-      tabs={SECTIONS.map((s) => ({ id: s.id, label: s.id === "brf-debts" && doc.source === "bank" ? "המסלולים" : s.label }))}
+      tabs={SECTIONS}
       onClose={onClose}
       holdEscape={sharing}
       actions={

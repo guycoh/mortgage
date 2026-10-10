@@ -8,7 +8,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import NumberFlow from "@number-flow/react";
-import { motion, useInView, useReducedMotion } from "motion/react";
+import { AnimatePresence, motion, useInView, useReducedMotion } from "motion/react";
 import { CaretDown } from "@phosphor-icons/react";
 import { useStageGo } from "./Stage";
 
@@ -29,7 +29,7 @@ export function Shekel({ value, heat, className }: { value: number; heat?: "hot"
 }
 
 /** A cell that may hold nothing: a dash, never a zero dressed as a fact. */
-export const Dash = () => <span className="brf-dash">—</span>;
+export const Dash = () => <span className="brf-nil">—</span>;
 
 /* ---------------------------------------------------------------- the band */
 
@@ -89,9 +89,12 @@ export function Sec({
   lit,
   fold,
   forceOpen,
+  span,
   children,
 }: {
   id: string;
+  /** Dashboard columns (of 12) the panel takes. */
+  span?: 4 | 5 | 6 | 7 | 8 | 12;
   /** Accepted for call-site compatibility; sections are named, not iconed. */
   icon?: ReactNode;
   title: string;
@@ -106,7 +109,7 @@ export function Sec({
   const [open, setOpen] = useState(false);
   const shown = !fold || open || !!forceOpen;
   return (
-    <section id={id} className="brf-sec" data-lit={lit || undefined}>
+    <section id={id} className="brf-sec" data-lit={lit || undefined} data-span={span}>
       <header className="brf-sec-head">
         <h2 className="brf-sec-title">{title}</h2>
         {aside && <span className="brf-sec-aside">{aside}</span>}
@@ -413,5 +416,118 @@ export function UseCell({ used, limit, heat }: { used: number; limit: number; he
       </span>
       <Meter value={u} heat={heat} />
     </span>
+  );
+}
+
+/* ------------------------------------------------------------- the board */
+//
+// Every finding on one board: severity, the claim, its figure and who it is
+// about on one line, the explanation under it, and — opened in place — the
+// exact rows of the document behind it. The operator reads the whole file
+// here without scrolling to evidence and back.
+
+export function FindingBoard({
+  items,
+  evidence,
+}: {
+  items: FindingItem[];
+  /** The document rows behind a finding, or null when it has none to show. */
+  evidence?: (f: FindingItem) => ReactNode | null;
+}) {
+  const reduce = useReducedMotion();
+  const openable = items.filter((f) => evidence?.(f));
+  const [open, setOpen] = useState<Set<string>>(() => new Set(items.filter((f) => f.severity === "critical").map((f) => f.id)));
+  const all = openable.length > 0 && openable.every((f) => open.has(f.id));
+  const toggle = (id: string) =>
+    setOpen((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+  return (
+    <div className="brf-fb">
+      {openable.length > 1 && (
+        <button className="brf-fb-all" onClick={() => setOpen(all ? new Set() : new Set(openable.map((f) => f.id)))}>
+          {all ? "הסתרת כל הנתונים" : "הצגת כל הנתונים"}
+        </button>
+      )}
+      <ol>
+        {items.map((f) => {
+          const ev = evidence?.(f) ?? null;
+          const isOpen = !!ev && open.has(f.id);
+          const where = f.where?.length ? Array.from(new Set(f.where)).slice(0, 3) : [];
+          const head = (
+            <>
+              <span className="brf-fb-sev">
+                <i />
+                {SEV_LABEL[f.severity]}
+              </span>
+              <span className="brf-fb-title">{f.title}</span>
+              <span className="brf-fb-amt">{f.amount !== undefined && f.amount > 0 ? <Shekel value={f.amount} /> : null}</span>
+              <span className="brf-fb-where">{where.join(", ")}</span>
+              <span className="brf-fb-caret" aria-hidden>
+                {ev ? <CaretDown size={12} weight="bold" /> : null}
+              </span>
+            </>
+          );
+          return (
+            <li key={f.id} className="brf-fb-row" data-tone={f.severity} data-open={isOpen || undefined}>
+              {ev ? (
+                <button className="brf-fb-head" aria-expanded={isOpen} onClick={() => toggle(f.id)}>
+                  {head}
+                </button>
+              ) : (
+                <div className="brf-fb-head">{head}</div>
+              )}
+              <p className="brf-fb-detail">{f.detail}</p>
+              <AnimatePresence initial={false}>
+                {isOpen && (
+                  <motion.div
+                    className="brf-fb-ev"
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: reduce ? 0 : 0.26, ease: [0.16, 1, 0.3, 1] }}
+                  >
+                    {ev}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
+  );
+}
+
+/** A compact evidence table — the document's own rows behind a claim. */
+export function MiniTable({ head, rows }: { head: string[]; rows: { key: string; bad?: boolean; cells: ReactNode[] }[] }) {
+  return (
+    <div className="brf-tablewrap">
+      <table className="brf-mini">
+        <thead>
+          <tr>
+            {head.map((h, i) => (
+              <th key={i} data-text={i === 0 || undefined}>
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.key} data-bad={r.bad || undefined}>
+              {r.cells.map((c, i) => (
+                <td key={i} data-text={i === 0 || undefined}>
+                  {c}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }

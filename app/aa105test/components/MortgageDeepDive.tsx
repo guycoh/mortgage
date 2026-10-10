@@ -35,8 +35,9 @@ import Stage from "./Stage";
 import {
   Dash,
   Facts,
-  Findings,
+  FindingBoard,
   Kpis,
+  MiniTable,
   RateCell,
   RowList,
   Sec,
@@ -308,6 +309,28 @@ export default function MortgageDeepDive({ analysis: a, onClose }: { analysis: S
   }));
 
   const anyMonthly = a.live.some((t) => (t.monthly ?? 0) > 0);
+  const byUid = new Map(a.live.map((t) => [t.uid, t]));
+  const evidenceOf = (f: FindingItem) => {
+    const ts = (f.uids ?? []).map((u) => byUid.get(u)).filter((t): t is BankTranche => !!t);
+    if (!ts.length) return null;
+    return (
+      <MiniTable
+        head={["מסלול", "יתרה", "ריבית", "החזר", "עמלת פירעון", "עדכון ריבית"]}
+        rows={ts.map((t) => ({
+          key: t.uid,
+          bad: (t.arrears ?? 0) > 0,
+          cells: [
+            <b key="n">{trackName(t)}</b>,
+            <Shekel key="b" value={t.balance ?? 0} />,
+            t.rate === null ? <Dash key="r" /> : rate2(t.rate),
+            t.monthly ? <Shekel key="m" value={t.monthly} /> : <Dash key="m2" />,
+            t.breakFee === null ? "לא דווח" : t.breakFee === 0 ? "ללא" : <Shekel key="f" value={t.breakFee} />,
+            t.nextReset || "—",
+          ],
+        }))}
+      />
+    );
+  };
   const trancheCols: RowCol<BankTranche>[] = [
     { key: "who", head: "", w: "minmax(0, 1.9fr)", lead: true, cell: (t) => <TrancheIdent t={t} /> },
     {
@@ -397,8 +420,7 @@ export default function MortgageDeepDive({ analysis: a, onClose }: { analysis: S
   return (
     <Stage
       label="ניתוח משכנתא"
-      nav="rail"
-      tabs={tabs}
+      tabs={[]}
       who={
         <>
           {st.client.name || st.bankLabel}
@@ -407,29 +429,14 @@ export default function MortgageDeepDive({ analysis: a, onClose }: { analysis: S
       }
       onClose={onClose}
     >
-      <article className="brf-sheet brf-sheet-dd">
-        <header className="brf-mast">
-          <span className="brf-mark">
-            <Logo size={24} />
-            <span>מורגי</span>
-          </span>
-          <span className="brf-mast-doc">
-            ניתוח משכנתא
-            {st.statementDate && <span className="brf-num">{st.statementDate}</span>}
-          </span>
+      <div className="brf-dash">
+        <header className="brf-dash-head">
+          <div>
+            <h1>ניתוח משכנתא</h1>
+            <p className="brf-dash-who">{[st.client.name, st.bankLabel, purposes.join(", "), eligibility ? "זכאות" : "", st.client.idNumber, st.statementDate ? `נכון ל-${st.statementDate}` : ""].filter(Boolean).join("   ")}</p>
+          </div>
+          <SevCounts items={findings} />
         </header>
-        <div className="brf-who">
-          <h1>{st.client.name || "ניתוח משכנתא"}</h1>
-          <span className="brf-who-bank">
-            <BankIcon source={st.bankLabel} size={20} />
-            {st.bankLabel}
-          </span>
-          {(purposes.length > 0 || eligibility || st.client.idNumber) && (
-            <span className="brf-who-meta">
-              {[purposes.join(", "), eligibility ? "זכאות" : "", st.client.idNumber ? `ת״ז ${st.client.idNumber}` : ""].filter(Boolean).join(", ")}
-            </span>
-          )}
-        </div>
 
         <Kpis
           items={[
@@ -473,14 +480,17 @@ export default function MortgageDeepDive({ analysis: a, onClose }: { analysis: S
           ]}
         />
 
+        <div className="brf-dash-grid">
+
         {findings.length > 0 && (
-          <Sec id="findings" icon={<ShieldWarning size={18} weight="fill" />} title="ממצאים" aside={<SevCounts items={findings} />} lit={lit?.section === "findings"}>
-            <Findings items={findings} onGo={(f) => f.section && setLit({ section: f.section, uids: new Set(f.uids ?? []) })} />
+          <Sec id="findings" span={8} title="ממצאים" aside={`${findings.length}`}>
+            <FindingBoard items={findings} evidence={evidenceOf} />
           </Sec>
         )}
 
         <Sec
           id="mix"
+          span={4}
           icon={<ChartPieSlice size={18} weight="fill" />}
           title="תמהיל המסלולים"
           aside={`${pct(a.exposure.variableShare)} משתנה, ${pct(a.exposure.linkedShare)} צמוד${a.exposure.fxShare > 0 ? `, ${pct(a.exposure.fxShare)} מט"ח` : ""}`}
@@ -491,6 +501,7 @@ export default function MortgageDeepDive({ analysis: a, onClose }: { analysis: S
 
         <Sec
           id="tranches"
+          span={12}
           icon={<Coins size={18} weight="fill" />}
           title="המסלולים"
           aside={a.live.some((t) => t.monthsDerived) ? "יתרת התקופה חושבה מתאריך הסיום" : undefined}
@@ -500,7 +511,7 @@ export default function MortgageDeepDive({ analysis: a, onClose }: { analysis: S
         </Sec>
 
         {a.recycle.length > 0 && (
-          <Sec id="recycle" icon={<TrendUp size={18} weight="bold" />} title="בדיקת מיחזור" lit={lit?.section === "recycle"}>
+          <Sec id="recycle" span={12} icon={<TrendUp size={18} weight="bold" />} title="בדיקת מיחזור" lit={lit?.section === "recycle"}>
             <RecycleMap a={a} />
             <p className="brf-sec-note">
               העמלה מוצגת בשקלים וביחס לריבית של חודש אחד, לפי היתרה והריבית הנוכחיות. לבדיקת חיסכון יש להשוות להצעה חלופית, כולל התקופה
@@ -515,7 +526,7 @@ export default function MortgageDeepDive({ analysis: a, onClose }: { analysis: S
         )}
 
         {(a.totals.breakFee > 0 || a.feeUnreported.length > 0) && (
-          <Sec id="fees" icon={<Receipt size={18} weight="fill" />} title="עמלות פירעון מוקדם" aside={<Shekel value={a.totals.breakFee} />} lit={lit?.section === "fees"}>
+          <Sec id="fees" span={6} icon={<Receipt size={18} weight="fill" />} title="עמלות פירעון מוקדם" aside={<Shekel value={a.totals.breakFee} />} lit={lit?.section === "fees"}>
             <ul className="brf-fees">
               {feeRows.map((t) => (
                 <li key={t.uid} data-lit={L("fees")?.has(t.uid) || undefined}>
@@ -569,6 +580,7 @@ export default function MortgageDeepDive({ analysis: a, onClose }: { analysis: S
         {a.upcomingResets.length > 0 && (
           <Sec
             id="resets"
+          span={6}
             icon={<CalendarBlank size={18} weight="fill" />}
             title="עדכוני ריבית ב-12 החודשים הקרובים"
             aside={<Shekel value={a.exposure.resettingWithinYear} />}
@@ -582,6 +594,7 @@ export default function MortgageDeepDive({ analysis: a, onClose }: { analysis: S
         {a.totals.indexation !== 0 && (
           <Sec
             id="index"
+          span={6}
             icon={<TrendUp size={18} weight="fill" />}
             title="הצמדה ומדדים"
             aside={`הפרשי הצמדה: ${(a.exposure.indexationDrag * 100).toFixed(1)}% מיתרת הקרן`}
@@ -599,7 +612,7 @@ export default function MortgageDeepDive({ analysis: a, onClose }: { analysis: S
           </Sec>
         )}
 
-        <Sec id="meta" icon={<IdentificationCard size={18} weight="bold" />} title="פרטי המסמך" fold="הצגה" forceOpen={lit?.section === "meta"} lit={lit?.section === "meta"}>
+        <Sec id="meta" span={6} icon={<IdentificationCard size={18} weight="bold" />} title="פרטי המסמך" fold="הצגה" forceOpen={lit?.section === "meta"} lit={lit?.section === "meta"}>
           <div className="brf-tablewrap">
             <table className="brf-table">
               <thead>
@@ -671,7 +684,8 @@ export default function MortgageDeepDive({ analysis: a, onClose }: { analysis: S
             הניתוח נגזר אוטומטית מתדפיס הבנק ואינו תחליף לקריאת המסמך המקורי. עמלות פירעון מוקדם משתנות מדי יום ותקפות למועד המסמך בלבד.
           </p>
         </Sec>
-      </article>
+        </div>
+      </div>
     </Stage>
   );
 }

@@ -34,8 +34,9 @@ import {
   Bars,
   Dash,
   Facts,
-  Findings,
+  FindingBoard,
   Kpis,
+  MiniTable,
   RateCell,
   RowList,
   Sec,
@@ -246,13 +247,37 @@ export default function CreditDeepDive({ analysis: a, onClose }: { analysis: Ana
   );
 
   const L = (s: string) => (lit?.section === s ? lit.uids : undefined);
+  const byUid = new Map(a.lines.map((l) => [l.uid, l]));
+  const evidenceOf = (f: FindingItem) => {
+    const ls = (f.uids ?? []).map((u) => byUid.get(u)).filter((l): l is DebtLine => !!l);
+    if (!ls.length) return null;
+    return (
+      <MiniTable
+        head={["מקור", "סוג", "יתרה", "ריבית", "החזר / חיוב", "מצב"]}
+        rows={ls.map((l) => ({
+          key: l.uid,
+          bad: l.overdue > 0 || !!l.arrearsRange,
+          cells: [
+            <b key="b">{lenderLabel(l.bank) || l.bank}</b>,
+            l.category === "mortgage" ? l.track || l.type : l.type,
+            <Shekel key="s" value={l.balance} />,
+            l.rate === null ? <Dash key="d" /> : rate2(l.rate),
+            l.monthly ? <Shekel key="m" value={l.monthly} /> : <Dash key="d2" />,
+            l.arrearsRange ||
+              (l.overdue > 0 ? `בפיגור ₪${l.overdue.toLocaleString("he-IL")}` : "") ||
+              (l.utilization !== null ? `ניצול ${Math.round(l.utilization)}%` : "") ||
+              (l.balloon ? "בלון" : ""),
+          ],
+        }))}
+      />
+    );
+  };
   const names = a.clients.map((c) => c.name).filter(Boolean);
 
   return (
     <Stage
       label="ניתוח חיווי אשראי"
-      nav="rail"
-      tabs={tabs}
+      tabs={[]}
       who={
         <>
           {names.length ? names.join(" ו") : "ניתוח חיווי אשראי"}
@@ -261,25 +286,14 @@ export default function CreditDeepDive({ analysis: a, onClose }: { analysis: Ana
       }
       onClose={onClose}
     >
-      <article className="brf-sheet brf-sheet-dd">
-        <header className="brf-mast">
-          <span className="brf-mark">
-            <Logo size={24} />
-            <span>מורגי</span>
-          </span>
-          <span className="brf-mast-doc">
-            ניתוח חיווי אשראי
-            {a.clients[0]?.reportDate && <span className="brf-num">{a.clients[0].reportDate}</span>}
-          </span>
+      <div className="brf-dash">
+        <header className="brf-dash-head">
+          <div>
+            <h1>ניתוח חיווי אשראי</h1>
+            <p className="brf-dash-who">{[names.join(" ו"), a.clients.map((x) => x.idNumber).filter(Boolean).join(", "), a.clients[0]?.reportDate ? `דוח מ-${a.clients[0].reportDate}` : ""].filter(Boolean).join("   ")}</p>
+          </div>
+          <SevCounts items={findings} />
         </header>
-        <div className="brf-who">
-          <h1>{a.clients.map((c) => c.name).filter(Boolean).join(" ו") || "ניתוח חיווי אשראי"}</h1>
-          {a.clients.some((c) => c.idNumber) && (
-            <span className="brf-who-meta">
-              ת״ז <span className="brf-num">{a.clients.map((c) => c.idNumber).filter(Boolean).join(", ")}</span>
-            </span>
-          )}
-        </div>
 
         <Kpis
           items={[
@@ -323,16 +337,19 @@ export default function CreditDeepDive({ analysis: a, onClose }: { analysis: Ana
           ]}
         />
 
+        <div className="brf-dash-grid">
+
         {/* ------------------------------------------------------ findings */}
         {findings.length > 0 && (
-          <Sec id="flags" icon={<ShieldWarning size={18} weight="fill" />} title="ממצאים" aside={<SevCounts items={findings} />} lit={lit?.section === "flags"}>
-            <Findings items={findings} onGo={(f) => f.section && setLit({ section: f.section, uids: new Set(f.uids ?? []) })} />
+          <Sec id="flags" span={8} title="ממצאים" aside={`${findings.length}`}>
+            <FindingBoard items={findings} evidence={evidenceOf} />
           </Sec>
         )}
 
         {/* ------------------------------------------------- debt picture */}
         <Sec
           id="picture"
+            span={4}
           icon={<ChartPieSlice size={18} weight="fill" />}
           title="תמונת החוב"
           aside={a.lines.some((l) => l.shared) ? "התחייבויות משותפות נספרו פעם אחת" : undefined}
@@ -348,8 +365,7 @@ export default function CreditDeepDive({ analysis: a, onClose }: { analysis: Ana
                   <th>יתרה</th>
                   <th>החזר חודשי</th>
                   <th>ריבית</th>
-                  <th>מסגרת</th>
-                  <th>בפיגור</th>
+
                 </tr>
               </thead>
               <tbody>
@@ -365,8 +381,7 @@ export default function CreditDeepDive({ analysis: a, onClose }: { analysis: Ana
                     <td><Shekel value={c.balance} /></td>
                     <td>{c.monthly ? <Shekel value={c.monthly} /> : <Dash />}</td>
                     <td>{c.rate === null ? <Dash /> : <span className="brf-num">{rate2(c.rate)}</span>}</td>
-                    <td>{c.limit ? <Shekel value={c.limit} /> : <Dash />}</td>
-                    <td>{c.overdue ? <Shekel value={c.overdue} heat="hot" /> : <Dash />}</td>
+
                   </tr>
                 ))}
               </tbody>
@@ -377,8 +392,7 @@ export default function CreditDeepDive({ analysis: a, onClose }: { analysis: Ana
                   <td><Shekel value={a.totals.balance} /></td>
                   <td><Shekel value={a.totals.monthly} /></td>
                   <td>{a.totals.rate === null ? <Dash /> : <span className="brf-num">{rate2(a.totals.rate)}</span>}</td>
-                  <td><Shekel value={a.totals.limit} /></td>
-                  <td>{a.totals.overdue ? <Shekel value={a.totals.overdue} heat="hot" /> : <Dash />}</td>
+
                 </tr>
               </tfoot>
             </table>
@@ -389,6 +403,7 @@ export default function CreditDeepDive({ analysis: a, onClose }: { analysis: Ana
         {mortgages.length > 0 && (
           <Sec
             id="mortgage"
+            span={12}
             icon={<Bank size={18} weight="fill" />}
             title="משכנתאות"
             aside={`${pct(a.mortgage.variableShare)} משתנה, ${pct(a.mortgage.linkedShare)} צמוד${a.mortgage.ltv !== null ? `, יחס מימון ${pct(a.mortgage.ltv)}` : ""}`}
@@ -422,6 +437,7 @@ export default function CreditDeepDive({ analysis: a, onClose }: { analysis: Ana
         {consumer.length > 0 && (
           <Sec
             id="consumer"
+            span={6}
             icon={<Pulse size={18} weight="bold" />}
             title="הלוואות צרכניות"
             aside={`ריבית ממוצעת ${rate2(a.consumer.rate)}${a.consumer.worstRate !== null ? `, הגבוהה ${rate2(a.consumer.worstRate)}` : ""}`}
@@ -435,6 +451,7 @@ export default function CreditDeepDive({ analysis: a, onClose }: { analysis: Ana
         {revolving.length > 0 && (
           <Sec
             id="revolving"
+            span={6}
             icon={<Certificate size={18} weight="fill" />}
             title='מסגרות אשראי וחשבונות עו"ש'
             aside={
@@ -459,7 +476,7 @@ export default function CreditDeepDive({ analysis: a, onClose }: { analysis: Ana
 
         {/* --------------------------------------------------------- other */}
         {otherDebts.length > 0 && (
-          <Sec id="other" icon={<Warning size={18} weight="fill" />} title="התחייבויות אחרות" lit={lit?.section === "other"}>
+          <Sec id="other" span={6} icon={<Warning size={18} weight="fill" />} title="התחייבויות אחרות" lit={lit?.section === "other"}>
             <DebtRows lit={L("other")} lines={otherDebts} kind="plain" asOf={a.clients[0]?.reportDate} />
           </Sec>
         )}
@@ -468,6 +485,7 @@ export default function CreditDeepDive({ analysis: a, onClose }: { analysis: Ana
         {guarantees.length > 0 && (
           <Sec
             id="guarantees"
+            span={6}
             icon={<Certificate size={18} weight="bold" />}
             title="ערבויות"
             aside="אינן החזר של הלקוח, אך נספרות כחשיפה בבדיקת בנק"
@@ -479,7 +497,7 @@ export default function CreditDeepDive({ analysis: a, onClose }: { analysis: Ana
 
         {/* ----------------------------------------------------- behaviour */}
         {behaviour && (
-          <Sec id="behaviour" icon={<CalendarBlank size={18} weight="fill" />} title="התנהגות תשלומים" lit={lit?.section === "behaviour"}>
+          <Sec id="behaviour" span={6} icon={<CalendarBlank size={18} weight="fill" />} title="התנהגות תשלומים" lit={lit?.section === "behaviour"}>
             <Facts
               items={[
                 { label: "שיקים שהוצגו", v: a.behaviour.checksPresented, bad: false },
@@ -503,6 +521,7 @@ export default function CreditDeepDive({ analysis: a, onClose }: { analysis: Ana
         {inquiries && (
           <Sec
             id="inquiries"
+            span={6}
             icon={<MagnifyingGlass size={18} weight="bold" />}
             title="פניות ובקשות אשראי"
             aside={`${a.inquiries.last3} ב-3 החודשים האחרונים, ${a.inquiries.last12} בשנה`}
@@ -552,7 +571,7 @@ export default function CreditDeepDive({ analysis: a, onClose }: { analysis: Ana
 
         {/* --------------------------------------------------------- legal */}
         {legal && (
-          <Sec id="legal" icon={<Gavel size={18} weight="fill" />} title="הליכים ואי עמידה בפירעון" lit={lit?.section === "legal"}>
+          <Sec id="legal" span={12} icon={<Gavel size={18} weight="fill" />} title="הליכים ואי עמידה בפירעון" lit={lit?.section === "legal"}>
             {a.legal.nonPayment.length > 0 && (
               <>
                 <Sub>נתונים המעידים על אי עמידה בפירעון</Sub>
@@ -648,6 +667,7 @@ export default function CreditDeepDive({ analysis: a, onClose }: { analysis: Ana
         {a.sources.length > 0 && (
           <Sec
             id="sources"
+            span={12}
             icon={<Bank size={18} weight="bold" />}
             title="תמצית הדוח לפי מקור"
             // Reference: it restates the tables above lender by lender, so it
@@ -706,7 +726,7 @@ export default function CreditDeepDive({ analysis: a, onClose }: { analysis: Ana
 
         {/* ---------------------------------------------------- collateral */}
         {collateral.length > 0 && (
-          <Sec id="collateral" icon={<Bank size={18} weight="bold" />} title="בטוחות" lit={lit?.section === "collateral"}>
+          <Sec id="collateral" span={6} icon={<Bank size={18} weight="bold" />} title="בטוחות" lit={lit?.section === "collateral"}>
             <div className="brf-tablewrap">
               <table className="brf-table">
                 <thead>
@@ -733,7 +753,7 @@ export default function CreditDeepDive({ analysis: a, onClose }: { analysis: Ana
         )}
 
         {/* ---------------------------------------------------- the report */}
-        <Sec id="meta" icon={<IdentificationCard size={18} weight="bold" />} title="פרטי הדוח" fold="הצגה" forceOpen={lit?.section === "meta"} lit={lit?.section === "meta"}>
+        <Sec id="meta" span={6} icon={<IdentificationCard size={18} weight="bold" />} title="פרטי הדוח" fold="הצגה" forceOpen={lit?.section === "meta"} lit={lit?.section === "meta"}>
           <div className="brf-tablewrap">
             <table className="brf-table">
               <thead>
@@ -799,7 +819,8 @@ export default function CreditDeepDive({ analysis: a, onClose }: { analysis: Ana
             בית נספרים פעם אחת בלבד.
           </p>
         </Sec>
-      </article>
+        </div>
+      </div>
     </Stage>
   );
 }
