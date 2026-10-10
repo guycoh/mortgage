@@ -41,46 +41,40 @@ type Row = {
   note?: (f: MixFigures) => string | null;
 };
 
-const GROUPS: { title: string; rows: Row[] }[] = [
-  {
-    title: "עלות",
-    rows: [
-      { key: "cost", label: "ריבית והצמדה", def: "סך התשלומים פחות הקרן", better: "lower", kind: "money", get: (f) => f.cost },
-      { key: "total", label: "עלות כוללת", def: "סך כל התשלומים לאורך חיי התמהיל", better: "lower", kind: "money", get: (f) => f.totalPaid },
-      { key: "per", label: "החזר לשקל", def: "כמה שקלים מוחזרים על כל שקל שנלווה", better: "lower", kind: "ratio", get: (f) => f.perShekel },
-      { key: "irr", label: 'שת"פ', def: "שיעור התשואה הפנימי של התשלומים, שנתי אפקטיבי", better: "lower", kind: "pct", get: (f) => f.irr },
-      { key: "npv", label: 'ענ"נ', def: "ערך נוכחי של התשלומים, מהוון לאורך עקום הריבית, פחות הקרן", better: "lower", kind: "money", get: (f) => f.npv },
-      {
-        key: "spread",
-        label: 'מרווח מעל אג"ח',
-        def: "המרווח הקבוע מעל עקום הריבית הממשלתי שבו שווי התשלומים שווה לקרן",
-        better: "lower",
-        kind: "pct",
-        get: (f) => f.spread,
-      },
-    ],
-  },
-  {
-    title: "תזרים",
-    rows: [
-      { key: "first", label: "החזר ראשון", def: "התשלום בחודש הראשון לפי הריביות שהוזנו", better: "lower", kind: "money", get: (f) => f.firstTyped },
-      {
-        key: "peak",
-        label: "החזר בשיא",
-        def: "התשלום החודשי הגבוה ביותר לפי התחזית",
-        better: "lower",
-        kind: "money",
-        get: (f) => f.peak,
-        note: (f) => `שנה ${f.peakYear}`,
-      },
-      { key: "term", label: "תקופה", def: "החודש האחרון בתמהיל, בשנים", better: "none", kind: "years", get: (f) => f.months / 12 },
-      { key: "dur", label: 'מח"מ', def: "משך החיים הממוצע של התשלומים, משוקלל לפי סכומם", better: "none", kind: "years", get: (f) => f.duration },
-    ],
-  },
-  {
-    title: "היקף",
-    rows: [{ key: "amount", label: "סכום ההלוואה", def: "סך יתרות השורות בתמהיל", better: "none", kind: "money", get: (f) => f.principal }],
-  },
+// Two blocks, no group titles (owner's order, 2026-10-10): what the client
+// reads first — size, cost, payments, term — then the advisor's technical
+// figures under a heavier rule.
+const BLOCKS: Row[][] = [
+  [
+    { key: "amount", label: "סכום ההלוואה", def: "סך יתרות השורות בתמהיל", better: "none", kind: "money", get: (f) => f.principal },
+    { key: "cost", label: "ריבית והצמדה", def: "סך התשלומים פחות הקרן", better: "lower", kind: "money", get: (f) => f.cost },
+    { key: "total", label: "עלות כוללת", def: "סך כל התשלומים לאורך חיי התמהיל", better: "lower", kind: "money", get: (f) => f.totalPaid },
+    { key: "per", label: "החזר לשקל", def: "כמה שקלים מוחזרים על כל שקל שנלווה", better: "lower", kind: "ratio", get: (f) => f.perShekel },
+    { key: "first", label: "החזר ראשון", def: "התשלום בחודש הראשון לפי הריביות שהוזנו", better: "lower", kind: "money", get: (f) => f.firstTyped },
+    {
+      key: "peak",
+      label: "החזר בשיא",
+      def: "התשלום החודשי הגבוה ביותר לפי התחזית",
+      better: "lower",
+      kind: "money",
+      get: (f) => f.peak,
+      note: (f) => `שנה ${f.peakYear}`,
+    },
+    { key: "term", label: "תקופה", def: "החודש האחרון בתמהיל, בשנים", better: "none", kind: "years", get: (f) => f.months / 12 },
+  ],
+  [
+    { key: "irr", label: 'שת"פ', def: "שיעור התשואה הפנימי של התשלומים, שנתי אפקטיבי", better: "lower", kind: "pct", get: (f) => f.irr },
+    { key: "npv", label: 'ענ"נ', def: "ערך נוכחי של התשלומים, מהוון לאורך עקום הריבית, פחות הקרן", better: "lower", kind: "money", get: (f) => f.npv },
+    {
+      key: "spread",
+      label: 'מרווח מעל אג"ח',
+      def: "המרווח הקבוע מעל עקום הריבית הממשלתי שבו שווי התשלומים שווה לקרן",
+      better: "lower",
+      kind: "pct",
+      get: (f) => f.spread,
+    },
+    { key: "dur", label: 'מח"מ', def: "משך החיים הממוצע של התשלומים, משוקלל לפי סכומם", better: "none", kind: "years", get: (f) => f.duration },
+  ],
 ];
 
 const COUNT: EffectTiming = { duration: 420, easing: "cubic-bezier(0.2, 0, 0, 1)" };
@@ -502,14 +496,9 @@ export default function Compare({
             <th>הפרש</th>
           </tr>
         </thead>
-        {GROUPS.map((g) => (
-          <tbody key={g.title}>
-            <tr className="lgr-cmx-group">
-              <th colSpan={4} scope="rowgroup">
-                {g.title}
-              </th>
-            </tr>
-            {g.rows.map((r) => {
+        {BLOCKS.map((rows, i) => (
+          <tbody key={i} className="lgr-cmx-block">
+            {rows.map((r) => {
               const a = r.get(A);
               const b = r.get(B);
               const title =

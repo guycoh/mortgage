@@ -1638,7 +1638,8 @@ html:has(.lgr-root) {
   height: 38px; padding: 0 12px; text-align: start; font-size: 12px; font-weight: 600; color: var(--lgr-3);
   border-bottom: 1px solid var(--line); background: var(--card);
 }
-.lgr-cmx-group > th { padding: 10px 12px 3px; text-align: start; font-size: 11px; font-weight: 700; color: var(--lgr-4); }
+/* No group titles: the technical block is set off by one heavier rule. */
+.lgr-cmx-block + .lgr-cmx-block > .lgr-cmx-row:first-child > * { border-top: 1px solid var(--line-2); }
 .lgr-cmx-row > th, .lgr-cmx-row > td { height: 34px; padding: 0 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
 .lgr-cmx-row > th {
   text-align: start; font-size: 12.5px; font-weight: 600; color: var(--lgr-2); cursor: help;
