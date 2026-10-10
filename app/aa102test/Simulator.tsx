@@ -323,10 +323,32 @@ export default function Simulator({
   const loadForecast = useCallback(() => {
     fetch("/api/simulator/forecast")
       .then((r) => (r.ok ? r.json() : null))
-      .then((j: ForecastState | null) => setForecastState(j ?? { forecast: null, boi: null, override: null }))
-      .catch(() => setForecastState({ forecast: null, boi: null, override: null }));
+      .then((j: ForecastState | null) =>
+        setForecastState(j ? { ...j, saved: j.saved ?? [] } : { forecast: null, boi: null, saved: [] })
+      )
+      .catch(() => setForecastState({ forecast: null, boi: null, saved: [] }));
   }, []);
   useEffect(loadForecast, [loadForecast]);
+  /**
+   * Which curves: null = the BoI rebuild (default, self-updating); otherwise the
+   * label of a saved curve (SmartNPV's, a pasted one). Remembered per browser —
+   * an advisor who prices on SmartNPV's curve does so on every board.
+   */
+  const [forecastSource, setForecastSource] = useState<string | null>(null);
+  useEffect(() => {
+    try {
+      setForecastSource(localStorage.getItem("aa102.forecastSource") || null);
+    } catch {}
+  }, []);
+  const chooseSource = useCallback((label: string | null) => {
+    setForecastSource(label);
+    try {
+      if (label) localStorage.setItem("aa102.forecastSource", label);
+      else localStorage.removeItem("aa102.forecastSource");
+    } catch {}
+  }, []);
+  const activeForecast =
+    (forecastSource && forecastState?.saved.find((s) => s.label === forecastSource)) || forecastState?.boi || null;
   /**
    * TWO PRICINGS, ON PURPOSE (owner, 2026-10-10). The grid, its totals and the
    * read-out price exactly what is typed — the rate as entered, CPI at the one
@@ -339,9 +361,9 @@ export default function Simulator({
   const econ: Econ = useMemo(
     () => ({
       inflation: annualInflation,
-      forecast: econMode === "forecast" ? forecastState?.forecast ?? null : null,
+      forecast: econMode === "forecast" ? activeForecast : null,
     }),
-    [annualInflation, econMode, forecastState]
+    [annualInflation, econMode, activeForecast]
   );
   /**
    * שיעור היוון — the rate ע.נ.נ discounts every row's payments at.
@@ -583,14 +605,19 @@ export default function Simulator({
    * תמהילים when there is one, else the master — the client's mortgage as it
    * stands, SmartNPV's קיימת. Owed rows only, the same rule as every total.
    */
+  /** The mix השוואת תמהילים and the charts measure against: the picked one;
+   *  unpicked → the master (or, on the master, the first proposal); "" → none. */
+  const compareTarget = useMemo(() => {
+    if (!activeMix || compareMixId === "") return null;
+    if (compareMixId) return list.find((m) => m.id === compareMixId && m.id !== activeMix.id) ?? null;
+    if (master && master.id !== activeMix.id) return master;
+    return list.find((m) => m.id !== activeMix.id) ?? null;
+  }, [activeMix, compareMixId, list, master]);
   const chartCompare = useMemo(() => {
-    if (!activeMix || isPrimaryMix) return null;
-    const picked = compareMixId && compareMixId !== activeMix.id ? list.find((m) => m.id === compareMixId) : null;
-    const other = picked ?? (master && master.id !== activeMix.id ? master : null);
-    if (!other) return null;
-    const rows = owedOnly(other.loans ?? []);
-    return rows.length ? { name: other.mix_name, loans: rows } : null;
-  }, [activeMix, isPrimaryMix, compareMixId, list, master]);
+    if (!compareTarget || isPrimaryMix) return null;
+    const rows = owedOnly(compareTarget.loans ?? []);
+    return rows.length ? { name: compareTarget.mix_name, loans: rows } : null;
+  }, [compareTarget, isPrimaryMix]);
   const cards = useMemo(
     () =>
       cardItems(
@@ -1418,7 +1445,7 @@ export default function Simulator({
                     onClick={() => forecastState && setForecastOpen(true)}
                     title="פרטי התחזית"
                   >
-                    {!forecastState ? "טוען…" : forecastState.forecast ? forecastState.forecast.label : "לא זמינה"}
+                    {!forecastState ? "טוען…" : activeForecast ? activeForecast.label : "לא זמינה"}
                   </button>
                 )}
               </span>
@@ -1766,15 +1793,27 @@ export default function Simulator({
             activeMixId={activeMixId}
             mixes={list}
             annualInflation={econ}
-            compareMixId={compareMixId}
+            discountRate={annualDiscount}
+            compareMixId={compareTarget ? compareTarget.id : ""}
             onDuplicate={duplicateMix}
+            source={
+              econMode === "forecast" && activeForecast ? (
+                <button type="button" className="lgr-econ-src" onClick={() => setForecastOpen(true)} title="מקור התחזית">
+                  {activeForecast.label}
+                </button>
+              ) : (
+                <span className="lgr-econ-src" data-state="loading">
+                  ללא תחזית · אינפלציה {annualInflation}%
+                </span>
+              )
+            }
             control={
               list.length > 1 ? (
                 <div style={{ minWidth: 208 }}>
                   <Select
                     variant="input"
-                    value={compareMixId ?? ""}
-                    onChange={(v) => setCompareMixId(v ? String(v) : null)}
+                    value={compareTarget ? compareTarget.id : ""}
+                    onChange={(v) => setCompareMixId(v ? String(v) : "")}
                     placeholder="בחרו תמהיל להשוואה…"
                     options={[
                       { value: "", label: "ללא השוואה" },
@@ -1931,9 +1970,11 @@ export default function Simulator({
       {forecastOpen && forecastState && (
         <ForecastDialog
           state={forecastState}
+          selected={activeForecast && activeForecast.source === "override" ? activeForecast.label : null}
+          onSelect={chooseSource}
           onClose={() => setForecastOpen(false)}
-          onSaved={() => {
-            setForecastOpen(false);
+          onSaved={(label) => {
+            if (label) chooseSource(label);
             loadForecast();
           }}
         />

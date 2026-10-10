@@ -1514,6 +1514,109 @@ html:has(.lgr-root) {
    missing and hands over the action that creates it — the picker is in this
    card's own header, forty pixels away, so this can point at it instead of
    sending anyone back up the page. */
+/* ===================================================== השוואת תמהילים (v3)
+   The two mixes keep the charts' identities everywhere they appear: violet
+   solid for this mix (side a), warm red dashed for the other (side b). Good and
+   bad are emerald and brick, and always carry an arrow and a word too. */
+.lgr-cmx { --side-a: #5b54d6; --side-b: #d4573b; --good: #147a45; --good-tint: #e9f5ee; --bad: #b42318; --bad-tint: #fdf1f0; }
+.lgr-cmx-head { flex-wrap: wrap; row-gap: 8px; }
+.lgr-cmx-pair { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.lgr-cmx-vs { font-size: 12px; color: var(--lgr-4); }
+.lgr-cmx-pair .lgr-select, .lgr-cmx-pair > div { min-width: 200px; }
+.lgr-cmx-tag { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 700; color: var(--ink); min-width: 0; }
+.lgr-cmx-tag > i { flex: none; width: 14px; height: 0; border-top: 2.5px solid var(--side-a); border-radius: 2px; }
+.lgr-cmx-tag[data-side="b"] > i { border-top: 2px dashed var(--side-b); }
+.lgr-cmx-tag[data-side="b"] { color: var(--lgr-2); font-weight: 600; }
+.lgr-cmx-tag { max-width: 100%; }
+.lgr-cmx-tag-name { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+
+/* --- the verdict: one sentence and the twin bars ----------------------- */
+.lgr-cmx-verdict { padding: 18px 20px 16px; border-bottom: 1px solid var(--line); }
+.lgr-cmx-line {
+  margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 6px; row-gap: 4px;
+  font-size: 16px; font-weight: 600; color: var(--ink); letter-spacing: -0.01em;
+}
+.lgr-cmx-line-name { font-weight: 700; }
+.lgr-cmx-line-fig { font-size: 26px; letter-spacing: -0.025em; line-height: 1; }
+.lgr-cmx-verdict[data-tone="good"] .lgr-cmx-line-fig { color: var(--good); }
+.lgr-cmx-verdict[data-tone="bad"] .lgr-cmx-line-fig { color: var(--bad); }
+.lgr-cmx-line-pct {
+  margin-inline-start: 4px; padding: 2px 8px; border-radius: 999px;
+  font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums;
+  background: var(--card-2); color: var(--lgr-3);
+}
+.lgr-cmx-verdict[data-tone="good"] .lgr-cmx-line-pct { background: var(--good-tint); color: var(--good); }
+.lgr-cmx-verdict[data-tone="bad"] .lgr-cmx-line-pct { background: var(--bad-tint); color: var(--bad); }
+
+.lgr-cmx-bars { margin-top: 14px; display: grid; gap: 8px; }
+.lgr-cmx-bar { display: grid; grid-template-columns: minmax(0, 170px) 1fr auto; align-items: center; gap: 12px; }
+.lgr-cmx-bar-name { display: inline-flex; align-items: center; gap: 7px; min-width: 0; font-size: 12.5px; font-weight: 600; color: var(--lgr-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lgr-cmx-bar-name > i { flex: none; width: 14px; height: 0; border-top: 2.5px solid var(--side-a); }
+.lgr-cmx-bar[data-side="b"] .lgr-cmx-bar-name > i { border-top: 2px dashed var(--side-b); }
+.lgr-cmx-bar-track { display: flex; height: 14px; border-radius: 7px; overflow: hidden; background: var(--card-2); }
+.lgr-cmx-bar-p, .lgr-cmx-bar-c {
+  height: 100%;
+  transition: width 520ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.lgr-cmx-bar-p { background: #d9dbe3; }
+.lgr-cmx-bar-c { background: var(--side-a); border-inline-start: 2px solid #fff; }
+.lgr-cmx-bar[data-side="b"] .lgr-cmx-bar-c {
+  background: repeating-linear-gradient(135deg, var(--side-b) 0 6px, #e27a62 6px 9px);
+}
+.lgr-cmx-bar-fig { font-size: 14px; color: var(--ink); min-width: 92px; text-align: end; }
+.lgr-cmx-bar[data-side="b"] .lgr-cmx-bar-fig { color: var(--lgr-2); }
+.lgr-cmx-bars-key { display: flex; gap: 16px; padding-inline-start: 182px; font-size: 11.5px; color: var(--lgr-4); }
+.lgr-cmx-bars-key > span { display: inline-flex; align-items: center; gap: 6px; }
+.lgr-cmx-bars-key i { width: 10px; height: 10px; border-radius: 3px; background: #d9dbe3; }
+.lgr-cmx-bars-key i[data-k="c"] { background: linear-gradient(90deg, var(--side-a) 50%, var(--side-b) 50%); }
+.lgr-cmx-caveat { margin: 10px 0 0; font-size: 12px; color: var(--lgr-3); }
+.lgr-cmx-caveat b { color: var(--ink); }
+
+/* --- the ledger ---------------------------------------------------------- */
+.lgr-cmx-table { width: 100%; table-layout: fixed; border-collapse: collapse; }
+.lgr-cmx-table thead th {
+  padding: 10px 14px 8px; text-align: start; font-size: 12px; font-weight: 600; color: var(--lgr-3);
+  border-bottom: 1px solid var(--line);
+}
+.lgr-cmx-group > th {
+  padding: 14px 14px 4px; text-align: start;
+  font-size: 11.5px; font-weight: 700; color: var(--lgr-4); letter-spacing: 0.01em;
+}
+.lgr-cmx-row > th, .lgr-cmx-row > td { padding: 8px 14px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.lgr-cmx-row > th { text-align: start; font-size: 13px; font-weight: 600; color: var(--lgr-2); cursor: help; }
+.lgr-cmx-table-at .lgr-cmx-row > th { cursor: default; }
+.lgr-cmx-row > td { text-align: start; font-size: 14px; }
+.lgr-cmx-row:hover > th, .lgr-cmx-row:hover > td { background: var(--card-2); }
+.lgr-cmx-table tbody:last-of-type .lgr-cmx-row:last-child > * { border-bottom: 0; }
+.lgr-cmx-row .lgr-money-block { display: inline-block; }
+.lgr-cmx-num { font-family: var(--num); font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); direction: ltr; unicode-bidi: isolate; }
+.lgr-cmx-num[data-dim] { font-weight: 600; color: var(--lgr-2); }
+.lgr-cmx-note { display: block; font-style: normal; font-size: 11px; color: var(--lgr-4); margin-top: 1px; }
+.lgr-cmx-na, .lgr-cmx-same { font-size: 12.5px; color: var(--lgr-4); }
+.lgr-cmx-delta {
+  display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px 3px 8px; border-radius: 999px;
+  font-size: 13px; font-weight: 700; background: var(--card-2); color: var(--lgr-3);
+}
+.lgr-cmx-delta .lgr-money { color: inherit; }
+.lgr-cmx-delta-mag { font-family: var(--num); font-variant-numeric: tabular-nums; direction: ltr; unicode-bidi: isolate; }
+.lgr-cmx-delta > em { font-style: normal; font-weight: 600; font-size: 12px; }
+.lgr-cmx-delta[data-tone="good"] { background: var(--good-tint); color: var(--good); }
+.lgr-cmx-delta[data-tone="bad"] { background: var(--bad-tint); color: var(--bad); }
+
+/* --- a moment in time ---------------------------------------------------- */
+.lgr-cmx-at { border-top: 1px solid var(--line); background: linear-gradient(180deg, var(--card-2), var(--card) 56px); }
+.lgr-cmx-at-head { display: flex; align-items: center; gap: 8px; padding: 12px 14px 4px; font-size: 13px; font-weight: 700; color: var(--ink); }
+.lgr-cmx-seg { display: inline-flex; padding: 2px; gap: 2px; border: 1px solid var(--line-2); border-radius: 10px; background: var(--card); }
+.lgr-cmx-seg > button {
+  min-width: 34px; height: 26px; padding: 0 8px; border: 0; border-radius: 8px; background: transparent;
+  font-family: var(--num); font-variant-numeric: tabular-nums; font-size: 13px; font-weight: 700; color: var(--lgr-3); cursor: pointer;
+  transition: background-color 140ms var(--ease), color 140ms var(--ease);
+}
+.lgr-cmx-seg > button:hover { color: var(--ink); }
+.lgr-cmx-seg > button[aria-checked="true"] { background: var(--ink); color: #fff; }
+.lgr-cmx-seg > button:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+@media (prefers-reduced-motion: reduce) { .lgr-cmx-bar-p, .lgr-cmx-bar-c { transition: none; } }
+
 .lgr-cmp-blank {
   display: grid;
   place-items: center;
@@ -3377,7 +3480,38 @@ html:has(.lgr-root) {
 .lgr-ask-btn-m { margin-inline-start: 4px; opacity: 0.72; }
 
 /* תחזית ריבית ואינפלציה — the receipt, then the admin paste-in folded away. */
-.lgr-fc { width: min(100%, 440px); }
+.lgr-fc { width: min(100%, 480px); }
+.lgr-fc-list { display: grid; gap: 8px; }
+/* A source is a card you pick: the label, where it comes from, and the four
+   numbers that tell two curves apart. Picked = violet edge + filled dot. */
+.lgr-fc-src {
+  display: grid; gap: 8px; width: 100%; text-align: start;
+  padding: 10px 12px; border: 1px solid var(--line-2); border-radius: 12px;
+  background: var(--card); cursor: pointer;
+  transition: border-color 140ms var(--ease), box-shadow 140ms var(--ease), background-color 140ms var(--ease);
+}
+.lgr-fc-src:hover { border-color: var(--edge); }
+.lgr-fc-src[aria-checked="true"] {
+  border-color: var(--primary);
+  background: #f7f6fe;
+  box-shadow: 0 0 0 3px rgba(91, 84, 214, 0.12);
+}
+.lgr-fc-src:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.lgr-fc-src-head { display: flex; align-items: center; gap: 8px; }
+.lgr-fc-src-head > b { font-size: 13px; font-weight: 700; color: var(--ink); }
+.lgr-fc-src-head > em { margin-inline-start: auto; font-style: normal; font-size: 11.5px; color: var(--lgr-4); }
+.lgr-fc-src-dot {
+  width: 16px; height: 16px; flex: none; display: grid; place-items: center;
+  border-radius: 999px; border: 1.5px solid var(--line-2); color: #fff;
+  transition: background-color 140ms var(--ease), border-color 140ms var(--ease);
+}
+.lgr-fc-src[aria-checked="true"] .lgr-fc-src-dot { background: var(--primary); border-color: var(--primary); }
+.lgr-fc-src-figs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.lgr-fc-src-figs > span {
+  display: grid; gap: 1px; padding: 5px 7px; border-radius: 8px; background: var(--card-2);
+  font-family: var(--num); font-variant-numeric: tabular-nums; font-size: 13px; font-weight: 700; color: var(--ink);
+}
+.lgr-fc-src-figs i { font-style: normal; font-family: var(--ui); font-size: 10.5px; font-weight: 500; color: var(--lgr-4); }
 .lgr-fc-admin { margin: 12px 0 2px; font-size: 12px; color: var(--lgr-3, #5a5d66); }
 .lgr-fc-admin > summary { cursor: pointer; font-weight: 600; padding: 4px 0; }
 .lgr-fc-admin[open] > summary { margin-bottom: 6px; }

@@ -1,96 +1,222 @@
 "use client";
 
-// Head-to-head between the active mix and one other.
+// השוואת תמהילים — SmartNPV's טבלה משווה, read as a decision.
 //
-// WHAT THIS ANSWERS, IN ORDER: is this one cheaper, by how much, and where does
-// the difference come from. The verdict states the first two in a sentence; the
-// ledger under it answers the third, one metric at a time.
+// ONE QUESTION, ANSWERED IN THREE DEPTHS.
+//   1. The verdict: which mix costs less beyond the loan, by how much — a
+//      sentence, and under it the one drawing on this card: each mix as a single
+//      bar of what is paid back, principal and then interest-and-linkage, on
+//      one scale. The difference is the gap between the two bar ends.
+//   2. The ledger: SmartNPV's figures, defined as SmartNPV defines them (see
+//      lib/compare-metrics), grouped by what they are about — עלות, תזרים,
+//      היקף. The difference column carries the verdict in colour, an arrow AND a
+//      word; size rows stay neutral, because borrowing less is a different
+//      mortgage, not a cheaper one.
+//   3. A moment in time: בעוד 5/10/15/20 שנים — the payment then, what is
+//      still owed, and what has been paid so far that was not principal.
+//      SmartNPV asks for a payment number; years are how a client asks.
 //
-// IT USED TO BE TWO PANELS SIDE BY SIDE — a four-column table on one half and an
-// ECharts diverging bar chart on the other — which meant the shekel difference
-// and the percentage difference for the same row lived in two coordinate spaces
-// 600px apart, and reading one row meant finding its label twice. The magnitude
-// is drawn INSIDE the row now, scaled by percentage so a ₪13k line and a ₪1.6M
-// line are comparable, with the shekels stated beside it. One place, both units,
-// no correlation work.
-//
-// NOT EVERY ROW HAS A WINNER. סכום המשכנתא and סך הקרן are the size of the loan,
-// not the price of it: borrowing less is a different mortgage, not a cheaper
-// one, and painting it green is the kind of help that gets someone the wrong
-// product. Only the five cost metrics carry a verdict colour. And when the two
-// sides are not the same size, the totals are not like for like — the ledger
-// says so, and points at the one row that is scale-free.
+// Every figure is on the board's forecast (or flat, when the switch is off) —
+// the same pricing as לוח סילוקין מאוחד and the charts. The mix colours are the
+// charts' own: violet solid for this mix, warm red dashed for the other.
 
+import { useMemo, useState, type ReactNode } from "react";
 import { ArrowDown, ArrowUp, Scales } from "@phosphor-icons/react";
-import type { MixFullTotals } from "@/app/private/crm/leads/simulators/components/calculate/mixScheduleCalculators";
-import { mixFullTotals, type Assume } from "../lib/price";
 import Money from "./Money";
-import { owedOnly, perShekel, type ImportedLoan } from "../lib/credit";
+import { owedOnly, type ImportedLoan } from "../lib/credit";
+import { asEcon, type Assume } from "../lib/price";
+import { atPayment, mixFigures, type MixFigures } from "../lib/compare-metrics";
 
-type Mix = { id: string; mix_name: string; loans?: ImportedLoan[] };
+type Mix = { id: string; mix_name: string; is_base?: boolean; loans?: ImportedLoan[] };
 
-/**
- * `cost` — lower is better, and the row says so in colour.
- * `scale` — the size of the loan. A difference here is a fact, not a verdict.
- */
-type Metric = {
+type Better = "lower" | "none";
+type Row = {
+  key: string;
   label: string;
-  field: string;
-  kind: "cost" | "scale";
-  /** Not a currency — a cost-per-shekel ratio, formatted and signed differently. */
-  ratio?: boolean;
+  /** Hover text: the definition, never on the face of the card. */
+  def: string;
+  better: Better;
+  kind: "money" | "pct" | "ratio" | "years";
+  get: (f: MixFigures) => number | null;
+  note?: (f: MixFigures) => string | null;
 };
 
-const ROWS: Metric[] = [
-  { label: "סכום המשכנתא", field: "originalLoanAmount", kind: "scale" },
-  { label: "סך הקרן", field: "totalPrincipal", kind: "scale" },
-  { label: "סך הריבית", field: "totalInterest", kind: "cost" },
-  { label: "תשלום ראשון", field: "firstPayment", kind: "cost" },
-  { label: "תשלום השיא", field: "maxPayment", kind: "cost" },
-  { label: "עלות כוללת", field: "totalPayment", kind: "cost" },
-  { label: "החזר לשקל", field: "costPerShekel", kind: "cost", ratio: true },
+const GROUPS: { title: string; rows: Row[] }[] = [
+  {
+    title: "עלות",
+    rows: [
+      { key: "cost", label: "תשלומי ריבית והצמדה", def: "סך התשלומים פחות הקרן", better: "lower", kind: "money", get: (f) => f.cost },
+      { key: "total", label: "עלות כוללת", def: "סך כל התשלומים לאורך חיי התמהיל", better: "lower", kind: "money", get: (f) => f.totalPaid },
+      { key: "per", label: "החזר לשקל", def: "כמה שקלים מוחזרים על כל שקל שנלווה", better: "lower", kind: "ratio", get: (f) => f.perShekel },
+      { key: "irr", label: 'שת"פ', def: "שיעור התשואה הפנימי של התשלומים, שנתי אפקטיבי", better: "lower", kind: "pct", get: (f) => f.irr },
+      { key: "npv", label: 'ענ"נ', def: "ערך נוכחי של התשלומים, מהוון לאורך עקום הריבית, פחות הקרן", better: "lower", kind: "money", get: (f) => f.npv },
+      {
+        key: "spread",
+        label: 'מרווח מעל אג"ח',
+        def: "המרווח הקבוע מעל עקום הריבית הממשלתי שבו שווי התשלומים שווה לקרן",
+        better: "lower",
+        kind: "pct",
+        get: (f) => f.spread,
+      },
+    ],
+  },
+  {
+    title: "תזרים",
+    rows: [
+      { key: "first", label: "החזר ראשון", def: "התשלום בחודש הראשון לפי הריביות שהוזנו", better: "lower", kind: "money", get: (f) => f.firstTyped },
+      {
+        key: "peak",
+        label: "החזר בשיא",
+        def: "התשלום החודשי הגבוה ביותר לפי התחזית",
+        better: "lower",
+        kind: "money",
+        get: (f) => f.peak,
+        note: (f) => `בשנה ${f.peakYear}`,
+      },
+      { key: "term", label: "תקופה", def: "החודש האחרון בתמהיל, בשנים", better: "none", kind: "years", get: (f) => f.months / 12 },
+      { key: "dur", label: 'מח"מ', def: "משך החיים הממוצע של התשלומים, משוקלל לפי סכומם", better: "none", kind: "years", get: (f) => f.duration },
+    ],
+  },
+  {
+    title: "היקף",
+    rows: [{ key: "amount", label: "סכום ההלוואה", def: "סך יתרות השורות בתמהיל", better: "none", kind: "money", get: (f) => f.principal }],
+  },
 ];
 
-const ratio = (v: number) => (isFinite(v) ? v.toFixed(2) : "0.00");
+const HORIZONS = [5, 10, 15, 20];
+
+const fmtPct = (v: number) => `${v.toFixed(2)}%`;
+const fmtRatio = (v: number) => v.toFixed(2);
+const fmtYears = (v: number) => v.toFixed(1);
+
+function Figure({ kind, value, dim }: { kind: Row["kind"]; value: number | null; dim?: boolean }) {
+  if (value === null || !Number.isFinite(value)) return <span className="lgr-cmx-na">—</span>;
+  if (kind === "money") return <Money value={value} weight={dim ? 600 : 700} color={dim ? "var(--lgr-2)" : undefined} />;
+  const text = kind === "pct" ? fmtPct(value) : kind === "ratio" ? fmtRatio(value) : fmtYears(value);
+  return (
+    <span className="lgr-cmx-num" data-dim={dim || undefined}>
+      {text}
+    </span>
+  );
+}
+
+function Delta({ kind, a, b, better }: { kind: Row["kind"]; a: number | null; b: number | null; better: Better }) {
+  if (a === null || b === null || !Number.isFinite(a) || !Number.isFinite(b)) return <span className="lgr-cmx-na">—</span>;
+  const raw = a - b;
+  const eps = kind === "money" ? 0.5 : 0.005;
+  if (Math.abs(raw) < eps) return <span className="lgr-cmx-same">זהה</span>;
+  const tone = better === "none" ? "flat" : raw < 0 ? "good" : "bad";
+  const Dir = raw < 0 ? ArrowDown : ArrowUp;
+  const mag =
+    kind === "money" ? (
+      <Money value={Math.abs(raw)} block={false} weight={700} />
+    ) : kind === "pct" ? (
+      fmtPct(Math.abs(raw))
+    ) : kind === "ratio" ? (
+      fmtRatio(Math.abs(raw))
+    ) : (
+      `${fmtYears(Math.abs(raw))} שנ׳`
+    );
+  return (
+    <span className="lgr-cmx-delta" data-tone={tone}>
+      <Dir size={11} weight="bold" aria-hidden />
+      <span className="lgr-cmx-delta-mag">{mag}</span>
+      <em>{raw < 0 ? "פחות" : "יותר"}</em>
+    </span>
+  );
+}
+
+/** One mix as one bar: principal, then the cost on top, on a shared scale. */
+function CostBar({ f, max, side, name }: { f: MixFigures; max: number; side: "a" | "b"; name: string }) {
+  const p = (f.principal / max) * 100;
+  const c = (Math.max(0, f.cost) / max) * 100;
+  return (
+    <div className="lgr-cmx-bar" data-side={side}>
+      <span className="lgr-cmx-bar-name" title={name}>
+        <i aria-hidden />
+        {name}
+      </span>
+      <span className="lgr-cmx-bar-track" role="img" aria-label={`${name}: קרן ועוד ריבית והצמדה`}>
+        <span className="lgr-cmx-bar-p" style={{ width: `${p}%` }} />
+        <span className="lgr-cmx-bar-c" style={{ width: `${c}%` }} />
+      </span>
+      <span className="lgr-cmx-bar-fig">
+        <Money value={f.cost} block={false} weight={700} />
+      </span>
+    </div>
+  );
+}
 
 export default function Compare({
   activeMixId,
   compareMixId,
   mixes,
   annualInflation = 0,
-  /** The picker lives in this section's own header — see the note in Simulator. */
+  discountRate = 4.5,
+  source,
   control,
   onDuplicate,
 }: {
   activeMixId: string | null;
+  /** The other mix. null = automatic (the master, or the first other mix); "" = none. */
   compareMixId: string | null;
   mixes: Mix[];
+  /** The board's pricing — the forecast set, or a bare inflation % (flat). */
   annualInflation?: Assume;
-  control?: React.ReactNode;
+  /** ענ"נ's discount rate when there is no forecast curve to discount along. */
+  discountRate?: number;
+  /** The forecast source chip, rendered in the header. */
+  source?: ReactNode;
+  control?: ReactNode;
   onDuplicate?: () => void;
 }) {
-  const activeMix = mixes.find((m) => m.id === activeMixId);
-  const compareMix = compareMixId ? mixes.find((m) => m.id === compareMixId) : null;
+  const [years, setYears] = useState(10);
 
-  const shell = (body: React.ReactNode, head: React.ReactNode = null) => (
-    <section className="lgr-card lgr-cmp mt-5 overflow-hidden">
-      <header className="lgr-head">
+  const activeMix = mixes.find((m) => m.id === activeMixId) ?? null;
+  const master = mixes.find((m) => m.is_base) ?? mixes[0] ?? null;
+  const autoOther =
+    compareMixId !== null
+      ? null
+      : master && master.id !== activeMixId
+        ? master
+        : (mixes.find((m) => m.id !== activeMixId) ?? null);
+  const otherMix = compareMixId ? (mixes.find((m) => m.id === compareMixId) ?? null) : autoOther;
+
+  const A = useMemo(
+    () => (activeMix ? mixFigures(owedOnly(activeMix.loans ?? []), annualInflation, discountRate) : null),
+    [activeMix, annualInflation, discountRate]
+  );
+  const B = useMemo(
+    () =>
+      otherMix && otherMix.id !== activeMix?.id
+        ? mixFigures(owedOnly(otherMix.loans ?? []), annualInflation, discountRate)
+        : null,
+    [otherMix, activeMix, annualInflation, discountRate]
+  );
+
+  const shell = (body: ReactNode) => (
+    <section className="lgr-card lgr-cmx mt-5">
+      <header className="lgr-head lgr-cmx-head">
         <h2 className="lgr-title">השוואת תמהילים</h2>
-        {head}
-        <div className="ms-auto">{control}</div>
+        {activeMix && control && (
+          <span className="lgr-cmx-pair">
+            <span className="lgr-cmx-tag" data-side="a" title={activeMix.mix_name}>
+              <i aria-hidden />
+              <span className="lgr-cmx-tag-name">{activeMix.mix_name}</span>
+            </span>
+            <span className="lgr-cmx-vs">מול</span>
+            {control}
+          </span>
+        )}
+        {source && <div className="ms-auto">{source}</div>}
       </header>
       {body}
     </section>
   );
 
   if (!activeMix) return shell(<div className="lgr-empty">בחרו תמהיל להצגה.</div>);
-  if (!owedOnly(activeMix.loans ?? []).length)
-    return shell(
-      <div className="lgr-empty">אין נתונים להשוואה — הזינו סכומים בתמהיל או גררו דוח.</div>
-    );
+  if (!A) return shell(<div className="lgr-empty">אין נתונים להשוואה — הזינו סכומים ותקופות בתמהיל או גררו דוח.</div>);
 
-  // NOTHING TO COMPARE AGAINST. An empty state that names the missing thing and
-  // hands over the one action that creates it, rather than a shrug.
   if (mixes.length < 2)
     return shell(
       <div className="lgr-cmp-blank">
@@ -98,7 +224,7 @@ export default function Compare({
         <p>
           יש תמהיל אחד בלבד על הבורד.
           <br />
-          שכפלו אותו כדי לערוך גרסה חלופית ולראות את ההפרש, שורה מול שורה.
+          שכפלו אותו כדי לבנות חלופה ולראות את ההפרש בכל מדד.
         </p>
         {onDuplicate && (
           <button className="lgr-btn lgr-btn-sm" onClick={onDuplicate}>
@@ -108,203 +234,166 @@ export default function Compare({
       </div>
     );
 
-  // The client's own debts on both sides. A guarantee is somebody else's loan,
-  // so counting it here would make one mix look dearer than another purely
-  // because a spouse's cousin borrowed money. See isSurety in lib/credit.
-  const activeRows = owedOnly(activeMix.loans ?? []);
-  const active: MixFullTotals = mixFullTotals(activeRows, annualInflation);
-  const otherRows = compareMix ? owedOnly(compareMix.loans ?? []) : [];
-  const other: MixFullTotals | null = otherRows.length
-    ? mixFullTotals(otherRows, annualInflation)
-    : null;
-
-  if (!other || !compareMix)
+  if (!B || !otherMix)
     return shell(
       <div className="lgr-cmp-blank">
         <Scales size={26} weight="duotone" style={{ color: "var(--lgr-4)" }} />
-        <p>
-          בחרו תמהיל להשוואה בבורר שבראש הכרטיס.
-          <br />
-          כאן יופיע ההפרש — בשקלים ובאחוזים — שורה מול שורה.
-        </p>
+        <p>{otherMix ? `אין נתונים ב${otherMix.mix_name} להשוואה.` : "בחרו תמהיל להשוואה בבורר שבראש הכרטיס."}</p>
       </div>
     );
 
-  // החזר לשקל is NOT totalPayment / originalLoanAmount, which is what this used
-  // to compute: a row with no term pays nothing and would still sit in the
-  // denominator, so a mix flattered itself by holding unschedulable debt. One
-  // definition, in lib/credit, shared with the board's rail and the export —
-  // the three quote the same name and must quote the same number.
-  const activePer = perShekel(activeRows, annualInflation).value;
-  const otherPer = perShekel(otherRows, annualInflation).value;
+  const saving = B.cost - A.cost;
+  const tone = Math.abs(saving) < 1 ? "flat" : saving > 0 ? "good" : "bad";
+  const pctLess = B.cost > 0 ? (saving / B.cost) * 100 : 0;
+  const max = Math.max(A.principal + Math.max(0, A.cost), B.principal + Math.max(0, B.cost), 1);
+  const sameScale = Math.abs(A.principal - B.principal) < 1;
+  const flat = !asEcon(annualInflation).forecast;
 
-  const valueOf = (t: MixFullTotals | null, field: string, per = 0) => {
-    if (!t) return 0;
-    if (field === "costPerShekel") return per;
-    return (t[field as keyof MixFullTotals] as number) || 0;
-  };
+  const n = Math.min(years * 12, Math.max(A.months, B.months));
+  const atA = atPayment(A, n);
+  const atB = atPayment(B, n);
+  const live = (f: MixFigures) => n <= f.months;
+  const atRows: { label: string; a: number; b: number; better: Better }[] = [
+    { label: "החזר חודשי", a: live(A) ? atA.payment : 0, b: live(B) ? atB.payment : 0, better: "lower" },
+    { label: "יתרת החוב", a: live(A) ? atA.balance : 0, b: live(B) ? atB.balance : 0, better: "none" },
+    { label: "ירידת הקרן עד אז", a: atA.retired, b: atB.retired, better: "none" },
+    { label: "ריבית והצמדה ששולמו עד אז", a: atA.costSoFar, b: atB.costSoFar, better: "lower" },
+  ];
 
-  const rows = ROWS.map((r) => {
-    const a = valueOf(active, r.field, activePer);
-    const b = valueOf(other, r.field, otherPer);
-    // Round before judging. Two mixes with an identical principal still differ
-    // by a float epsilon, which rendered as a red "+₪0".
-    const diff = r.ratio ? a - b : Math.round(a) - Math.round(b);
-    const pct = b ? (diff / Math.abs(b)) * 100 : 0;
-    return { ...r, a, b, diff, pct };
-  });
-
-  // ONE SCALE FOR EVERY BAR, AND IT IS PERCENTAGE. The metrics run from ₪13k to
-  // ₪2.8M, so an absolute scale draws תשלום ראשון as nothing at all. The share
-  // each row moved is scale-free and is the thing being decided anyway.
-  const widest = Math.max(...rows.map((r) => Math.abs(r.pct)), 0.001);
-
-  const totalDiff = rows.find((r) => r.field === "totalPayment")!.diff;
-  const monthlyDiff = rows.find((r) => r.field === "firstPayment")!.diff;
-  // Same money borrowed on both sides? If not, "cheaper" is comparing a
-  // mortgage to a different mortgage, and only החזר לשקל survives that.
-  const sameScale =
-    Math.round(valueOf(active, "originalLoanAmount")) === Math.round(valueOf(other, "originalLoanAmount"));
-
-  const tone = totalDiff < 0 ? "pos" : totalDiff > 0 ? "neg" : "flat";
-  const Verdict = totalDiff < 0 ? ArrowDown : ArrowUp;
+  const cols = (
+    <colgroup>
+      <col style={{ width: "28%" }} />
+      <col style={{ width: "22%" }} />
+      <col style={{ width: "22%" }} />
+      <col style={{ width: "28%" }} />
+    </colgroup>
+  );
 
   return shell(
     <>
-      {/* ------------------------------------------------------- the verdict */}
-      {/* A SENTENCE, NOT A TILE. The answer to "which one" is one clause long,
-          and the figure belongs inside the clause that qualifies it — a big
-          number floating over a small caption would say the same thing with
-          more furniture and less meaning. */}
-      <div className="lgr-cmp-verdict" data-tone={tone}>
-        {tone !== "flat" && (
-          <span className="lgr-cmp-verdict-ico" aria-hidden>
-            <Verdict size={15} weight="bold" />
-          </span>
-        )}
-        <p className="lgr-cmp-verdict-line">
+      {/* ---------------------------------------------------------- verdict */}
+      <div className="lgr-cmx-verdict" data-tone={tone}>
+        <p className="lgr-cmx-line">
           {tone === "flat" ? (
-            <>שני התמהילים עולים אותו הדבר לאורך חיי ההלוואה.</>
+            <>שני התמהילים עולים אותו הדבר בריבית ובהצמדה.</>
           ) : (
             <>
-              התמהיל הנוכחי {totalDiff < 0 ? "זול ב־" : "יקר ב־"}
-              <Money
-                value={Math.abs(totalDiff)}
-                block={false}
-                weight={700}
-                className="lgr-cmp-verdict-fig"
-              />{" "}
-              לאורך כל חיי ההלוואה, מול {compareMix.mix_name}
-              {Math.round(monthlyDiff) !== 0 && (
-                <>
-                  {" — ו־"}
-                  <Money value={Math.abs(monthlyDiff)} block={false} weight={700} />{" "}
-                  {monthlyDiff < 0 ? "פחות" : "יותר"} בתשלום הראשון
-                </>
-              )}
-              .
+              <span className="lgr-cmx-line-name">{activeMix.mix_name}</span>
+              {saving > 0 ? " חוסך " : " מוסיף "}
+              <Money value={Math.abs(saving)} block={false} weight={800} className="lgr-cmx-line-fig" />
+              {" בריבית ובהצמדה"}
+              <span className="lgr-cmx-line-pct">
+                {Math.abs(pctLess).toFixed(0)}% {saving > 0 ? "פחות" : "יותר"}
+              </span>
             </>
           )}
         </p>
+        <div className="lgr-cmx-bars">
+          <CostBar f={A} max={max} side="a" name={activeMix.mix_name} />
+          <CostBar f={B} max={max} side="b" name={otherMix.mix_name} />
+          <div className="lgr-cmx-bars-key" aria-hidden>
+            <span>
+              <i data-k="p" />
+              קרן
+            </span>
+            <span>
+              <i data-k="c" />
+              ריבית והצמדה
+            </span>
+          </div>
+        </div>
         {!sameScale && (
-          <p className="lgr-cmp-caveat">
-            שימו לב: הסכומים הנלווים אינם זהים, כך שהעלות הכוללת אינה השוואה שוות־ערך.
-            השורה שכן — <b>החזר לשקל</b>.
+          <p className="lgr-cmx-caveat">
+            הסכומים שנלווים אינם זהים — המדד שמשווה ביניהם בהגינות הוא <b>החזר לשקל</b>.
           </p>
         )}
       </div>
 
-      {/* -------------------------------------------------------- the ledger */}
-      <div className="lgr-scroll overflow-x-auto">
-        <table className="lgr-table lgr-cmp-table w-full table-fixed">
-          {/* The two mix columns get real room: these are names people typed,
-              and "משכנתא נוכחית · יונס חורשיד" truncated to eleven characters is
-              a column nobody can read. */}
-          <colgroup>
-            <col style={{ width: "24%" }} />
-            <col style={{ width: "22%" }} />
-            <col style={{ width: "22%" }} />
-            <col style={{ width: "32%" }} />
-          </colgroup>
-          <thead>
-            <tr>
-              <th />
-              <th className="truncate" data-side="active">
-                {activeMix.mix_name}
+      {/* ----------------------------------------------------------- ledger */}
+      <table className="lgr-cmx-table">
+        {cols}
+        <thead>
+          <tr>
+            <th />
+            <th>
+              <span className="lgr-cmx-tag" data-side="a" title={activeMix.mix_name}>
+                <i aria-hidden />
+                <span className="lgr-cmx-tag-name">{activeMix.mix_name}</span>
+              </span>
+            </th>
+            <th>
+              <span className="lgr-cmx-tag" data-side="b" title={otherMix.mix_name}>
+                <i aria-hidden />
+                <span className="lgr-cmx-tag-name">{otherMix.mix_name}</span>
+              </span>
+            </th>
+            <th>הפרש</th>
+          </tr>
+        </thead>
+        {GROUPS.map((g) => (
+          <tbody key={g.title}>
+            <tr className="lgr-cmx-group">
+              <th colSpan={4} scope="rowgroup">
+                {g.title}
               </th>
-              <th className="truncate">{compareMix.mix_name}</th>
-              <th>הפרש</th>
             </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => {
-              const verdictRow = row.kind === "cost";
-              const color =
-                !verdictRow || row.diff === 0
-                  ? "var(--lgr-3)"
-                  : row.diff < 0
-                    ? "var(--pos)"
-                    : "var(--neg)";
-              const Dir = row.diff < 0 ? ArrowDown : ArrowUp;
-
+            {g.rows.map((r) => {
+              const a = r.get(A);
+              const b = r.get(B);
+              const title = r.key === "npv" && flat ? `ערך נוכחי של התשלומים בהיוון קבוע של ${discountRate}%, פחות הקרן` : r.def;
               return (
-                <tr key={row.field} className="lgr-cmp-row">
-                  <td className="lgr-cmp-label">
-                    {row.label}
-                    {row.ratio && <em>₪ לכל ₪1 שנלווה</em>}
+                <tr key={r.key} className="lgr-cmx-row">
+                  <th scope="row" title={title}>
+                    {r.label}
+                  </th>
+                  <td>
+                    <Figure kind={r.kind} value={a} />
+                    {r.note && <em className="lgr-cmx-note">{r.note(A)}</em>}
                   </td>
                   <td>
-                    {row.ratio ? (
-                      <span className="lgr-money lgr-money-block font-bold">{ratio(row.a)}</span>
-                    ) : (
-                      <Money value={row.a} weight={700} />
-                    )}
+                    <Figure kind={r.kind} value={b} dim />
+                    {r.note && <em className="lgr-cmx-note">{r.note(B)}</em>}
                   </td>
                   <td>
-                    {row.ratio ? (
-                      <span className="lgr-money lgr-money-block" style={{ color: "var(--lgr-3)" }}>
-                        {ratio(row.b)}
-                      </span>
-                    ) : (
-                      <Money value={row.b} color="var(--lgr-3)" />
-                    )}
-                  </td>
-
-                  {/* THE DIFFERENCE, WITH ITS SIZE DRAWN UNDER IT. Direction is
-                      an arrow as well as a colour — a red and a green figure are
-                      the same figure to a deuteranope, and this column is the
-                      one that decides. */}
-                  <td>
-                    <div className="lgr-cmp-delta">
-                      <span className="lgr-cmp-delta-fig" style={{ color }}>
-                        {row.diff !== 0 && verdictRow && (
-                          <Dir size={12} weight="bold" aria-hidden />
-                        )}
-                        {row.ratio ? (
-                          <span className="lgr-money">
-                            {row.diff > 0 ? "+" : row.diff < 0 ? "−" : ""}
-                            {ratio(Math.abs(row.diff))}
-                          </span>
-                        ) : (
-                          <Money value={row.diff} sign weight={700} color={color} block={false} />
-                        )}
-                        {row.diff !== 0 && (
-                          <em className="lgr-cmp-delta-pct">{Math.abs(row.pct).toFixed(1)}%</em>
-                        )}
-                      </span>
-                      <span className="lgr-cmp-bar" aria-hidden>
-                        <span
-                          style={{
-                            transform: `scaleX(${Math.min(1, Math.abs(row.pct) / widest)})`,
-                            background: color,
-                          }}
-                        />
-                      </span>
-                    </div>
+                    <Delta kind={r.kind} a={a} b={b} better={r.better} />
                   </td>
                 </tr>
               );
             })}
+          </tbody>
+        ))}
+      </table>
+
+      {/* -------------------------------------------------- a moment in time */}
+      <div className="lgr-cmx-at">
+        <div className="lgr-cmx-at-head">
+          <span>בעוד</span>
+          <div className="lgr-cmx-seg" role="radiogroup" aria-label="נקודת זמן">
+            {HORIZONS.map((y) => (
+              <button key={y} type="button" role="radio" aria-checked={years === y} onClick={() => setYears(y)}>
+                {y}
+              </button>
+            ))}
+          </div>
+          <span>שנים</span>
+        </div>
+        <table className="lgr-cmx-table lgr-cmx-table-at">
+          {cols}
+          <tbody>
+            {atRows.map((r) => (
+              <tr key={r.label} className="lgr-cmx-row">
+                <th scope="row">{r.label}</th>
+                <td>
+                  <Money value={r.a} weight={700} />
+                </td>
+                <td>
+                  <Money value={r.b} weight={600} color="var(--lgr-2)" />
+                </td>
+                <td>
+                  <Delta kind="money" a={r.a} b={r.b} better={r.better} />
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>

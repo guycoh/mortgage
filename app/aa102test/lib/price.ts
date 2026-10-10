@@ -68,6 +68,7 @@ type Extra = Loan & {
   change_frequency?: string | null;
   source_start_date?: string;
   next_reset?: string | null;
+  reset_fresh?: boolean;
 };
 
 /** Months between rate resets on a bond track. 60 when nothing says — the market's default. */
@@ -90,6 +91,8 @@ export function firstResetOf(l: Extra, V: number, today = startOfToday()): numbe
   // 08/10/2026 leaves 52 payments at the old rate (Nov 2026 … Feb 2031) and the
   // new one is first paid in March — SmartNPV's schedule moves at month 53.
   const calMonths = (a: Date, b: Date) => (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth());
+  // Re-tracked on the board: a new loan, whatever the document said.
+  if (l.reset_fresh) return V;
   const next = l.next_reset ? parseDate(l.next_reset) : null;
   if (next) {
     const s = calMonths(today, next);

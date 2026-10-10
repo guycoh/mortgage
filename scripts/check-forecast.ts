@@ -15,6 +15,7 @@ import { priceLoan, mixFullTotals, ratePath, type Econ } from "../app/aa102test/
 import { bondAnchor, fitForecast, type Forecast } from "../app/aa102test/lib/forecast";
 import type { Loan } from "../app/private/crm/leads/simulators/components/calculate/loanCalculators";
 import { buildMixLine } from "../app/aa102test/lib/timeline";
+import { mixFigures } from "../app/aa102test/lib/compare-metrics";
 import type { ImportedLoan } from "../app/aa102test/lib/credit";
 
 const fx = JSON.parse(
@@ -116,6 +117,37 @@ near(
   "Σ yearly saving = חסכון מצטבר end"
 );
 near(lp.rate[0][1], 4.45758, 0.01, "מוצעת ריבית ממוצעת month 1");
+
+console.log("\nCOMPARISON FIGURES (SmartNPV's טבלה משווה)");
+{
+  const P = mixFigures([mlz, prime, kz1, kz2] as ImportedLoan[], econ, 4.5)!;
+  const X = mixFigures([mz, prime, kz1, kz2] as ImportedLoan[], econ, 4.5)!;
+  near(P.irr!, 5.2084, 0.005, 'מוצעת שת"פ');
+  near(X.irr!, 6.1651, 0.005, 'קיימת שת"פ');
+  near(P.npv, 94594.44, 150, 'מוצעת ענ"נ (curve-discounted)');
+  near(X.npv, 203953.58, 150, 'קיימת ענ"נ (curve-discounted)');
+  near(P.duration, 11.7467, 0.005, 'מוצעת מח"מ');
+  near(X.duration, 12.3117, 0.005, 'קיימת מח"מ');
+  near(P.perShekel, 1.7172, 0.0005, "מוצעת החזר לשקל");
+  near(P.peak, 7242.48, 3, "מוצעת החזר בשיא");
+  ok(P.peakYear === 20, `מוצעת peak year ${P.peakYear} (SmartNPV: 20)`);
+  // KNOWN DIFFERENCE, not a regression: SmartNPV's mix-level מרווח שוק is
+  // "updated daily from government-bond trading data" (their tooltip) — inputs
+  // we do not have. Ours is the Z-spread over the forecast curve; it agrees on a
+  // single prime loan (1.00, below) and reads 0.90 here against their 2.03.
+  console.log(`  info מוצעת מרווח מעל אג"ח ${P.spread!.toFixed(2)} (SmartNPV מרווח שוק 2.03 — live bond data)`);
+  const single = mixFigures(
+    [row({ path_id: 1, amount: 1_000_000, months: 360, rate: 4.25, anchor: 4.75, anchor_margin: -0.5 })] as ImportedLoan[],
+    econ,
+    4.5
+  )!;
+  near(single.npv, 123186, 5, 'prime 1M/360 ענ"נ');
+  near(single.duration, 15.31, 0.005, 'prime 1M/360 מח"מ');
+  near(single.irr!, 5.41, 0.005, 'prime 1M/360 שת"פ');
+  near(single.spread!, 1.0, 0.01, "prime 1M/360 מרווח שוק");
+  near(single.firstTyped, 4919, 1, "prime 1M/360 החזר ראשון (typed)");
+  ok(single.peakYear === 21, `prime 1M/360 peak year ${single.peakYear} (SmartNPV: 21)`);
+}
 
 console.log("\nBoI REBUILD vs SmartNPV's curves");
 const boi = fitForecast(fx.boi_2026_09.nominal, fx.boi_2026_09.real);

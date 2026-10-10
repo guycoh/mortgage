@@ -1,12 +1,13 @@
 // תחזית ריבית ואינפלציה — the curves the board prices variable and linked rows on.
 //
-// GET  → { forecast, boi, override }
+// GET  → { forecast, boi, saved }
 //        `boi` is rebuilt from the Bank of Israel's published zero-coupon points
 //        (SDMX flow BOI.STATISTICS/ZCM, monthly averages) by lib/forecast's
 //        fitForecast — the same construction directive 451 prescribes and
-//        SmartNPV runs. `override` is an exact vector an admin pasted in, newest
-//        row of `mortgage_forecasts`; when present it wins, because the reason
-//        anyone pastes one is to match a number they are holding.
+//        SmartNPV runs. It is the default (`forecast`).
+//        `saved` are exact vectors kept in `mortgage_forecasts` — SmartNPV's own
+//        curve, pasted vectors — newest first, one per label. The board offers
+//        them as alternatives; none of them replaces the default by itself.
 // POST → save or clear the override. Console admin session only (/console).
 //
 // Nothing here can fail the board: no BoI, no table, no network → the answer
@@ -81,34 +82,38 @@ function db() {
   return url && key ? createClient(url, key) : null;
 }
 
-async function readOverride(): Promise<Forecast | null> {
+async function readSaved(): Promise<Forecast[]> {
   const supabase = db();
-  if (!supabase) return null;
+  if (!supabase) return [];
   try {
     const { data, error } = await supabase
       .from("mortgage_forecasts")
-      .select("as_of, label, nominal, inflation, active")
+      .select("as_of, label, nominal, inflation, active, created_at")
       .order("created_at", { ascending: false })
-      .limit(1);
-    if (error || !data?.length || !data[0].active) return null;
-    const r = data[0] as { as_of: string; label: string; nominal: number[]; inflation: number[] };
-    if (r.nominal?.length !== HORIZON || r.inflation?.length !== HORIZON) return null;
-    return { asOf: r.as_of, source: "override", label: r.label, nominal: r.nominal.map(Number), inflation: r.inflation.map(Number) };
+      .limit(40);
+    if (error || !data) return [];
+    // Newest row per label decides; a clearing row (active=false) retires it.
+    const seen = new Set<string>();
+    const out: Forecast[] = [];
+    for (const r of data as { as_of: string; label: string; nominal: number[]; inflation: number[]; active: boolean }[]) {
+      if (seen.has(r.label)) continue;
+      seen.add(r.label);
+      if (!r.active || r.nominal?.length !== HORIZON || r.inflation?.length !== HORIZON) continue;
+      out.push({ asOf: r.as_of, source: "override", label: r.label, nominal: r.nominal.map(Number), inflation: r.inflation.map(Number) });
+    }
+    return out;
   } catch {
-    return null;
+    return [];
   }
 }
 
 export async function GET() {
-  const [boi, override] = await Promise.all([fromBoi(), readOverride()]);
-  return NextResponse.json(
-    { forecast: override ?? boi, boi, override },
-    { headers: { "Cache-Control": "private, max-age=300" } }
-  );
+  const [boi, saved] = await Promise.all([fromBoi(), readSaved()]);
+  return NextResponse.json({ forecast: boi, boi, saved }, { headers: { "Cache-Control": "private, max-age=300" } });
 }
 
 const Body = z.union([
-  z.object({ clear: z.literal(true) }),
+  z.object({ clear: z.literal(true), label: z.string().trim().min(1).max(60) }),
   z.object({
     raw: z.string().min(1).max(200_000),
     label: z.string().trim().min(1).max(60),
@@ -130,7 +135,7 @@ export async function POST(req: NextRequest) {
     // curves from <date>" is itself a fact worth keeping.
     const { error } = await supabase
       .from("mortgage_forecasts")
-      .insert({ as_of: new Date().toISOString().slice(0, 7), label: "ביטול", nominal: [], inflation: [], active: false });
+      .insert({ as_of: new Date().toISOString().slice(0, 7), label: parsed.data.label, nominal: [], inflation: [], active: false });
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ ok: true });
   }

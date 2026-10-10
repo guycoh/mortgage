@@ -268,3 +268,30 @@ export function lenderLabel(source?: string | null): string {
   const l = lenderOf(source);
   return (l.known ? l.name : l.full) || "";
 }
+
+/* ------------------------------------------------------ choosing by hand
+
+   A row typed onto the board has no document to name its lender, so the
+   advisor picks one. The list is the registry's own names — the same words
+   every imported row shows — mortgage banks first, by how often they write
+   mortgages; a הלוואה row also gets the card companies and the non-bank
+   lenders a client is likely to carry. The chosen name goes into source_bank,
+   so the icon, the column, the export and the save treat it like any other. */
+
+export const MORTGAGE_BANKS = [
+  "מזרחי טפחות",
+  "הפועלים",
+  "לאומי",
+  "דיסקונט",
+  "הבינלאומי",
+  "מרכנתיל",
+  "ירושלים",
+  "אוצר החייל",
+  "מסד",
+  "יהב",
+  'פאג"י',
+  "וואן זירו",
+];
+
+export const OTHER_LENDERS = ["מקס", "כאל", "ישראכרט", "אמריקן אקספרס", "מימון ישיר", "טריא", "בלנדר", "כלמוביל", "פנינסולה"];
+

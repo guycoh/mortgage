@@ -91,7 +91,9 @@ export function buildTimeline(loans: ImportedLoan[], annualInflation: Assume): T
     for (const r of rows) {
       const row = r.res.schedule[m - 1];
       if (!row || row.openingBalance <= 0) continue;
-      num += r.rate * row.openingBalance;
+      // The rate the month was actually priced at — the forecast path when the
+      // board runs on one, the typed rate otherwise.
+      num += (r.res.rates[m - 1] ?? r.rate) * row.openingBalance;
       den += row.openingBalance;
     }
     if (den <= 0) break;

@@ -5,8 +5,9 @@
 -- rebuilt from the Bank of Israel's published zero points and the paste-in
 -- reports the missing table.
 --
--- A history, not a setting: every save — and every "back to BoI" — is an insert,
--- and the newest row decides. `active = false` on the newest row means no override.
+-- A history, not a setting: every save — and every removal — is an insert, and
+-- the newest row PER LABEL decides; `active = false` retires that label. The
+-- board lists the live labels as alternatives to the BoI curves.
 
 create table if not exists public.mortgage_forecasts (
   id         bigserial primary key,

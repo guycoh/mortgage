@@ -145,6 +145,9 @@ export type ImportedLoan = Loan & {
    * `s`); without it the phase is read from the opening date. Session-only.
    */
   next_reset?: string | null;
+  /** Track or reset period changed on the board → the document's reset calendar no
+   *  longer applies; the forecast resets it one full interval out. Session-only. */
+  reset_fresh?: boolean;
   /** סכום מקורי — 201-045. 0 when the document did not print one. */
   source_orig_amount?: number;
   /**

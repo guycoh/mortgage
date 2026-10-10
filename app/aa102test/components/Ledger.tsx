@@ -62,7 +62,7 @@ import {
 } from "../lib/credit";
 import { addMonths, monthsBetween, parseDate, startOfToday, toIso } from "../lib/dates";
 import { PURPOSES, PURPOSE_LABEL_OF, defaultPurpose, type PurposeId } from "../lib/purposes";
-import { lenderOf } from "../lib/lenders";
+import { MORTGAGE_BANKS, OTHER_LENDERS, lenderOf } from "../lib/lenders";
 import { freqLabel } from "@/lib/rate-frequency";
 import type { AnchorResponse } from "@/lib/anchors/types";
 
@@ -289,6 +289,8 @@ export default function Ledger({
     patch(id, {
       anchor_interval: months,
       change_frequency: freqLabel(months),
+      // A new reset period is a new loan's calendar, not the document's.
+      reset_fresh: true,
     } as Partial<ImportedLoan>);
   };
 
@@ -362,8 +364,15 @@ export default function Ledger({
       l.anchor_original !== undefined ||
       !!l.anchor_void ||
       !!l.anchor_note;
+    // A row on a new track is a new loan: the reset calendar it inherited from
+    // the document (next-reset date, opening date) belonged to the old one, so
+    // the forecast resets it one full interval out — see firstResetOf.
+    // Automatic ריבית survives the switch. The track change clears the anchor,
+    // and a row with no anchor reads as "typed" — so an automatic row used to
+    // turn manual here and keep the old track's rate beside the new sum.
+    const keepAuto = canAuto(l) ? { rate_auto: rateAuto(l) } : {};
     if (!carries) {
-      patch(id, { path_id: pathId });
+      patch(id, { path_id: pathId, reset_fresh: true, ...keepAuto } as Partial<ImportedLoan>);
       return;
     }
     // A fixed track is not priced off anything published, so it is not missing
@@ -376,6 +385,8 @@ export default function Ledger({
     const to = PATH_SHORT[pathId] ?? "המסלול החדש";
     patch(id, {
       path_id: pathId,
+      reset_fresh: true,
+      ...keepAuto,
       anchor: null,
       anchor_void: anchored || undefined,
       anchor_note: !anchored
@@ -1380,7 +1391,26 @@ export default function Ledger({
                               A row with no lender is a row somebody typed. The
                               dash says so, which the grid could not before. */}
                           <td>
-                            {lender ? (
+                            {!loan.source_type ? (
+                              /* A row typed onto the board: no document names its
+                                 lender, so the advisor picks one from the
+                                 registry's own names. Stored in source_bank, so
+                                 from here on it is like any imported row. */
+                              <Select
+                                value={loan.source_bank ? lenderOf(loan.source_bank).name : ""}
+                                onChange={(v) => patch(loan.id, { source_bank: v ? String(v) : undefined })}
+                                placeholder="בחרו גוף"
+                                ariaLabel="גוף מימון"
+                                options={[
+                                  ...MORTGAGE_BANKS,
+                                  ...(loan.group === "loan" ? OTHER_LENDERS : []),
+                                ].map((name) => ({
+                                  value: name,
+                                  label: name,
+                                  icon: <BankIcon source={name} size={16} />,
+                                }))}
+                              />
+                            ) : lender ? (
                               <div className="lgr-lender" title={lender.full}>
                                 <span className="lgr-lender-id">
                                   <BankIcon source={loan.source_bank} size={18} />
