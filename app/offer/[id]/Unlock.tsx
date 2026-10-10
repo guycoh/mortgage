@@ -18,7 +18,16 @@ const MSG: Record<string, string> = {
   net: "בעיית חיבור. נסו שוב.",
 };
 
-export default function Unlock({ id }: { id: string }) {
+export default function Unlock({
+  id,
+  title = "הצעת המשכנתא שהכנו עבורכם",
+  words,
+}: {
+  id: string;
+  title?: string;
+  /** The page's own words for its gone states — a summary is not an offer. */
+  words?: Partial<Record<"expired" | "revoked" | "missing", string>>;
+}) {
   const router = useRouter();
   const input = useRef<HTMLInputElement>(null);
   const shake = useAnimationControls();
@@ -47,7 +56,8 @@ export default function Unlock({ id }: { id: string }) {
         return;
       }
       const j = (await res.json().catch(() => ({}))) as { error?: string };
-      setErr(MSG[j.error ?? "wrong"] ?? MSG.wrong);
+      const key = j.error ?? "wrong";
+      setErr((words as Record<string, string> | undefined)?.[key] ?? MSG[key] ?? MSG.wrong);
       await shake.start({ x: [0, -10, 9, -6, 4, 0], transition: { duration: 0.42, ease: "easeOut" } });
       setCode("");
     } catch {
@@ -79,7 +89,7 @@ export default function Unlock({ id }: { id: string }) {
               <Logo size={40} />
               <span>מורגי</span>
             </span>
-            <h1 className="ofr-gate-title">הצעת המשכנתא שהכנו עבורכם</h1>
+            <h1 className="ofr-gate-title">{title}</h1>
             <p className="ofr-gate-text">הקלידו את הקוד בן 6 הספרות שקיבלתם מהיועץ.</p>
 
             <motion.label className="ofr-otp" animate={shake} data-busy={busy || undefined}>

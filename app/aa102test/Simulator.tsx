@@ -123,6 +123,12 @@ const toolSkeleton = () => (
 const ReverseTool = dynamic(() => import("./reverse/ReverseMortgage"), { loading: toolSkeleton });
 const AbilityTool = dynamic(() => import("./ability/AbilityCalculator"), { loading: toolSkeleton });
 
+// /aa105test's full-screen client brief and deep-dives. Loaded only on that
+// route (variant "v105"), so /aa102test ships none of it.
+const ClientBrief = dynamic(() => import("@/app/aa105test/components/ClientBrief"), { ssr: false });
+const CreditDeepDive = dynamic(() => import("@/app/aa105test/components/CreditDeepDive"), { ssr: false });
+const MortgageDeepDive = dynamic(() => import("@/app/aa105test/components/MortgageDeepDive"), { ssr: false });
+
 type Mix = {
   id: string;
   mix_name: string;
@@ -281,6 +287,8 @@ export default function Simulator({
   endpoint = "/api/aa100/mixes",
   locked = false,
   initialTool = "mix",
+  variant,
+  base = "/aa102test",
 }: {
   lead: Lead | null;
   /**
@@ -305,6 +313,10 @@ export default function Simulator({
    * ledger and then swapping it out.
    */
   initialTool?: Tool;
+  /** "v105" presents סיכום ללקוח and the analyses full-screen (/aa105test). */
+  variant?: "v105";
+  /** The route this board lives under — where the lead picker navigates. */
+  base?: string;
 }) {
   const [mixes, setMixes] = useState<Mix[] | null>(null);
   const [activeMixId, setActiveMixId] = useState<string | null>(null);
@@ -1167,12 +1179,12 @@ export default function Simulator({
                 // the answer turns on WHICH lead is being left and what is on
                 // it, and the card can state both. See Ask.
                 onPick={(l) => {
-                  if (dirty) return setAskLeave({ to: `/aa102test/${l.id}`, name: l.name || `ליד ${l.id}` });
-                  router.push(`/aa102test/${l.id}`);
+                  if (dirty) return setAskLeave({ to: `${base}/${l.id}`, name: l.name || `ליד ${l.id}` });
+                  router.push(`${base}/${l.id}`);
                 }}
                 onClear={() => {
                   if (dirty) return setAskLeave({ to: null, name: "" });
-                  router.push("/aa102test");
+                  router.push(base);
                 }}
               />
             )}
@@ -1965,7 +1977,7 @@ export default function Simulator({
           onConfirm={() => {
             const to = askLeave.to;
             setAskLeave(null);
-            router.push(to ?? "/aa102test");
+            router.push(to ?? base);
           }}
           onClose={() => setAskLeave(null)}
         />
@@ -2025,32 +2037,58 @@ export default function Simulator({
 
       {/* Derived on open rather than on import: the analysis is a read of the
           reports, and recomputing it costs nothing next to parsing the PDF. */}
-      {showClient && statement && reading === "bank" && (
-        <StatementSummaryModal
-          analysis={analyseStatement(statement)}
-          onClose={() => setShowClient(false)}
-        />
-      )}
+      {variant === "v105" ? (
+        <>
+          {showClient && statement && reading === "bank" && (
+            <ClientBrief statement={analyseStatement(statement)} leadId={lead?.id ?? null} onClose={() => setShowClient(false)} />
+          )}
+          {showAnalysis && statement && reading === "bank" && (
+            <MortgageDeepDive analysis={analyseStatement(statement)} onClose={() => setShowAnalysis(false)} />
+          )}
+          {showClient && creditReports.length > 0 && reading === "credit" && (
+            <ClientBrief
+              credit={analyseReports(creditReports, creditDocs.map((r) => r.fileName))}
+              leadId={lead?.id ?? null}
+              onClose={() => setShowClient(false)}
+            />
+          )}
+          {showAnalysis && creditReports.length > 0 && reading === "credit" && (
+            <CreditDeepDive
+              analysis={analyseReports(creditReports, creditDocs.map((r) => r.fileName))}
+              onClose={() => setShowAnalysis(false)}
+            />
+          )}
+        </>
+      ) : (
+        <>
+        {showClient && statement && reading === "bank" && (
+          <StatementSummaryModal
+            analysis={analyseStatement(statement)}
+            onClose={() => setShowClient(false)}
+          />
+        )}
 
-      {showAnalysis && statement && reading === "bank" && (
-        <StatementAnalysisModal
-          analysis={analyseStatement(statement)}
-          onClose={() => setShowAnalysis(false)}
-        />
-      )}
+        {showAnalysis && statement && reading === "bank" && (
+          <StatementAnalysisModal
+            analysis={analyseStatement(statement)}
+            onClose={() => setShowAnalysis(false)}
+          />
+        )}
 
-      {showClient && creditReports.length > 0 && reading === "credit" && (
-        <ClientSummaryModal
-          analysis={analyseReports(creditReports, creditDocs.map((r) => r.fileName))}
-          onClose={() => setShowClient(false)}
-        />
-      )}
+        {showClient && creditReports.length > 0 && reading === "credit" && (
+          <ClientSummaryModal
+            analysis={analyseReports(creditReports, creditDocs.map((r) => r.fileName))}
+            onClose={() => setShowClient(false)}
+          />
+        )}
 
-      {showAnalysis && creditReports.length > 0 && reading === "credit" && (
-        <AnalysisModal
-          analysis={analyseReports(creditReports, creditDocs.map((r) => r.fileName))}
-          onClose={() => setShowAnalysis(false)}
-        />
+        {showAnalysis && creditReports.length > 0 && reading === "credit" && (
+          <AnalysisModal
+            analysis={analyseReports(creditReports, creditDocs.map((r) => r.fileName))}
+            onClose={() => setShowAnalysis(false)}
+          />
+        )}
+        </>
       )}
     </div>
   );

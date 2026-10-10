@@ -52,7 +52,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
-    path: `/offer/${id}`,
+    // A client brief lives at /summary/<id>; the cookie opens only that page.
+    path: (row.payload as { kind?: string }).kind === "brief" ? `/summary/${id}` : `/offer/${id}`,
     maxAge: OFFER_DAYS * 86400,
   });
   return res;

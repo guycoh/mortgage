@@ -30,6 +30,8 @@ export default async function OfferPage({ params }: { params: Promise<{ id: stri
   const row = await readOffer(id);
   const state = stateOf(row);
   if (state !== "ok" || !row) return <Gone state={state === "ok" ? "missing" : state} />;
+  // A client brief shares the table, never the page.
+  if ((row.payload as { kind?: string }).kind === "brief") return <Gone state="missing" />;
 
   const jar = await cookies();
   if (!verifySession(id, jar.get(cookieName(id))?.value)) return <Unlock id={id} />;
