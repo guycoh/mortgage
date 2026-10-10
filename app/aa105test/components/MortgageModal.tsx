@@ -35,7 +35,7 @@ import {
 } from "@phosphor-icons/react";
 import Money, { fmt } from "@/app/aa102test/components/Money";
 import { ShareTable } from "./BriefView";
-import { IndexBars, RecycleMap, ResetDates } from "./MortgageDeepDive";
+import { IndexBars } from "./MortgageDeepDive";
 import { docFromStatement } from "../lib/brief";
 import {
   SEVERITY_LABEL,
@@ -577,9 +577,6 @@ export default function MortgageModal({
               {/* "כדאיות מיחזור" promised a saving the table never computes — there
                   is no alternative offer here to compare against. What it does show
                   is a first screen, and the paragraph says exactly that. */}
-              <div className="brf-desk brf-embed mb-3">
-                <RecycleMap a={a} />
-              </div>
               <p className="mb-2.5 text-[12px] leading-relaxed" style={{ color: "var(--lgr-3)" }}>
                 הטבלה מסייעת לבחור אילו מסלולים לבדוק למיחזור. העמלה מוצגת בשקלים וגם ביחס לריבית של חודש
                 אחד, לפי היתרה והריבית הנוכחיות. היחס אינו מספר החודשים להחזרת עלות המיחזור. לבדיקת חיסכון יש
@@ -710,8 +707,29 @@ export default function MortgageModal({
               lit={lit?.section === "resets"}
               note={`₪${fmt(a.exposure.resettingWithinYear)} מהיתרה`}
             >
-              <div className="brf-desk brf-embed">
-                <ResetDates a={a} lit={lit?.section === "resets" ? lit.uids : undefined} />
+              <div className="overflow-x-auto">
+                <table className="lgr-table lgr-mini">
+                  <thead>
+                    <tr>
+                      <th>מסלול</th>
+                      <th>יתרה</th>
+                      <th>ריבית כיום</th>
+                      <th>מועד השינוי</th>
+                      <th>תדירות</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {a.upcomingResets.map((t) => (
+                      <tr key={t.uid} data-hl={lit?.uids.has(t.uid) || undefined}>
+                        <td className="font-semibold">{trackName(t)}</td>
+                        <td><Money value={t.balance ?? 0} block={false} /></td>
+                        <td className="lgr-fig">{rate(t.rate)}</td>
+                        <td className="lgr-fig">{t.nextReset || "—"}</td>
+                        <td>{freqLabel(t.resetMonths) || (t.rateKind === "prime" ? FREQ_PRIME : "—")}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
               {/* Was: "…עמלת ההיוון מתאפסת… חוסך את מרכיב ההיוון במלואו" — a promise
                   about a fee the document does not quote for that date. */}

@@ -83,6 +83,7 @@ const Doc = z.object({
     .nullable(),
   pains: z.array(Pain).max(40),
   book: z.array(BookGroup).max(4),
+  totals: z.object({ balance: money, monthly: money }).optional(),
   groups: z
     .array(
       z.object({

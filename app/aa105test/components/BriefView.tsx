@@ -22,7 +22,8 @@ import { AnimatePresence, motion, useInView, useReducedMotion } from "motion/rea
 import { Phone, Plus, WhatsappLogo } from "@phosphor-icons/react";
 import { BankIcon } from "@/app/aa102test/components/bankIcons";
 import Logo from "@/app/aa102test/components/Logo";
-import type { BookGroup, BriefDoc, BriefFigure, BriefPain, BriefSlice, Lens } from "../lib/brief";
+import { WORRY_GROUP_LABEL, WORRY_GROUP_ORDER } from "@/lib/verdicts";
+import type { BookGroup, BriefDoc, BriefFigure, BriefPain, BriefSlice, DebtRow, Lens } from "../lib/brief";
 import "@fontsource-variable/inter";
 import "@fontsource/assistant/hebrew-300.css";
 import "@fontsource/assistant/hebrew-400.css";
@@ -562,6 +563,213 @@ function Extras({ doc }: { doc: BriefDoc }) {
   );
 }
 
+
+/* ------------------------------------------------------ the summary itself */
+//
+// The board's סיכום ללקוח, kept as it was — debts by family, one line per
+// lender (one per facility for cards), the points worth checking, the totals —
+// and drawn in the statement language: ruled lines, ink, and the advisor's
+// marker on what hurts.
+
+function LedgerRow({ r }: { r: DebtRow }) {
+  return (
+    <li className="brf-lr" data-alarm={r.alarm || undefined}>
+      <span className="brf-lr-mark">{r.dot ? <i style={{ background: r.dot }} /> : <BankIcon source={r.source} size={26} />}</span>
+      <div className="brf-lr-id">
+        <div className="brf-lr-name">
+          {r.name}
+          {r.kind && <span className="brf-lr-kind">{r.kind}</span>}
+        </div>
+        {r.facts.length > 0 && (
+          <p className="brf-lr-facts">
+            {r.facts.map((f, i) => (
+              <span key={i} data-heat={f.heat}>
+                {f.text}
+              </span>
+            ))}
+          </p>
+        )}
+      </div>
+      <div className="brf-lr-amt" data-heat={r.balanceHeat}>
+        <span className="brf-lr-cap">יתרה</span>
+        <Shekel value={r.balance} />
+      </div>
+      <div className="brf-lr-amt" data-heat={r.monthlyHeat}>
+        <span className="brf-lr-cap">לחודש</span>
+        {r.monthly !== null ? <Shekel value={r.monthly} /> : <span className="brf-lr-none">{r.monthlyLabel}</span>}
+        {r.monthlyNotes.map((n) => (
+          <span key={n} className="brf-lr-note">
+            {n}
+          </span>
+        ))}
+      </div>
+    </li>
+  );
+}
+
+function Ledger({ doc }: { doc: BriefDoc }) {
+  const solo = doc.groups.length === 1;
+  const noMonthly = doc.groups.every((g) => g.rows.every((r) => r.monthly === null && r.monthlyLabel === "לא דווח" && !r.monthlyNotes.length));
+  return (
+    <div className="brf-ledger" data-nomonthly={noMonthly || undefined}>
+      <div className="brf-lhead" aria-hidden>
+        <span />
+        <span>יתרה</span>
+        {!noMonthly && <span>לחודש</span>}
+      </div>
+      {doc.groups.map((g) => {
+        const many = g.rows.length + g.lines.length > 1;
+        return (
+          <div key={g.key} className="brf-lg" style={{ ["--fam" as string]: g.color }}>
+            {!solo && (
+              <h3 className="brf-lg-title">
+                <i />
+                {g.title}
+              </h3>
+            )}
+            <ul>
+              {g.rows.map((r) => (
+                <LedgerRow key={r.key} r={r} />
+              ))}
+              {g.lines.map((l) => (
+                <li key={l} className="brf-lr-line">
+                  {l}
+                </li>
+              ))}
+            </ul>
+            {many && !solo && (
+              <div className="brf-lsum">
+                <span>סה״כ {g.title}</span>
+                <Shekel value={g.total.balance} />
+                {!noMonthly && <Shekel value={g.total.monthly} />}
+              </div>
+            )}
+          </div>
+        );
+      })}
+      {!doc.groups.length && <p className="brf-calm">לא נמצאו התחייבויות פעילות בדוח.</p>}
+    </div>
+  );
+}
+
+function Payoff({ doc }: { doc: BriefDoc }) {
+  const p = doc.payoff;
+  if (!p || p.payoff <= 0) return null;
+  return (
+    <div className="brf-payoff">
+      <h3 className="brf-lg-title">{doc.asOf ? `סילוק המשכנתא, נכון ל-${doc.asOf}` : "סילוק המשכנתא לפי המסמך"}</h3>
+      <dl>
+        <div>
+          <dt>סכום לסילוק</dt>
+          <dd>
+            <Shekel value={p.payoff} />
+          </dd>
+        </div>
+        {p.accrued > 0 && (
+          <div>
+            <dt>מזה ריבית שנצברה</dt>
+            <dd>
+              <Shekel value={p.accrued} />
+            </dd>
+          </div>
+        )}
+        <div data-heat={p.fee > 0 ? "hot" : undefined}>
+          <dt>מזה עמלת פירעון מוקדם</dt>
+          <dd>
+            <Shekel value={p.fee} />
+            {p.feeMissing > 0 && (
+              <span className="brf-lr-note">
+                {p.feeMissing === 1 ? "לא כולל מסלול אחד שלא דווחה בו עמלה" : `לא כולל עמלות ב-${p.feeMissing} מסלולים שלא דווחה בהם עמלה`}
+              </span>
+            )}
+          </dd>
+        </div>
+        {p.free > 0 && (
+          <div data-heat="good">
+            <dt>במסלולים ללא עמלת פירעון מוקדם</dt>
+            <dd>
+              <Shekel value={p.free} />
+            </dd>
+          </div>
+        )}
+      </dl>
+    </div>
+  );
+}
+
+const markOf = (p: BriefPain): "marker" | "soft" | "pen" | "good" | null =>
+  p.good ? "good" : p.tone === "critical" ? "pen" : p.tone === "high" ? "marker" : p.tone === "medium" ? "soft" : null;
+
+function Point({ p, i, withNext }: { p: BriefPain; i: number; withNext: boolean }) {
+  const ref = useRef<HTMLLIElement>(null);
+  const seen = useInView(ref, { once: true, margin: "0px 0px -10% 0px" });
+  const tone = markOf(p);
+  return (
+    <li ref={ref} className="brf-pt" data-tone={p.good ? "good" : p.tone}>
+      <div className="brf-pt-fig">
+        {p.figure &&
+          (tone ? (
+            <Mark show={seen} tone={tone} delay={0.1 + Math.min(i, 5) * 0.05}>
+              <Rolling kind={p.figure.kind} value={p.figure.value} shown={seen} />
+            </Mark>
+          ) : (
+            <Rolling kind={p.figure.kind} value={p.figure.value} shown={seen} />
+          ))}
+      </div>
+      <div className="brf-pt-text">
+        <h3>{p.title}</h3>
+        <p>{p.say}</p>
+        {withNext && p.next && <p className="brf-pt-next">{p.next}</p>}
+      </div>
+    </li>
+  );
+}
+
+function Points({ doc }: { doc: BriefDoc }) {
+  const groups = WORRY_GROUP_ORDER.map((g) => ({ g, rows: doc.pains.filter((p) => p.group === g) })).filter((x) => x.rows.length > 0);
+  if (!groups.length) return null;
+  return (
+    <section className="brf-sm-points" aria-label="נקודות שחשוב לבדוק">
+      <h2 className="brf-sm-h">נקודות שחשוב לבדוק</h2>
+      {groups.map(({ g, rows }) => (
+        <div key={g} className="brf-pg" data-group={g}>
+          <h3 className="brf-pg-title">{WORRY_GROUP_LABEL[g]}</h3>
+          <ol className="brf-pts">
+            {rows.map((p, i) => (
+              <Point key={p.id} p={p} i={i} withNext={g !== "info"} />
+            ))}
+          </ol>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+function Totals({ doc }: { doc: BriefDoc }) {
+  const credit = doc.source === "credit";
+  const t = doc.totals ?? { balance: doc.balance, monthly: doc.monthly ?? 0 };
+  return (
+    <div className="brf-sm-totals">
+      <div>
+        <span className="brf-op-label">{credit ? "סך יתרות ההתחייבויות" : "יתרת המשכנתא"}</span>
+        <Shekel value={t.balance} className="brf-sm-fig" />
+      </div>
+      {t.monthly > 0 && (
+        <div>
+          <span className="brf-op-label">{credit ? "החזר חודשי על הלוואות ומשכנתא" : "החזר חודשי לפי המסמך"}</span>
+          <Shekel value={t.monthly} className="brf-sm-fig" />
+        </div>
+      )}
+      {doc.cards > 0 && (
+        <div>
+          <span className="brf-op-label">חיוב חודשי בכרטיסים ובמסגרות</span>
+          <Shekel value={doc.cards} className="brf-sm-fig" />
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* --------------------------------------------------------------- page */
 
 export default function BriefView({
@@ -587,7 +795,7 @@ export default function BriefView({
 
   return (
     <div className="brf-desk" data-mode={mode}>
-      <article className="brf-sheet brf-op brf-ps">
+      <article className="brf-sheet brf-op brf-sm">
         <header className="brf-mast">
           <span className="brf-mark">
             <Logo size={mode === "client" ? 28 : 24} />
@@ -609,9 +817,17 @@ export default function BriefView({
           )}
         </div>
 
-        <Headline doc={doc} />
-        <LoanPains doc={doc} />
-        <Extras doc={doc} />
+        <Ledger doc={doc} />
+        <Payoff doc={doc} />
+        <Points doc={doc} />
+        <Totals doc={doc} />
+        {doc.notes.length > 0 && (
+          <ul className="brf-notes">
+            {doc.notes.map((n) => (
+              <li key={n}>{n}</li>
+            ))}
+          </ul>
+        )}
 
         {mode === "client" && (advisor?.name || phone) && (
           <section className="brf-op-contact" aria-label="יצירת קשר">

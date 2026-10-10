@@ -466,6 +466,8 @@ export interface BookGroup {
 export interface BriefDoc extends Brief {
   /** Mortgages and loans, lender by lender — the one-pager's list. */
   book: BookGroup[];
+  /** The summary's own totals: every debt the ledger lists, and the repayments. */
+  totals?: { balance: number; monthly: number };
   groups: DebtGroup[];
   /** The ordinary card bill, beside the repayment and never added to it. */
   cards: number;
@@ -679,7 +681,7 @@ export function docFromCredit(a: Analysis): BriefDoc {
   // (the row; the ערבויות line) — repeating them here is only more text.
   if (v.cardParts.unreportedCount > 0)
     notes.push(`לא דווח חיוב עבור ${v.cardParts.unreportedCount === 1 ? "מסגרת אחת" : `${v.cardParts.unreportedCount} מסגרות`}.`);
-  return { ...briefFromCredit(a), book: bookFromCredit(v, a.lines), groups: creditGroups(v), cards: v.footer.cards, payoff: null, notes };
+  return { ...briefFromCredit(a), book: bookFromCredit(v, a.lines), totals: { balance: v.footer.balance, monthly: v.footer.monthly }, groups: creditGroups(v), cards: v.footer.cards, payoff: null, notes };
 }
 
 /* ------------------------------------------------------------- bank rows */
@@ -725,6 +727,7 @@ export function docFromStatement(a: StatementAnalysis): BriefDoc {
     notes.push(`לא דווח החזר חודשי עבור ${a.monthlyUnreported === 1 ? "מסלול אחד" : `${a.monthlyUnreported} מסלולים`}, ולכן ההחזר החודשי חלקי.`);
   return {
     ...briefFromStatement(a),
+    totals: { balance: a.totals.balance, monthly: a.totals.monthly },
     // On a bank letter there is one lender; the book divides it by track.
     book: [
       {

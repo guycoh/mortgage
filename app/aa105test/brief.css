@@ -805,3 +805,38 @@ button.brf-fb-head:focus-visible { outline: 2px solid var(--violet); outline-off
 .brf-desk.brf-embed { padding: 0; background: none; font-size: 13.5px; }
 .brf-modal .lgr-navbar { position: relative; }
 .brf-modal .brf-map-plot { max-width: 760px; }
+
+/* ============================================================ the summary */
+.brf-sm { max-width: 860px; }
+.brf-sm .brf-who { padding-bottom: 8px; }
+.brf-sm-h { margin: 26px 0 6px; font-size: 16px; font-weight: 700; }
+.brf-sm-points { padding-top: 4px; border-top: 1px solid var(--rule-2); margin-top: 22px; }
+.brf-sm-points .brf-pt { grid-template-columns: 120px minmax(0, 1fr); }
+@media (max-width: 600px) { .brf-sm-points .brf-pt { grid-template-columns: 1fr; } }
+.brf-sm-points .brf-pt-fig { font-size: 21px; }
+.brf-sm-points .brf-pt-text h3 { font-size: 15.5px; }
+.brf-sm-points .brf-pt-text p { font-size: 14.5px; }
+.brf-sm-totals { display: flex; flex-wrap: wrap; gap: 14px 40px; margin-top: 22px; padding-top: 14px; border-top: 3px double var(--ink); }
+.brf-sm-totals > div { display: grid; gap: 2px; }
+.brf-sm-fig { font-size: 26px; font-weight: 300; letter-spacing: -0.02em; }
+/* The summary as a modal over the board. */
+.brf-modal-back { position: fixed; inset: 0; z-index: 140; display: grid; place-items: center; padding: 16px; background: rgba(14, 21, 36, 0.5); }
+.brf-modal-card { position: relative; display: flex; flex-direction: column; width: min(100%, 900px); max-height: 94vh; border-radius: 14px; background: #fff; box-shadow: 0 40px 100px -40px rgba(14, 21, 36, 0.6); overflow: hidden; font-family: var(--font); color: var(--ink); }
+.brf-modal-bar { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--rule); }
+.brf-modal-bar .brf-acts { display: flex; gap: 6px; }
+.brf-modal-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.brf-modal-body .brf-desk { padding: 0; }
+.brf-modal-body .brf-sheet { box-shadow: none; border-radius: 0; max-width: none; padding: 22px 36px 30px; }
+@media (max-width: 640px) { .brf-modal-body .brf-sheet { padding: 18px 16px 24px; } }
+@media print {
+  .brf-modal-back { position: static; padding: 0; background: none; }
+  .brf-modal-card { max-height: none; box-shadow: none; }
+  .brf-modal-bar { display: none; }
+  .brf-modal-body { overflow: visible; }
+}
+
+/* Inside the board's modals the visuals stay compact: figures beside their labels. */
+.brf-modal .brf-embed { max-width: 720px; }
+.brf-modal .brf-ibars li { grid-template-columns: minmax(0, 220px) minmax(0, 260px) auto; justify-content: start; gap: 18px; }
+.brf-modal .brf-ibars-fig { justify-items: start; text-align: start; }
+.brf-modal .brf-shares table { max-width: 640px; }
