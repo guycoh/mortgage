@@ -1,26 +1,25 @@
 "use client";
 
-// השוואת תמהילים — SmartNPV's טבלה משווה, read as a decision.
+// השוואת תמהילים — SmartNPV's טבלה משווה, read as a decision, in half the room.
 //
-// ONE QUESTION, ANSWERED IN THREE DEPTHS.
-//   1. The verdict: which mix costs less beyond the loan, by how much — a
-//      sentence, and under it the one drawing on this card: each mix as a single
-//      bar of what is paid back, principal and then interest-and-linkage, on
-//      one scale. The difference is the gap between the two bar ends.
-//   2. The ledger: SmartNPV's figures, defined as SmartNPV defines them (see
-//      lib/compare-metrics), grouped by what they are about — עלות, תזרים,
-//      היקף. The difference column carries the verdict in colour, an arrow AND a
-//      word; size rows stay neutral, because borrowing less is a different
-//      mortgage, not a cheaper one.
-//   3. A moment in time: בעוד 5/10/15/20 שנים — the payment then, what is
-//      still owed, and what has been paid so far that was not principal.
-//      SmartNPV asks for a payment number; years are how a client asks.
+// TWO PANES, NOT A FULL-WIDTH TABLE. Four columns stretched across 1,250px put
+// a hand's width of nothing between every figure and the one it is compared
+// with, and the card ran past a thousand pixels tall. Now:
 //
-// Every figure is on the board's forecast (or flat, when the switch is off) —
-// the same pricing as לוח סילוקין מאוחד and the charts. The mix colours are the
-// charts' own: violet solid for this mix, warm red dashed for the other.
+//   · the VERDICT pane (where the eye lands in RTL): the saving, re-counted live
+//     when anything it depends on changes; the twin cost bars; and a TIME
+//     SCRUBBER — the saving accumulated year by year as a small area, with a
+//     handle the advisor drags to "בעוד N שנים". The four figures under it
+//     (payment then, balance, principal retired, cost so far) follow the handle.
+//   · the LEDGER pane: SmartNPV's figures, tight columns, grouped עלות / תזרים /
+//     היקף, each difference a coloured pill that also says פחות / יותר.
+//
+// Figures are defined as SmartNPV defines them (lib/compare-metrics) and run on
+// the board's forecast. Mix colours are the charts': violet solid for this mix,
+// warm red dashed for the other.
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import NumberFlow from "@number-flow/react";
 import { ArrowDown, ArrowUp, Scales } from "@phosphor-icons/react";
 import Money from "./Money";
 import { owedOnly, type ImportedLoan } from "../lib/credit";
@@ -30,13 +29,14 @@ import { atPayment, mixFigures, type MixFigures } from "../lib/compare-metrics";
 type Mix = { id: string; mix_name: string; is_base?: boolean; loans?: ImportedLoan[] };
 
 type Better = "lower" | "none";
+type Kind = "money" | "pct" | "ratio" | "years";
 type Row = {
   key: string;
   label: string;
   /** Hover text: the definition, never on the face of the card. */
   def: string;
   better: Better;
-  kind: "money" | "pct" | "ratio" | "years";
+  kind: Kind;
   get: (f: MixFigures) => number | null;
   note?: (f: MixFigures) => string | null;
 };
@@ -45,7 +45,7 @@ const GROUPS: { title: string; rows: Row[] }[] = [
   {
     title: "עלות",
     rows: [
-      { key: "cost", label: "תשלומי ריבית והצמדה", def: "סך התשלומים פחות הקרן", better: "lower", kind: "money", get: (f) => f.cost },
+      { key: "cost", label: "ריבית והצמדה", def: "סך התשלומים פחות הקרן", better: "lower", kind: "money", get: (f) => f.cost },
       { key: "total", label: "עלות כוללת", def: "סך כל התשלומים לאורך חיי התמהיל", better: "lower", kind: "money", get: (f) => f.totalPaid },
       { key: "per", label: "החזר לשקל", def: "כמה שקלים מוחזרים על כל שקל שנלווה", better: "lower", kind: "ratio", get: (f) => f.perShekel },
       { key: "irr", label: 'שת"פ', def: "שיעור התשואה הפנימי של התשלומים, שנתי אפקטיבי", better: "lower", kind: "pct", get: (f) => f.irr },
@@ -71,7 +71,7 @@ const GROUPS: { title: string; rows: Row[] }[] = [
         better: "lower",
         kind: "money",
         get: (f) => f.peak,
-        note: (f) => `בשנה ${f.peakYear}`,
+        note: (f) => `שנה ${f.peakYear}`,
       },
       { key: "term", label: "תקופה", def: "החודש האחרון בתמהיל, בשנים", better: "none", kind: "years", get: (f) => f.months / 12 },
       { key: "dur", label: 'מח"מ', def: "משך החיים הממוצע של התשלומים, משוקלל לפי סכומם", better: "none", kind: "years", get: (f) => f.duration },
@@ -83,15 +83,15 @@ const GROUPS: { title: string; rows: Row[] }[] = [
   },
 ];
 
-const HORIZONS = [5, 10, 15, 20];
+const COUNT: EffectTiming = { duration: 420, easing: "cubic-bezier(0.2, 0, 0, 1)" };
 
 const fmtPct = (v: number) => `${v.toFixed(2)}%`;
 const fmtRatio = (v: number) => v.toFixed(2);
 const fmtYears = (v: number) => v.toFixed(1);
 
-function Figure({ kind, value, dim }: { kind: Row["kind"]; value: number | null; dim?: boolean }) {
+function Figure({ kind, value, dim }: { kind: Kind; value: number | null; dim?: boolean }) {
   if (value === null || !Number.isFinite(value)) return <span className="lgr-cmx-na">—</span>;
-  if (kind === "money") return <Money value={value} weight={dim ? 600 : 700} color={dim ? "var(--lgr-2)" : undefined} />;
+  if (kind === "money") return <Money value={value} block={false} weight={dim ? 600 : 700} color={dim ? "var(--lgr-2)" : undefined} />;
   const text = kind === "pct" ? fmtPct(value) : kind === "ratio" ? fmtRatio(value) : fmtYears(value);
   return (
     <span className="lgr-cmx-num" data-dim={dim || undefined}>
@@ -100,7 +100,7 @@ function Figure({ kind, value, dim }: { kind: Row["kind"]; value: number | null;
   );
 }
 
-function Delta({ kind, a, b, better }: { kind: Row["kind"]; a: number | null; b: number | null; better: Better }) {
+function Delta({ kind, a, b, better }: { kind: Kind; a: number | null; b: number | null; better: Better }) {
   if (a === null || b === null || !Number.isFinite(a) || !Number.isFinite(b)) return <span className="lgr-cmx-na">—</span>;
   const raw = a - b;
   const eps = kind === "money" ? 0.5 : 0.005;
@@ -115,33 +115,87 @@ function Delta({ kind, a, b, better }: { kind: Row["kind"]; a: number | null; b:
     ) : kind === "ratio" ? (
       fmtRatio(Math.abs(raw))
     ) : (
-      `${fmtYears(Math.abs(raw))} שנ׳`
+      `${fmtYears(Math.abs(raw))} ש׳`
     );
   return (
-    <span className="lgr-cmx-delta" data-tone={tone}>
-      <Dir size={11} weight="bold" aria-hidden />
+    <span className="lgr-cmx-delta" data-tone={tone} title={raw < 0 ? "פחות" : "יותר"}>
+      <Dir size={10} weight="bold" aria-hidden />
       <span className="lgr-cmx-delta-mag">{mag}</span>
-      <em>{raw < 0 ? "פחות" : "יותר"}</em>
     </span>
   );
 }
 
 /** One mix as one bar: principal, then the cost on top, on a shared scale. */
 function CostBar({ f, max, side, name }: { f: MixFigures; max: number; side: "a" | "b"; name: string }) {
-  const p = (f.principal / max) * 100;
-  const c = (Math.max(0, f.cost) / max) * 100;
   return (
     <div className="lgr-cmx-bar" data-side={side}>
-      <span className="lgr-cmx-bar-name" title={name}>
-        <i aria-hidden />
-        {name}
-      </span>
-      <span className="lgr-cmx-bar-track" role="img" aria-label={`${name}: קרן ועוד ריבית והצמדה`}>
-        <span className="lgr-cmx-bar-p" style={{ width: `${p}%` }} />
-        <span className="lgr-cmx-bar-c" style={{ width: `${c}%` }} />
-      </span>
-      <span className="lgr-cmx-bar-fig">
+      <div className="lgr-cmx-bar-top">
+        <span className="lgr-cmx-tag" data-side={side} title={name}>
+          <i aria-hidden />
+          <span className="lgr-cmx-tag-name">{name}</span>
+        </span>
         <Money value={f.cost} block={false} weight={700} />
+      </div>
+      <span className="lgr-cmx-bar-track" role="img" aria-label={`${name}: קרן ועוד ריבית והצמדה`}>
+        <span className="lgr-cmx-bar-p" style={{ width: `${(f.principal / max) * 100}%` }} />
+        <span className="lgr-cmx-bar-c" style={{ width: `${(Math.max(0, f.cost) / max) * 100}%` }} />
+      </span>
+    </div>
+  );
+}
+
+/**
+ * The saving accumulated year by year, as a small area with a draggable year.
+ * Plain SVG — 30 points do not need a chart library — on the same time axis
+ * as every chart on the board: year 1 at the left, the last year at the right.
+ */
+function Scrubber({
+  cum,
+  year,
+  onYear,
+}: {
+  cum: number[];
+  year: number;
+  onYear: (y: number) => void;
+}) {
+  const W = 340;
+  const H = 74;
+  const n = cum.length;
+  const lo = Math.min(0, ...cum);
+  const hi = Math.max(0, ...cum);
+  const span = hi - lo || 1;
+  const x = (i: number) => (i / Math.max(1, n - 1)) * W;
+  const y = (v: number) => 6 + (1 - (v - lo) / span) * (H - 12);
+  const pts = cum.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`);
+  const zeroY = y(0);
+  const area = `M${x(0)},${zeroY} L${pts.join(" L")} L${x(n - 1)},${zeroY} Z`;
+  const line = `M${pts.join(" L")}`;
+  const i = Math.min(n - 1, Math.max(0, year - 1));
+  const end = cum[n - 1] ?? 0;
+  const tone = end >= 0 ? "good" : "bad";
+  return (
+    <div className="lgr-cmx-scrub" data-tone={tone}>
+      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-hidden className="lgr-cmx-scrub-svg">
+        <line x1="0" x2={W} y1={zeroY} y2={zeroY} className="lgr-cmx-scrub-zero" />
+        <path d={area} className="lgr-cmx-scrub-area" />
+        <path d={line} className="lgr-cmx-scrub-line" vectorEffect="non-scaling-stroke" />
+        <line x1={x(i)} x2={x(i)} y1="0" y2={H} className="lgr-cmx-scrub-mark" vectorEffect="non-scaling-stroke" />
+        <circle cx={x(i)} cy={y(cum[i] ?? 0)} r="4" className="lgr-cmx-scrub-dot" />
+      </svg>
+      <input
+        type="range"
+        className="lgr-cmx-range"
+        min={1}
+        max={n}
+        step={1}
+        value={year}
+        onChange={(e) => onYear(Number(e.target.value))}
+        aria-label="שנה"
+        dir="ltr"
+      />
+      <span className="lgr-cmx-scrub-ends" aria-hidden>
+        <span>שנה 1</span>
+        <span>שנה {n}</span>
       </span>
     </div>
   );
@@ -170,8 +224,6 @@ export default function Compare({
   control?: ReactNode;
   onDuplicate?: () => void;
 }) {
-  const [years, setYears] = useState(10);
-
   const activeMix = mixes.find((m) => m.id === activeMixId) ?? null;
   const master = mixes.find((m) => m.is_base) ?? mixes[0] ?? null;
   const autoOther =
@@ -193,6 +245,20 @@ export default function Compare({
         : null,
     [otherMix, activeMix, annualInflation, discountRate]
   );
+
+  // Cumulative saving, year by year: the other mix's cost so far minus this one's.
+  const cum = useMemo(() => {
+    if (!A || !B) return [];
+    const years = Math.ceil(Math.max(A.months, B.months) / 12);
+    return Array.from({ length: years }, (_, i) => {
+      const m = (i + 1) * 12;
+      return atPayment(B, m).costSoFar - atPayment(A, m).costSoFar;
+    });
+  }, [A, B]);
+  const [year, setYear] = useState(10);
+  useEffect(() => {
+    if (cum.length && year > cum.length) setYear(cum.length);
+  }, [cum.length, year]);
 
   const shell = (body: ReactNode) => (
     <section className="lgr-card lgr-cmx mt-5">
@@ -245,49 +311,47 @@ export default function Compare({
   const saving = B.cost - A.cost;
   const tone = Math.abs(saving) < 1 ? "flat" : saving > 0 ? "good" : "bad";
   const pctLess = B.cost > 0 ? (saving / B.cost) * 100 : 0;
+  const firstGap = B.firstTyped - A.firstTyped;
   const max = Math.max(A.principal + Math.max(0, A.cost), B.principal + Math.max(0, B.cost), 1);
   const sameScale = Math.abs(A.principal - B.principal) < 1;
   const flat = !asEcon(annualInflation).forecast;
 
-  const n = Math.min(years * 12, Math.max(A.months, B.months));
+  const n = Math.min(year * 12, Math.max(A.months, B.months));
   const atA = atPayment(A, n);
   const atB = atPayment(B, n);
   const live = (f: MixFigures) => n <= f.months;
   const atRows: { label: string; a: number; b: number; better: Better }[] = [
     { label: "החזר חודשי", a: live(A) ? atA.payment : 0, b: live(B) ? atB.payment : 0, better: "lower" },
     { label: "יתרת החוב", a: live(A) ? atA.balance : 0, b: live(B) ? atB.balance : 0, better: "none" },
-    { label: "ירידת הקרן עד אז", a: atA.retired, b: atB.retired, better: "none" },
-    { label: "ריבית והצמדה ששולמו עד אז", a: atA.costSoFar, b: atB.costSoFar, better: "lower" },
+    { label: "ריבית והצמדה עד אז", a: atA.costSoFar, b: atB.costSoFar, better: "lower" },
   ];
 
-  const cols = (
-    <colgroup>
-      <col style={{ width: "28%" }} />
-      <col style={{ width: "22%" }} />
-      <col style={{ width: "22%" }} />
-      <col style={{ width: "28%" }} />
-    </colgroup>
-  );
-
   return shell(
-    <>
-      {/* ---------------------------------------------------------- verdict */}
-      <div className="lgr-cmx-verdict" data-tone={tone}>
-        <p className="lgr-cmx-line">
-          {tone === "flat" ? (
-            <>שני התמהילים עולים אותו הדבר בריבית ובהצמדה.</>
-          ) : (
-            <>
-              <span className="lgr-cmx-line-name">{activeMix.mix_name}</span>
-              {saving > 0 ? " חוסך " : " מוסיף "}
-              <Money value={Math.abs(saving)} block={false} weight={800} className="lgr-cmx-line-fig" />
-              {" בריבית ובהצמדה"}
-              <span className="lgr-cmx-line-pct">
+    <div className="lgr-cmx-body">
+      {/* ------------------------------------------------- the verdict pane */}
+      <aside className="lgr-cmx-side" data-tone={tone}>
+        <div className="lgr-cmx-hero">
+          <span className="lgr-cmx-hero-label">
+            {tone === "flat" ? "אותה עלות" : saving > 0 ? "חיסכון בריבית ובהצמדה" : "תוספת בריבית ובהצמדה"}
+          </span>
+          <span className="lgr-cmx-hero-fig">
+            <span className="lgr-cur">₪</span>
+            <NumberFlow value={Math.round(Math.abs(saving))} locales="he-IL" spinTiming={COUNT} transformTiming={COUNT} />
+          </span>
+          <span className="lgr-cmx-hero-chips">
+            {tone !== "flat" && (
+              <span className="lgr-cmx-chip" data-tone={tone}>
                 {Math.abs(pctLess).toFixed(0)}% {saving > 0 ? "פחות" : "יותר"}
               </span>
-            </>
-          )}
-        </p>
+            )}
+            {Math.abs(firstGap) >= 1 && (
+              <span className="lgr-cmx-chip" data-tone={firstGap > 0 ? "good" : "bad"}>
+                <Money value={Math.abs(firstGap)} block={false} weight={700} /> {firstGap > 0 ? "פחות" : "יותר"} בהחזר הראשון
+              </span>
+            )}
+          </span>
+        </div>
+
         <div className="lgr-cmx-bars">
           <CostBar f={A} max={max} side="a" name={activeMix.mix_name} />
           <CostBar f={B} max={max} side="b" name={otherMix.mix_name} />
@@ -302,16 +366,63 @@ export default function Compare({
             </span>
           </div>
         </div>
+
+        {cum.length > 1 && (
+          <div className="lgr-cmx-time">
+            <div className="lgr-cmx-time-head">
+              <b>
+                בעוד <NumberFlow value={year} locales="he-IL" spinTiming={COUNT} /> שנים
+              </b>
+              <span>
+                נחסכו{" "}
+                <Money value={Math.abs(cum[year - 1] ?? 0)} block={false} weight={700} />
+              </span>
+            </div>
+            <Scrubber cum={cum} year={year} onYear={setYear} />
+            <dl className="lgr-cmx-time-rows">
+              <div className="lgr-cmx-time-key" aria-hidden>
+                <dt />
+                <dd>
+                  <span className="lgr-cmx-time-a">
+                    <i data-side="a" />
+                  </span>
+                  <span className="lgr-cmx-time-b">
+                    <i data-side="b" />
+                  </span>
+                </dd>
+              </div>
+              {atRows.map((r) => (
+                <div key={r.label}>
+                  <dt>{r.label}</dt>
+                  <dd>
+                    <span className="lgr-cmx-time-a">
+                      <Money value={r.a} block={false} weight={700} />
+                    </span>
+                    <span className="lgr-cmx-time-b">
+                      <Money value={r.b} block={false} weight={500} color="var(--lgr-3)" />
+                    </span>
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        )}
+
         {!sameScale && (
           <p className="lgr-cmx-caveat">
-            הסכומים שנלווים אינם זהים — המדד שמשווה ביניהם בהגינות הוא <b>החזר לשקל</b>.
+            הסכומים שנלווים אינם זהים — המדד ההוגן ביניהם הוא <b>החזר לשקל</b>.
           </p>
         )}
-      </div>
+      </aside>
 
-      {/* ----------------------------------------------------------- ledger */}
+      {/* -------------------------------------------------- the ledger pane */}
       <table className="lgr-cmx-table">
-        {cols}
+        <colgroup>
+          <col />
+          <col style={{ width: "24%" }} />
+          <col style={{ width: "24%" }} />
+          <col style={{ width: "21%" }} />
+        </colgroup>
         <thead>
           <tr>
             <th />
@@ -340,7 +451,8 @@ export default function Compare({
             {g.rows.map((r) => {
               const a = r.get(A);
               const b = r.get(B);
-              const title = r.key === "npv" && flat ? `ערך נוכחי של התשלומים בהיוון קבוע של ${discountRate}%, פחות הקרן` : r.def;
+              const title =
+                r.key === "npv" && flat ? `ערך נוכחי של התשלומים בהיוון קבוע של ${discountRate}%, פחות הקרן` : r.def;
               return (
                 <tr key={r.key} className="lgr-cmx-row">
                   <th scope="row" title={title}>
@@ -363,40 +475,6 @@ export default function Compare({
           </tbody>
         ))}
       </table>
-
-      {/* -------------------------------------------------- a moment in time */}
-      <div className="lgr-cmx-at">
-        <div className="lgr-cmx-at-head">
-          <span>בעוד</span>
-          <div className="lgr-cmx-seg" role="radiogroup" aria-label="נקודת זמן">
-            {HORIZONS.map((y) => (
-              <button key={y} type="button" role="radio" aria-checked={years === y} onClick={() => setYears(y)}>
-                {y}
-              </button>
-            ))}
-          </div>
-          <span>שנים</span>
-        </div>
-        <table className="lgr-cmx-table lgr-cmx-table-at">
-          {cols}
-          <tbody>
-            {atRows.map((r) => (
-              <tr key={r.label} className="lgr-cmx-row">
-                <th scope="row">{r.label}</th>
-                <td>
-                  <Money value={r.a} weight={700} />
-                </td>
-                <td>
-                  <Money value={r.b} weight={600} color="var(--lgr-2)" />
-                </td>
-                <td>
-                  <Delta kind="money" a={r.a} b={r.b} better={r.better} />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </>
+    </div>
   );
 }

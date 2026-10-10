@@ -25,6 +25,7 @@ import Money from "./Money";
 import { PATH_LABEL, TRACK_HEX, type ImportedLoan } from "../lib/credit";
 import { buildMixLine, buildTimeline, type MixLine, type Timeline, type TrackSeries } from "../lib/timeline";
 import { asEcon, type Assume } from "../lib/price";
+import { HORIZON, inflationAt, nominalAt, type Forecast } from "../lib/forecast";
 import {
   TOOLTIP,
   axisBase,
@@ -372,6 +373,66 @@ export function savingCumOption(saving: number[]): EChartsCoreOption {
   };
 }
 
+/* ------------------------------------------ תחזית ריבית ואינפלציה
+
+   The two curves everything above is priced on, as SmartNPV draws them: the
+   BoI rate path and expected CPI, month by month for thirty years. Slate and
+   amber — not the mixes' violet and red, because these lines are not a mix. */
+
+const RATE_HEX = "#475569";
+const CPI_HEX = "#c98a12";
+
+export function forecastOption(f: Forecast): EChartsCoreOption {
+  const pts = (fn: (m: number) => number) => Array.from({ length: HORIZON }, (_, i) => [i + 1, Math.round(fn(i + 1) * 1000) / 1000]);
+  const rate = pts((m) => nominalAt(f, m));
+  const cpi = pts((m) => inflationAt(f, m));
+  const all = [...rate, ...cpi].map((p) => p[1]);
+  const lo = Math.max(0, Math.floor(Math.min(...all) - 0.5));
+  const hi = Math.ceil(Math.max(...all) + 0.5);
+  return {
+    grid: GRID,
+    tooltip: {
+      ...TOOLTIP,
+      formatter: (p: unknown) => {
+        const arr = p as { seriesName: string; value: [number, number]; color: string }[];
+        if (!arr.length) return "";
+        const { title, sub } = monthLabel(arr[0].value[0]);
+        return tipHead(title, sub) + arr.map((x) => tipRow(x.color, x.seriesName, `${Number(x.value[1]).toFixed(2)}%`)).join("");
+      },
+    },
+    xAxis: yearAxis(HORIZON),
+    yAxis: {
+      type: "value",
+      min: lo,
+      max: hi,
+      interval: 1,
+      ...axisBase,
+      axisLabel: { ...axisBase.axisLabel, formatter: (v: number) => `${v}%` },
+    },
+    series: [
+      {
+        name: "ריבית בנק ישראל",
+        type: "line",
+        showSymbol: false,
+        smooth: 0.15,
+        lineStyle: { width: 2, color: RATE_HEX },
+        itemStyle: { color: RATE_HEX },
+        areaStyle: { color: RATE_HEX, opacity: 0.05 },
+        data: rate,
+      },
+      {
+        name: "אינפלציה צפויה",
+        type: "line",
+        showSymbol: false,
+        smooth: 0.15,
+        lineStyle: { width: 2, color: CPI_HEX },
+        itemStyle: { color: CPI_HEX },
+        data: cpi,
+      },
+    ],
+  };
+}
+
 /* -------------------------------------------------------------- the panels */
 
 function Legend({ items }: { items: { color: string; label: string }[] }) {
@@ -483,6 +544,9 @@ export default function Charts({
       other,
     };
   }, [mine, theirs, compare, name]);
+
+  const fc = asEcon(annualInflation).forecast;
+  const fcOpt = useMemo(() => (cmp && fc ? forecastOption(fc) : null), [cmp, fc]);
 
   const mixLegend = cmp ? (
     <div className="lgr-chart-legend" aria-label="מקרא">
@@ -607,6 +671,28 @@ export default function Charts({
           <Panel title="חיסכון שנתי" reading={<span>ריבית והצמדה, לפי שנה</span>}>
             <EChart option={cmp.savingYear} />
           </Panel>
+          {fcOpt && fc && (
+            <div className="lgr-chart-wide">
+              <Panel
+                title="תחזית ריבית ואינפלציה"
+                reading={
+                  <>
+                    <span>{fc.label}</span>
+                  </>
+                }
+                legend={
+                  <Legend
+                    items={[
+                      { color: RATE_HEX, label: "ריבית בנק ישראל" },
+                      { color: CPI_HEX, label: "אינפלציה צפויה" },
+                    ]}
+                  />
+                }
+              >
+                <EChart option={fcOpt} group={group} height={190} />
+              </Panel>
+            </div>
+          )}
         </div>
       ) : (
         <div className="lgr-chart-grid">

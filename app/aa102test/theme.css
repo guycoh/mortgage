@@ -938,6 +938,12 @@ html:has(.lgr-root) {
 }
 /* the focused half owns the seam, so its ring is never sliced by its neighbour */
 .lgr-pair > .lgr-cell:focus { z-index: 1; }
+/* עוגן / תוספת as two ordinary fields (owner, 2026-10-10): each its own rounded
+   box like ריבית beside them, a 4px gutter instead of a shared seam. The money
+   pair (יתרת קרן / הצמדת קרן) keeps the joined construction. */
+.lgr-pair:not(.lgr-pair-money) { gap: 4px; }
+.lgr-pair:not(.lgr-pair-money) > .lgr-cell { border-radius: var(--r-sm); }
+.lgr-pair:not(.lgr-pair-money) > .lgr-cell:last-child { margin-inline-start: 0; }
 
 /* CHANGED — the classic spreadsheet corner tick, in the ink. */
 .lgr-well { position: relative; }
@@ -1514,107 +1520,136 @@ html:has(.lgr-root) {
    missing and hands over the action that creates it — the picker is in this
    card's own header, forty pixels away, so this can point at it instead of
    sending anyone back up the page. */
-/* ===================================================== השוואת תמהילים (v3)
-   The two mixes keep the charts' identities everywhere they appear: violet
-   solid for this mix (side a), warm red dashed for the other (side b). Good and
-   bad are emerald and brick, and always carry an arrow and a word too. */
+/* ===================================================== השוואת תמהילים (v4)
+   Two panes: the verdict + time scrubber on the reading side, a dense ledger
+   beside it. Mix identities are the charts' own — violet solid (a), warm red
+   dashed (b); good and bad are emerald and brick and always carry an arrow. */
 .lgr-cmx { --side-a: #5b54d6; --side-b: #d4573b; --good: #147a45; --good-tint: #e9f5ee; --bad: #b42318; --bad-tint: #fdf1f0; }
 .lgr-cmx-head { flex-wrap: wrap; row-gap: 8px; }
 .lgr-cmx-pair { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
 .lgr-cmx-vs { font-size: 12px; color: var(--lgr-4); }
-.lgr-cmx-pair .lgr-select, .lgr-cmx-pair > div { min-width: 200px; }
-.lgr-cmx-tag { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 700; color: var(--ink); min-width: 0; }
-.lgr-cmx-tag > i { flex: none; width: 14px; height: 0; border-top: 2.5px solid var(--side-a); border-radius: 2px; }
+.lgr-cmx-pair > div { min-width: 220px; }
+.lgr-cmx-tag { display: inline-flex; align-items: center; gap: 7px; max-width: 100%; min-width: 0; font-size: 12.5px; font-weight: 700; color: var(--ink); }
+.lgr-cmx-tag > i { flex: none; width: 13px; height: 0; border-top: 2.5px solid var(--side-a); border-radius: 2px; }
 .lgr-cmx-tag[data-side="b"] > i { border-top: 2px dashed var(--side-b); }
 .lgr-cmx-tag[data-side="b"] { color: var(--lgr-2); font-weight: 600; }
-.lgr-cmx-tag { max-width: 100%; }
 .lgr-cmx-tag-name { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 
-/* --- the verdict: one sentence and the twin bars ----------------------- */
-.lgr-cmx-verdict { padding: 18px 20px 16px; border-bottom: 1px solid var(--line); }
-.lgr-cmx-line {
-  margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 6px; row-gap: 4px;
-  font-size: 16px; font-weight: 600; color: var(--ink); letter-spacing: -0.01em;
+.lgr-cmx-body { display: grid; grid-template-columns: 380px minmax(0, 1fr); align-items: start; }
+@media (max-width: 1199px) {
+  .lgr-cmx-body { grid-template-columns: 1fr; }
+  .lgr-cmx-side { border-inline-end: 0; border-bottom: 1px solid var(--line); }
 }
-.lgr-cmx-line-name { font-weight: 700; }
-.lgr-cmx-line-fig { font-size: 26px; letter-spacing: -0.025em; line-height: 1; }
-.lgr-cmx-verdict[data-tone="good"] .lgr-cmx-line-fig { color: var(--good); }
-.lgr-cmx-verdict[data-tone="bad"] .lgr-cmx-line-fig { color: var(--bad); }
-.lgr-cmx-line-pct {
-  margin-inline-start: 4px; padding: 2px 8px; border-radius: 999px;
-  font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums;
-  background: var(--card-2); color: var(--lgr-3);
-}
-.lgr-cmx-verdict[data-tone="good"] .lgr-cmx-line-pct { background: var(--good-tint); color: var(--good); }
-.lgr-cmx-verdict[data-tone="bad"] .lgr-cmx-line-pct { background: var(--bad-tint); color: var(--bad); }
 
-.lgr-cmx-bars { margin-top: 14px; display: grid; gap: 8px; }
-.lgr-cmx-bar { display: grid; grid-template-columns: minmax(0, 170px) 1fr auto; align-items: center; gap: 12px; }
-.lgr-cmx-bar-name { display: inline-flex; align-items: center; gap: 7px; min-width: 0; font-size: 12.5px; font-weight: 600; color: var(--lgr-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.lgr-cmx-bar-name > i { flex: none; width: 14px; height: 0; border-top: 2.5px solid var(--side-a); }
-.lgr-cmx-bar[data-side="b"] .lgr-cmx-bar-name > i { border-top: 2px dashed var(--side-b); }
-.lgr-cmx-bar-track { display: flex; height: 14px; border-radius: 7px; overflow: hidden; background: var(--card-2); }
-.lgr-cmx-bar-p, .lgr-cmx-bar-c {
-  height: 100%;
-  transition: width 520ms cubic-bezier(0.22, 1, 0.36, 1);
+/* --- the verdict pane ---------------------------------------------------- */
+.lgr-cmx-side {
+  display: grid; gap: 14px; padding: 16px 18px 18px;
+  border-inline-end: 1px solid var(--line);
+  background: linear-gradient(180deg, var(--card-2), var(--card) 140px);
 }
-.lgr-cmx-bar-p { background: #d9dbe3; }
+.lgr-cmx-hero { display: grid; gap: 4px; }
+.lgr-cmx-hero-label { font-size: 12.5px; font-weight: 600; color: var(--lgr-3); }
+.lgr-cmx-hero-fig {
+  display: inline-flex; align-items: baseline; gap: 3px; direction: ltr; justify-content: flex-end;
+  font-family: var(--num); font-variant-numeric: tabular-nums; font-size: 34px; font-weight: 800;
+  letter-spacing: -0.035em; line-height: 1.05; color: var(--ink);
+}
+.lgr-cmx-hero-fig .lgr-cur { font-size: 19px; font-weight: 700; opacity: 0.75; }
+.lgr-cmx-side[data-tone="good"] .lgr-cmx-hero-fig { color: var(--good); }
+.lgr-cmx-side[data-tone="bad"] .lgr-cmx-hero-fig { color: var(--bad); }
+.lgr-cmx-hero-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+.lgr-cmx-chip {
+  display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px; border-radius: 999px;
+  font-size: 11.5px; font-weight: 700; background: var(--card-2); color: var(--lgr-3);
+}
+.lgr-cmx-chip .lgr-money { color: inherit; }
+.lgr-cmx-chip[data-tone="good"] { background: var(--good-tint); color: var(--good); }
+.lgr-cmx-chip[data-tone="bad"] { background: var(--bad-tint); color: var(--bad); }
+
+.lgr-cmx-bars { display: grid; gap: 9px; }
+.lgr-cmx-bar { display: grid; gap: 4px; }
+.lgr-cmx-bar-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; font-size: 13px; min-width: 0; }
+.lgr-cmx-bar-top .lgr-money { flex: none; color: var(--ink); }
+.lgr-cmx-bar[data-side="b"] .lgr-cmx-bar-top .lgr-money { color: var(--lgr-2); }
+.lgr-cmx-bar-track { display: flex; height: 9px; border-radius: 5px; overflow: hidden; background: #f0f1f4; }
+.lgr-cmx-bar-p, .lgr-cmx-bar-c { height: 100%; transition: width 520ms cubic-bezier(0.22, 1, 0.36, 1); }
+.lgr-cmx-bar-p { background: #d5d8e0; }
 .lgr-cmx-bar-c { background: var(--side-a); border-inline-start: 2px solid #fff; }
-.lgr-cmx-bar[data-side="b"] .lgr-cmx-bar-c {
-  background: repeating-linear-gradient(135deg, var(--side-b) 0 6px, #e27a62 6px 9px);
-}
-.lgr-cmx-bar-fig { font-size: 14px; color: var(--ink); min-width: 92px; text-align: end; }
-.lgr-cmx-bar[data-side="b"] .lgr-cmx-bar-fig { color: var(--lgr-2); }
-.lgr-cmx-bars-key { display: flex; gap: 16px; padding-inline-start: 182px; font-size: 11.5px; color: var(--lgr-4); }
-.lgr-cmx-bars-key > span { display: inline-flex; align-items: center; gap: 6px; }
-.lgr-cmx-bars-key i { width: 10px; height: 10px; border-radius: 3px; background: #d9dbe3; }
+.lgr-cmx-bar[data-side="b"] .lgr-cmx-bar-c { background: repeating-linear-gradient(135deg, var(--side-b) 0 5px, #e58a74 5px 8px); }
+.lgr-cmx-bars-key { display: flex; gap: 14px; font-size: 11px; color: var(--lgr-4); }
+.lgr-cmx-bars-key > span { display: inline-flex; align-items: center; gap: 5px; }
+.lgr-cmx-bars-key i { width: 9px; height: 9px; border-radius: 3px; background: #d5d8e0; }
 .lgr-cmx-bars-key i[data-k="c"] { background: linear-gradient(90deg, var(--side-a) 50%, var(--side-b) 50%); }
-.lgr-cmx-caveat { margin: 10px 0 0; font-size: 12px; color: var(--lgr-3); }
+
+/* --- the time scrubber --------------------------------------------------- */
+.lgr-cmx-time { display: grid; gap: 6px; padding: 12px 12px 8px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
+.lgr-cmx-time-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font-size: 13px; }
+.lgr-cmx-time-head > b { font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+.lgr-cmx-time-head > span { font-size: 12px; color: var(--lgr-3); }
+.lgr-cmx-time-head > span .lgr-money { color: var(--good); }
+.lgr-cmx-scrub { position: relative; height: 74px; margin-bottom: 14px; }
+.lgr-cmx-scrub-ends { position: absolute; inset-inline: 0; top: 100%; display: flex; flex-direction: row-reverse; justify-content: space-between; padding-top: 3px; font-size: 10.5px; color: var(--lgr-4); }
+.lgr-cmx-scrub-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.lgr-cmx-scrub-zero { stroke: var(--line-2); stroke-width: 1; stroke-dasharray: 2 3; }
+.lgr-cmx-scrub-area { fill: rgba(20, 122, 69, 0.12); }
+.lgr-cmx-scrub-line { fill: none; stroke: var(--good); stroke-width: 2; }
+.lgr-cmx-scrub[data-tone="bad"] .lgr-cmx-scrub-area { fill: rgba(180, 35, 24, 0.1); }
+.lgr-cmx-scrub[data-tone="bad"] .lgr-cmx-scrub-line { stroke: var(--bad); }
+.lgr-cmx-scrub-mark { stroke: var(--ink); stroke-width: 1; opacity: 0.35; }
+.lgr-cmx-scrub-dot { fill: #fff; stroke: var(--ink); stroke-width: 2; }
+/* The range lies over the drawing, transparent: the whole area is the handle. */
+.lgr-cmx-range {
+  position: absolute; inset: 0; width: 100%; height: 100%; margin: 0;
+  background: transparent; cursor: ew-resize; -webkit-appearance: none; appearance: none;
+}
+.lgr-cmx-range::-webkit-slider-runnable-track { height: 100%; background: transparent; }
+.lgr-cmx-range::-moz-range-track { height: 100%; background: transparent; }
+.lgr-cmx-range::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 74px; border: 0; background: transparent; }
+.lgr-cmx-range::-moz-range-thumb { width: 14px; height: 74px; border: 0; background: transparent; }
+.lgr-cmx-range:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 6px; }
+.lgr-cmx-time-rows { margin: 2px 0 0; display: grid; }
+.lgr-cmx-time-rows > div {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  padding: 5px 0; border-top: 1px solid var(--line); font-size: 12.5px;
+}
+.lgr-cmx-time-rows dt { color: var(--lgr-3); font-weight: 600; }
+.lgr-cmx-time-rows dd { margin: 0; display: inline-flex; align-items: baseline; gap: 10px; font-size: 13px; }
+.lgr-cmx-time-a, .lgr-cmx-time-b { display: inline-flex; justify-content: flex-end; }
+.lgr-cmx-time-a { min-width: 82px; }
+.lgr-cmx-time-b { min-width: 70px; font-size: 12px; }
+.lgr-cmx-time-rows > .lgr-cmx-time-key { border-top: 0; padding: 0 0 2px; }
+.lgr-cmx-time-key i { display: block; width: 16px; height: 0; border-top: 2.5px solid var(--side-a); border-radius: 2px; }
+.lgr-cmx-time-key i[data-side="b"] { border-top: 2px dashed var(--side-b); }
+.lgr-cmx-caveat { margin: 0; font-size: 12px; color: var(--lgr-3); }
 .lgr-cmx-caveat b { color: var(--ink); }
 
-/* --- the ledger ---------------------------------------------------------- */
+/* --- the ledger pane ----------------------------------------------------- */
 .lgr-cmx-table { width: 100%; table-layout: fixed; border-collapse: collapse; }
 .lgr-cmx-table thead th {
-  padding: 10px 14px 8px; text-align: start; font-size: 12px; font-weight: 600; color: var(--lgr-3);
-  border-bottom: 1px solid var(--line);
+  height: 38px; padding: 0 12px; text-align: start; font-size: 12px; font-weight: 600; color: var(--lgr-3);
+  border-bottom: 1px solid var(--line); background: var(--card);
 }
-.lgr-cmx-group > th {
-  padding: 14px 14px 4px; text-align: start;
-  font-size: 11.5px; font-weight: 700; color: var(--lgr-4); letter-spacing: 0.01em;
+.lgr-cmx-group > th { padding: 10px 12px 3px; text-align: start; font-size: 11px; font-weight: 700; color: var(--lgr-4); }
+.lgr-cmx-row > th, .lgr-cmx-row > td { height: 34px; padding: 0 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.lgr-cmx-row > th {
+  text-align: start; font-size: 12.5px; font-weight: 600; color: var(--lgr-2); cursor: help;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.lgr-cmx-row > th, .lgr-cmx-row > td { padding: 8px 14px; border-bottom: 1px solid var(--line); vertical-align: middle; }
-.lgr-cmx-row > th { text-align: start; font-size: 13px; font-weight: 600; color: var(--lgr-2); cursor: help; }
-.lgr-cmx-table-at .lgr-cmx-row > th { cursor: default; }
-.lgr-cmx-row > td { text-align: start; font-size: 14px; }
+.lgr-cmx-row > td { text-align: start; font-size: 13.5px; white-space: nowrap; }
 .lgr-cmx-row:hover > th, .lgr-cmx-row:hover > td { background: var(--card-2); }
 .lgr-cmx-table tbody:last-of-type .lgr-cmx-row:last-child > * { border-bottom: 0; }
-.lgr-cmx-row .lgr-money-block { display: inline-block; }
 .lgr-cmx-num { font-family: var(--num); font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); direction: ltr; unicode-bidi: isolate; }
 .lgr-cmx-num[data-dim] { font-weight: 600; color: var(--lgr-2); }
-.lgr-cmx-note { display: block; font-style: normal; font-size: 11px; color: var(--lgr-4); margin-top: 1px; }
-.lgr-cmx-na, .lgr-cmx-same { font-size: 12.5px; color: var(--lgr-4); }
+.lgr-cmx-note { font-style: normal; font-size: 11px; color: var(--lgr-4); margin-inline-start: 6px; }
+.lgr-cmx-na, .lgr-cmx-same { font-size: 12px; color: var(--lgr-4); }
 .lgr-cmx-delta {
-  display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px 3px 8px; border-radius: 999px;
-  font-size: 13px; font-weight: 700; background: var(--card-2); color: var(--lgr-3);
+  display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px 2px 7px; border-radius: 999px;
+  font-size: 12.5px; font-weight: 700; background: var(--card-2); color: var(--lgr-3);
 }
 .lgr-cmx-delta .lgr-money { color: inherit; }
 .lgr-cmx-delta-mag { font-family: var(--num); font-variant-numeric: tabular-nums; direction: ltr; unicode-bidi: isolate; }
-.lgr-cmx-delta > em { font-style: normal; font-weight: 600; font-size: 12px; }
 .lgr-cmx-delta[data-tone="good"] { background: var(--good-tint); color: var(--good); }
 .lgr-cmx-delta[data-tone="bad"] { background: var(--bad-tint); color: var(--bad); }
-
-/* --- a moment in time ---------------------------------------------------- */
-.lgr-cmx-at { border-top: 1px solid var(--line); background: linear-gradient(180deg, var(--card-2), var(--card) 56px); }
-.lgr-cmx-at-head { display: flex; align-items: center; gap: 8px; padding: 12px 14px 4px; font-size: 13px; font-weight: 700; color: var(--ink); }
-.lgr-cmx-seg { display: inline-flex; padding: 2px; gap: 2px; border: 1px solid var(--line-2); border-radius: 10px; background: var(--card); }
-.lgr-cmx-seg > button {
-  min-width: 34px; height: 26px; padding: 0 8px; border: 0; border-radius: 8px; background: transparent;
-  font-family: var(--num); font-variant-numeric: tabular-nums; font-size: 13px; font-weight: 700; color: var(--lgr-3); cursor: pointer;
-  transition: background-color 140ms var(--ease), color 140ms var(--ease);
-}
-.lgr-cmx-seg > button:hover { color: var(--ink); }
-.lgr-cmx-seg > button[aria-checked="true"] { background: var(--ink); color: #fff; }
-.lgr-cmx-seg > button:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
 @media (prefers-reduced-motion: reduce) { .lgr-cmx-bar-p, .lgr-cmx-bar-c { transition: none; } }
 
 .lgr-cmp-blank {
@@ -2021,6 +2056,9 @@ html:has(.lgr-root) {
   width: 14px; height: 0; border-radius: 0;
   border-top: 2px dashed; background: none;
 }
+/* A panel that spans the whole grid — the forecast the panels above run on. */
+.lgr-chart-wide { grid-column: 1 / -1; }
+.lgr-chart-wide > .lgr-chart-panel { height: 100%; }
 .lgr-chart-fig-2 { font-size: 13px; font-weight: 600; color: var(--lgr-2); }
 
 /* ------------------------------------------------------------------ chips */
@@ -3352,6 +3390,7 @@ html:has(.lgr-root) {
 .lgr-th-pair { display: flex; align-items: baseline; gap: 0; }
 .lgr-th-pair > :first-child { flex: 1; min-width: 0; }
 .lgr-th-pair-b { flex: 0 0 56px; }
+.lgr-th-pair:not(.lgr-th-pair-money) { gap: 4px; }
 
 /* --------------------------------------------- the master's money, apart */
 
