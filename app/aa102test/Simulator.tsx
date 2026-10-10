@@ -37,6 +37,7 @@ import type { LoanPath } from "@/app/data/hooks/useLoanPaths";
 import { paths as STATIC_PATHS } from "@/app/data/paths";
 import { priceLoan, type Econ } from "./lib/price";
 import ForecastDialog, { type ForecastState } from "./components/ForecastDialog";
+import ShareOfferDialog from "./components/ShareOfferDialog";
 import Bay from "./components/Bay";
 import Btn from "./components/Btn";
 import AnalysisModal from "./components/AnalysisModal";
@@ -320,6 +321,8 @@ export default function Simulator({
   const [econMode, setEconMode] = useState<"forecast" | "flat">("forecast");
   const [forecastState, setForecastState] = useState<ForecastState | null>(null);
   const [forecastOpen, setForecastOpen] = useState(false);
+  /** הצגה ללקוח: the two mixes being sent, or null when the dialog is closed. */
+  const [sharePair, setSharePair] = useState<{ activeId: string; otherId: string } | null>(null);
   const loadForecast = useCallback(() => {
     fetch("/api/simulator/forecast")
       .then((r) => (r.ok ? r.json() : null))
@@ -1796,6 +1799,7 @@ export default function Simulator({
             discountRate={annualDiscount}
             compareMixId={compareTarget ? compareTarget.id : ""}
             onDuplicate={duplicateMix}
+            onShare={setSharePair}
             source={
               econMode === "forecast" && activeForecast ? (
                 <button type="button" className="lgr-econ-src" onClick={() => setForecastOpen(true)} title="מקור התחזית">
@@ -1966,6 +1970,29 @@ export default function Simulator({
           onClose={() => setAskLeave(null)}
         />
       )}
+
+      {sharePair &&
+        (() => {
+          // The client's mortgage as it stands is the master; the other is the
+          // offer. Two proposals compared with each other: the picked one is the
+          // baseline, the one on screen is the offer.
+          const a = list.find((m) => m.id === sharePair.activeId);
+          const o = list.find((m) => m.id === sharePair.otherId);
+          if (!a || !o) return null;
+          const [cur, prop] = a.is_base || (!o.is_base && list[0]?.id === a.id) ? [a, o] : [o, a];
+          const fromName = (n: string) => (n.includes("·") ? n.split("·").slice(1).join("·").trim() : "");
+          const client = reports[0]?.clientName || fromName(cur.mix_name) || lead?.name || "";
+          return (
+            <ShareOfferDialog
+              current={owedOnly(cur.loans ?? [])}
+              proposed={owedOnly(prop.loans ?? [])}
+              assume={econ}
+              defaultClient={client}
+              leadId={lead?.id ?? null}
+              onClose={() => setSharePair(null)}
+            />
+          );
+        })()}
 
       {forecastOpen && forecastState && (
         <ForecastDialog

@@ -1,0 +1,251 @@
+/* /offer/<id> — the client's one-pager. Prefix .ofr-*, isolated from the board.
+
+   Cool paper, one ink, three meanings of colour and no others:
+     violet  — the new mix (the מורגי identity)
+     slate   — the current mortgage (calm: not bad, only dearer)
+     emerald — the saving, and only the saving
+   No grey captions: every word is ink; hierarchy is size and weight. */
+
+.ofr-root {
+  --paper: #f7f8fb;
+  --ink: #12141a;
+  --ink-soft: #2f333d;
+  --line: rgba(18, 20, 26, 0.09);
+  --line-2: rgba(18, 20, 26, 0.16);
+  --now: #9aa3b2;
+  --next: #5b54d6;
+  --next-deep: #443dbd;
+  --next-tint: #efeefc;
+  --save: #0e7a4e;
+  --save-tint: #e6f4ec;
+  --bad: #b42318;
+  --ui: "Assistant", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --num: "Inter Variable", "Inter", system-ui, sans-serif;
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+
+  min-height: 100dvh;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--ui);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+.ofr-root *,
+.ofr-root *::before,
+.ofr-root *::after { box-sizing: border-box; }
+.ofr-root h1, .ofr-root h2, .ofr-root p { margin: 0; }
+.ofr-root [dir="ltr"] { unicode-bidi: isolate; }
+
+.ofr-page { max-width: 780px; margin: 0 auto; padding: 22px 22px 40px; }
+@media (min-width: 720px) { .ofr-page { padding: 34px 40px 56px; } }
+
+/* ------------------------------------------------------------- the mark */
+.ofr-mark { display: inline-flex; align-items: center; gap: 9px; font-weight: 700; font-size: 19px; letter-spacing: -0.01em; color: var(--ink); }
+.ofr-mark-sm { font-size: 14px; gap: 7px; }
+.ofr-top { display: flex; align-items: center; justify-content: space-between; }
+.ofr-top-date { font-family: var(--num); font-size: 14px; font-weight: 450; color: var(--ink); font-variant-numeric: tabular-nums; }
+
+/* ------------------------------------------------------------- the hero */
+.ofr-hero { padding: clamp(36px, 8vw, 64px) 0 28px; }
+.ofr-hello { font-size: clamp(18px, 2.4vw, 21px); font-weight: 600; }
+.ofr-lede { margin-top: 2px; font-size: clamp(26px, 4.6vw, 38px); font-weight: 600; letter-spacing: -0.02em; line-height: 1.15; }
+.ofr-big { margin-top: clamp(14px, 3vw, 22px); display: grid; gap: 4px; justify-items: start; }
+.ofr-big-fig {
+  display: inline-flex; align-items: baseline; gap: 0.06em;
+  font-family: var(--num); font-weight: 250; font-variant-numeric: tabular-nums lining-nums;
+  font-size: clamp(60px, 15vw, 118px); line-height: 0.95; letter-spacing: -0.045em;
+  color: var(--save);
+}
+.ofr-big-cur { font-size: 0.42em; font-weight: 400; letter-spacing: 0; transform: translateY(-0.12em); }
+.ofr-big-cap { font-size: clamp(16px, 2.3vw, 19px); font-weight: 500; color: var(--ink); }
+
+/* The divergence chart: two payments and the space between them. */
+.ofr-div { position: relative; margin-top: clamp(26px, 5vw, 40px); }
+.ofr-div-svg { display: block; width: 100%; height: clamp(170px, 30vw, 250px); overflow: visible; }
+.ofr-div-mask { fill: var(--paper); }
+.ofr-div-axis { display: flex; justify-content: space-between; padding-top: 8px; border-top: 1px solid var(--line-2); font-size: 13.5px; font-weight: 600; color: var(--ink); }
+
+.ofr-key { display: inline-flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 12px; font-size: 14px; font-weight: 500; color: var(--ink); }
+.ofr-key > span { display: inline-flex; align-items: center; gap: 8px; }
+.ofr-key i { display: inline-block; width: 18px; height: 0; border-top: 2.75px solid var(--c); border-radius: 2px; }
+.ofr-key i[data-dash] { border-top: 2px dashed var(--c); }
+.ofr-key i[data-fill] { height: 11px; border: 0; border-radius: 3px; background: var(--c); opacity: 0.32; }
+
+/* ------------------------------------------------------------- the month */
+.ofr-month {
+  display: grid; grid-template-columns: 1fr auto 1fr; align-items: end; column-gap: 18px; row-gap: 14px;
+  padding: 28px 0 30px; border-top: 1px solid var(--line);
+}
+.ofr-month-col { display: grid; gap: 2px; }
+.ofr-month-label { font-size: 15px; font-weight: 600; }
+.ofr-month-fig { font-family: var(--num); font-size: clamp(32px, 6.4vw, 46px); font-weight: 300; letter-spacing: -0.035em; line-height: 1.05; font-variant-numeric: tabular-nums; justify-self: start; }
+.ofr-month-fig[data-side="now"] { color: var(--ink); }
+.ofr-month-fig[data-side="next"] { color: var(--next); font-weight: 400; }
+.ofr-month-arrow { color: var(--ink); padding-bottom: 14px; }
+.ofr-month-line {
+  grid-column: 1 / -1; justify-self: start;
+  display: inline-flex; align-items: baseline; gap: 6px; padding: 7px 14px; border-radius: 999px;
+  background: var(--save-tint); color: var(--save); font-size: 15.5px; font-weight: 600;
+}
+.ofr-month-line b { font-family: var(--num); font-weight: 650; font-variant-numeric: tabular-nums; }
+
+/* ------------------------------------------------------------ sections */
+.ofr-sec { padding: 30px 0 32px; border-top: 1px solid var(--line); }
+.ofr-sec-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 16px; margin-bottom: 14px; }
+.ofr-sec-head h2 { font-size: clamp(19px, 2.8vw, 23px); font-weight: 700; letter-spacing: -0.015em; }
+.ofr-sec-head .ofr-key { margin-top: 0; }
+.ofr-chart-skel { height: 240px; border-radius: 12px; background: linear-gradient(90deg, rgba(18,20,26,0.03), rgba(18,20,26,0.06), rgba(18,20,26,0.03)); background-size: 200% 100%; animation: ofr-shimmer 1.4s linear infinite; }
+@keyframes ofr-shimmer { to { background-position: -200% 0; } }
+
+/* ---------------------------------------------------- side by side table */
+.ofr-table { width: 100%; border-collapse: collapse; font-size: 15.5px; }
+.ofr-table thead th { padding: 0 10px 10px; text-align: start; font-size: 14.5px; font-weight: 700; border-bottom: 1px solid var(--line-2); }
+.ofr-table tbody th { padding: 13px 10px 13px 0; text-align: start; font-weight: 500; }
+.ofr-table td { padding: 13px 10px; text-align: start; font-variant-numeric: tabular-nums; font-weight: 400; white-space: nowrap; }
+.ofr-table td[data-side="next"] { color: var(--next-deep); font-weight: 600; }
+.ofr-table tbody tr + tr > * { border-top: 1px solid var(--line); }
+.ofr-table .ofr-table-d { color: var(--save); font-weight: 600; }
+.ofr-table thead .ofr-table-d { color: var(--save); }
+.ofr-col { display: inline-flex; align-items: center; gap: 8px; }
+.ofr-col i { width: 16px; height: 0; border-top: 2.75px solid var(--next); border-radius: 2px; }
+.ofr-col[data-side="now"] i { border-top: 2px dashed var(--now); }
+@media (max-width: 560px) {
+  .ofr-table { font-size: 14.5px; }
+  .ofr-table .ofr-table-d { display: none; }
+  .ofr-table tbody th { white-space: normal; }
+}
+
+/* -------------------------------------------------------- milestones */
+.ofr-miles {
+  list-style: none; margin: 18px 0 0; padding: 0;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px;
+}
+.ofr-miles li {
+  position: relative; display: grid; gap: 2px; padding: 14px 16px 14px;
+  border-radius: 16px; background: #fff;
+  box-shadow: 0 0 0 1px rgba(18, 20, 26, 0.06), 0 10px 24px -18px rgba(14, 122, 78, 0.45);
+}
+.ofr-miles li::before {
+  content: ""; position: absolute; top: 16px; inset-inline-end: 16px; width: 8px; height: 8px; border-radius: 999px;
+  background: var(--save); box-shadow: 0 0 0 4px var(--save-tint);
+}
+.ofr-miles-when { font-size: 14px; font-weight: 600; color: var(--ink); }
+.ofr-miles-fig { justify-self: start; font-family: var(--num); font-size: 22px; font-weight: 500; letter-spacing: -0.02em; color: var(--save); font-variant-numeric: tabular-nums; }
+
+/* ---------------------------------------------------------- the advisor */
+.ofr-contact {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 18px;
+  margin-top: 6px; padding: 24px; border-radius: 20px; background: var(--next-tint);
+}
+.ofr-contact-q { font-size: 17px; font-weight: 500; }
+.ofr-contact-name { margin-top: 2px; font-size: 22px; font-weight: 700; letter-spacing: -0.01em; }
+.ofr-contact-acts { display: flex; gap: 10px; }
+.ofr-btn {
+  display: inline-flex; align-items: center; gap: 8px; height: 48px; padding: 0 22px; border-radius: 999px;
+  font-size: 16px; font-weight: 700; text-decoration: none; color: var(--next-deep);
+  background: #fff; border: 1px solid rgba(91, 84, 214, 0.25);
+  transition: transform 160ms var(--ease), box-shadow 160ms var(--ease), background-color 160ms;
+}
+.ofr-btn[data-primary] { background: var(--next); color: #fff; border-color: var(--next); box-shadow: 0 8px 20px -10px rgba(68, 61, 189, 0.7); }
+.ofr-btn:hover { transform: translateY(-1px); }
+.ofr-btn:active { transform: translateY(0) scale(0.98); }
+.ofr-btn:focus-visible { outline: 2px solid var(--next); outline-offset: 3px; }
+
+/* -------------------------------------------------------------- footer */
+.ofr-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px; margin-top: 28px; padding-top: 18px; border-top: 1px solid var(--line); }
+.ofr-foot p { max-width: 56ch; font-size: 13.5px; font-weight: 500; color: var(--ink); line-height: 1.55; }
+
+/* ---------------------------------------------------------- the gate */
+.ofr-gate { display: grid; place-items: center; padding: 24px; }
+.ofr-gate-card { width: min(100%, 420px); display: grid; justify-items: center; text-align: center; gap: 10px; }
+.ofr-gate-card .ofr-mark { margin-bottom: 18px; font-size: 21px; }
+.ofr-gate-title { font-size: clamp(25px, 6vw, 30px); font-weight: 700; letter-spacing: -0.02em; }
+.ofr-gate-text { font-size: 16.5px; font-weight: 500; color: var(--ink); max-width: 40ch; text-wrap: balance; }
+.ofr-otp { position: relative; margin-top: 22px; display: block; cursor: text; }
+.ofr-otp-input {
+  position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; border: 0; outline: none;
+  font-size: 16px; /* no iOS zoom */ caret-color: transparent; color: transparent; background: transparent;
+}
+.ofr-otp-cells { display: flex; gap: 9px; }
+.ofr-otp-cell {
+  position: relative; display: grid; place-items: center; width: clamp(44px, 12vw, 54px); height: clamp(54px, 14vw, 64px);
+  border-radius: 14px; background: #fff; border: 1px solid var(--line-2);
+  font-family: var(--num); font-size: 28px; font-weight: 400; color: var(--ink);
+  transition: border-color 160ms var(--ease), box-shadow 160ms var(--ease), transform 160ms var(--ease);
+}
+.ofr-otp-cell[data-full] { border-color: rgba(91, 84, 214, 0.35); }
+.ofr-otp-cell[data-on] { border-color: var(--next); box-shadow: 0 0 0 4px rgba(91, 84, 214, 0.14); }
+.ofr-otp-cell[data-on]::after {
+  content: ""; position: absolute; width: 2px; height: 26px; border-radius: 1px; background: var(--next);
+  animation: ofr-caret 1.05s steps(1) infinite;
+}
+.ofr-otp-cell[data-full][data-on]::after { display: none; }
+.ofr-otp-cell[data-err] { border-color: rgba(180, 35, 24, 0.55); }
+.ofr-otp[data-busy] .ofr-otp-cell { opacity: 0.6; }
+@keyframes ofr-caret { 50% { opacity: 0; } }
+.ofr-gate-err { min-height: 1.5em; font-size: 15px; font-weight: 600; color: var(--bad); }
+
+@media (prefers-reduced-motion: reduce) {
+  .ofr-otp-cell[data-on]::after, .ofr-chart-skel { animation: none; }
+  .ofr-btn { transition: none; }
+}
+
+/* ------------------------------------------- the stage (figure + chart) */
+.ofr-stage {
+  --stage: #ffffff;
+  margin-top: clamp(18px, 4vw, 28px);
+  padding: clamp(20px, 4vw, 34px) clamp(18px, 4vw, 34px) clamp(18px, 3vw, 26px);
+  border-radius: 28px;
+  background: var(--stage);
+  box-shadow:
+    0 0 0 1px rgba(18, 20, 26, 0.05),
+    0 2px 4px rgba(18, 20, 26, 0.03),
+    0 34px 70px -40px rgba(68, 61, 189, 0.32);
+}
+.ofr-stage .ofr-big { margin-top: 0; }
+.ofr-stage .ofr-div-mask { fill: var(--stage); }
+
+/* the inspector — hover or touch the drawing */
+.ofr-div-plot { position: relative; touch-action: pan-y; cursor: default; }
+.ofr-div-guide { position: absolute; top: 0; bottom: 0; width: 0; border-left: 1px dashed rgba(18, 20, 26, 0.35); pointer-events: none; }
+.ofr-div-dot {
+  position: absolute; width: 11px; height: 11px; margin: -5.5px 0 0 -5.5px; border-radius: 999px;
+  background: #fff; border: 2.5px solid var(--c); pointer-events: none;
+  box-shadow: 0 2px 6px rgba(18, 20, 26, 0.18);
+}
+.ofr-div-card {
+  position: absolute; top: 6px; transform: translateX(12px); pointer-events: none;
+  display: grid; gap: 3px; min-width: 128px; padding: 9px 12px; border-radius: 12px;
+  background: rgba(18, 20, 26, 0.92); color: #fff; font-size: 13px; font-weight: 600;
+  box-shadow: 0 14px 30px -14px rgba(18, 20, 26, 0.55);
+  -webkit-backdrop-filter: blur(6px);
+}
+@supports (backdrop-filter: blur(1px)) { .ofr-div-card { backdrop-filter: blur(6px); } }
+.ofr-div-card[data-flip] { transform: translateX(calc(-100% - 12px)); }
+.ofr-div-card > b { font-weight: 700; font-size: 12.5px; opacity: 0.85; }
+.ofr-div-card > span { display: inline-flex; align-items: center; justify-content: space-between; gap: 14px; font-family: var(--num); font-variant-numeric: tabular-nums; }
+.ofr-div-card i { width: 14px; height: 0; border-top: 2.5px solid var(--c); border-radius: 2px; }
+.ofr-div-card i[data-dash] { border-top-style: dashed; border-top-width: 2px; }
+
+/* --------------------------------------------- the month, performed */
+.ofr-month-fig[data-side="now"] { position: relative; text-decoration: none; }
+.ofr-month-strike {
+  position: absolute; inset-inline: -4px; top: 54%; height: 2px; border-radius: 2px; background: var(--now);
+  transform: scaleX(0); transform-origin: left center;
+  transition: transform 700ms var(--ease) 150ms;
+}
+.ofr-month[data-seen] .ofr-month-strike { transform: scaleX(1); }
+.ofr-month-cur { font-size: 0.62em; margin-inline-end: 1px; }
+.ofr-month-line { opacity: 0; transform: translateY(6px); transition: opacity 500ms var(--ease) 900ms, transform 500ms var(--ease) 900ms; }
+.ofr-month[data-seen] .ofr-month-line { opacity: 1; transform: none; }
+@media (max-width: 560px) {
+  .ofr-month { grid-template-columns: 1fr auto 1fr; column-gap: 10px; }
+  .ofr-month-arrow svg { width: 26px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ofr-month-strike, .ofr-month-line { transition: none; }
+}
+.ofr-table bdi { font-family: var(--num); }
+@media (max-width: 560px) { .ofr-miles li:last-child:nth-child(odd) { grid-column: 1 / -1; } }

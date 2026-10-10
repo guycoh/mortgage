@@ -20,7 +20,7 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import NumberFlow from "@number-flow/react";
-import { ArrowDown, ArrowUp, Scales } from "@phosphor-icons/react";
+import { ArrowDown, ArrowUp, PresentationChart, Scales } from "@phosphor-icons/react";
 import Money from "./Money";
 import { owedOnly, type ImportedLoan } from "../lib/credit";
 import { asEcon, type Assume } from "../lib/price";
@@ -173,26 +173,72 @@ function Scrubber({
   const i = Math.min(n - 1, Math.max(0, year - 1));
   const end = cum[n - 1] ?? 0;
   const tone = end >= 0 ? "good" : "bad";
+
+  // A plain pointer, not a resize cursor: hovering previews a year (a ghost
+  // line and its figure), pressing or dragging commits it. The keyboard gets
+  // the same through role="slider" and the arrow keys.
+  const [hover, setHover] = useState<number | null>(null);
+  const [drag, setDrag] = useState(false);
+  const yearAt = (e: React.PointerEvent<HTMLDivElement>) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    const t = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+    return Math.round(t * (n - 1)) + 1;
+  };
+  const h = hover !== null ? Math.min(n - 1, Math.max(0, hover - 1)) : null;
+  const pct = (k: number) => `${(x(k) / W) * 100}%`;
+
   return (
-    <div className="lgr-cmx-scrub" data-tone={tone}>
+    <div
+      className="lgr-cmx-scrub"
+      data-tone={tone}
+      data-drag={drag || undefined}
+      role="slider"
+      tabIndex={0}
+      aria-label="שנה"
+      aria-valuemin={1}
+      aria-valuemax={n}
+      aria-valuenow={year}
+      aria-valuetext={`שנה ${year}`}
+      onPointerMove={(e) => {
+        const yr = yearAt(e);
+        setHover(yr);
+        if (drag) onYear(yr);
+      }}
+      onPointerLeave={() => setHover(null)}
+      onPointerDown={(e) => {
+        e.currentTarget.setPointerCapture(e.pointerId);
+        setDrag(true);
+        onYear(yearAt(e));
+      }}
+      onPointerUp={(e) => {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+        setDrag(false);
+      }}
+      onKeyDown={(e) => {
+        const step = e.key === "ArrowLeft" ? -1 : e.key === "ArrowRight" ? 1 : e.key === "Home" ? -n : e.key === "End" ? n : 0;
+        if (!step) return;
+        e.preventDefault();
+        onYear(Math.min(n, Math.max(1, year + step)));
+      }}
+    >
       <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-hidden className="lgr-cmx-scrub-svg">
         <line x1="0" x2={W} y1={zeroY} y2={zeroY} className="lgr-cmx-scrub-zero" />
         <path d={area} className="lgr-cmx-scrub-area" />
         <path d={line} className="lgr-cmx-scrub-line" vectorEffect="non-scaling-stroke" />
+        {h !== null && h !== i && (
+          <line x1={x(h)} x2={x(h)} y1="0" y2={H} className="lgr-cmx-scrub-ghost" vectorEffect="non-scaling-stroke" />
+        )}
         <line x1={x(i)} x2={x(i)} y1="0" y2={H} className="lgr-cmx-scrub-mark" vectorEffect="non-scaling-stroke" />
-        <circle cx={x(i)} cy={y(cum[i] ?? 0)} r="4" className="lgr-cmx-scrub-dot" />
       </svg>
-      <input
-        type="range"
-        className="lgr-cmx-range"
-        min={1}
-        max={n}
-        step={1}
-        value={year}
-        onChange={(e) => onYear(Number(e.target.value))}
-        aria-label="שנה"
-        dir="ltr"
-      />
+      {/* The dot is HTML, not SVG: a preserveAspectRatio="none" drawing would
+          squash a circle into an ellipse. */}
+      <span className="lgr-cmx-scrub-dot" style={{ left: pct(i), top: `${(y(cum[i] ?? 0) / H) * 100}%` }} aria-hidden />
+      {h !== null && h !== i && (
+        <span className="lgr-cmx-scrub-peek" style={{ left: pct(h) }} aria-hidden>
+          <b>שנה {h + 1}</b>
+          <Money value={Math.abs(cum[h] ?? 0)} block={false} weight={700} />
+        </span>
+      )}
       <span className="lgr-cmx-scrub-ends" aria-hidden>
         <span>שנה 1</span>
         <span>שנה {n}</span>
@@ -210,6 +256,7 @@ export default function Compare({
   source,
   control,
   onDuplicate,
+  onShare,
 }: {
   activeMixId: string | null;
   /** The other mix. null = automatic (the master, or the first other mix); "" = none. */
@@ -223,6 +270,8 @@ export default function Compare({
   source?: ReactNode;
   control?: ReactNode;
   onDuplicate?: () => void;
+  /** הצגה ללקוח — opens the share dialog for these two mixes. */
+  onShare?: (pair: { activeId: string; otherId: string }) => void;
 }) {
   const activeMix = mixes.find((m) => m.id === activeMixId) ?? null;
   const master = mixes.find((m) => m.is_base) ?? mixes[0] ?? null;
@@ -274,7 +323,19 @@ export default function Compare({
             {control}
           </span>
         )}
-        {source && <div className="ms-auto">{source}</div>}
+        <div className="ms-auto lgr-cmx-head-end">
+          {onShare && A && B && activeMix && otherMix && (
+            <button
+              type="button"
+              className="lgr-btn lgr-btn-sm lgr-cmx-share"
+              onClick={() => onShare({ activeId: activeMix.id, otherId: otherMix.id })}
+            >
+              <PresentationChart size={15} weight="bold" />
+              שיתוף עם הלקוח
+            </button>
+          )}
+          {source}
+        </div>
       </header>
       {body}
     </section>
