@@ -18,7 +18,7 @@
 // resets — it is the difference between a 3% tranche that stays 3% and one that
 // reprices next spring.
 
-import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
   ArrowCounterClockwise,
@@ -42,6 +42,7 @@ import { BankIcon } from "./bankIcons";
 import Money from "./Money";
 import RowSettings from "./RowSettings";
 import RateAutoToggle from "./RateAutoToggle";
+import { useFitInputs } from "../lib/fit-text";
 import Btn from "./Btn";
 import { settle, snap } from "../lib/transitions";
 import Toaster, { type Toast, type ToastTone } from "./Toast";
@@ -191,6 +192,9 @@ export default function Ledger({
   const [flash, setFlash] = useState<{ ids: string[]; at: number } | null>(null);
   /** The ריבית field that just became automatic — replays the refresh mark on it. */
   const [ratePulse, setRatePulse] = useState<{ id: string; at: number } | null>(null);
+  /** Every figure in the grid fits its box on a laptop too — see lib/fit-text. */
+  const gridRef = useRef<HTMLDivElement>(null);
+  useFitInputs(gridRef, [loans, isBase]);
   useEffect(() => {
     if (!ratePulse) return;
     const t = setTimeout(() => setRatePulse(null), FLASH_TOTAL_MS + 100);
@@ -1004,7 +1008,7 @@ export default function Ledger({
         // full-height page — two scrollbars fighting, and no way to see the
         // list whole. The page is the only scroller now; the header and the
         // totals bar stay put on their own.
-        <div>
+        <div ref={gridRef} className="lgr-grid-fit">
           <table className="lgr-table">
             <colgroup>
               {/* Fourteen columns summing to 100. תאריך סיום is the one that must

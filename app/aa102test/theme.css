@@ -2253,6 +2253,18 @@ html:has(.lgr-root) {
 
 /* Numeric wells read LTR and flush right so a column's units digits line up. */
 .lgr-num-in { direction: ltr; unicode-bidi: isolate; text-align: right; }
+/* Figures get the inner width: 6px of padding, not 9 — on a laptop those 6px
+   are the last digit of a balance. lib/fit-text shrinks whatever still overflows. */
+.lgr-table .lgr-cell.lgr-num-in { padding-inline: 6px; }
+/* Below ~1230px (a 1440 or 1536 laptop at 125% scaling) the columns are too
+   narrow for any font that is still readable, so the grid stops shrinking at
+   1200px and scrolls sideways in its own band. The header stops sticking at
+   these widths — it pins to the scroller — which is the cheaper loss than
+   figures nobody can read. */
+@media (max-width: 1229px) {
+  .lgr-grid-fit { overflow-x: auto; overscroll-behavior-x: contain; }
+  .lgr-grid-fit > .lgr-table { min-width: 1200px; }
+}
 
 /* A derived note pinned in the well's bottom-left corner. Absolute, so it can
    never change the row's height — which is what made the months cell jump.
