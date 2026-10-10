@@ -327,7 +327,15 @@ export default function Simulator({
       .catch(() => setForecastState({ forecast: null, boi: null, override: null }));
   }, []);
   useEffect(loadForecast, [loadForecast]);
-  /** What every calculation on the board reads. No curves yet → flat, said so on the rail. */
+  /**
+   * TWO PRICINGS, ON PURPOSE (owner, 2026-10-10). The grid, its totals and the
+   * read-out price exactly what is typed — the rate as entered, CPI at the one
+   * % beside it — because that is where an advisor edits a row and must see the
+   * edit, and only the edit. The forecast drives the views that look down the
+   * years: לוח סילוקין מאוחד, מהלך התמהיל and השוואת תמהילים.
+   */
+  const typed: Econ = useMemo(() => ({ inflation: annualInflation, forecast: null }), [annualInflation]);
+  /** The over-time views. No curves yet, or the switch off → the typed pricing. */
   const econ: Econ = useMemo(
     () => ({
       inflation: annualInflation,
@@ -710,7 +718,7 @@ export default function Simulator({
     let monthly = 0;
     let interest = 0;
     for (const l of owed) {
-      const r = priceLoan(l, econ);
+      const r = priceLoan(l, typed);
       amount += Math.round(Number(l.amount) || 0);
       // Rounded per row so the rail's החזר חודשי is the same figure as the
       // ledger's סה״כ and the export's grand total — see the note in Ledger.
@@ -720,9 +728,9 @@ export default function Simulator({
     // החזר לשקל — the mix's quality in one figure, and the only cell here that
     // reads across two mixes of different sizes. Defined once in lib/credit,
     // because the comparison table and the export quote the same name.
-    const ratio = perShekel(owed, econ);
+    const ratio = perShekel(owed, typed);
     return { amount, monthly, interest, perShekel: ratio.value, unpriced: ratio.unpriced };
-  }, [owed, econ]);
+  }, [owed, typed]);
 
   /** The mix's colour signature — share of balance per track, biggest first. */
   const trackSegs = useMemo(() => {
@@ -1066,7 +1074,7 @@ export default function Simulator({
       await exportMixToExcel({
         mixName: activeMix.mix_name,
         loans,
-        annualInflation: econ,
+        annualInflation: typed,
         annualDiscount,
         clients: reports.map((r) => ({ name: r.clientName, id: r.clientId, reportDate: r.reportDate })),
       });
@@ -1360,32 +1368,49 @@ export default function Simulator({
                 it is: the one cell of the read-out you are allowed to type in.
                 Ruled off rather than spaced off, because an input among outputs
                 needs the seam stated. */}
-            {/* Two ways to price the future. תחזית: the BoI curves, as every
-                bank prices a quote under directive 451 — prime and anchors move,
-                CPI runs month by month. קבועה: the typed rate for life and one
-                CPI %. The source chip opens what the curves say. */}
+            <label className="lgr-rail-assume" title="שיעור האינפלציה השנתי שלפיו מחושבת ההצמדה בשורות התמהיל">
+              <span className="lgr-rail-label">אינפלציה שנתית</span>
+              <span className="lgr-rail-assume-well">
+                <input
+                  type="number"
+                  step="0.1"
+                  value={annualInflation}
+                  onChange={(e) => setAnnualInflation(parseFloat(e.target.value) || 0)}
+                  onFocus={(e) => e.currentTarget.select()}
+                  className="lgr-rail-assume-in"
+                  aria-label="אינפלציה שנתית באחוזים"
+                />
+                <span className="lgr-rail-assume-unit">%</span>
+              </span>
+            </label>
+
+            {/* THE FORECAST, FOR THE VIEWS THAT LOOK DOWN THE YEARS. The rows
+                above price what is typed; לוח סילוקין מאוחד, the charts and the
+                comparison price the BoI curves (directive 451 — prime and
+                anchors move, CPI runs month by month) unless this is off. The
+                source chip opens what the curves say. */}
             <div className="lgr-rail-assume" style={{ cursor: "default" }}>
-              <span className="lgr-rail-label">ריבית ואינפלציה</span>
+              <span className="lgr-rail-label">תחזית ריבית ואינפלציה</span>
               <span className="lgr-econ">
-                <span className="lgr-econ-seg" role="group" aria-label="הנחת ריבית ואינפלציה">
+                <span className="lgr-econ-seg" role="group" aria-label="תחזית ללוח המאוחד, לגרפים ולהשוואה">
                   <button
                     type="button"
                     aria-pressed={econMode === "forecast"}
                     onClick={() => setEconMode("forecast")}
-                    title="תחזית בנק ישראל לפי הוראה 451: פריים ועוגנים לפי עקום הריבית, הצמדה לפי האינפלציה הצפויה"
+                    title="לוח סילוקין מאוחד, גרפים והשוואה לפי תחזית בנק ישראל (הוראה 451)"
                   >
-                    תחזית
+                    פעילה
                   </button>
                   <button
                     type="button"
                     aria-pressed={econMode === "flat"}
                     onClick={() => setEconMode("flat")}
-                    title="ריבית קבועה כפי שהוזנה ושיעור אינפלציה שנתי אחד"
+                    title="לוח סילוקין מאוחד, גרפים והשוואה לפי הנתונים שהוזנו בשורות"
                   >
-                    קבועה
+                    כבויה
                   </button>
                 </span>
-                {econMode === "forecast" ? (
+                {econMode === "forecast" && (
                   <button
                     type="button"
                     className="lgr-econ-src"
@@ -1395,19 +1420,6 @@ export default function Simulator({
                   >
                     {!forecastState ? "טוען…" : forecastState.forecast ? forecastState.forecast.label : "לא זמינה"}
                   </button>
-                ) : (
-                  <label className="lgr-rail-assume-well" title="שיעור האינפלציה השנתי שלפיו מחושבת ההצמדה">
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={annualInflation}
-                      onChange={(e) => setAnnualInflation(parseFloat(e.target.value) || 0)}
-                      onFocus={(e) => e.currentTarget.select()}
-                      className="lgr-rail-assume-in"
-                      aria-label="אינפלציה שנתית באחוזים"
-                    />
-                    <span className="lgr-rail-assume-unit">%</span>
-                  </label>
                 )}
               </span>
             </div>
@@ -1719,7 +1731,7 @@ export default function Simulator({
               <Ledger
                 loans={loans}
                 paths={PATHS}
-                annualInflation={econ}
+                annualInflation={typed}
                 annualDiscount={annualDiscount}
                 baseline={baseline}
                 // The master is the same mix a dropped report belongs to — what
@@ -1934,7 +1946,7 @@ export default function Simulator({
               ? { kind: "mix", name: activeMix.mix_name, loans: owed }
               : { kind: "loan", loan: schedFor }
           }
-          annualInflation={econ}
+          annualInflation={schedFor === "mix" ? econ : typed}
           onClose={() => setSchedFor(null)}
         />
       )}

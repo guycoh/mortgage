@@ -9,7 +9,7 @@ import { createPortal } from "react-dom";
 import { motion } from "motion/react";
 import { DownloadSimple, X } from "@phosphor-icons/react";
 import type { ScheduleRow } from "@/app/private/crm/leads/simulators/components/calculate/loanCalculators";
-import { priceLoan, unifiedSchedule, type Assume } from "../lib/price";
+import { asEcon, priceLoan, unifiedSchedule, type Assume } from "../lib/price";
 import Money from "./Money";
 import { FAMILY, PATH_LABEL, TRACK_HEX, type ImportedLoan } from "../lib/credit";
 
@@ -36,6 +36,7 @@ export default function ScheduleModal({
     };
   }, [onClose]);
 
+  const econ = asEcon(annualInflation);
   const { rows, title, badges, summary } = useMemo(() => {
     if (subject.kind === "mix") {
       const s = unifiedSchedule(subject.loans, annualInflation);
@@ -51,9 +52,14 @@ export default function ScheduleModal({
         rows,
         title: `לוח סילוקין מאוחד — ${subject.name}`,
         badges: (
-          <span className="lgr-chip">
-            <span className="lgr-fig font-bold">{subject.loans.length}</span> שורות בתמהיל
-          </span>
+          <>
+            <span className="lgr-chip">
+              <span className="lgr-fig font-bold">{subject.loans.length}</span> שורות בתמהיל
+            </span>
+            {/* Which future this schedule was priced on — the rows above it on
+                the board price what is typed, so the difference must be said. */}
+            <span className="lgr-chip">{econ.forecast ? `תחזית ${econ.forecast.label}` : `אינפלציה ${econ.inflation}%`}</span>
+          </>
         ),
         summary: {
           first: rows[0]?.payment ?? 0,

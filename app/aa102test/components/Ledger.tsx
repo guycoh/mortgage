@@ -32,6 +32,7 @@ import {
   Table as TableIcon,
   Trash,
   Warning,
+  Calculator,
 } from "@phosphor-icons/react";
 import { schedules } from "@/app/data/amortization_schedules";
 import type { LoanPath } from "@/app/data/hooks/useLoanPaths";
@@ -407,6 +408,43 @@ export default function Ledger({
    * clears to null rather than to 0 — which also keeps the numeric columns
    * nullable in the database, the way they are declared.
    */
+  /* --- ריבית אוטומטית: עוגן + תוספת, on a proposal's variable rows ---------
+     The master is what the client owes, and its rate is the one the document
+     printed — never recomputed. A proposal is being designed, and on a prime or
+     bond-anchored track its rate IS the anchor plus the margin; typing the sum
+     by hand is the step that goes stale. A fixed track has no anchor to add to,
+     so it has no switch either. */
+  const canAuto = (l: ImportedLoan) => !isBase && [1, 4, 5].includes(Number(l.path_id));
+  const sumOf = (a: unknown, m: unknown): number | null => {
+    const x = Number(a);
+    const y = Number(m);
+    if (a === null || a === undefined || a === "" || m === null || m === undefined || m === "") return null;
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+    return Math.max(0, Math.round((x + y) * 100) / 100);
+  };
+  /** Explicit when the advisor flipped it; otherwise read off the row — a rate
+   *  that already is the sum (or no rate yet) is automatic, a different one was
+   *  typed and stays typed. A reload therefore never rewrites a typed rate. */
+  const rateAuto = (l: ImportedLoan) => {
+    if (!canAuto(l)) return false;
+    if (l.rate_auto !== undefined) return l.rate_auto;
+    const sum = sumOf(l.anchor, l.anchor_margin);
+    const rate = Number(l.rate) || 0;
+    return !rate || (sum !== null && Math.abs(rate - sum) < 0.005);
+  };
+  /** A typed rate that is not the sum of the boxes beside it — the sum, or null when it agrees. */
+  const rateMismatch = (l: ImportedLoan): number | null => {
+    if (!canAuto(l) || rateAuto(l)) return null;
+    const sum = sumOf(l.anchor, l.anchor_margin);
+    const rate = Number(l.rate) || 0;
+    return sum !== null && rate > 0 && Math.abs(rate - sum) >= 0.005 ? sum : null;
+  };
+  const toggleAuto = (l: ImportedLoan) => {
+    const on = !rateAuto(l);
+    const sum = sumOf(l.anchor, l.anchor_margin);
+    patch(l.id, { rate_auto: on, ...(on && sum !== null ? { rate: sum } : {}) } as Partial<ImportedLoan>);
+  };
+
   const numField = (
     loan: ImportedLoan,
     key: "anchor" | "anchor_margin",
@@ -431,17 +469,24 @@ export default function Ledger({
       placeholder={placeholder}
       value={loan[key] ?? ""}
       onFocus={(e) => e.currentTarget.select()}
-      onChange={(e) =>
+      onChange={(e) => {
+        const v = e.target.value === "" ? null : Number(e.target.value);
+        // On an automatic row ריבית IS עוגן + תוספת, so typing either box
+        // reprices it; a half-filled pair leaves nothing to add, and the rate
+        // empties rather than keeping a sum that is no longer true.
+        const auto = rateAuto(loan);
+        const sum = sumOf(key === "anchor" ? v : loan.anchor, key === "anchor_margin" ? v : loan.anchor_margin);
         patch(loan.id, {
-          [key]: e.target.value === "" ? null : Number(e.target.value),
+          [key]: v,
+          ...(auto ? { rate: sum ?? 0, rate_auto: true } : {}),
           // Typing an anchor IS the answer to "this row has no anchor for its
           // track" — so the warning and its note go with the keystroke rather
           // than outliving the thing they asked for.
           ...(key === "anchor" && loan.anchor_void
             ? { anchor_void: undefined, anchor_note: undefined }
             : {}),
-        } as Partial<ImportedLoan>)
-      }
+        } as Partial<ImportedLoan>);
+      }}
     />
   );
 
@@ -1599,16 +1644,37 @@ export default function Ledger({
                           {/* --- ריבית: the sum of the two boxes before it, and
                               it warms as the rate climbs, per family --- */}
                           <td>
-                            <div className="lgr-well" data-dirty={dirty.has("rate") || undefined}>
+                            <div
+                              className="lgr-well"
+                              data-dirty={dirty.has("rate") || undefined}
+                              data-auto={rateAuto(loan) || undefined}
+                              data-mismatch={rateMismatch(loan) !== null || undefined}
+                            >
+                              {canAuto(loan) && (
+                                <button
+                                  type="button"
+                                  className="lgr-rate-auto"
+                                  aria-pressed={rateAuto(loan)}
+                                  aria-label={rateAuto(loan) ? "ריבית מחושבת אוטומטית — לחצו להזנה ידנית" : "הזנה ידנית — לחצו לחישוב אוטומטי"}
+                                  title={rateAuto(loan) ? "ריבית = עוגן + תוספת · לחצו להזנה ידנית" : "הזנה ידנית · לחצו לחישוב ריבית = עוגן + תוספת"}
+                                  onClick={() => toggleAuto(loan)}
+                                >
+                                  <Calculator size={10} weight={rateAuto(loan) ? "bold" : "regular"} />
+                                </button>
+                              )}
                               <input
                                 className="lgr-cell lgr-num-in"
                                 type="number"
                                 step="0.01"
                                 min={0}
+                                readOnly={rateAuto(loan)}
+                                tabIndex={rateAuto(loan) ? -1 : undefined}
                                 aria-label="ריבית באחוזים"
                                 data-heat={heat ?? undefined}
                                 title={
-                                  heat === "hot"
+                                  rateMismatch(loan) !== null
+                                    ? `הריבית שהוזנה (${Number(loan.rate).toFixed(2)}%) שונה מעוגן + תוספת (${rateMismatch(loan)!.toFixed(2)}%) · לחצו על המחשבון לחישוב אוטומטי`
+                                    : heat === "hot"
                                     ? `ריבית גבוהה ל${fam.label}`
                                     : heat === "warm"
                                       ? `ריבית גבוהה מהממוצע ל${fam.label}`
@@ -1617,7 +1683,10 @@ export default function Ledger({
                                 value={loan.rate || ""}
                                 placeholder="0.00"
                                 onFocus={(e) => e.currentTarget.select()}
-                                onChange={(e) => patch(loan.id, { rate: Number(e.target.value) || 0 })}
+                                onChange={(e) => {
+                                  if (rateAuto(loan)) return;
+                                  patch(loan.id, { rate: Number(e.target.value) || 0 });
+                                }}
                               />
                             </div>
                           </td>

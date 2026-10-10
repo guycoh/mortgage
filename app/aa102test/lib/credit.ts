@@ -261,6 +261,13 @@ export type ImportedLoan = Loan & {
    * empty field — instead of quietly reading as a row nobody ever priced.
    */
   anchor_void?: boolean;
+  /**
+   * On a proposal's variable row: is ריבית computed as עוגן + תוספת (true) or
+   * typed (false)? Session-only. Unset, it is read off the row itself — a rate
+   * that already equals the sum, or no rate yet, is automatic; a rate that
+   * differs was typed and stays typed (see rateAuto in Ledger).
+   */
+  rate_auto?: boolean;
   /** False when the value came from a secondary source rather than the bank's own. */
   anchor_verified?: boolean;
   /** Older than its family republishes — still the latest published value. */
