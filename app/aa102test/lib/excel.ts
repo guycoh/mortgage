@@ -16,7 +16,7 @@
 // Framework-free: no React, no `window`, so it can also be built headlessly.
 
 import type { Workbook, Worksheet } from "exceljs";
-import { calculateLoan } from "@/app/private/crm/leads/simulators/components/calculate/loanCalculators";
+import { asEcon, priceLoan, type Assume } from "./price";
 import { schedules } from "@/app/data/amortization_schedules";
 import {
   FAMILY,
@@ -78,7 +78,7 @@ const PCT = "0.00%";
 export interface ExcelInput {
   mixName: string;
   loans: ImportedLoan[];
-  annualInflation: number;
+  annualInflation: Assume;
   /**
    * שיעור היוון — the rate ע.נ.נ discounts at.
    *
@@ -188,7 +188,7 @@ const scheduleName = (id: number) => schedules.find((s) => s.id === id)?.schedul
  */
 const alignOf = (ci: number) => (COLS[ci].fmt ? ("center" as const) : ("right" as const));
 
-type Priced = { l: ImportedLoan; res: ReturnType<typeof calculateLoan> };
+type Priced = { l: ImportedLoan; res: ReturnType<typeof priceLoan> };
 
 /** Which column is which, by name, so inserting one cannot silently move a sum. */
 const CI = {
@@ -269,7 +269,7 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
   // החזר לשקל and the strip below it quotes four totals, and all of them have to
   // be the same arithmetic as the table at the bottom of the sheet.
 
-  const per = loans.map((l) => ({ l, res: calculateLoan(l, annualInflation) }));
+  const per = loans.map((l) => ({ l, res: priceLoan(l, annualInflation) }));
   // The split that governs the whole sheet — see isSurety.
   const owed = per.filter((x) => !isSurety(x.l));
   const sureties = per.filter((x) => isSurety(x.l));
@@ -328,9 +328,11 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
   const dd = `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
   // A board of nothing but guarantees has no cost per shekel — the client is not
   // paying any of them. 0.00 would be a figure where there is no figure.
+  // The assumption every figure below was priced on, said once.
+  const econ = asEcon(annualInflation);
   stamp.value = [
     `הופק ב-${dd}`,
-    `אינפלציה שנתית בהנחה: ${annualInflation}%`,
+    econ.forecast ? `תחזית ריבית ואינפלציה: ${econ.forecast.label}` : `אינפלציה שנתית בהנחה: ${econ.inflation}%`,
     totalAmount ? `החזר לשקל: ${perShekel.toFixed(2)}` : "",
   ]
     .filter(Boolean)

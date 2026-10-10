@@ -11,7 +11,7 @@ import { paths as STATIC_PATHS } from "@/app/data/paths";
 import type { CreditReport } from "@/lib/credit-parser/types";
 import type { BankStatement } from "@/lib/bank-parser/types";
 import { extractLoans, type ExtractedLoan } from "@/lib/credit-parser/loan-mapping";
-import { calculateLoan } from "@/app/private/crm/leads/simulators/components/calculate/loanCalculators";
+import { priceLoan, type Assume } from "./price";
 import type { Loan } from "@/app/private/crm/leads/simulators/components/LoanTable";
 import { creditReportPurpose } from "@/lib/bank-parser/purpose";
 import { purposeFrom, type PurposeId } from "./purposes";
@@ -67,14 +67,14 @@ export const owedOnly = (loans: ImportedLoan[]) => loans.filter((l) => !isSurety
  */
 export function perShekel(
   rows: ImportedLoan[],
-  annualInflation: number
+  annualInflation: Assume
 ): { value: number; paid: number; principal: number; unpriced: number } {
   let paid = 0;
   let principal = 0;
   let unpriced = 0;
   for (const l of rows) {
     const amount = Math.round(Number(l.amount) || 0);
-    const res = calculateLoan(l, annualInflation);
+    const res = priceLoan(l, annualInflation);
     if (res.totalPaid > 0) {
       paid += res.totalPaid;
       principal += amount;
@@ -139,6 +139,12 @@ export type ImportedLoan = Loan & {
      what happens when a document prints none of them. --- */
   /** תאריך פתיחה — 201-016, as printed (dd/mm/yyyy). */
   source_start_date?: string;
+  /**
+   * מועד שינוי הריבית הקרוב, as a bank letter prints it — when a bond-anchored
+   * tranche first resets. The forecast engine counts the months to it (451's
+   * `s`); without it the phase is read from the opening date. Session-only.
+   */
+  next_reset?: string | null;
   /** סכום מקורי — 201-045. 0 when the document did not print one. */
   source_orig_amount?: number;
   /**

@@ -22,10 +22,8 @@
 // says so, and points at the one row that is scale-free.
 
 import { ArrowDown, ArrowUp, Scales } from "@phosphor-icons/react";
-import {
-  calculateMixFullTotals,
-  type MixFullTotals,
-} from "@/app/private/crm/leads/simulators/components/calculate/mixScheduleCalculators";
+import type { MixFullTotals } from "@/app/private/crm/leads/simulators/components/calculate/mixScheduleCalculators";
+import { mixFullTotals, type Assume } from "../lib/price";
 import Money from "./Money";
 import { owedOnly, perShekel, type ImportedLoan } from "../lib/credit";
 
@@ -67,7 +65,7 @@ export default function Compare({
   activeMixId: string | null;
   compareMixId: string | null;
   mixes: Mix[];
-  annualInflation?: number;
+  annualInflation?: Assume;
   control?: React.ReactNode;
   onDuplicate?: () => void;
 }) {
@@ -114,10 +112,10 @@ export default function Compare({
   // so counting it here would make one mix look dearer than another purely
   // because a spouse's cousin borrowed money. See isSurety in lib/credit.
   const activeRows = owedOnly(activeMix.loans ?? []);
-  const active: MixFullTotals = calculateMixFullTotals(activeRows, annualInflation);
+  const active: MixFullTotals = mixFullTotals(activeRows, annualInflation);
   const otherRows = compareMix ? owedOnly(compareMix.loans ?? []) : [];
   const other: MixFullTotals | null = otherRows.length
-    ? calculateMixFullTotals(otherRows, annualInflation)
+    ? mixFullTotals(otherRows, annualInflation)
     : null;
 
   if (!other || !compareMix)

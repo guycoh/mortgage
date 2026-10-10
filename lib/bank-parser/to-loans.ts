@@ -123,6 +123,21 @@ function anchorNameOf(t: BankTranche): string {
   return s.replace(/בנק\s+ישראל/g, 'ב"י');
 }
 
+/**
+ * The date the rate CHANGES, ISO. Leumi, Hapoalim and Discount print exactly
+ * that ("מועד שינוי הריבית הקרוב"). Mizrahi prints the first PAYMENT at the new
+ * rate ("מועד החיוב הראשון בריבית המעודכנת") and says in its notes that the
+ * change takes effect a month earlier — so its date is stepped back one month.
+ * SmartNPV books the same letter's 01/03/2031 as a 01/02/2031 change.
+ */
+function resetDateOf(t: BankTranche, st: BankStatement): string | null {
+  const raw = t.nextReset ? iso(t.nextReset) : null;
+  if (!raw || st.bank !== "mizrahi") return raw;
+  const [y, m, d] = raw.split("-").map(Number);
+  const back = new Date(y, m - 2, d);
+  return `${back.getFullYear()}-${String(back.getMonth() + 1).padStart(2, "0")}-${String(back.getDate()).padStart(2, "0")}`;
+}
+
 function toRow(t: BankTranche, mixId: string, st: BankStatement): ImportedLoan {
   const end = iso(t.endDate);
   return {
@@ -166,6 +181,8 @@ function toRow(t: BankTranche, mixId: string, st: BankStatement): ImportedLoan {
     // יד שניה" is a fact the letter states that "רכישת דירה" rounds off.
     // The tranche's own identity, for the merge — see loanKey in lib/credit.
     source_start_date: t.startDate,
+    // When the rate first moves — the forecast engine resets the anchor there.
+    next_reset: resetDateOf(t, st),
     source_orig_amount: t.originalAmount ?? undefined,
     source_purpose: t.purpose || PURPOSE_LABEL[t.purposeKind],
     // The board's own eleven-word list, from the kind and the raw wording —

@@ -52,12 +52,14 @@ export const TOOLTIP: Record<string, unknown> = {
 
 export const nis = (n: number) => Math.round(n).toLocaleString("he-IL");
 /** Axis-tick money: 1.2M · 850K · 400 — short, because the axis is a ruler. */
-export const short = (n: number) =>
-  n >= 1_000_000
-    ? `${(n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1)}M`
-    : n >= 1000
-      ? `${Math.round(n / 1000)}K`
-      : String(Math.round(n));
+export const short = (n: number): string =>
+  n < 0
+    ? `-${short(-n)}`
+    : n >= 1_000_000
+      ? `${(n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1)}M`
+      : n >= 1000
+        ? `${Math.round(n / 1000)}K`
+        : String(Math.round(n));
 
 /** One row of a tooltip: swatch, name, figure — figures LTR, flush end. */
 export const tipRow = (color: string, name: string, value: string, bold = false) =>

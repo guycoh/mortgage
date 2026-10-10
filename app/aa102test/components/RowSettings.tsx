@@ -18,7 +18,7 @@ import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
 import { Sliders, X } from "@phosphor-icons/react";
 import { FAMILY, PATH_LABEL, type ImportedLoan } from "../lib/credit";
-import { calculateLoan } from "@/app/private/crm/leads/simulators/components/calculate/loanCalculators";
+import { priceLoan, type Assume } from "../lib/price";
 import { rowYield } from "../lib/yield";
 import { lenderOf } from "../lib/lenders";
 
@@ -50,7 +50,7 @@ export default function RowSettings({
    * surface that HAS these controls has to pass them — /aa102test does;
    * /hachamsim renders this sheet from its own Ledger copy and does not.
    */
-  annualInflation?: number;
+  annualInflation?: Assume;
   annualDiscount?: number;
   onPatch: (next: Partial<ImportedLoan>) => void;
   onClose: () => void;
@@ -131,7 +131,7 @@ export default function RowSettings({
    * inputs: the grid is where you change a row, this sheet is where you read
    * what changing it did.
    */
-  const res = calculateLoan(loan, annualInflation);
+  const res = priceLoan(loan, annualInflation);
   const ry = rowYield(Number(loan.amount) || 0, res, annualDiscount);
 
   /** Everything the document said about this row — the footer's hover text. */

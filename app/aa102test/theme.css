@@ -1840,6 +1840,13 @@ html:has(.lgr-root) {
 .lgr-chart-legend > span { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
 .lgr-chart-legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2.5px; }
 .lgr-charts .lgr-head .lgr-chart-legend { padding: 0; }
+/* The compared mix: a dash, not a chip — the line it names is dashed too, so
+   the legend says it in shape as well as colour. */
+.lgr-chart-legend i.lgr-chart-dash {
+  width: 14px; height: 0; border-radius: 0;
+  border-top: 2px dashed; background: none;
+}
+.lgr-chart-fig-2 { font-size: 13px; font-weight: 600; color: var(--lgr-2); }
 
 /* ------------------------------------------------------------------ chips */
 
@@ -3277,6 +3284,41 @@ html:has(.lgr-root) {
   padding: 10px 16px 14px;
 }
 .lgr-ask-btn-m { margin-inline-start: 4px; opacity: 0.72; }
+
+/* תחזית ריבית ואינפלציה — the receipt, then the admin paste-in folded away. */
+.lgr-fc { width: min(100%, 440px); }
+.lgr-fc-admin { margin: 12px 0 2px; font-size: 12px; color: var(--lgr-3, #5a5d66); }
+.lgr-fc-admin > summary { cursor: pointer; font-weight: 600; padding: 4px 0; }
+.lgr-fc-admin[open] > summary { margin-bottom: 6px; }
+.lgr-fc-raw, .lgr-fc-label {
+  width: 100%; border: 1px solid var(--line-2); border-radius: var(--r-sm);
+  background: var(--card); font-size: 12px; color: var(--ink); padding: 6px 8px;
+}
+.lgr-fc-raw { font-family: var(--num); resize: vertical; }
+.lgr-fc-raw:focus, .lgr-fc-label:focus { outline: none; border-color: var(--focus); box-shadow: 0 0 0 2px var(--focus-ring-strong); }
+.lgr-fc-row { display: flex; gap: 8px; align-items: center; margin: 8px 0; }
+.lgr-fc-row .lgr-fc-label { flex: 1; height: 30px; }
+.lgr-fc-err { margin: 6px 0 0; color: var(--neg); font-weight: 600; }
+
+/* The rail's assumption cell in forecast mode: a two-way switch and the source. */
+.lgr-econ { display: inline-flex; align-items: center; gap: 6px; height: 28px; }
+.lgr-econ-seg {
+  display: inline-flex; height: 28px; padding: 2px; gap: 2px;
+  border: 1px solid var(--line-2); border-radius: var(--r-sm); background: var(--card-2);
+}
+.lgr-econ-seg > button {
+  border: 0; border-radius: 6px; padding: 0 9px; font-size: 12px; font-weight: 600;
+  color: var(--lgr-3, #5a5d66); background: transparent; cursor: pointer;
+}
+.lgr-econ-seg > button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+.lgr-econ-seg > button:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.lgr-econ-src {
+  height: 28px; display: inline-flex; align-items: center; gap: 4px; padding: 0 8px;
+  border: 1px solid var(--line-2); border-radius: var(--r-sm); background: var(--card);
+  font-size: 12px; font-weight: 600; color: var(--ink); white-space: nowrap; cursor: pointer;
+}
+.lgr-econ-src:hover { border-color: var(--edge); }
+.lgr-econ-src[data-state="loading"] { color: var(--lgr-4); }
 .lgr-btn-primary .lgr-ask-btn-m { opacity: 0.85; }
 
 /* שת"פ / ע.נ.נ — two read-outs stacked in one cell.

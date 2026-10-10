@@ -35,7 +35,7 @@ import {
 } from "@phosphor-icons/react";
 import { schedules } from "@/app/data/amortization_schedules";
 import type { LoanPath } from "@/app/data/hooks/useLoanPaths";
-import { calculateLoan } from "@/app/private/crm/leads/simulators/components/calculate/loanCalculators";
+import { priceLoan, type Assume } from "../lib/price";
 import Select from "./Select";
 import DateField from "./DateField";
 import { BankIcon } from "./bankIcons";
@@ -156,7 +156,7 @@ export default function Ledger({
 }: {
   loans: ImportedLoan[];
   paths: LoanPath[];
-  annualInflation: number;
+  annualInflation: Assume;
   /** שיעור היוון — the board-wide rate ע.נ.נ discounts each row's payments at. */
   annualDiscount: number;
   /** Row values as of the last load / import / save — drives the change marks. */
@@ -512,7 +512,7 @@ export default function Ledger({
     const of = (rows: ImportedLoan[]) => ({
       rows,
       amount: rows.reduce((s, l) => s + Math.round(Number(l.amount) || 0), 0),
-      monthly: rows.reduce((s, l) => s + Math.round(calculateLoan(l, annualInflation).monthlyPayment), 0),
+      monthly: rows.reduce((s, l) => s + Math.round(priceLoan(l, annualInflation).monthlyPayment), 0),
       // The master's two extra sums. `amount` above is already principal +
       // indexation, so the balance is not re-added; these are the parts the
       // master's own columns foot — how much of it is linkage, and what leaving
@@ -1159,7 +1159,7 @@ export default function Ledger({
                         "--fam-ring": fam.ring,
                       } as React.CSSProperties;
 
-                      const res = calculateLoan(loan, annualInflation);
+                      const res = priceLoan(loan, annualInflation);
                       const dirty = dirtyOf(loan);
                       const amount = Number(loan.amount) || 0;
                       const months = Number(loan.months) || 0;

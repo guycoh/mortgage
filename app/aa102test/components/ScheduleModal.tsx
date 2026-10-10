@@ -8,11 +8,8 @@ import { useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { motion } from "motion/react";
 import { DownloadSimple, X } from "@phosphor-icons/react";
-import {
-  calculateLoan,
-  type ScheduleRow,
-} from "@/app/private/crm/leads/simulators/components/calculate/loanCalculators";
-import { calculateUnifiedSchedule } from "@/app/private/crm/leads/simulators/components/calculate/mixScheduleCalculators";
+import type { ScheduleRow } from "@/app/private/crm/leads/simulators/components/calculate/loanCalculators";
+import { priceLoan, unifiedSchedule, type Assume } from "../lib/price";
 import Money from "./Money";
 import { FAMILY, PATH_LABEL, TRACK_HEX, type ImportedLoan } from "../lib/credit";
 
@@ -26,7 +23,7 @@ export default function ScheduleModal({
   onClose,
 }: {
   subject: Subject;
-  annualInflation: number;
+  annualInflation: Assume;
   onClose: () => void;
 }) {
   useEffect(() => {
@@ -41,7 +38,7 @@ export default function ScheduleModal({
 
   const { rows, title, badges, summary } = useMemo(() => {
     if (subject.kind === "mix") {
-      const s = calculateUnifiedSchedule(subject.loans, annualInflation);
+      const s = unifiedSchedule(subject.loans, annualInflation);
       const rows: ScheduleRow[] = s.map((r) => ({
         month: r.month,
         payment: r.totalPayment,
@@ -66,7 +63,7 @@ export default function ScheduleModal({
         },
       };
     }
-    const res = calculateLoan(subject.loan, annualInflation);
+    const res = priceLoan(subject.loan, annualInflation);
     const fam = FAMILY[subject.loan.group === "loan" ? "loan" : "mortgage"];
     return {
       rows: res.schedule,
