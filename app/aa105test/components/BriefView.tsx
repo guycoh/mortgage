@@ -22,13 +22,13 @@ import { AnimatePresence, motion, useInView, useReducedMotion } from "motion/rea
 import { Phone, Plus, WhatsappLogo } from "@phosphor-icons/react";
 import { BankIcon } from "@/app/aa102test/components/bankIcons";
 import Logo from "@/app/aa102test/components/Logo";
-import type { BriefDoc, BriefFigure, BriefPain, BriefSlice, Lens, OweBlock } from "../lib/brief";
-import "@fontsource/ibm-plex-sans-hebrew/200.css";
-import "@fontsource/ibm-plex-sans-hebrew/300.css";
-import "@fontsource/ibm-plex-sans-hebrew/400.css";
-import "@fontsource/ibm-plex-sans-hebrew/500.css";
-import "@fontsource/ibm-plex-sans-hebrew/600.css";
-import "@fontsource/ibm-plex-sans-hebrew/700.css";
+import type { BookGroup, BriefDoc, BriefFigure, BriefPain, BriefSlice, Lens } from "../lib/brief";
+import "@fontsource-variable/inter";
+import "@fontsource/assistant/hebrew-300.css";
+import "@fontsource/assistant/hebrew-400.css";
+import "@fontsource/assistant/hebrew-500.css";
+import "@fontsource/assistant/hebrew-600.css";
+import "@fontsource/assistant/hebrew-700.css";
 import "../brief.css";
 
 const EASE = [0.16, 1, 0.3, 1] as const;
@@ -148,7 +148,6 @@ function Figures({ doc }: { doc: BriefDoc }) {
       key: "monthly",
       label: "החזר חודשי",
       fig: <Rolling kind="money" value={doc.monthly} shown />,
-      foot: doc.interestShare !== null ? <>כ-{pct(doc.interestShare)} הם ריבית</> : undefined,
     });
   if (doc.yearlyInterest !== null && doc.yearlyInterest > 0)
     cells.push({
@@ -175,15 +174,14 @@ function Figures({ doc }: { doc: BriefDoc }) {
   if (doc.ends)
     cells.push({
       key: "ends",
-      label: "עד סיום התשלומים",
+      label: "עד התשלום האחרון",
       fig: <Rolling kind="years" value={doc.ends.years} shown />,
-      foot: <>עד {doc.ends.label}</>,
     });
 
   return (
     <div className="brf-op-figs">
       <div className="brf-op-total">
-        <span className="brf-op-label">{credit ? "סך החובות" : "יתרת המשכנתא"}</span>
+        <span className="brf-op-label">{credit ? "משכנתאות והלוואות" : "יתרת המשכנתא"}</span>
         <span className="brf-op-total-fig" dir="ltr">
           <span className="brf-cur">₪</span>
           <NumberFlow
@@ -207,107 +205,64 @@ function Figures({ doc }: { doc: BriefDoc }) {
   );
 }
 
-/* ------------------------------------------------------- who is owed what */
+/* ------------------------------------------------- mortgages and loans */
 
-function Tags({ tags }: { tags: { text: string; heat?: "hot" | "warm" }[] }) {
-  if (!tags.length) return null;
-  return (
-    <span className="brf-ow-tags">
-      {tags.map((t, i) => (
-        <span key={i} data-heat={t.heat}>
-          {t.text}
-        </span>
-      ))}
-    </span>
-  );
-}
-
-function Owe({ b, max, i }: { b: OweBlock; max: number; i: number }) {
-  const ref = useRef<HTMLLIElement>(null);
+function Book({ doc }: { doc: BriefDoc }) {
+  const ref = useRef<HTMLElement>(null);
   const seen = useInView(ref, { once: true });
   const reduce = useReducedMotion();
+  // A link frozen before the book existed has none; it still opens.
+  const book: BookGroup[] = doc.book ?? [];
+  const max = Math.max(...book.flatMap((g) => g.rows.map((r) => r.balance)), 1);
+  // A letter that prints no instalment at all gets no column of "לא דווח".
+  const noMonthly = book.every((g) => g.rows.every((r) => r.monthly === null));
+  let n = 0;
   return (
-    <li ref={ref} className="brf-ow" data-alarm={b.alarm || undefined}>
-      <div className="brf-ow-head">
-        <span className="brf-ow-mark">{b.dot ? <i style={{ background: b.dot }} /> : <BankIcon source={b.source} size={26} />}</span>
-        <span className="brf-ow-name">{b.name}</span>
-        <Shekel value={b.balance} className="brf-ow-bal" />
-        <span className="brf-ow-mon">{b.monthly > 0 ? <><Shekel value={b.monthly} /> לחודש</> : null}</span>
+    <section ref={ref} className="brf-op-col brf-bk" data-nomonthly={noMonthly || undefined} aria-label="משכנתאות והלוואות">
+      <div className="brf-bk-head" aria-hidden>
+        <span />
+        <span>יתרה</span>
+        <span>לחודש</span>
+        <span>ריבית</span>
       </div>
-      {/* The bar: this lender's share of the largest debt, by family. */}
-      <div className="brf-ow-bar" aria-hidden>
-        <motion.div
-          className="brf-ow-fill"
-          style={{ width: `${Math.max(1.2, (b.balance / (max || 1)) * 100)}%` }}
-          initial={{ scaleX: 0 }}
-          animate={{ scaleX: seen ? 1 : 0 }}
-          transition={{ duration: reduce ? 0 : 0.8, ease: EASE, delay: reduce ? 0 : 0.15 + i * 0.07 }}
-        >
-          {b.parts.map((p) => (
-            <span key={p.key} style={{ flexGrow: p.balance, background: p.color }} />
-          ))}
-        </motion.div>
-      </div>
-      {b.tags.length > 0 && <Tags tags={b.tags} />}
-      {b.items.length > 0 && (
-        <ul className="brf-ow-items">
-          {b.items.map((it, k) => (
-            <li key={k}>
-              <span className="brf-ow-item-name">
-                {it.label}
-                <Tags tags={it.tags} />
-              </span>
-              <Shekel value={it.balance} />
-              <span className="brf-ow-item-mon">
-                {it.monthly !== null ? <Shekel value={it.monthly} /> : <span>{it.monthlyLabel}</span>}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </li>
-  );
-}
-
-function Owed({ doc }: { doc: BriefDoc }) {
-  const credit = doc.source === "credit";
-  // A link frozen before the list existed has none; it still opens.
-  const owed = doc.owed ?? [];
-  const max = Math.max(...owed.map((b) => b.balance), 1);
-  const p = doc.payoff;
-  return (
-    <section className="brf-op-col" aria-label={credit ? "למי אתם חייבים" : "המשכנתא לפי מסלולים"}>
-      <h2 className="brf-op-h">{credit ? "למי אתם חייבים" : "המשכנתא לפי מסלולים"}</h2>
-      <ol className="brf-ow-list">
-        {owed.map((b, i) => (
-          <Owe key={b.key} b={b} max={max} i={i} />
-        ))}
-      </ol>
-      <div className="brf-ow-total">
-        <span>{credit ? "סך הכול" : "יתרת המשכנתא"}</span>
-        <Shekel value={doc.balance} className="brf-ow-bal" />
-        <span className="brf-ow-mon">{doc.monthly !== null ? <><Shekel value={doc.monthly} /> לחודש</> : null}</span>
-      </div>
-      {doc.cards > 0 && (
-        <p className="brf-ow-aside">
-          חיוב חודשי בכרטיסים ובמסגרות אשראי, לא כלול בהחזר: <Shekel value={doc.cards} />
-        </p>
-      )}
-      {p && p.payoff > 0 && (
-        <p className="brf-ow-aside">
-          {doc.asOf ? `לסילוק ב-${doc.asOf}: ` : "לסילוק לפי המסמך: "}
-          <Shekel value={p.payoff} />
-          {p.fee > 0 && (
-            <>
-              , מזה עמלת פירעון מוקדם <Shekel value={p.fee} />
-            </>
-          )}
-        </p>
-      )}
-      {doc.notes.map((n) => (
-        <p key={n} className="brf-ow-aside">
-          {n}
-        </p>
+      {book.map((g) => (
+        <div key={g.key} className="brf-bk-group" style={{ ["--fam" as string]: g.color }}>
+          <div className="brf-bk-title">
+            <span>
+              <i />
+              {g.title}
+            </span>
+            <Shekel value={g.total.balance} />
+            <span>{g.total.monthly > 0 ? <Shekel value={g.total.monthly} /> : null}</span>
+            <span />
+          </div>
+          <ul>
+            {g.rows.map((r) => {
+              const k = n++;
+              return (
+                <li key={r.key} className="brf-bk-row" data-late={r.late || undefined}>
+                  <span className="brf-bk-who">
+                    {r.dot ? <i className="brf-bk-dot" style={{ background: r.dot }} /> : <BankIcon source={r.source} size={22} />}
+                    <span className="brf-bk-name">{r.name}</span>
+                    <span className="brf-bk-bar" aria-hidden>
+                      <motion.span
+                        style={{ width: `${Math.max(2, (r.balance / max) * 100)}%`, background: r.dot }}
+                        initial={{ scaleX: 0 }}
+                        animate={{ scaleX: seen ? 1 : 0 }}
+                        transition={{ duration: reduce ? 0 : 0.8, ease: EASE, delay: reduce ? 0 : 0.1 + k * 0.05 }}
+                      />
+                    </span>
+                  </span>
+                  <Shekel value={r.balance} className="brf-bk-bal" />
+                  <span className="brf-bk-mon">{r.monthly !== null ? <Shekel value={r.monthly} /> : r.monthlyLabel}</span>
+                  <span className="brf-bk-rate" data-hot={r.hot || undefined} dir={r.late ? undefined : "ltr"}>
+                    {r.late ? "בפיגור" : r.rate ?? ""}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       ))}
     </section>
   );
@@ -361,18 +316,22 @@ function Tile({ p, i }: { p: BriefPain; i: number }) {
   );
 }
 
+/** The tiles: what needs handling or checking — the notes stay with the advisor. */
+const MAX_TILES = 8;
+
 function Pains({ doc }: { doc: BriefDoc }) {
+  const pains = doc.pains.filter((p) => p.group !== "info").slice(0, MAX_TILES);
   return (
     <section className="brf-op-col" aria-label="מה דורש תשומת לב">
       <h2 className="brf-op-h">
         מה דורש תשומת לב
-        {doc.pains.length > 0 && <span className="brf-op-n">{doc.pains.length}</span>}
+        {pains.length > 0 && <span className="brf-op-n">{pains.length}</span>}
       </h2>
-      {doc.pains.length === 0 ? (
+      {pains.length === 0 ? (
         <p className="brf-calm">לא נמצאו בדוח נושאים שדורשים טיפול.</p>
       ) : (
         <ol className="brf-tiles">
-          {doc.pains.map((p, i) => (
+          {pains.map((p, i) => (
             <Tile key={p.id} p={p} i={i} />
           ))}
         </ol>
@@ -498,7 +457,7 @@ export default function BriefView({
         <Figures doc={doc} />
 
         <div className="brf-op-cols">
-          <Owed doc={doc} />
+          <Book doc={doc} />
           <Pains doc={doc} />
         </div>
 

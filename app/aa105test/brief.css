@@ -8,7 +8,7 @@
      pen     — red, on what is critical or overdue
      relief  — green, on what is good news
      violet  — the מורגי mark and the one action (send)
-   IBM Plex Sans Hebrew throughout: one family, weight does the work. */
+   Assistant for words, Inter for figures. */
 
 .brf-root,
 .brf-desk {
@@ -27,7 +27,8 @@
   --violet: #5b54d6;
   --violet-deep: #443dbd;
   --violet-tint: #efeefc;
-  --font: "IBM Plex Sans Hebrew", "Assistant", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font: "Assistant", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --num: "Inter Variable", "Inter", system-ui, sans-serif;
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
   --label-w: 156px;
 }
@@ -43,7 +44,7 @@
 .brf-root { min-height: 100dvh; background: var(--desk); color: var(--ink); font-family: var(--font); }
 
 /* ---------------------------------------------------------------- figures */
-.brf-num { display: inline-flex; align-items: baseline; gap: 0.06em; font-variant-numeric: tabular-nums lining-nums; white-space: nowrap; }
+.brf-num { font-family: var(--num); display: inline-flex; align-items: baseline; gap: 0.06em; font-variant-numeric: tabular-nums lining-nums; white-space: nowrap; }
 .brf-cur { font-size: 0.74em; }
 .brf-num-words { direction: rtl; gap: 0.26em; }
 .brf-unit { font-size: 0.5em; font-weight: 600; }
@@ -735,3 +736,43 @@ button.brf-fb-head:focus-visible { outline: 2px solid var(--violet); outline-off
   .brf-dash #recycle .brf-sec-body { grid-template-columns: 1fr; }
   .brf-dash #recycle .brf-map, .brf-dash #recycle .brf-sec-body > :not(.brf-map) { grid-column: 1; grid-row: auto; }
 }
+
+/* Figures set in Inter wherever they are not wrapped in .brf-num. */
+.brf-op-total-fig, .brf-kpi-val, .brf-share-fig, .brf-rd-date b, .brf-map-tick { font-family: var(--num); }
+
+/* ----------------------------------------------- the book: mortgages and loans */
+.brf-bk { --bk-cols: minmax(0, 1fr) 112px 92px 104px; }
+.brf-bk-head, .brf-bk-title, .brf-bk-row { display: grid; grid-template-columns: var(--bk-cols); column-gap: 14px; align-items: center; }
+.brf-bk-head { padding-bottom: 6px; border-bottom: 1px solid var(--rule-2); font-size: 12.5px; font-weight: 700; }
+.brf-bk-head > :not(:first-child), .brf-bk-title > :not(:first-child), .brf-bk-row > :not(:first-child) { justify-self: end; text-align: end; }
+.brf-bk-group + .brf-bk-group { margin-top: 6px; }
+.brf-bk-title { padding: 12px 0 6px; font-size: 14px; font-weight: 700; }
+.brf-bk-title > span:first-child { display: inline-flex; align-items: center; gap: 8px; }
+.brf-bk-title i { width: 9px; height: 9px; border-radius: 2px; background: var(--fam); }
+.brf-bk-title .brf-num { font-size: 15px; font-weight: 600; }
+.brf-bk-row { padding: 8px 0; border-top: 1px solid var(--rule); font-size: 14px; }
+.brf-bk-who { display: grid; grid-template-columns: 22px minmax(70px, auto) minmax(40px, 1fr); align-items: center; gap: 10px; min-width: 0; }
+.brf-bk-dot { width: 10px; height: 10px; border-radius: 3px; justify-self: center; }
+.brf-bk-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; font-weight: 700; }
+.brf-bk-row[data-late] .brf-bk-name { color: var(--pen); }
+.brf-bk-bar { height: 5px; border-radius: 99px; background: #f0f1f4; overflow: hidden; }
+.brf-bk-bar > span { display: block; height: 100%; border-radius: inherit; background: var(--fam); transform-origin: right center; }
+.brf-bk-bal { font-size: 15px; font-weight: 600; }
+.brf-bk-mon { font-size: 14px; font-weight: 500; }
+.brf-bk-rate { font-family: var(--num); font-size: 13.5px; font-weight: 500; white-space: nowrap; }
+.brf-bk-rate[data-hot] { color: var(--pen); font-weight: 700; }
+.brf-bk-row[data-late] .brf-bk-rate { color: var(--pen); font-family: var(--font); font-weight: 700; }
+@media (max-width: 640px) {
+  .brf-bk { --bk-cols: minmax(0, 1fr) auto; }
+  .brf-bk-head { display: none; }
+  .brf-bk-title > :nth-child(n + 3) { display: none; }
+  .brf-bk-row { row-gap: 4px; }
+  .brf-bk-who { grid-column: 1; }
+  .brf-bk-bal { grid-column: 2; grid-row: 1; }
+  .brf-bk-mon { grid-column: 1; grid-row: 2; justify-self: start !important; text-align: start !important; }
+  .brf-bk-mon::after { content: " לחודש"; }
+  .brf-bk-rate { grid-column: 2; grid-row: 2; }
+}
+
+.brf-bk[data-nomonthly] { --bk-cols: minmax(0, 1fr) 120px 96px; }
+.brf-bk[data-nomonthly] .brf-bk-head > :nth-child(3), .brf-bk[data-nomonthly] .brf-bk-title > :nth-child(3), .brf-bk[data-nomonthly] .brf-bk-mon { display: none; }
