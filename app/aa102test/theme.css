@@ -955,34 +955,91 @@ html:has(.lgr-root) {
 
 /* ריבית אוטומטית — the switch rides the field's top corner, over the border,
    so it costs the saturated grid no width (the dirty tick owns the other corner).
-   On: a filled violet disc — the value is derived, and the field drops its well
-   to read as a calculated figure (the board's rule: sunken = you type here).
-   Off: a quiet outline that brightens on hover, so the option is findable
-   without shouting on every row. */
+   GREEN when the rate is עוגן + תוספת and follows them; RED when it was typed —
+   an outline while the typed figure still agrees with the sum, a solid disc
+   when it does not. The field drops its well on an automatic row so it reads
+   as a calculated figure (the board's rule: sunken = you type here). */
 .lgr-rate-auto {
+  --ra: #1f9d6b;
   position: absolute;
-  top: -6px;
-  inset-inline-start: -6px;
-  z-index: 2;
-  width: 16px;
-  height: 16px;
+  top: -7px;
+  inset-inline-start: -7px;
+  z-index: 3;
+  width: 18px;
+  height: 18px;
   display: grid;
   place-items: center;
+  padding: 0;
   border-radius: 999px;
-  border: 1px solid var(--line-2);
-  background: #fff;
-  color: var(--lgr-4);
-  cursor: pointer;
-  transition: background-color 140ms var(--ease), color 140ms var(--ease), border-color 140ms var(--ease), transform 140ms var(--ease);
-}
-.lgr-rate-auto:hover { border-color: var(--primary); color: var(--primary); transform: scale(1.08); }
-.lgr-rate-auto[aria-pressed="true"] {
-  background: var(--primary);
-  border-color: var(--primary);
+  border: 1.5px solid #fff;
+  background: var(--ra);
   color: #fff;
-  box-shadow: 0 1px 2px rgba(91, 84, 214, 0.35);
+  cursor: pointer;
+  box-shadow: 0 0 0 1px rgba(20, 122, 69, 0.18), 0 1px 3px rgba(20, 122, 69, 0.35);
+  transition: background-color 160ms var(--ease), color 160ms var(--ease), box-shadow 160ms var(--ease), transform 160ms var(--ease);
 }
-.lgr-rate-auto:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.lgr-rate-auto:hover { transform: scale(1.12); }
+.lgr-rate-auto:active { transform: scale(0.94); }
+.lgr-rate-auto[data-state-auto="off"] {
+  --ra: #d64545;
+  background: #fff5f5;
+  color: var(--ra);
+  box-shadow: 0 0 0 1px rgba(214, 69, 69, 0.55);
+}
+.lgr-rate-auto[data-state-auto="mismatch"] {
+  --ra: #d64545;
+  box-shadow: 0 0 0 1px rgba(180, 35, 24, 0.25), 0 1px 3px rgba(214, 69, 69, 0.45);
+}
+.lgr-rate-auto:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+/* The answer to a click: the disc pops on a spring and the glyph turns in.
+   Two keyframe names, one per side, so every change of state restarts it. */
+.lgr-rate-auto[data-pressed][aria-pressed="true"] { animation: lgr-ra-pop-on 340ms cubic-bezier(0.34, 1.56, 0.64, 1); }
+.lgr-rate-auto[data-pressed][aria-pressed="false"] { animation: lgr-ra-pop-off 340ms cubic-bezier(0.34, 1.56, 0.64, 1); }
+.lgr-rate-auto[data-pressed] svg { animation: lgr-ra-glyph 300ms cubic-bezier(0.22, 1, 0.36, 1); }
+@keyframes lgr-ra-pop-on { 0% { transform: scale(0.72); } 60% { transform: scale(1.18); } 100% { transform: scale(1); } }
+@keyframes lgr-ra-pop-off { 0% { transform: scale(0.72); } 60% { transform: scale(1.18); } 100% { transform: scale(1); } }
+@keyframes lgr-ra-glyph { from { transform: rotate(-90deg) scale(0.6); opacity: 0; } to { transform: none; opacity: 1; } }
+/* Manual → the well comes back as an input; the switch between the two looks is
+   eased, so the field visibly "opens" for typing rather than snapping. */
+.lgr-well .lgr-cell { transition-property: border-color, background-color, color, box-shadow; transition-duration: 180ms; }
+@media (prefers-reduced-motion: reduce) {
+  .lgr-rate-auto, .lgr-rate-auto svg, .lgr-rtip, .lgr-flash-halo::after { animation: none !important; transition: none; }
+}
+
+/* The tooltip — the board's card, not a grey OS slab. */
+.lgr-rtip {
+  z-index: 140;
+  min-width: 196px;
+  padding: 9px 11px 8px;
+  border-radius: 10px;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 0.5px 1px rgba(0,0,0,.09), 0 2px 6px -2px rgba(0,0,0,.06), 0 20px 48px -16px rgba(0,0,0,.28);
+  font-family: var(--ui);
+  font-size: 12px;
+  color: var(--ink);
+  transform-origin: var(--radix-tooltip-content-transform-origin);
+  animation: lgr-rtip-in 150ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes lgr-rtip-in { from { opacity: 0; transform: translateY(3px) scale(0.97); } to { opacity: 1; transform: none; } }
+.lgr-rtip-arrow { fill: #fff; filter: drop-shadow(0 1px 0 rgba(0,0,0,0.1)); }
+.lgr-rtip-head { display: flex; align-items: center; gap: 7px; font-weight: 700; font-size: 12.5px; }
+.lgr-rtip-head > i { width: 8px; height: 8px; border-radius: 999px; background: #1f9d6b; box-shadow: 0 0 0 3px rgba(31,157,107,.15); }
+.lgr-rtip-head > i:not([data-state-auto="on"]) { background: #d64545; box-shadow: 0 0 0 3px rgba(214,69,69,.15); }
+.lgr-rtip-sum {
+  direction: ltr; /* a sum reads as arithmetic: 4.75 − 0.50 = 4.25 */
+  display: flex; align-items: flex-end; justify-content: center; gap: 7px;
+  margin-top: 7px; padding: 6px 8px; border-radius: 8px; background: var(--card-2);
+  font-family: var(--num); font-variant-numeric: tabular-nums; font-weight: 600; font-size: 13px;
+}
+.lgr-rtip-sum > span { display: flex; flex-direction: column; align-items: center; line-height: 1.15; }
+.lgr-rtip-sum em { font-style: normal; font-family: var(--ui); font-size: 10px; font-weight: 500; color: var(--lgr-4); }
+.lgr-rtip-sum > b { color: var(--lgr-4); font-weight: 500; padding-bottom: 1px; }
+.lgr-rtip-sum > span[data-strong] { color: var(--ink); font-weight: 800; }
+.lgr-rtip-warn { margin-top: 6px; color: #b42318; font-weight: 600; }
+.lgr-rtip-note { margin-top: 6px; color: var(--lgr-3); }
+.lgr-rtip-act { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--line); color: var(--lgr-3); font-size: 11.5px; }
+
 .lgr-well[data-auto] .lgr-cell {
   background: var(--card-2);
   border-style: dashed;
@@ -1000,7 +1057,6 @@ html:has(.lgr-root) {
   color: #b42318;
 }
 .lgr-well[data-mismatch] .lgr-cell:focus { border-color: #d64545; box-shadow: 0 0 0 2px rgba(214, 69, 69, 0.25); }
-.lgr-well[data-mismatch] .lgr-rate-auto { border-color: rgba(214, 69, 69, 0.55); color: #d64545; }
 
 /* WARNING / ERROR fields */
 .lgr-cell[data-state="warn"] { border-color: var(--warn-line); background: var(--warn-tint); color: var(--warn); }
@@ -2377,33 +2433,39 @@ html:has(.lgr-root) {
    transforms with a SPRING by default — which it does, and which silently ate
    `duration` and `times` here until the keyframes collapsed to their final
    frame and the mark was gone before it was drawn. */
+/* THE REFRESH MARK (rehauled 2026-10-10). A crisp emerald ring tightens onto
+   the עוגן/תוספת pair, a single band of light sweeps across it the way the
+   writing reads, and both release — no blur, no green blob, nothing left behind.
+   Ring = box-shadow, sweep = a translating gradient: compositor-only, so a
+   column of rows costs nothing. Staggered per row by --flash-delay. */
 .lgr-flash-halo {
   position: absolute;
-  inset: -7px;
-  z-index: 0;
-  border-radius: 15px;
+  inset: -3px;
+  z-index: 2;
+  border-radius: 13px;
   pointer-events: none;
-  /* Two stops doing different jobs: a luminous core that sits just off the
-     field's edge so the digits read against something bright, and a long tail
-     that reaches nothing so the bloom has no boundary at any point in the run.
-     A single stop gave a flat green pill; this gives light. */
-  background:
-    radial-gradient(closest-side, rgba(20, 122, 69, 0.4), rgba(20, 122, 69, 0) 72%),
-    radial-gradient(closest-side, rgba(52, 168, 105, 0.28), rgba(52, 168, 105, 0) 100%);
-  filter: blur(4px);
+  overflow: hidden;
   opacity: 0;
-  animation: lgr-flash-halo var(--flash-dur, 1900ms) cubic-bezier(0.22, 1, 0.36, 1)
-    var(--flash-delay, 0ms) both;
+  animation: lgr-flash-ring var(--flash-dur, 1900ms) cubic-bezier(0.22, 1, 0.36, 1) var(--flash-delay, 0ms) both;
 }
-@keyframes lgr-flash-halo {
-  /* Gathers just inside the field... */
-  0% { opacity: 0; transform: scale(0.94); }
-  /* ...blooms to full... */
-  18% { opacity: 1; transform: scale(1); }
-  /* ...holds long enough to be read... */
-  50% { opacity: 0.9; transform: scale(1.02); }
-  /* ...then spreads out and is gone, leaving no shape behind. */
-  100% { opacity: 0; transform: scale(1.12); }
+.lgr-flash-halo::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 60%;
+  background: linear-gradient(100deg, rgba(31,157,107,0) 0%, rgba(31,157,107,0.16) 45%, rgba(255,255,255,0.55) 50%, rgba(31,157,107,0.16) 55%, rgba(31,157,107,0) 100%);
+  transform: translateX(-120%);
+  animation: lgr-flash-sweep 760ms cubic-bezier(0.4, 0, 0.2, 1) calc(var(--flash-delay, 0ms) + 120ms) both;
+}
+@keyframes lgr-flash-ring {
+  0%   { opacity: 0; box-shadow: 0 0 0 7px rgba(31,157,107,0), inset 0 0 0 1.5px rgba(31,157,107,0); }
+  14%  { opacity: 1; box-shadow: 0 0 0 4px rgba(31,157,107,0.16), inset 0 0 0 1.5px rgba(31,157,107,0.9); }
+  60%  { opacity: 1; box-shadow: 0 0 0 3px rgba(31,157,107,0.1), inset 0 0 0 1.5px rgba(31,157,107,0.75); }
+  100% { opacity: 0; box-shadow: 0 0 0 0 rgba(31,157,107,0), inset 0 0 0 1.5px rgba(31,157,107,0); }
+}
+@keyframes lgr-flash-sweep {
+  from { transform: translateX(190%); }
+  to   { transform: translateX(-130%); }
 }
 
 .lgr-pair { position: relative; z-index: 1; }
@@ -2417,15 +2479,16 @@ html:has(.lgr-root) {
    whole cell green and the digits had to compete with it; here the fill only
    separates the changed field from its neighbours, and the ring does the work. */
 .lgr-well[data-flash] .lgr-cell {
-  border-color: var(--pos-line);
-  transition: border-color 0.22s ease-out;
+  border-color: rgba(31, 157, 107, 0.45);
+  background: #f3fbf7;
+  transition: border-color 0.2s ease-out, background-color 0.2s ease-out;
 }
 .lgr-well[data-flash] .lgr-num-in {
-  color: #0d5233;
+  color: #0f6b44;
   font-weight: 700;
   transition: color 0.2s ease-out;
 }
-.lgr-well:not([data-flash]) .lgr-cell { transition: border-color 0.9s ease-in; }
+.lgr-well:not([data-flash]) .lgr-cell { transition: border-color 0.9s ease-in, background-color 0.9s ease-in; }
 .lgr-well:not([data-flash]) .lgr-num-in { transition: color 1s ease-in; }
 
 @media (prefers-reduced-motion: reduce) {

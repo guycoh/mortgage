@@ -32,7 +32,6 @@ import {
   Table as TableIcon,
   Trash,
   Warning,
-  Calculator,
 } from "@phosphor-icons/react";
 import { schedules } from "@/app/data/amortization_schedules";
 import type { LoanPath } from "@/app/data/hooks/useLoanPaths";
@@ -42,6 +41,7 @@ import DateField from "./DateField";
 import { BankIcon } from "./bankIcons";
 import Money from "./Money";
 import RowSettings from "./RowSettings";
+import RateAutoToggle from "./RateAutoToggle";
 import Btn from "./Btn";
 import { settle, snap } from "../lib/transitions";
 import Toaster, { type Toast, type ToastTone } from "./Toast";
@@ -189,6 +189,13 @@ export default function Ledger({
    * four unrelated flashes.
    */
   const [flash, setFlash] = useState<{ ids: string[]; at: number } | null>(null);
+  /** The ריבית field that just became automatic — replays the refresh mark on it. */
+  const [ratePulse, setRatePulse] = useState<{ id: string; at: number } | null>(null);
+  useEffect(() => {
+    if (!ratePulse) return;
+    const t = setTimeout(() => setRatePulse(null), FLASH_TOTAL_MS + 100);
+    return () => clearTimeout(t);
+  }, [ratePulse]);
   /* While a percent cell has focus the field shows what was TYPED, not what the
      amount rounds back to — otherwise "2" becomes "2.0" under the caret and the
      next keystroke lands in the wrong place. */
@@ -415,10 +422,11 @@ export default function Ledger({
      by hand is the step that goes stale. A fixed track has no anchor to add to,
      so it has no switch either. */
   const canAuto = (l: ImportedLoan) => !isBase && [1, 4, 5].includes(Number(l.path_id));
+  /** עוגן + תוספת. The anchor is required; an empty margin is a margin of 0. */
   const sumOf = (a: unknown, m: unknown): number | null => {
+    if (a === null || a === undefined || a === "") return null;
     const x = Number(a);
-    const y = Number(m);
-    if (a === null || a === undefined || a === "" || m === null || m === undefined || m === "") return null;
+    const y = m === null || m === undefined || m === "" ? 0 : Number(m);
     if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
     return Math.max(0, Math.round((x + y) * 100) / 100);
   };
@@ -443,6 +451,18 @@ export default function Ledger({
     const on = !rateAuto(l);
     const sum = sumOf(l.anchor, l.anchor_margin);
     patch(l.id, { rate_auto: on, ...(on && sum !== null ? { rate: sum } : {}) } as Partial<ImportedLoan>);
+    if (on) {
+      // The value just became the sum — mark it the way a refreshed anchor is marked.
+      setRatePulse({ id: l.id, at: Date.now() });
+    } else {
+      // Manual means "I will type it" — so the field is ready for the keystroke.
+      setRatePulse(null);
+      requestAnimationFrame(() => {
+        const el = document.querySelector<HTMLInputElement>(`input[data-rate-for="${l.id}"]`);
+        el?.focus();
+        el?.select();
+      });
+    }
   };
 
   const numField = (
@@ -756,20 +776,18 @@ export default function Ledger({
         updated++;
         // Collected in row order, because the stagger reads down the board.
         changed.push(l.id);
-        const margin = Number(l.anchor_margin);
-        const hasMargin = l.anchor_margin !== null && l.anchor_margin !== undefined && Number.isFinite(margin);
         return {
           ...l,
           // Written once. Pressing the button twice must not overwrite the
           // client's own anchor with the previous refresh's value.
           anchor_original: l.anchor_original !== undefined ? l.anchor_original : (had ? before : null),
           anchor: r.anchor,
-          // ריבית = עוגן + תוספת is this board's existing arithmetic, not a new
-          // rule — anchorRate() in lib/credit derives the anchor by subtracting
-          // the margin from the rate. Where the document gave no margin there is
-          // nothing to add to, and the rate is left alone rather than replaced by
-          // a bare anchor.
-          rate: hasMargin ? Math.round((r.anchor + margin) * 100) / 100 : l.rate,
+          // ריבית follows the new anchor ONLY on a row whose rate is automatic
+          // (עוגן + תוספת). A rate the advisor typed is theirs: the refresh
+          // moves the anchor beside it and leaves the rate alone — the field
+          // turns red if the two now disagree, which is the point.
+          ...(canAuto(l) ? { rate_auto: rateAuto(l) } : {}),
+          rate: rateAuto(l) ? sumOf(r.anchor, l.anchor_margin) ?? l.rate : l.rate,
           anchor_asof: r.effectiveAt,
           anchor_source: r.familyLabel,
           anchor_family: r.family,
@@ -851,13 +869,11 @@ export default function Ledger({
     onChange(
       loans.map((l) => {
         if (l.anchor_original === undefined) return l;
-        const margin = Number(l.anchor_margin);
-        const hasMargin = l.anchor_margin !== null && l.anchor_margin !== undefined && Number.isFinite(margin);
         const back = l.anchor_original;
         return {
           ...l,
           anchor: back,
-          rate: hasMargin && back !== null ? Math.round((back + margin) * 100) / 100 : l.rate,
+          rate: rateAuto(l) && back !== null ? sumOf(back, l.anchor_margin) ?? l.rate : l.rate,
           anchor_original: undefined,
           anchor_asof: undefined,
           anchor_source: undefined,
@@ -1650,17 +1666,33 @@ export default function Ledger({
                               data-auto={rateAuto(loan) || undefined}
                               data-mismatch={rateMismatch(loan) !== null || undefined}
                             >
+                              {/* The same mark the anchor refresh leaves: on the
+                                  pair it says "the anchor moved", here "so the rate
+                                  did" — and on a toggle to automatic, "this is the
+                                  sum now". */}
+                              {((ratePulse?.id === loan.id && rateAuto(loan)) ||
+                                (flashOrder(loan.id) >= 0 && flash && rateAuto(loan))) && (
+                                <span
+                                  key={ratePulse?.id === loan.id ? `p:${ratePulse.at}` : `f:${flash?.at}`}
+                                  className="lgr-flash-halo"
+                                  aria-hidden
+                                  style={
+                                    {
+                                      "--flash-delay":
+                                        ratePulse?.id === loan.id ? "0ms" : `${flashOrder(loan.id) * FLASH_STAGGER_MS + 140}ms`,
+                                      "--flash-dur": `${FLASH_TOTAL_MS}ms`,
+                                    } as React.CSSProperties
+                                  }
+                                />
+                              )}
                               {canAuto(loan) && (
-                                <button
-                                  type="button"
-                                  className="lgr-rate-auto"
-                                  aria-pressed={rateAuto(loan)}
-                                  aria-label={rateAuto(loan) ? "ריבית מחושבת אוטומטית — לחצו להזנה ידנית" : "הזנה ידנית — לחצו לחישוב אוטומטי"}
-                                  title={rateAuto(loan) ? "ריבית = עוגן + תוספת · לחצו להזנה ידנית" : "הזנה ידנית · לחצו לחישוב ריבית = עוגן + תוספת"}
-                                  onClick={() => toggleAuto(loan)}
-                                >
-                                  <Calculator size={10} weight={rateAuto(loan) ? "bold" : "regular"} />
-                                </button>
+                                <RateAutoToggle
+                                  on={rateAuto(loan)}
+                                  anchor={loan.anchor === null || loan.anchor === undefined || !Number.isFinite(Number(loan.anchor)) ? null : Number(loan.anchor)}
+                                  margin={loan.anchor_margin === null || loan.anchor_margin === undefined ? null : Number(loan.anchor_margin)}
+                                  rate={Number(loan.rate) || 0}
+                                  onToggle={() => toggleAuto(loan)}
+                                />
                               )}
                               <input
                                 className="lgr-cell lgr-num-in"
@@ -1668,12 +1700,13 @@ export default function Ledger({
                                 step="0.01"
                                 min={0}
                                 readOnly={rateAuto(loan)}
+                                data-rate-for={loan.id}
                                 tabIndex={rateAuto(loan) ? -1 : undefined}
                                 aria-label="ריבית באחוזים"
                                 data-heat={heat ?? undefined}
                                 title={
                                   rateMismatch(loan) !== null
-                                    ? `הריבית שהוזנה (${Number(loan.rate).toFixed(2)}%) שונה מעוגן + תוספת (${rateMismatch(loan)!.toFixed(2)}%) · לחצו על המחשבון לחישוב אוטומטי`
+                                    ? `הריבית שהוזנה (${Number(loan.rate).toFixed(2)}%) שונה מעוגן + תוספת (${rateMismatch(loan)!.toFixed(2)}%)`
                                     : heat === "hot"
                                     ? `ריבית גבוהה ל${fam.label}`
                                     : heat === "warm"
