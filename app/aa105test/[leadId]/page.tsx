@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import Simulator from "@/app/aa102test/Simulator";
 import { parseTool } from "@/app/aa102test/lib/tools";
+import "../board.css";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,

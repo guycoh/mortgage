@@ -155,6 +155,7 @@ export default function Ledger({
   onTarget,
   onChange,
   onSchedule,
+  tools,
 }: {
   loans: ImportedLoan[];
   paths: LoanPath[];
@@ -174,6 +175,11 @@ export default function Ledger({
   onTarget?: (value: number | null) => void;
   onChange: (loans: ImportedLoan[]) => void;
   onSchedule: (loan: ImportedLoan) => void;
+  /**
+   * Actions on the whole mix, set in the sheet's own header after the add
+   * buttons (/aa105test). Absent on /aa102test, where they sit on the strip.
+   */
+  tools?: React.ReactNode;
 }) {
   const [armed, setArmed] = useState<string | null>(null);
   const [sheet, setSheet] = useState<{ id: string; rect: DOMRect } | null>(null);
@@ -1000,6 +1006,7 @@ export default function Ledger({
         )}
 
         <div className="ms-auto">{addBtns()}</div>
+        {tools}
       </header>
 
       {loans.length === 0 ? (

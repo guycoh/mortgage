@@ -1,0 +1,319 @@
+/* ============================================================================
+   /aa105test — the board, made one object.
+
+   Loaded only by the /aa105test routes and scoped to the root's
+   data-v="v105", so /aa102test renders exactly as before.
+
+   Three ideas, and everything below serves one of them:
+
+   1. ONE SHEET PER MIX. The mix tabs are folder tabs on a tinted rail. The
+      active one is the same white as the ledger and opens straight into it,
+      so "which mix" and "its rows" read as one object, not a strip above a
+      table.
+   2. ACTIONS LIVE ON WHAT THEY ACT ON. The tab rail holds tabs and nothing
+      else; what you do to a mix sits in that mix's sheet header; what you
+      read out of the document sits on the document's band.
+   3. ONE BUTTON GRAMMAR. One solid fill (save, choose file). Every other
+      button is the same flat outlined control with a monochrome icon. The
+      family-add buttons keep their family ink because that is identity, not
+      decoration. Sibling choices are one joined group; every two-way switch
+      is the same segmented control.
+   ========================================================================== */
+
+.lgr-root[data-v="v105"] {
+  --v5-col: 1480px;
+  --v5-rail: #f3f3f7;
+  --v5-shadow-btn: 0 1px 0 rgba(20, 22, 32, 0.04);
+}
+
+/* The owner's screen is 1917px wide and the ledger is fourteen saturated
+   columns — the extra 180px goes to the rows, not to canvas. */
+.lgr-root[data-v="v105"] .lgr-nav { max-width: var(--v5-col); }
+.lgr-root[data-v="v105"] > .max-w-\[1300px\] { max-width: var(--v5-col); }
+
+/* ------------------------------------------------------------- buttons */
+/* TACTILE, AND EACH ONE IN ITS OWN INK. One recipe, one variable: --a is the
+   button's accent. The face is white falling into a 7% wash of it, the edge is
+   a third of it with a deeper bottom lip, the top carries a white highlight and
+   the shadow is tinted by the same hue — so a button looks pressed out of its
+   own colour rather than outlined in grey. Neutral buttons use slate. */
+.lgr-root[data-v="v105"] .lgr-btn {
+  --a: #5c6474;
+  --a-ink: color-mix(in oklab, var(--a) 74%, #000);
+  background: linear-gradient(180deg, #fff 0%, color-mix(in oklab, var(--a) 7%, #fff) 100%);
+  border: 1px solid color-mix(in oklab, var(--a) 30%, #d6d8df);
+  border-bottom-color: color-mix(in oklab, var(--a) 48%, #b3b7c1);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    0 1px 1px color-mix(in oklab, var(--a) 14%, transparent),
+    0 3px 6px -3px color-mix(in oklab, var(--a) 30%, transparent);
+  color: var(--a-ink);
+  font-weight: 600;
+}
+.lgr-root[data-v="v105"] .lgr-btn:hover:not(:disabled) {
+  background: linear-gradient(180deg, color-mix(in oklab, var(--a) 3%, #fff) 0%, color-mix(in oklab, var(--a) 13%, #fff) 100%);
+  border-color: color-mix(in oklab, var(--a) 46%, #c7cad2);
+  border-bottom-color: color-mix(in oklab, var(--a) 62%, #9da2ad);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 1px 1px color-mix(in oklab, var(--a) 16%, transparent),
+    0 6px 12px -6px color-mix(in oklab, var(--a) 45%, transparent);
+  color: var(--a-ink);
+  translate: 0 -1px;
+}
+.lgr-root[data-v="v105"] .lgr-btn:active:not(:disabled) {
+  translate: 0;
+  background: color-mix(in oklab, var(--a) 12%, #fff);
+  box-shadow: inset 0 1px 2px color-mix(in oklab, var(--a) 30%, transparent);
+}
+.lgr-root[data-v="v105"] .lgr-btn:focus-visible {
+  outline: none;
+  border-color: var(--a);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--a) 28%, transparent);
+}
+.lgr-root[data-v="v105"] .lgr-btn-sm { height: 32px; padding: 0 12px; gap: 7px; }
+/* The icon carries the accent at full strength (several arrive with inline
+   colours from /aa102test, hence the !important). */
+.lgr-root[data-v="v105"] .lgr-btn > svg { color: var(--a) !important; flex: none; }
+
+.lgr-root[data-v="v105"] .lgr-btn[data-tone="violet"] { --a: #5b54d6; }
+.lgr-root[data-v="v105"] .lgr-btn[data-tone="teal"] { --a: #0d8b9b; }
+.lgr-root[data-v="v105"] .lgr-btn[data-tone="red"] { --a: #c4372b; }
+.lgr-root[data-v="v105"] .lgr-btn[data-tone="blue"] { --a: #2563eb; }
+.lgr-root[data-v="v105"] .lgr-btn-excel { --a: #1d7a46; }
+.lgr-root[data-v="v105"] .lgr-btn-fam { --a: var(--fam); --a-ink: var(--fam-text, var(--fam)); }
+
+/* THE ONE SOLID BUTTON — same build, filled. */
+.lgr-root[data-v="v105"] .lgr-btn-primary,
+.lgr-root[data-v="v105"] .lgr-btn-primary:disabled {
+  background: linear-gradient(180deg, #6b64e4 0%, #544cd0 100%);
+  border-color: #4a42bf;
+  border-bottom-color: #3a33a0;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 1px 2px rgba(68, 60, 176, 0.35),
+    0 4px 10px -4px rgba(68, 60, 176, 0.55);
+  color: #fff;
+}
+.lgr-root[data-v="v105"] .lgr-btn-primary:hover:not(:disabled) {
+  background: linear-gradient(180deg, #625ade 0%, #4a42c4 100%);
+  border-color: #443cb0;
+  border-bottom-color: #342d92;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 1px 2px rgba(68, 60, 176, 0.35),
+    0 8px 16px -6px rgba(68, 60, 176, 0.6);
+  color: #fff;
+}
+.lgr-root[data-v="v105"] .lgr-btn-primary:active:not(:disabled) {
+  background: #4a42c4;
+  box-shadow: inset 0 1px 3px rgba(20, 16, 80, 0.4);
+}
+.lgr-root[data-v="v105"] .lgr-btn-primary > svg { color: currentColor !important; }
+
+.lgr-root[data-v="v105"] .lgr-btn-ghost,
+.lgr-root[data-v="v105"] .lgr-btn-ghost:hover:not(:disabled) {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  translate: 0;
+}
+.lgr-root[data-v="v105"] .lgr-btn-ghost:hover:not(:disabled) { background: var(--card-3); }
+
+/* Square icon buttons beside a 32px row of controls: same build, 32px. */
+.lgr-root[data-v="v105"] .lgr-receipt-acts .lgr-act {
+  width: 32px;
+  height: 32px;
+  border: 1px solid #d6d8df;
+  border-bottom-color: #b3b7c1;
+  background: linear-gradient(180deg, #fff, #f3f4f6);
+  box-shadow: inset 0 1px 0 #fff, 0 2px 5px -3px rgba(40, 44, 60, 0.3);
+}
+.lgr-root[data-v="v105"] .lgr-receipt-acts .lgr-act:hover { border-color: #b3b7c1; color: var(--ink); }
+
+/* The three readings of one document, held together by spacing. */
+.v5-join { display: inline-flex; align-items: center; gap: 6px; }
+
+/* ONE SEGMENTED SWITCH — the forecast on/off reads like the document picker:
+   a quiet track, the chosen side lifted onto white in the identity ink. */
+.lgr-root[data-v="v105"] .lgr-econ-seg {
+  border: 0;
+  background: var(--card-3);
+  border-radius: 9px;
+  padding: 2px;
+}
+.lgr-root[data-v="v105"] .lgr-econ-seg > button { border-radius: 7px; color: var(--lgr-3); }
+.lgr-root[data-v="v105"] .lgr-econ-seg > button:hover { color: var(--ink); }
+.lgr-root[data-v="v105"] .lgr-econ-seg > button[aria-pressed="true"] {
+  background: #fff;
+  color: var(--primary-deep);
+  box-shadow: 0 1px 2px rgba(20, 22, 32, 0.1), 0 0 0 0.5px rgba(20, 22, 32, 0.06);
+}
+.lgr-root[data-v="v105"] .lgr-econ-src { box-shadow: var(--v5-shadow-btn); }
+
+/* -------------------------------------------------------------- read-out */
+/* Figures size to themselves, so the hero never runs past the card edge; the
+   composition takes what is left. */
+.lgr-root[data-v="v105"] .lgr-rail-cells {
+  grid-template-columns: max-content max-content max-content max-content minmax(220px, 1fr);
+  gap: 4px 32px;
+  padding: 14px 20px 14px;
+}
+.lgr-root[data-v="v105"] .lgr-rail-assume { padding: 14px 18px; }
+.lgr-root[data-v="v105"] .lgr-rail-cell { min-height: 56px; gap: 5px; }
+.lgr-root[data-v="v105"] .lgr-rail-cell[data-hero="true"] .lgr-rail-value { color: var(--primary-deep); }
+/* The three inputs are one group of assumptions: one tinted ground, not three
+   ruled cells. */
+.lgr-root[data-v="v105"] .lgr-rail > .lgr-rail-assume { background: var(--card-2); }
+.lgr-root[data-v="v105"] .lgr-rail > .lgr-rail-assume + .lgr-rail-assume { border-inline-start: 0; padding-inline-start: 4px; }
+.lgr-root[data-v="v105"] .lgr-rail > .lgr-rail-assume:last-child { border-start-end-radius: calc(var(--r) - 1px); }
+
+/* --------------------------------------------------- the document band */
+/* The receipt was a card inside the workbench. It is a band of it now. */
+.lgr-root[data-v="v105"] .lgr-wb-intake:has(> .lgr-card) { padding: 0; }
+.lgr-root[data-v="v105"] .lgr-wb-intake > .lgr-card {
+  border: 0;
+  border-radius: 0;
+  background: #fff;
+}
+.lgr-root[data-v="v105"] .lgr-wb-intake > .lgr-card > div:first-child { padding: 12px 20px; }
+.lgr-root[data-v="v105"] .lgr-receipt-acts { gap: 8px; }
+.lgr-root[data-v="v105"] .lgr-receipt-sep { height: 22px; margin-inline: 2px; }
+
+/* ---------------------------------------------------------- folder tabs */
+/* Each mix is a sheet with its own tab: its name and row count, nothing else.
+   Closed tabs stand on the rail as quiet raised slips; the open one is white,
+   a step taller, capped in the identity violet, and runs straight into its
+   ledger. */
+.v5-tabs {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  padding: 10px 16px 0;
+  border-top: 1px solid var(--line);
+  background: linear-gradient(180deg, #f3f3f7 0%, #ededf2 100%);
+  /* the sheet's top edge, drawn on the rail so the open tab can break it */
+  box-shadow: inset 0 -1px 0 var(--line-2);
+}
+.lgr-root[data-v="v105"] .v5-tabs + .lgr-board { border-top: 0; }
+
+.v5-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  min-width: 120px;
+  padding: 0 16px;
+  border: 1px solid #dcdde5;
+  border-bottom: 0;
+  border-radius: 10px 10px 0 0;
+  background: linear-gradient(180deg, #fbfbfd, #f2f2f6);
+  box-shadow: inset 0 1px 0 #fff;
+  color: var(--lgr-2);
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  transition: background var(--t) var(--ease), border-color var(--t) var(--ease);
+}
+.v5-tab:hover { background: #fff; border-color: var(--line-2); }
+.v5-tab:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--focus-ring-strong); }
+.v5-tab[data-on="true"] {
+  z-index: 1;
+  height: 44px;
+  background: #fff;
+  border-color: var(--line-2);
+  color: var(--ink);
+  box-shadow: 0 -4px 12px -6px rgba(40, 36, 120, 0.22);
+}
+/* the violet cap, following the tab's own rounded top */
+.v5-tab[data-on="true"]::before {
+  content: "";
+  position: absolute;
+  inset: -1px -1px auto;
+  height: 3px;
+  border-radius: 10px 10px 0 0;
+  background: var(--primary);
+}
+/* closes the rail's hairline under the open tab */
+.v5-tab[data-on="true"]::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  bottom: -1px;
+  height: 1px;
+  background: #fff;
+}
+
+.v5-tab .lgr-tab-name {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+}
+.v5-tab-n {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 17px;
+  padding: 0 5px;
+  border-radius: 6px;
+  background: rgba(20, 22, 32, 0.07);
+  color: var(--lgr-3);
+  font-family: var(--num);
+  font-variant-numeric: tabular-nums;
+  font-size: 10.5px;
+  font-weight: 600;
+}
+.v5-tab[data-on="true"] .v5-tab-n { background: var(--primary-tint); color: var(--primary-deep); }
+.v5-tab .lgr-tab-x {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin-inline: -6px -8px;
+  border-radius: 7px;
+  color: var(--lgr-4);
+  opacity: 0;
+  transition: opacity var(--t) var(--ease), background var(--t) var(--ease);
+}
+.v5-tab:hover .lgr-tab-x,
+.v5-tab[data-on="true"] .lgr-tab-x,
+.v5-tab .lgr-tab-x:focus-visible { opacity: 1; }
+.v5-tab .lgr-tab-x:hover { background: var(--card-3); color: var(--ink); }
+
+/* A new sheet: the outline of a tab not yet made. */
+.v5-tab-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  margin-inline-start: 6px;
+  margin-bottom: 5px;
+  padding: 0 12px;
+  border: 1px dashed #b9b6ea;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.5);
+  color: var(--primary-deep);
+  font-family: var(--ui);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--t) var(--ease), border-color var(--t) var(--ease);
+}
+.v5-tab-add:hover { background: #fff; border-color: var(--primary); border-style: solid; }
+.v5-tab-add:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-ring-strong); }
+.v5-tab-add > svg { color: var(--primary); }
+
+/* ------------------------------------------------------- the sheet head */
+.lgr-root[data-v="v105"] .lgr-board .lgr-head { padding: 14px 20px; gap: 12px; flex-wrap: wrap; }
+.lgr-root[data-v="v105"] .lgr-board .lgr-title { font-size: 15px; }
+.v5-sheet-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-inline-start: 12px;
+  border-inline-start: 1px solid var(--line-2);
+}

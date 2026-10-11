@@ -5,6 +5,7 @@
 import { redirect } from "next/navigation";
 import Simulator from "@/app/aa102test/Simulator";
 import { parseTool } from "@/app/aa102test/lib/tools";
+import "./board.css";
 
 export default async function Aa105TestPage({
   searchParams,

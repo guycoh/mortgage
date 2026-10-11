@@ -282,6 +282,17 @@ function nameFor(mix: Mix, summary: ImportSummary, first: boolean, held: string[
   return `משכנתא נוכחית · ${names[0]} ועוד ${names.length - 1}`;
 }
 
+/** /aa105test sets the document's three readings as one joined group. */
+function ReadGroup({ on, children }: { on: boolean; children: React.ReactNode }) {
+  return on ? (
+    <span className="v5-join" role="group" aria-label="קריאות המסמך">
+      {children}
+    </span>
+  ) : (
+    <>{children}</>
+  );
+}
+
 export default function Simulator({
   lead,
   endpoint = "/api/aa100/mixes",
@@ -318,6 +329,7 @@ export default function Simulator({
   /** The route this board lives under — where the lead picker navigates. */
   base?: string;
 }) {
+  const v105 = variant === "v105";
   const [mixes, setMixes] = useState<Mix[] | null>(null);
   const [activeMixId, setActiveMixId] = useState<string | null>(null);
   const [compareMixId, setCompareMixId] = useState<string | null>(null);
@@ -1127,9 +1139,54 @@ export default function Simulator({
     }
   };
 
+  /* What you do to the whole mix. /aa102test keeps them on the tab strip;
+     /aa105test sets them in the sheet's own header, beside the add buttons. */
+  const mixTools = (
+    <>
+              <Btn
+                className="lgr-btn lgr-btn-sm"
+                data-tone="violet"
+                onClick={() => setSchedFor("mix")}
+                disabled={!loans.length}
+                title={loans.length ? "לוח סילוקין של כל התמהיל, חודש בחודש" : "אין שורות בתמהיל"}
+              >
+                <ListChecks size={14} weight="bold" />
+                לוח סילוקין מאוחד
+              </Btn>
+              <Btn
+                className="lgr-btn lgr-btn-sm"
+                data-tone="blue"
+                onClick={duplicateMix}
+                disabled={!activeMix}
+                title={
+                  isPrimaryMix
+                    ? "שכפול המשכנתא הנוכחית לתמהיל חדש — יתרת הקרן והצמדתה מאוחדות לסכום אחד, ותישאלו אם להוסיף את הפרשי ההיוון"
+                    : "יצירת עותק של התמהיל הזה כנקודת פתיחה להצעה"
+                }
+              >
+                <Copy size={14} weight="bold" />
+                שכפל תמהיל
+              </Btn>
+              <Btn
+              className="lgr-btn lgr-btn-sm lgr-btn-excel"
+              onClick={exportExcel}
+              disabled={!loans.length || exporting}
+              aria-busy={exporting}
+              title={loans.length ? "ייצוא התמהיל לגיליון אקסל" : "אין שורות לייצוא"}
+              >
+              {exporting ? (
+              <CircleNotch size={14} weight="bold" className="lgr-excel-ico animate-spin" />
+              ) : (
+              <MicrosoftExcelLogo size={14} weight="fill" className="lgr-excel-ico" />
+              )}
+              {v105 ? "ייצוא לאקסל" : "יצוא לאקסל"}
+              </Btn>
+    </>
+  );
+
   /* ----------------------------------------------------------------- ui */
   return (
-    <div className="lgr-root" dir="rtl">
+    <div className="lgr-root" dir="rtl" data-v={variant}>
       {/* --------------------------------------- 1. the shell, then the title */}
       {/* The chrome belongs to the application, not to the sheet: a full-bleed
           bar fastened to the top of the document, ruled off the canvas by a
@@ -1559,8 +1616,10 @@ export default function Simulator({
                               <span className="lgr-receipt-sep" aria-hidden />
                             </>
                           )}
+                          <ReadGroup on={v105}>
                           <Btn
                             className="lgr-btn lgr-btn-sm"
+                            data-tone="violet"
                             onClick={() => setShowClient(true)}
                             title={
                               reading === "bank"
@@ -1573,6 +1632,7 @@ export default function Simulator({
                           </Btn>
                           <Btn
                             className="lgr-btn lgr-btn-sm"
+                            data-tone="teal"
                             onClick={() => setShowAnalysis(true)}
                             title={
                               reading === "bank"
@@ -1585,6 +1645,7 @@ export default function Simulator({
                           </Btn>
                           <Btn
                             className="lgr-btn lgr-btn-sm"
+                            data-tone="red"
                             onClick={() => setShowDoc(true)}
                             disabled={!reports.some((r) => r.file)}
                             title={
@@ -1596,6 +1657,7 @@ export default function Simulator({
                             <FilePdf size={14} weight="fill" style={{ color: "var(--neg)" }} />
                             צפייה במסמך
                           </Btn>
+                          </ReadGroup>
                         </>
                       ) : null
                     }
@@ -1612,10 +1674,37 @@ export default function Simulator({
             tray of their own, one band up, with nothing but canvas tying them to
             the mix they act on. They are actions on the named mix, so they are
             on the strip that names it, next to the other three. */}
-        <div className="lgr-tabs">
+        <div className={v105 ? "v5-tabs" : "lgr-tabs"} role={v105 ? "tablist" : undefined} aria-label={v105 ? "תמהילים" : undefined}>
           {list.map((m) => (
             <div key={m.id} className="relative">
-              <div className="lgr-tab" data-on={m.id === activeMixId} onClick={() => setActiveMixId(m.id)}>
+              <div
+                className={v105 ? "v5-tab" : "lgr-tab"}
+                data-on={m.id === activeMixId}
+                role={v105 ? "tab" : undefined}
+                aria-selected={v105 ? m.id === activeMixId : undefined}
+                tabIndex={v105 ? 0 : undefined}
+                onKeyDown={
+                  v105
+                    ? (e) => {
+                        if (e.target !== e.currentTarget) return;
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          setActiveMixId(m.id);
+                        } else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+                          // RTL: left is the next tab
+                          e.preventDefault();
+                          const idx = list.findIndex((x) => x.id === m.id);
+                          const next = list[(idx + (e.key === "ArrowLeft" ? 1 : -1) + list.length) % list.length];
+                          setActiveMixId(next.id);
+                          (e.currentTarget.parentElement?.parentElement?.querySelectorAll<HTMLElement>(".v5-tab")[list.indexOf(next)])?.focus();
+                        }
+                      }
+                    : undefined
+                }
+                onDoubleClick={v105 ? () => setEditingId(m.id) : undefined}
+                title={v105 ? "לחיצה כפולה לשינוי שם" : undefined}
+                onClick={() => setActiveMixId(m.id)}
+              >
                 {editingId === m.id ? (
                   <input
                     autoFocus
@@ -1632,16 +1721,27 @@ export default function Simulator({
                   />
                 ) : (
                   <>
-                    {m.is_base && (
-                      <span
-                        className="lgr-dot"
-                        style={{ background: m.id === activeMixId ? "#fff" : "var(--primary)" }}
-                      />
+                    {v105 ? (
+                      <>
+                        <span className="lgr-tab-name" title={m.mix_name}>
+                          {m.mix_name}
+                        </span>
+                        <span className="v5-tab-n" title={`${m.loans.length} שורות`}>{m.loans.length}</span>
+                      </>
+                    ) : (
+                      <>
+                        {m.is_base && (
+                          <span
+                            className="lgr-dot"
+                            style={{ background: m.id === activeMixId ? "#fff" : "var(--primary)" }}
+                          />
+                        )}
+                        <span className="lgr-tab-name" title={m.mix_name}>
+                          {m.mix_name}
+                        </span>
+                        <span className="lgr-fig text-[10.5px] opacity-55">{m.loans.length}</span>
+                      </>
                     )}
-                    <span className="lgr-tab-name" title={m.mix_name}>
-                      {m.mix_name}
-                    </span>
-                    <span className="lgr-fig text-[10.5px] opacity-55">{m.loans.length}</span>
                   </>
                 )}
                 <button
@@ -1693,9 +1793,9 @@ export default function Simulator({
             </div>
           ))}
 
-          <Btn className="lgr-btn lgr-btn-sm" onClick={addMix}>
+          <Btn className={v105 ? "v5-tab-add" : "lgr-btn lgr-btn-sm"} onClick={addMix}>
             <Plus size={13} weight="bold" />
-            תמהיל
+            {v105 ? "תמהיל חדש" : "תמהיל"}
           </Btn>
 
           {/* WHAT YOU DO TO THE MIX, on the strip that names it.
@@ -1706,46 +1806,11 @@ export default function Simulator({
               document's own receipt in the band above. What is left is three
               actions on the named mix, which is inside what a person can hold at
               one decision point. */}
+          {!v105 && (
           <div className="lgr-strip-acts">
-              <div className="lgr-act-group">
-              <Btn
-                className="lgr-btn lgr-btn-sm"
-                onClick={() => setSchedFor("mix")}
-                disabled={!loans.length}
-                title={loans.length ? "לוח סילוקין של כל התמהיל, חודש בחודש" : "אין שורות בתמהיל"}
-              >
-                <ListChecks size={14} weight="bold" />
-                לוח סילוקין מאוחד
-              </Btn>
-              <Btn
-                className="lgr-btn lgr-btn-sm"
-                onClick={duplicateMix}
-                disabled={!activeMix}
-                title={
-                  isPrimaryMix
-                    ? "שכפול המשכנתא הנוכחית לתמהיל חדש — יתרת הקרן והצמדתה מאוחדות לסכום אחד, ותישאלו אם להוסיף את הפרשי ההיוון"
-                    : "יצירת עותק של התמהיל הזה כנקודת פתיחה להצעה"
-                }
-              >
-                <Copy size={14} weight="bold" />
-                שכפל תמהיל
-              </Btn>
-              <Btn
-              className="lgr-btn lgr-btn-sm lgr-btn-excel"
-              onClick={exportExcel}
-              disabled={!loans.length || exporting}
-              aria-busy={exporting}
-              title={loans.length ? "ייצוא התמהיל לגיליון אקסל" : "אין שורות לייצוא"}
-              >
-              {exporting ? (
-              <CircleNotch size={14} weight="bold" className="lgr-excel-ico animate-spin" />
-              ) : (
-              <MicrosoftExcelLogo size={14} weight="fill" className="lgr-excel-ico" />
-              )}
-              יצוא לאקסל
-              </Btn>
-              </div>
+              <div className="lgr-act-group">{mixTools}</div>
           </div>
+          )}
         </div>
 
         {/* The import flash marks the rows that just arrived. It was a 3px ring
@@ -1784,6 +1849,7 @@ export default function Simulator({
                 onTarget={setTarget}
                 onChange={setLoans}
                 onSchedule={(l) => setSchedFor(l)}
+                tools={v105 ? <div className="v5-sheet-tools">{mixTools}</div> : undefined}
               />
             )
           )}
