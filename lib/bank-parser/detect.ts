@@ -94,6 +94,18 @@ const RULES: Rule[] = [
     dataPage: ["שם החלק בהלוואה"],
     docStart: "נתונים לסילוק מלא של הלוואה בתיק",
   },
+  {
+    // Bank Jerusalem's סילוקית: a fixed-pitch printout, one block per loan under
+    // "הלוואה N - סילוק מלא , הסכם לתיוק M". The form name and the lender's
+    // name are both in the letterhead of every page, so both are required.
+    // Its blocks run across page breaks onto pages with no marker of their own,
+    // so the reader takes the whole file and dataPages is informational only.
+    bank: "jerusalem",
+    template: "jerusalem/payoff",
+    must: ["בנק ירושלים", "סילוקית בתיק"],
+    hints: ["פירוט סילוקית", "הסכם לתיוק", "סיכום הסילוקית", "תשלומים שנותרו"],
+    dataPage: ["הסכם לתיוק"],
+  },
 ];
 
 /**

@@ -13,7 +13,7 @@
 import type { FundingKind, PurposeKind } from "./purpose";
 
 /** Which lender's template produced this. */
-export type BankId = "leumi" | "poalim" | "discount" | "mercantile" | "mizrahi";
+export type BankId = "leumi" | "poalim" | "discount" | "mercantile" | "mizrahi" | "jerusalem";
 
 export const BANK_LABEL: Record<BankId, string> = {
   leumi: "בנק לאומי",
@@ -21,6 +21,7 @@ export const BANK_LABEL: Record<BankId, string> = {
   discount: "בנק דיסקונט",
   mercantile: "מרכנתיל דיסקונט",
   mizrahi: "בנק מזרחי טפחות",
+  jerusalem: "בנק ירושלים",
 };
 
 /**

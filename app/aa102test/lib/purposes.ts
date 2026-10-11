@@ -78,7 +78,10 @@ export function purposeFrom(
     if (/קבוצתרכישה/.test(hay)) return "purchase_group";
     if (/נדוני/.test(hay)) return "dowry";
     if (/גישור/.test(hay)) return "bridge";
-    if (/שעבוד|שיעבוד/.test(hay)) return "existing_lien";
+    // Bank Jerusalem ends every purpose with "בשעבוד דירת מגורים" — the
+    // collateral, not the purpose ("מטרה אחרת בשעבוד דירת מגורים" is כל מטרה).
+    // Only a lien named for something else counts.
+    if (/שעבוד|שיעבוד/.test(hay.replace(/בשי?עבודדירתמגורים/g, ""))) return "existing_lien";
     if (/מיחזור|מחזור/.test(hay)) return /כלמטרה/.test(hay) ? "refi_any" : "refi_housing";
   }
   switch (kind) {

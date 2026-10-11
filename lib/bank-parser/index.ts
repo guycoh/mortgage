@@ -1,4 +1,4 @@
-// Read a mortgage statement, whichever of the four lenders printed it.
+// Read a mortgage statement, whichever of the supported lenders printed it.
 //
 // Detection first, then the matching reader. A template that is recognised but
 // not yet implemented says so by name — "בנק לאומי" rather than "unsupported
@@ -10,6 +10,7 @@ import { parseDiscount } from "./banks/discount";
 import { parsePoalim } from "./banks/poalim";
 import { parseLeumi } from "./banks/leumi";
 import { parseMizrahi } from "./banks/mizrahi";
+import { parseJerusalem } from "./banks/jerusalem";
 import { BANK_LABEL, type BankStatement } from "./types";
 
 /** True when this looks like a bank mortgage statement at all. */
@@ -28,7 +29,7 @@ export function parseBankStatement(pages: RawPage[]): BankStatement {
   const det = detectBank(pages);
   if (!det) {
     throw new Error(
-      "לא זוהתה תבנית בנק מוכרת בקובץ. נתמכים: דיסקונט, מרכנתיל, לאומי, הפועלים, מזרחי טפחות."
+      "לא זוהתה תבנית בנק מוכרת בקובץ. נתמכים: דיסקונט, מרכנתיל, לאומי, הפועלים, מזרחי טפחות, ירושלים."
     );
   }
 
@@ -49,6 +50,8 @@ export function parseBankStatement(pages: RawPage[]): BankStatement {
       );
     case "mizrahi":
       return withMeta(parseMizrahi(pages, det.dataPages), det);
+    case "jerusalem":
+      return withMeta(parseJerusalem(pages), det);
     default:
       throw new Error(
         `זוהה מסמך של ${BANK_LABEL[det.bank]}, אך הקריאה עבור התבנית הזו עדיין לא נתמכת.`

@@ -104,11 +104,11 @@ Track identity comes from the STATIC `app/data/paths.ts` (1 פריים · 2 קל
 ## 5. Parsers (client-side, PDF never leaves the browser)
 
 - `lib/credit-parser/` — חיווי אשראי / דוח ריכוז נתונים (BDI). `extract.client.ts` (pdf.js) → `parse.ts`/`report.ts` → `loan-mapping.ts#extractLoans` (balance, rate, term, track label, purpose 201-017, anchor 201-034/035, printed payment 201-046). Term is measured from the report date, not today.
-- `lib/bank-parser/` — bank payoff letters: `banks/{leumi,poalim,discount,mizrahi}.ts` (mercantile = discount template), `types.ts` (`BankTranche`: principal, indexation, breakFee, anchor/margin/reset, dates), `to-loans.ts` (tranche → `ImportedLoan`, fills `indexation`, `prepayment_fee`, `purpose`), `purpose.ts` (`PurposeKind`, `classifyPurpose`, `creditReportPurpose`), `analysis.ts` (`StatementAnalysis`: tracks, payoff, break fees, findings).
+- `lib/bank-parser/` — bank payoff letters: `banks/{leumi,poalim,discount,mizrahi,jerusalem}.ts` (mercantile = discount template), `types.ts` (`BankTranche`: principal, indexation, breakFee, anchor/margin/reset, dates), `to-loans.ts` (tranche → `ImportedLoan`, fills `indexation`, `prepayment_fee`, `purpose`), `purpose.ts` (`PurposeKind`, `classifyPurpose`, `creditReportPurpose`), `analysis.ts` (`StatementAnalysis`: tracks, payoff, break fees, findings).
 - `lib/anchors/` — עדכון עוגנים: registry + sources + resolver behind `/api/simulator/anchors`; cache table `mortgage_anchors` (migration in `supabase/migrations/`), refreshed by a cron on `morg`.
 - `lib/verdicts.ts` — shared severity/heat helpers.
 
-Where to test parsers: real PDFs live outside the repo (`../Bank-Templates/*.pdf` = the four bank templates; `../דוח/*.pdf` = credit reports).
+Where to test parsers: real PDFs live outside the repo (`../Bank-Templates/*.pdf` = the bank templates; `../דוח/*.pdf` = credit reports).
 
 ## 6. Persistence and APIs
 
