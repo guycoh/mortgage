@@ -36,7 +36,7 @@ import {
 import type { LoanPath } from "@/app/data/hooks/useLoanPaths";
 import { paths as STATIC_PATHS } from "@/app/data/paths";
 import { priceLoan, type Econ } from "./lib/price";
-import ForecastDialog, { type ForecastState } from "./components/ForecastDialog";
+import ForecastDialog, { SAVED_FORECASTS_ENABLED, type ForecastState } from "./components/ForecastDialog";
 import ShareOfferDialog from "./components/ShareOfferDialog";
 import Bay from "./components/Bay";
 import Btn from "./components/Btn";
@@ -375,7 +375,9 @@ export default function Simulator({
     } catch {}
   }, []);
   const activeForecast =
-    (forecastSource && forecastState?.saved.find((s) => s.label === forecastSource)) || forecastState?.boi || null;
+    (SAVED_FORECASTS_ENABLED && forecastSource && forecastState?.saved.find((s) => s.label === forecastSource)) ||
+    forecastState?.boi ||
+    null;
   /**
    * TWO PRICINGS, ON PURPOSE (owner, 2026-10-10). The grid, its totals and the
    * read-out price exactly what is typed — the rate as entered, CPI at the one

@@ -18,6 +18,14 @@ import { Check, X } from "@phosphor-icons/react";
 import Btn from "./Btn";
 import { inflationAt, nominalAt, type Forecast } from "../lib/forecast";
 
+/**
+ * Saved curves (SmartNPV's, pasted ones) are switched off for now — owner,
+ * 2026-10-12. While false the dialog lists only the BoI rebuild, the admin
+ * paste-in is hidden, and the board prices on BoI even for a browser that had
+ * remembered a saved curve. Flip to true to bring them back; nothing else changes.
+ */
+export const SAVED_FORECASTS_ENABLED = false;
+
 export type ForecastState = {
   forecast: Forecast | null;
   boi: Forecast | null;
@@ -90,7 +98,8 @@ export default function ForecastDialog({
   const [label, setLabel] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const chosenSaved = selected !== null && state.saved.some((s) => s.label === selected);
+  const saved = SAVED_FORECASTS_ENABLED ? state.saved : [];
+  const chosenSaved = selected !== null && saved.some((s) => s.label === selected);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -157,7 +166,7 @@ export default function ForecastDialog({
             {state.boi && (
               <SourceCard f={state.boi} hint="מתעדכנת אוטומטית" selected={!chosenSaved} onSelect={() => onSelect(null)} />
             )}
-            {state.saved.map((f) => (
+            {saved.map((f) => (
               <SourceCard
                 key={f.label}
                 f={f}
@@ -166,11 +175,12 @@ export default function ForecastDialog({
                 onSelect={() => onSelect(f.label)}
               />
             ))}
-            {!state.boi && !state.saved.length && (
+            {!state.boi && !saved.length && (
               <p className="lgr-ask-q">אין תחזית זמינה — הלוח מחושב באינפלציה קבועה.</p>
             )}
           </div>
 
+          {SAVED_FORECASTS_ENABLED && (
           <details className="lgr-fc-admin">
             <summary>הוספת תחזית (מנהל)</summary>
             <textarea
@@ -216,6 +226,7 @@ export default function ForecastDialog({
             )}
             {err && <p className="lgr-fc-err">{err}</p>}
           </details>
+          )}
         </div>
 
         <div className="lgr-ask-acts">
