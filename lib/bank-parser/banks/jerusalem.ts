@@ -198,7 +198,7 @@ export function parseJerusalem(pages: RawPage[]): BankStatement {
     loan.tranches.push(tranche);
   }
 
-  const loans = [...byAgreement.values()];
+  const loans = Array.from(byAgreement.values());
   const tranches = loans.flatMap((l) => l.tranches);
   if (!tranches.length) warnings.push("לא נמצאו הלוואות פעילות עם יתרה בסילוקית.");
 
