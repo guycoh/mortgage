@@ -19,10 +19,11 @@ import Btn from "./Btn";
 import { inflationAt, nominalAt, type Forecast } from "../lib/forecast";
 
 /**
- * Saved curves (SmartNPV's, pasted ones) are switched off for now — owner,
- * 2026-10-12. While false the dialog lists only the BoI rebuild, the admin
- * paste-in is hidden, and the board prices on BoI even for a browser that had
- * remembered a saved curve. Flip to true to bring them back; nothing else changes.
+ * The choice of curve is switched off for now — owner, 2026-10-12. While false
+ * the board's forecast pill is a read-only label (this dialog never opens), and
+ * the board prices on BoI even for a browser that had remembered a saved curve,
+ * which would otherwise be stuck on it with no way back. Flip to true to bring
+ * the pill, the saved curves and the admin paste-in back; nothing else changes.
  */
 export const SAVED_FORECASTS_ENABLED = false;
 

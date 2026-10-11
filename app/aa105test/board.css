@@ -149,7 +149,7 @@
   color: var(--primary-deep);
   box-shadow: 0 1px 2px rgba(20, 22, 32, 0.1), 0 0 0 0.5px rgba(20, 22, 32, 0.06);
 }
-.lgr-root[data-v="v105"] .lgr-econ-src { box-shadow: var(--v5-shadow-btn); }
+.lgr-root[data-v="v105"] .lgr-econ-src:not(:disabled) { box-shadow: var(--v5-shadow-btn); }
 
 /* -------------------------------------------------------------- read-out */
 /* Figures size to themselves, so the hero never runs past the card edge; the

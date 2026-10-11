@@ -1516,8 +1516,11 @@ export default function Simulator({
                     type="button"
                     className="lgr-econ-src"
                     data-state={!forecastState ? "loading" : undefined}
-                    onClick={() => forecastState && setForecastOpen(true)}
-                    title="פרטי התחזית"
+                    // Read-only while saved curves are off: it names the curve
+                    // the board prices on, and there is nothing to choose.
+                    disabled={!SAVED_FORECASTS_ENABLED}
+                    onClick={() => SAVED_FORECASTS_ENABLED && forecastState && setForecastOpen(true)}
+                    title={SAVED_FORECASTS_ENABLED ? "פרטי התחזית" : undefined}
                   >
                     {!forecastState ? "טוען…" : activeForecast ? activeForecast.label : "לא זמינה"}
                   </button>

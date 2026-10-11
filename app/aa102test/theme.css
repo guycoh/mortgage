@@ -3624,7 +3624,8 @@ html:has(.lgr-root) {
   border: 1px solid var(--line-2); border-radius: var(--r-sm); background: var(--card);
   font-size: 12px; font-weight: 600; color: var(--ink); white-space: nowrap; cursor: pointer;
 }
-.lgr-econ-src:hover { border-color: var(--edge); }
+.lgr-econ-src:not(:disabled):hover { border-color: var(--edge); }
+.lgr-econ-src:disabled { cursor: default; }
 .lgr-econ-src[data-state="loading"] { color: var(--lgr-4); }
 .lgr-btn-primary .lgr-ask-btn-m { opacity: 0.85; }
 
