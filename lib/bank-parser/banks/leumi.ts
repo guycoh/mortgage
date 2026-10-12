@@ -19,7 +19,7 @@
 //     Nothing but the x coordinate says which two.
 
 import type { RawItem, RawPage } from "@/lib/credit-parser/types";
-import { date, has, norm, num, pageLines, pct, toDate, monthsBetween, type Line } from "../text";
+import { date, has, norm, num, pageLines, pct, toDate, paymentsLeft, type Line } from "../text";
 import { clean } from "../fields";
 import type { BankLoan, BankStatement, BankTranche, Linkage, RateKind } from "../types";
 import { BANK_LABEL } from "../types";
@@ -259,6 +259,9 @@ export function parseLeumi(pages: RawPage[], dataPages: number[]): BankStatement
       payoff: row(grid, 'סה"כ יתרה לסילוק'),
       breakFee: row(grid, 'סה"כ עמלות פירעון מוקדם'),
       noticeFee: row(grid, "עמלת אי הודעה"),
+      // ".1 עמלת היוון *" — the הפרשי היוון component on its own. Not to be
+      // confused with "ריבית להיוון" below it, which is a rate.
+      capitalization: row(grid, "עמלת היוון"),
       /** The rate used to discount, not an amount — kept for display only. */
       discountRate: row(grid, "ריבית להיוון"),
     };
@@ -346,11 +349,18 @@ export function parseLeumi(pages: RawPage[], dataPages: number[]): BankStatement
         startDate: date(g.start[c]),
         firstPaymentDate: date(g.first[c]),
         endDate,
-        months: asOfDate && to ? monthsBetween(asOfDate, to) : null,
+        months: asOfDate && to ? paymentsLeft(asOfDate, to) : null,
         monthsDerived: true,
         baseIndex: num(g.baseIndex[c]),
         currentIndex: null,
         breakFee: num(g.breakFee[c]),
+        // Blank where a משנה has none, while its total still carries the notice
+        // fee — so what the total holds beyond notice IS the היוון, zero included.
+        capitalizationFee:
+          num(g.capitalization[c]) ??
+          (num(g.breakFee[c]) !== null
+            ? Math.max(0, Math.round(((num(g.breakFee[c]) ?? 0) - (num(g.noticeFee[c]) ?? 0)) * 100) / 100)
+            : null),
         breakFeeParts: fees,
       });
     }

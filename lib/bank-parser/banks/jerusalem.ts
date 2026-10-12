@@ -173,6 +173,7 @@ export function parseJerusalem(pages: RawPage[]): BankStatement {
       baseIndex,
       currentIndex: num(g("מדד נוכחי")),
       breakFee: num(g("סה\"כ עמלות")),
+      capitalizationFee: num(g("עמלת היוון")),
       breakFeeParts: feeParts,
     };
 

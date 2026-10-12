@@ -28,6 +28,7 @@ import {
   signedPct,
   toDate,
   monthsBetween,
+  paymentsLeft,
   type Line,
 } from "../text";
 import { clean } from "../fields";
@@ -84,6 +85,8 @@ export interface LoanTotals {
   indexation: number | null;
   arrears: number | null;
   interest: number | null;
+  /** "ריבית נדחית והצמדת ריבית נדחית" — one figure, deferred by a grace period. */
+  deferred: number | null;
   breakFee: number | null;
   payoff: number | null;
   monthly: number | null;
@@ -117,7 +120,7 @@ function readTotals(lines: Line[]): LoanTotals[] {
       .filter((s) => /[\d,]+\.\d{2}-?$/.test(s.trim()))
       .map((s) => num(s));
     if (nums.length < 9) continue;
-    const [principal, indexation, arrears, interest, , , breakFee, payoff, monthly] = nums;
+    const [principal, indexation, arrears, interest, deferred, , breakFee, payoff, monthly] = nums;
     out.push({
       loanNumber: m[0],
       accountNumber: account,
@@ -125,6 +128,7 @@ function readTotals(lines: Line[]): LoanTotals[] {
       indexation,
       arrears,
       interest,
+      deferred,
       breakFee,
       payoff,
       monthly,
@@ -363,7 +367,7 @@ export function parsePoalim(pages: RawPage[], dataPages: number[]): BankStatemen
         startDate: date(g.start[c]),
         firstPaymentDate: date(g.first[c]),
         endDate,
-        months: asOfDate && to ? monthsBetween(asOfDate, to) : null,
+        months: asOfDate && to ? paymentsLeft(asOfDate, to) : null,
         monthsDerived: true,
         baseIndex: num(g.baseIndex[c]),
         currentIndex: num(g.lastIndex[c]),
@@ -380,7 +384,12 @@ export function parsePoalim(pages: RawPage[], dataPages: number[]): BankStatemen
   const loans: BankLoan[] = [];
   for (const tot of totals) {
     const tranches = byLoan.get(tot.loanNumber) ?? [];
-    const loanBalance = (tot.principal ?? 0) + (tot.indexation ?? 0);
+    // Deferred interest is owed and capitalises — part of the balance, as on
+    // Mizrahi's letter. This lender prints it and its indexation as one figure,
+    // so it goes onto the principal.
+    const deferred = tot.deferred ?? 0;
+    const loanPrincipal = (tot.principal ?? 0) + deferred;
+    const loanBalance = loanPrincipal + (tot.indexation ?? 0);
     if (!tranches.length) {
       warnings.push(`הלוואה ${tot.loanNumber}: נמצאה בסיכום אך לא נמצאו מרכיבים בפירוט.`);
       continue;
@@ -397,7 +406,8 @@ export function parsePoalim(pages: RawPage[], dataPages: number[]): BankStatemen
     tranches.forEach((t, i) => {
       const share = modelSum > 0 ? modelled[i] / modelSum : 1 / tranches.length;
       t.balance = Math.round(loanBalance * share);
-      t.principal = Math.round((tot.principal ?? 0) * share);
+      t.principal = Math.round(loanPrincipal * share);
+      t.deferredInterest = deferred ? Math.round(deferred * share * 100) / 100 : null;
       t.indexation = Math.round((tot.indexation ?? 0) * share);
       t.payoff = tot.payoff !== null ? Math.round(tot.payoff * share) : null;
       t.monthly = tot.monthly !== null ? Math.round(tot.monthly * share * 100) / 100 : null;

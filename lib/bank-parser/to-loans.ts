@@ -13,7 +13,7 @@
 import { PATH_IDS, type ImportedLoan, type ImportSummary } from "@/app/aa100test/lib/credit";
 import type { Loan } from "@/app/private/crm/leads/simulators/components/LoanTable";
 import { freqLabel } from "@/lib/rate-frequency";
-import { monthsBetween, toDate } from "./text";
+import { paymentsLeft, toDate } from "./text";
 import type { BankStatement, BankTranche } from "./types";
 import { PURPOSE_LABEL } from "./purpose";
 import { purposeFrom, type PurposeId } from "@/app/aa102test/lib/purposes";
@@ -60,7 +60,7 @@ function termOf(t: BankTranche, statementDate: string): number {
   if (t.months && t.months > 0) return t.months;
   const from = toDate(statementDate) ?? new Date();
   const to = toDate(t.endDate);
-  return to ? monthsBetween(from, to) : 0;
+  return to ? paymentsLeft(from, to) : 0;
 }
 
 /**
@@ -152,7 +152,9 @@ function toRow(t: BankTranche, mixId: string, st: BankStatement): ImportedLoan {
     // Null where the template does not print the line — a missing figure is
     // not a zero.
     indexation: t.indexation === null || t.indexation === undefined ? null : Math.round(t.indexation),
-    prepayment_fee: t.breakFee === null || t.breakFee === undefined ? null : Math.round(t.breakFee),
+    // הפרשי היוון, as the column says and as SmartNPV reads the same letter —
+    // the total fee only where a lender does not itemise it.
+    prepayment_fee: feeOfTranche(t),
     rate: t.rate ?? 0,
     months: termOf(t, st.statementDate),
     loan_end_date: end,
@@ -198,6 +200,12 @@ function toRow(t: BankTranche, mixId: string, st: BankStatement): ImportedLoan {
     source_start_date: string;
     source_orig_amount: number | undefined;
   };
+}
+
+/** The הפרשי היוון column: the itemised component, else the printed total. */
+function feeOfTranche(t: BankTranche): number | null {
+  const v = t.capitalizationFee ?? t.breakFee;
+  return v === null || v === undefined ? null : Math.round(v);
 }
 
 /** A readable track name when the lender's own wording is missing. */

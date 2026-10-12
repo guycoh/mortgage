@@ -149,6 +149,25 @@ export function monthsBetween(a: Date, b: Date): number {
   return Math.max(0, m);
 }
 
+/**
+ * Instalments still to be paid between a statement date and the final payment
+ * date, both ends inclusive of a payment falling on them.
+ *
+ * NOT `monthsBetween`, which floors to whole months and so runs one short on
+ * every statement: from 12/10/2026 to a last payment on 10/03/2054 the payments
+ * are 10/11/2026 … 10/03/2054 — 329 — while whole months come to 328. A payment
+ * due ON the statement date is still owed (Mizrahi: only payments due BEFORE the
+ * statement are assumed paid). Bank Jerusalem prints the figure outright (276
+ * from 07/10/2026 to 10/09/2049) and SmartNPV counts the same way.
+ */
+export function paymentsLeft(asOf: Date, last: Date): number {
+  const m =
+    (last.getFullYear() - asOf.getFullYear()) * 12 +
+    (last.getMonth() - asOf.getMonth()) +
+    (asOf.getDate() <= last.getDate() ? 1 : 0);
+  return Math.max(0, m);
+}
+
 /** dd/mm/yyyy → Date, or null. */
 export function toDate(s: string): Date | null {
   const m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);

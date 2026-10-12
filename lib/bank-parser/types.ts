@@ -68,6 +68,13 @@ export interface BankTranche {
   indexation: number | null;
   /** Accrued interest to the payoff date. */
   accruedInterest: number | null;
+  /**
+   * צבירת ריבית נדחית (+ its indexation) — interest a grace period deferred
+   * rather than collected. It is owed and capitalises into the loan, so it is
+   * ALREADY folded into `principal` / `indexation` / `balance`; this field only
+   * says how much of them it is. SmartNPV imports the same letter the same way.
+   */
+  deferredInterest?: number | null;
   /** Arrears, where the lender prints them. */
   arrears: number | null;
   /**
@@ -138,6 +145,14 @@ export interface BankTranche {
   /* ---- cost of breaking it */
   /** סה"כ עמלת פרעון מוקדם for this tranche. */
   breakFee: number | null;
+  /**
+   * הפרשי היוון alone — the part of the fee that prices the rate gap, and the
+   * figure SmartNPV and the board's הפרשי היוון column mean. The rest of the
+   * fee (אי הודעה, פיצוי מדד, תפעולית) is procedural: notice waives one, and a
+   * refinancing lender waives אי הודעה by law. Null where the lender prints only
+   * the total; the board then falls back to `breakFee`.
+   */
+  capitalizationFee?: number | null;
   /** Its parts, where itemised: היוון / אי הודעה / מדד ממוצע / תפעולית. */
   breakFeeParts: { label: string; amount: number }[];
 }

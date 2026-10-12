@@ -26,7 +26,7 @@
 // its own; see readAnchorBlock.
 
 import type { RawItem, RawPage } from "@/lib/credit-parser/types";
-import { date, has, norm, num, pageLines, pct, signedPct, toDate, monthsBetween } from "../text";
+import { date, has, norm, num, pageLines, pct, signedPct, toDate, paymentsLeft } from "../text";
 import { clean } from "../fields";
 import type { BankLoan, BankStatement, BankTranche, Linkage, RateKind } from "../types";
 import { BANK_LABEL } from "../types";
@@ -570,8 +570,19 @@ export function parseMizrahi(pages: RawPage[], dataPages: number[]): BankStateme
     const G = (k: string) => beside(right.items, k);
     const P = (k: string) => beside(left.items, k);
 
-    const principal = num(P("יתרת הקרן"));
-    const indexation = num(P("הפרשי הצמדה על הקרן"));
+    const printedPrincipal = num(P("יתרת הקרן"));
+    const printedIndexation = num(P("הפרשי הצמדה על הקרן"));
+    // A tranche in partial grace prints the interest it has deferred, and the
+    // indexation on it, as two more lines of the balance. Both are owed and both
+    // capitalise; leaving them out understated a ₪1.02M file by ₪17,324. Folded
+    // in the way SmartNPV imports the same letter: deferred interest onto the
+    // principal, its indexation onto the indexation.
+    const deferred = num(P("צבירת ריבית נדחית"));
+    const deferredIdx = num(P("הפרשי הצמדה על ריבית נדחית"));
+    const principal =
+      printedPrincipal === null && deferred === null ? null : (printedPrincipal ?? 0) + (deferred ?? 0);
+    const indexation =
+      printedIndexation === null && deferredIdx === null ? null : (printedIndexation ?? 0) + (deferredIdx ?? 0);
     // "סכום הסילוק" / "בחלק זה של ההלוואה:" — the figure is beside the second line.
     const payoff = num(P("בחלק זה של ההלוואה")) ?? num(P("סכום הסילוק"));
     const balance = (principal ?? 0) + (indexation ?? 0);
@@ -617,12 +628,12 @@ export function parseMizrahi(pages: RawPage[], dataPages: number[]): BankStateme
     const baseIndex =
       num(G("מדד הבסיס לחישוב ההצמדה")) ?? num(G("שער הבסיס לחישוב ההצמדה"));
     const currentIndex = linkage === "fx" ? summary.fxRate : summary.index;
-    if (linkage !== "unlinked" && baseIndex && currentIndex && principal && indexation !== null) {
-      const expected = principal * (currentIndex / baseIndex - 1);
-      const off = Math.abs(expected - indexation);
-      if (off > Math.max(50, Math.abs(indexation) * 0.02)) {
+    if (linkage !== "unlinked" && baseIndex && currentIndex && printedPrincipal && printedIndexation !== null) {
+      const expected = printedPrincipal * (currentIndex / baseIndex - 1);
+      const off = Math.abs(expected - printedIndexation);
+      if (off > Math.max(50, Math.abs(printedIndexation) * 0.02)) {
         warnings.push(
-          `חלק ${partNo}: הפרשי ההצמדה המודפסים (${Math.round(indexation).toLocaleString("en-US")} ₪) אינם תואמים לחישוב ממדד ${baseIndex} למדד ${currentIndex} (${Math.round(expected).toLocaleString("en-US")} ₪).`
+          `חלק ${partNo}: הפרשי ההצמדה המודפסים (${Math.round(printedIndexation).toLocaleString("en-US")} ₪) אינם תואמים לחישוב ממדד ${baseIndex} למדד ${currentIndex} (${Math.round(expected).toLocaleString("en-US")} ₪).`
         );
       }
     }
@@ -650,11 +661,17 @@ export function parseMizrahi(pages: RawPage[], dataPages: number[]): BankStateme
       principal,
       indexation,
       accruedInterest: num(P("ריבית")),
+      deferredInterest: deferred !== null || deferredIdx !== null ? (deferred ?? 0) + (deferredIdx ?? 0) : null,
       arrears: null,
       balance,
       payoff,
       originalAmount: num(G("סכום חלק זה בעת הביצוע")),
-      monthly: num(G("סכום החיוב החודשי בגין חלק זה")) ?? num(G("החיוב החודשי בגין חלק זה")),
+      // Three wordings across this lender's letters; the newest says "חיוב חודשי
+      // אחרון בגין חלק זה" and was not read at all.
+      monthly:
+        num(G("סכום החיוב החודשי בגין חלק זה")) ??
+        num(G("החיוב החודשי בגין חלק זה")) ??
+        num(G("חיוב חודשי אחרון בגין חלק זה")),
       rate,
       effectiveRate:
         pct(besideExact(right.items, "שיעור הריבית המתואמת:")) ??
@@ -679,7 +696,7 @@ export function parseMizrahi(pages: RawPage[], dataPages: number[]): BankStateme
       startDate: date(G("תאריך הביצוע")),
       firstPaymentDate: date(G("תאריך חיוב ראשון")),
       endDate,
-      months: asOfDate && to ? monthsBetween(asOfDate, to) : null,
+      months: asOfDate && to ? paymentsLeft(asOfDate, to) : null,
       monthsDerived: true,
       // For a foreign-currency tranche the same two fields are an exchange rate
       // rather than an index — "שער הבסיס לחישוב ההצמדה: 4.858900 ש"ח לאירו"
@@ -687,6 +704,9 @@ export function parseMizrahi(pages: RawPage[], dataPages: number[]): BankStateme
       baseIndex,
       currentIndex,
       breakFee: num(P('סה"כ עמלת פרעון מוקדם')),
+      // Printed per חלק even when zero ("- הפרשי היוון (לאחר הפחתה אם ישנה): 0.00"),
+      // so a missing value means the line was not found, not that it is free.
+      capitalizationFee: num(P("הפרשי היוון")),
       breakFeeParts: fees,
     });
   });

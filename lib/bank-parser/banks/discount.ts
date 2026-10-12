@@ -226,6 +226,8 @@ export function parseDiscount(
       baseIndex: num(g("מדד בסיס")),
       currentIndex: num(g("מדד נוכחי ידוע")),
       breakFee: num(g('סה"כ עמלת פרעון מוקדם')),
+      // "עמלת פערי ריבית" is this form's name for הפרשי היוון.
+      capitalizationFee: num(g("עמלת פערי ריבית")),
       breakFeeParts: feeParts,
     };
 
