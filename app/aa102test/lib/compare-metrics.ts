@@ -7,7 +7,8 @@
 //   · תשלומי ריבית והצמדה   Σ payments − principal
 //   · עלות כוללת             Σ payments
 //   · החזר לשקל              Σ payments / principal
-//   · החזר ראשון             month 1 at the TYPED rates — the grid's figure
+//   · החזר ראשון             month 1 at the TYPED rates — the grid's figure,
+//                            the document's printed charge on an unedited row
 //   · החזר בשיא (שנה)        the highest forecast month, and its year
 //   · שת"פ                   IRR of the payments, annual effective
 //   · ענ"נ                   PV of the payments discounted along the forecast
@@ -25,6 +26,7 @@ import { priceLoan, asEcon, type Assume } from "./price";
 import { nominalAt } from "./forecast";
 import { annualIRR } from "./yield";
 import type { ImportedLoan } from "./credit";
+import { monthOnePay } from "./timeline";
 
 export type MixFigures = {
   principal: number;
@@ -37,6 +39,8 @@ export type MixFigures = {
   cost: number;
   perShekel: number;
   firstTyped: number;
+  /** Month 1 as the grid shows it, forecast pricing — what atPayment(1) quotes. */
+  firstShown: number;
   peak: number;
   peakYear: number;
   irr: number | null;
@@ -111,7 +115,8 @@ export function mixFigures(rows: ImportedLoan[], assume: Assume, discountRate: n
     totalPaid,
     cost: totalPaid - principal,
     perShekel: principal ? totalPaid / principal : 0,
-    firstTyped: typed.reduce((s, r) => s + (r.schedule[0]?.payment ?? 0), 0),
+    firstTyped: live.reduce((s, l, i) => s + (typed[i].schedule[0] ? monthOnePay(l, typed[i].schedule[0].payment) : 0), 0),
+    firstShown: live.reduce((s, l, i) => s + (all[i].schedule[0] ? monthOnePay(l, all[i].schedule[0].payment) : 0), 0),
     peak,
     peakYear: Math.ceil(peakAt / 12),
     irr: annualIRR(principal, payments),
@@ -131,7 +136,7 @@ export function atPayment(f: MixFigures, n: number) {
   const retired = f.principal - balance;
   return {
     n: k,
-    payment: f.payments[k - 1] ?? 0,
+    payment: k === 1 ? f.firstShown : f.payments[k - 1] ?? 0,
     balance,
     retired,
     costSoFar: paidSoFar - retired,

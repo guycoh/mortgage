@@ -4,9 +4,11 @@
 // inflation assumption it returns, per month, the balance and the payment by
 // track, the balance-weighted rate, and per year the payment split three ways.
 // Every figure comes from calculateLoan's own schedule, so the charts and the
-// grid can never disagree about the maths.
+// grid can never disagree about the maths — except month 1's PAYMENT, which is
+// the grid's own figure (see monthOnePay), so the chart's opening reading is
+// the number the החזר חודשי column sums to.
 
-import { isIndexedPath, type ImportedLoan } from "./credit";
+import { boardMonthly, isIndexedPath, type ImportedLoan } from "./credit";
 import { asEcon, priceLoan, type Assume } from "./price";
 import { inflationAt } from "./forecast";
 
@@ -19,6 +21,15 @@ import { inflationAt } from "./forecast";
  * the surface gaps the chart draws between segments).
  */
 export const STACK: number[] = [3, 1, 5, 2, 4];
+
+/**
+ * Month 1's payment on one row, as the grid shows it: the document's printed
+ * charge while the row is unedited (boardMonthly), rounded per row the way the
+ * ledger's סה״כ is. Month 2 on is the engine's — the forecast from next month.
+ * Only the payment SERIES reads this; totals, costs and the yearly split stay
+ * on the schedule, so nothing summed over the life moves by a shekel.
+ */
+export const monthOnePay = (l: ImportedLoan, enginePayment: number) => Math.round(boardMonthly(l, enginePayment));
 
 /** One month-based series per track: [month, value] pairs. */
 export type TrackSeries = { id: number; points: [number, number][] };
@@ -72,7 +83,7 @@ export function buildTimeline(loans: ImportedLoan[], annualInflation: Assume): T
         const row = r.res.schedule[m - 1];
         if (!row) continue;
         bal += row.closingBalance;
-        pay += row.payment;
+        pay += m === 1 ? monthOnePay(r.loan, row.payment) : row.payment;
       }
       b.push([m, Math.max(0, Math.round(bal))]);
       p.push([m, Math.max(0, Math.round(pay))]);
@@ -212,7 +223,8 @@ export function buildMixLine(loans: ImportedLoan[], assume: Assume): MixLine | n
       }
     }
     totalPaid += pay;
-    payment.push([m, Math.round(pay)]);
+    // Month 1 is the grid's figure; the life totals above stay on the schedule.
+    payment.push([m, m === 1 ? rows.reduce((s, r) => s + (r.res.schedule[0] ? monthOnePay(r.l, r.res.schedule[0].payment) : 0), 0) : Math.round(pay)]);
     balance.push([m, Math.max(0, Math.round(bal))]);
     if (den > 0) rate.push([m, Math.round((num / den) * 1000) / 1000]);
   }
