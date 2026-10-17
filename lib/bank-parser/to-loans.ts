@@ -17,6 +17,7 @@ import { paymentsLeft, toDate } from "./text";
 import type { BankStatement, BankTranche } from "./types";
 import { PURPOSE_LABEL } from "./purpose";
 import { purposeFrom, type PurposeId } from "@/app/aa102test/lib/purposes";
+import { monthlyBasis } from "@/app/aa102test/lib/credit";
 
 /**
  * Which of the five canonical tracks this tranche is.
@@ -138,13 +139,36 @@ function resetDateOf(t: BankTranche, st: BankStatement): string | null {
   return `${back.getFullYear()}-${String(back.getMonth() + 1).padStart(2, "0")}-${String(back.getDate()).padStart(2, "0")}`;
 }
 
+/**
+ * The tranche's monthly charge as the letter prints it, or undefined.
+ *
+ * It is the figure the board shows in החזר חודשי until the row is edited (see
+ * boardMonthly in lib/credit) — SmartNPV shows the same one. The engine's own
+ * first payment lands a little above it, by design rather than by error: it is
+ * NEXT month's payment, one month of CPI later on a צמוד tranche, and the
+ * letter's figure is the last one charged.
+ *
+ * Hapoalim prints the monthly per LOAN, and the per-tranche figure it leaves us
+ * is our own balance-weighted share of it (see balanceApportioned). That is a
+ * split we made, not a charge the bank stated, so those rows keep the engine.
+ */
+function printedMonthlyOf(t: BankTranche): number | undefined {
+  if (t.balanceApportioned) return undefined;
+  return t.monthly !== null && t.monthly > 0 ? t.monthly : undefined;
+}
+
 function toRow(t: BankTranche, mixId: string, st: BankStatement): ImportedLoan {
   const end = iso(t.endDate);
+  const amount = Math.round(t.balance ?? 0);
+  const rate = t.rate ?? 0;
+  const months = termOf(t, st.statementDate);
+  const scheduleId = amortizationId(t.amortization);
+  const printed = printedMonthlyOf(t);
   return {
     id: crypto.randomUUID(),
     mix_id: mixId,
     path_id: pathIdOf(t),
-    amount: Math.round(t.balance ?? 0),
+    amount,
     // The balance, taken apart the way the letter prints it. `amount` above is
     // principal + indexation and stays the figure everything computes on;
     // these two let the master show יתרת קרן and הצמדת קרן as separate cells,
@@ -155,11 +179,11 @@ function toRow(t: BankTranche, mixId: string, st: BankStatement): ImportedLoan {
     // הפרשי היוון, as the column says and as SmartNPV reads the same letter —
     // the total fee only where a lender does not itemise it.
     prepayment_fee: feeOfTranche(t),
-    rate: t.rate ?? 0,
-    months: termOf(t, st.statementDate),
+    rate,
+    months,
     loan_end_date: end,
     end_date: end,
-    amortization_schedule_id: amortizationId(t.amortization),
+    amortization_schedule_id: scheduleId,
     grace_type_id: 1,
     grace_months: 0,
     // Numeric: the anchor's own rate, printed where a lender prints it and
@@ -186,6 +210,10 @@ function toRow(t: BankTranche, mixId: string, st: BankStatement): ImportedLoan {
     // When the rate first moves — the forecast engine resets the anchor there.
     next_reset: resetDateOf(t, st),
     source_orig_amount: t.originalAmount ?? undefined,
+    // The letter's own charge, and the row it was true of — the same pair the
+    // credit report fills from 201-046. No grace: the row is imported without one.
+    source_monthly: printed,
+    source_monthly_basis: printed ? monthlyBasis(amount, rate, months, scheduleId, 0, 0) : undefined,
     source_purpose: t.purpose || PURPOSE_LABEL[t.purposeKind],
     // The board's own eleven-word list, from the kind and the raw wording —
     // the raw wording first, because it alone can say גישור or קבוצת רכישה.
@@ -199,6 +227,8 @@ function toRow(t: BankTranche, mixId: string, st: BankStatement): ImportedLoan {
     purpose: PurposeId;
     source_start_date: string;
     source_orig_amount: number | undefined;
+    source_monthly: number | undefined;
+    source_monthly_basis: string | undefined;
   };
 }
 

@@ -151,12 +151,14 @@ export type ImportedLoan = Loan & {
   /** סכום מקורי — 201-045. 0 when the document did not print one. */
   source_orig_amount?: number;
   /**
-   * החזר חודשי exactly as the document printed it (201-046).
+   * החזר חודשי exactly as the document printed it — 201-046 on a credit
+   * report, the tranche's last charge on a bank letter.
    *
    * Absent when the document printed none — which is a different fact from a
-   * printed zero, and the export says which. The board goes on pricing rows with
-   * the engine, because that is what lets an advisor change one and see the
-   * effect; the EXPORT is a reproduction of the document and shows this.
+   * printed zero, and the export says which. Both the board's החזר חודשי column
+   * and the export show it while the row is unedited (see boardMonthly); edit
+   * the row and both go back to the engine, which is what lets an advisor
+   * change one and see the effect.
    */
   source_monthly?: number;
   /**
@@ -165,8 +167,8 @@ export type ImportedLoan = Loan & {
    *
    * The printed payment is a statement about a specific debt repaid a specific
    * way. Change any of those and it becomes a statement about a loan that no
-   * longer exists on this row, so the export falls back to the engine and says
-   * so in the הערות column.
+   * longer exists on this row, so the board and the export fall back to the
+   * engine, and the export says so in the הערות column.
    */
   source_monthly_basis?: string;
   /**
@@ -527,6 +529,26 @@ export function reportedMonthly(l: ImportedLoan): number | null {
     Number(l.grace_partial_months) || 0
   );
   return l.source_monthly_basis === now ? Number(l.source_monthly) : null;
+}
+
+/**
+ * The החזר חודשי the BOARD shows for a row: the document's own figure while the
+ * row is still the debt the document described, the engine's once it is not.
+ *
+ * What the client pays today is a fact the bank already stated, so the board
+ * quotes it rather than re-deriving it — SmartNPV shows the same figure. The
+ * engine's first payment is a different, later number: next month's, with one
+ * month of CPI on a צמוד row (on the Gatenio letter that alone was the whole
+ * 0.1%, to the agora), and on a credit report a balance the bureau stated a
+ * month or more before the report's date. Schedules, totals, charts and the
+ * comparison keep the engine, so every mix is still measured from one date.
+ *
+ * A row with no term stays out, whatever the document printed: that is a debt
+ * past its end date, which the grid marks חסרה תקופה and keeps out of the sums.
+ */
+export function boardMonthly(l: ImportedLoan, engine: number): number {
+  if (!(Number(l.months) > 0)) return engine;
+  return reportedMonthly(l) ?? engine;
 }
 
 /**

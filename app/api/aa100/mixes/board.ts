@@ -90,6 +90,16 @@ const PURPOSE = ["purpose"] as const;
 const GRACE = ["grace_full_months", "grace_partial_months"] as const;
 
 /**
+ * The החזר חודשי the document printed for the row, and the row it was true of
+ * (see reportedMonthly / boardMonthly in app/aa102test/lib/credit). The board
+ * shows the document's figure until the row is edited, so without these a
+ * saved board would quietly switch every row to the engine's figure on reload.
+ * Nothing breaks without the migration — the row is simply priced by the
+ * engine after a reload, as it was before these columns existed.
+ */
+const PRINTED = ["source_monthly", "source_monthly_basis"] as const;
+
+/**
  * Flips to false the first time Postgres says the columns aren't there — and
  * stays false for the life of the process. Two consequences worth knowing:
  * a migration applied while the server is up needs a restart to be seen, and
@@ -103,6 +113,7 @@ let hasAnchor = true;
 let hasSplit = true;
 let hasPurpose = true;
 let hasGrace = true;
+let hasPrinted = true;
 /**
  * loan_mixes.target_amount — גובה התמהיל, the figure the board's אחוז column
  * allocates against. Same deal as the two above, on the other table: without the
@@ -179,6 +190,14 @@ function toDbRow(loan: Row, mixId: string): Row {
     out.grace_full_months = gFull;
     out.grace_partial_months = gPartial;
   }
+  if (hasPrinted) {
+    // Together or not at all: a figure without its basis can't tell when the
+    // row has been edited away from it, so reportedMonthly ignores it anyway.
+    const pay = numOrNull(loan.source_monthly);
+    const basis = typeof loan.source_monthly_basis === "string" ? loan.source_monthly_basis : null;
+    out.source_monthly = pay !== null && pay > 0 && basis ? pay : null;
+    out.source_monthly_basis = pay !== null && pay > 0 && basis ? basis : null;
+  }
   return out;
 }
 
@@ -191,6 +210,7 @@ const selectCols = () =>
     ...(hasSplit ? SPLIT : []),
     ...(hasPurpose ? PURPOSE : []),
     ...(hasGrace ? GRACE : []),
+    ...(hasPrinted ? PRINTED : []),
   ].join(",");
 
 function fromDbRow(row: Row): Row {
@@ -207,6 +227,11 @@ function fromDbRow(row: Row): Row {
     out.grace_full_months = legacyType === 3 ? legacyMonths : 0;
     out.grace_partial_months = legacyType === 2 ? legacyMonths : 0;
   }
+  // null in the table is "the document printed none"; the row type says that
+  // with an absent field, which is what every reader of it tests for.
+  if (row.source_monthly == null) delete out.source_monthly;
+  else out.source_monthly = Number(row.source_monthly);
+  if (row.source_monthly_basis == null) delete out.source_monthly_basis;
   delete out.debt_group;
   out.is_guarantor = !!row.is_guarantor;
   out.is_shared = !!row.is_shared;
@@ -241,7 +266,7 @@ export async function loadBoard(lead: number) {
 
   // Retire the newest column set first, then the older ones, so a deployment
   // that is one migration behind loses only what that migration added.
-  for (const retire of [() => (hasGrace = false), () => (hasPurpose = false), () => (hasSplit = false), () => (hasAnchor = false), () => (hasExtra = false)]) {
+  for (const retire of [() => (hasPrinted = false), () => (hasGrace = false), () => (hasPurpose = false), () => (hasSplit = false), () => (hasAnchor = false), () => (hasExtra = false)]) {
     if (!loansRes.error || !isMissingColumn(loansRes.error)) break;
     retire();
     loansRes = await supabase.from("loans").select(selectCols()).in("mix_id", ids);
@@ -313,7 +338,7 @@ export async function saveBoard(lead: number, mixes: BoardMix[]) {
       const build = () =>
         (mix.loans ?? []).map((l) => ({ ...toDbRow(l, mix.id), id: l.id as string }));
       let res = await supabase.from("loans").upsert(rows, { onConflict: "id" });
-      for (const retire of [() => (hasGrace = false), () => (hasPurpose = false), () => (hasSplit = false), () => (hasAnchor = false), () => (hasExtra = false)]) {
+      for (const retire of [() => (hasPrinted = false), () => (hasGrace = false), () => (hasPurpose = false), () => (hasSplit = false), () => (hasAnchor = false), () => (hasExtra = false)]) {
         if (!res.error || !isMissingColumn(res.error)) break;
         retire();
         res = await supabase.from("loans").upsert(build(), { onConflict: "id" });

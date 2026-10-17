@@ -39,7 +39,7 @@ import { priceLoan, type Assume } from "../lib/price";
 import Select from "./Select";
 import DateField from "./DateField";
 import { BankIcon } from "./bankIcons";
-import Money from "./Money";
+import Money, { fmt } from "./Money";
 import RowSettings from "./RowSettings";
 import RateAutoToggle from "./RateAutoToggle";
 import { useFitInputs } from "../lib/fit-text";
@@ -51,12 +51,14 @@ import {
   PATH_IDS,
   PATH_SHORT,
   TRACK_HEX,
+  boardMonthly,
   feeOf,
   indexationOf,
   isSurety,
   pathIdFromTrack,
   principalOf,
   rateHeat,
+  reportedMonthly,
   type DebtGroup,
   type ImportedLoan,
 } from "../lib/credit";
@@ -598,7 +600,7 @@ export default function Ledger({
     const of = (rows: ImportedLoan[]) => ({
       rows,
       amount: rows.reduce((s, l) => s + Math.round(Number(l.amount) || 0), 0),
-      monthly: rows.reduce((s, l) => s + Math.round(priceLoan(l, annualInflation).monthlyPayment), 0),
+      monthly: rows.reduce((s, l) => s + Math.round(boardMonthly(l, priceLoan(l, annualInflation).monthlyPayment)), 0),
       // The master's two extra sums. `amount` above is already principal +
       // indexation, so the balance is not re-added; these are the parts the
       // master's own columns foot — how much of it is linkage, and what leaving
@@ -1252,6 +1254,11 @@ export default function Ledger({
                       // an already-elapsed end date is stale data, not a blocker
                       const stale = !!end && end < today;
                       const flag = noTerm ? "err" : stale ? "warn" : undefined;
+                      // החזר חודשי: the document's own charge while the row is
+                      // the debt it described — see boardMonthly. The engine's
+                      // figure (next month's) is one hover away, not gone.
+                      const pay = boardMonthly(loan, res.monthlyPayment);
+                      const payFromDoc = months > 0 && reportedMonthly(loan) !== null;
                       // A guarantee is no share of the mix, because it is not in
                       // the mix — the column says so rather than quoting a
                       // percentage of a total this row is not part of.
@@ -1840,7 +1847,16 @@ export default function Ledger({
                                   חסרה תקופה
                                 </span>
                               ) : (
-                                <Money value={res.monthlyPayment} className="lgr-pay" style={{ color: "var(--ink)" }} />
+                                <Money
+                                  value={pay}
+                                  className="lgr-pay"
+                                  style={{ color: "var(--ink)" }}
+                                  title={
+                                    payFromDoc
+                                      ? `החיוב כפי שמופיע במסמך · מחושב לחודש הבא: ₪${fmt(res.monthlyPayment)}`
+                                      : undefined
+                                  }
+                                />
                               )}
                               {(res.isIndexed || stale) && (
                                 <span className="lgr-note lgr-note-pay">

@@ -88,3 +88,16 @@ alter table public.loans
 alter table public.loans
   add column if not exists grace_full_months    integer default 0,
   add column if not exists grace_partial_months integer default 0;
+
+-- החזר חודשי כפי שהודפס במסמך.
+--
+-- source_monthly is the monthly payment the imported document stated for the
+-- row: 201-046 on a credit report, the tranche's last charge on a bank letter.
+-- source_monthly_basis is the row it was true of — amount|rate|months|schedule|
+-- grace full|grace partial (monthlyBasis in app/aa102test/lib/credit.ts). The
+-- board's החזר חודשי shows the printed figure while the row still matches its
+-- basis, and the engine's once it has been edited. Both nullable: null is "the
+-- document printed none", not a zero.
+alter table public.loans
+  add column if not exists source_monthly       numeric,
+  add column if not exists source_monthly_basis text;

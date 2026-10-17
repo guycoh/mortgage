@@ -63,6 +63,7 @@ import {
   FAMILY,
   PATH_LABEL,
   TRACK_HEX,
+  boardMonthly,
   docKey,
   foldMasterRow,
   masterTotals,
@@ -778,7 +779,7 @@ export default function Simulator({
       amount += Math.round(Number(l.amount) || 0);
       // Rounded per row so the rail's החזר חודשי is the same figure as the
       // ledger's סה״כ and the export's grand total — see the note in Ledger.
-      monthly += Math.round(r.monthlyPayment);
+      monthly += Math.round(boardMonthly(l, r.monthlyPayment));
       interest += r.totalInterest;
     }
     // החזר לשקל — the mix's quality in one figure, and the only cell here that
