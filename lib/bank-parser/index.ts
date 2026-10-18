@@ -12,6 +12,7 @@ import { parseLeumi } from "./banks/leumi";
 import { parseMizrahi } from "./banks/mizrahi";
 import { parseJerusalem } from "./banks/jerusalem";
 import { BANK_LABEL, type BankStatement } from "./types";
+import { toDate } from "./text";
 
 /** True when this looks like a bank mortgage statement at all. */
 export function isBankStatement(pages: RawPage[]): boolean {
@@ -67,8 +68,11 @@ export function parseBankStatement(pages: RawPage[]): BankStatement {
  * document should not erase a value the other printed.
  */
 function joinStatements(parts: BankStatement[]): BankStatement {
-  const live = parts.filter((p) => p.tranches.length);
-  if (live.length <= 1) return live[0] ?? parts[0];
+  const { kept: live, reprints } = dropReprints(parts.filter((p) => p.tranches.length));
+  if (live.length <= 1) {
+    const only = live[0] ?? parts[0];
+    return reprints ? { ...only, warnings: [REPRINT_NOTE, ...only.warnings] } : only;
+  }
   const first = live[0];
   return {
     ...first,
@@ -87,9 +91,39 @@ function joinStatements(parts: BankStatement[]): BankStatement {
     },
     warnings: [
       `הקובץ מכיל ${live.length} הלוואות נפרדות — כולן נקראו.`,
+      ...(reprints ? [REPRINT_NOTE] : []),
       ...live.flatMap((p) => p.warnings),
     ],
   };
+}
+
+const REPRINT_NOTE = "אותה הלוואה מופיעה בקובץ יותר מפעם אחת — נקראה פעם אחת בלבד.";
+
+/**
+ * Drop a statement that is the same loan printed again.
+ *
+ * The bank's site prints a statement per click, and a client who clicks twice
+ * sends one PDF holding the same letter twice — seconds apart, every figure
+ * identical (Gonen, 15/10/2026: pages 9–16 reprint pages 1–8 at 13:30:10 instead
+ * of 13:30:06). Joined as two mortgages it doubled the debt on the board. A
+ * second mortgage at the same lender has its own loan number, so the set of
+ * tranche ids is what tells a reprint from a second loan. Where the same loan
+ * appears under two dates, the later statement is the one that is still true.
+ */
+function dropReprints(parts: BankStatement[]): { kept: BankStatement[]; reprints: number } {
+  const byKey = new Map<string, BankStatement>();
+  const order: string[] = [];
+  for (const p of parts) {
+    const key = p.tranches.map((t) => t.uid).sort().join("|");
+    const prev = byKey.get(key);
+    if (!prev) {
+      byKey.set(key, p);
+      order.push(key);
+    } else if ((toDate(p.statementDate)?.getTime() ?? 0) > (toDate(prev.statementDate)?.getTime() ?? 0)) {
+      byKey.set(key, p);
+    }
+  }
+  return { kept: order.map((k) => byKey.get(k)!), reprints: parts.length - order.length };
 }
 
 /**

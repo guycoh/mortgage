@@ -39,7 +39,9 @@ function pathIdOf(t: BankTranche): number {
 function amortizationId(text: string): number {
   const t = text.replace(/\s+/g, "");
   if (/קרןשווה|קש"ש/.test(t)) return 2;
-  if (/בולט|בלון/.test(t)) return 3;
+  // Leumi spells it with a yud ("בוליט - מדד"), and the bare בולט missed it:
+  // interest-only tranches imported as שפיצר.
+  if (/בולי?ט|בלון/.test(t)) return 3;
   return 1;
 }
 

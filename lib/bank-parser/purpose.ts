@@ -75,7 +75,10 @@ function norm(s: string): string {
  * as an unspecified housing loan would throw away the one word that matters.
  */
 const RULES: { kind: PurposeKind; needles: string[] }[] = [
-  { kind: "any", needles: ["כלמטרה", "לכלמטרה"] },
+  // Leumi's "לווה פרטי-נכס קיים" names the collateral, an existing property,
+  // beside its housing wording "לווה פרטי-מגורים": a loan secured on a home
+  // the borrower already owns, which is what כל מטרה means.
+  { kind: "any", needles: ["כלמטרה", "לכלמטרה", "נכסקיים"] },
   // גרירה declines ("גרירת משכנתא"), so match the stem — the full word sits
   // before "משכנתא", which would otherwise carry the row into `housing`.
   { kind: "refinance", needles: ["מיחזור", "מחזור", "גריר"] },

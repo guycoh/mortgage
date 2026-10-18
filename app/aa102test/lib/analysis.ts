@@ -606,7 +606,7 @@ function weightedRate(rows: { balance: number; rate: number | null }[]): number 
   return w > 0 ? Math.round((sum / w) * 100) / 100 : null;
 }
 
-const BALLOON_RE = /בלון|בולט/;
+const BALLOON_RE = /בלון|בולי?ט/;
 const VARIABLE_RE = /משתנה|פריים/;
 
 /**
