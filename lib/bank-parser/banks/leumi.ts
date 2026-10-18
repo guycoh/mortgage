@@ -349,7 +349,9 @@ export function parseLeumi(pages: RawPage[], dataPages: number[]): BankStatement
         startDate: date(g.start[c]),
         firstPaymentDate: date(g.first[c]),
         endDate,
-        months: asOfDate && to ? paymentsLeft(asOfDate, to) : null,
+        // Every Leumi letter prints the interest accrued since the last charge;
+        // a blank one on a payment day means today's charge is already taken.
+        months: asOfDate && to ? paymentsLeft(asOfDate, to, !(num(g.interest[c]) ?? 0)) : null,
         monthsDerived: true,
         baseIndex: num(g.baseIndex[c]),
         currentIndex: null,

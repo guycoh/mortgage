@@ -159,12 +159,20 @@ export function monthsBetween(a: Date, b: Date): number {
  * due ON the statement date is still owed (Mizrahi: only payments due BEFORE the
  * statement are assumed paid). Bank Jerusalem prints the figure outright (276
  * from 07/10/2026 to 10/09/2049) and SmartNPV counts the same way.
+ *
+ * `paidOnDay` is for the one case that rule cannot see: a statement dated ON a
+ * payment day, after the day's charge went through. The letter says so itself —
+ * nothing has accrued since the charge (Leumi, Gonen 15/10/2026: ריבית לסילוק
+ * blank, the payoff exactly principal + indexation + fees, and the day's
+ * 4,222.89 cancelled by a credit of −4,222.89). 228 payments from 15/04/2025 to
+ * 15/03/2044, 19 of them made through 15/10/2026: 209 left, not 210.
  */
-export function paymentsLeft(asOf: Date, last: Date): number {
+export function paymentsLeft(asOf: Date, last: Date, paidOnDay = false): number {
+  const dueToday = asOf.getDate() === last.getDate() && !paidOnDay;
   const m =
     (last.getFullYear() - asOf.getFullYear()) * 12 +
     (last.getMonth() - asOf.getMonth()) +
-    (asOf.getDate() <= last.getDate() ? 1 : 0);
+    (asOf.getDate() < last.getDate() || dueToday ? 1 : 0);
   return Math.max(0, m);
 }
 
