@@ -601,7 +601,8 @@ export function toLoanRow(src: ExtractedLoan, mixId: string, group: DebtGroup, r
     // instalment; it does not state when principal starts (201-054 and 201-055
     // are blank), so nothing here picks a grace length — the row is the document,
     // and an advisor who learns the real one sets it in the row sheet.
-    amortization_schedule_id: src.interestOnly ? 3 : 1,
+    // lib/payment-shape decides; a balloon that states no instalment is בלון מלא.
+    amortization_schedule_id: src.schedule,
     grace_type_id: 1, // ללא
     grace_months: 0,
     // The numeric column is the anchor's own RATE. The report does not print it,
@@ -632,7 +633,7 @@ export function toLoanRow(src: ExtractedLoan, mixId: string, group: DebtGroup, r
       Math.round(src.balance),
       Number(src.interest) || 0,
       Number(src.months) || 0,
-      src.interestOnly ? 3 : 1,
+      src.schedule,
       0,
       0
     ),

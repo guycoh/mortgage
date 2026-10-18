@@ -13,6 +13,7 @@
 import { PATH_IDS, type ImportedLoan, type ImportSummary } from "@/app/aa100test/lib/credit";
 import type { Loan } from "@/app/private/crm/leads/simulators/components/LoanTable";
 import { freqLabel } from "@/lib/rate-frequency";
+import { scheduleFromText } from "@/lib/payment-shape";
 import { paymentsLeft, toDate } from "./text";
 import type { BankStatement, BankTranche } from "./types";
 import { PURPOSE_LABEL } from "./purpose";
@@ -35,15 +36,8 @@ function pathIdOf(t: BankTranche): number {
   return linked ? PATH_IDS.fixedLinked : PATH_IDS.fixedUnlinked;
 }
 
-/** שפיצר unless the statement says otherwise. */
-function amortizationId(text: string): number {
-  const t = text.replace(/\s+/g, "");
-  if (/קרןשווה|קש"ש/.test(t)) return 2;
-  // Leumi spells it with a yud ("בוליט - מדד"), and the bare בולט missed it:
-  // interest-only tranches imported as שפיצר.
-  if (/בולי?ט|בלון/.test(t)) return 3;
-  return 1;
-}
+/** שפיצר unless the statement says otherwise — see lib/payment-shape. */
+const amortizationId = scheduleFromText;
 
 /** dd/mm/yyyy → yyyy-mm-dd, the shape the picker and the API both expect. */
 function iso(dmy: string): string | null {

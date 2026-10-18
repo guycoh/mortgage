@@ -26,6 +26,7 @@ import {
   type ClientWorry,
 } from "@/lib/verdicts";
 import { toDate, monthsBetween } from "./text";
+import { BALLOON_WORD } from "@/lib/payment-shape";
 import {
   BREAK_FEE_RATIO_HIGH,
   BREAK_FEE_RATIO_MEDIUM,
@@ -245,7 +246,7 @@ function weighted(rows: { balance: number | null; value: number | null }[]): num
  */
 function remainingInterest(t: BankTranche): { value: number | null; why?: string } {
   if (!t.monthly || !t.months || !t.balance) return { value: null };
-  if (/בלון|בולי?ט/.test(t.amortization)) return { value: null, why: "מסלול בלון — ההחזר החודשי אינו כולל את הקרן" };
+  if (BALLOON_WORD.test(t.amortization)) return { value: null, why: "מסלול בלון — ההחזר החודשי אינו כולל את הקרן" };
   if (/קרן\s*שווה/.test(t.amortization)) return { value: null, why: "קרן שווה — ההחזר יורד מחודש לחודש" };
   const total = t.monthly * t.months;
   if (total < t.balance) return { value: null, why: "ההחזר הנוכחי אינו מכסה את היתרה בתקופה שנותרה" };
@@ -689,7 +690,7 @@ function buildFindings(a: StatementAnalysis): Finding[] {
   }
 
   /* ---- the shape of the debt */
-  const balloon = a.live.filter((t) => /בלון|בולי?ט/.test(t.amortization));
+  const balloon = a.live.filter((t) => BALLOON_WORD.test(t.amortization));
   if (balloon.length) {
     push({
       id: "balloon",

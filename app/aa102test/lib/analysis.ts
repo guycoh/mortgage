@@ -33,6 +33,7 @@ import {
   type LiabilityCategory,
 } from "@/lib/credit-parser/loan-mapping";
 import { instalmentCredit } from "./cards";
+import { wordShape } from "@/lib/payment-shape";
 import {
   APPLICATIONS_IN_WINDOW_TRIGGER,
   INQUIRY_WINDOW_MONTHS,
@@ -147,6 +148,8 @@ export interface DebtLine {
   paymentType: string;
   /** Principal falls due in one lump — a payment shock the mix maths hides. */
   balloon: boolean;
+  /** The instalment is the month's interest; the balance does not move. */
+  interestOnly: boolean;
   overdue: number;
   arrearsRange: string;
   firstMiss: string;
@@ -606,16 +609,15 @@ function weightedRate(rows: { balance: number; rate: number | null }[]): number 
   return w > 0 ? Math.round((sum / w) * 100) / 100 : null;
 }
 
-const BALLOON_RE = /בלון|בולי?ט/;
 const VARIABLE_RE = /משתנה|פריים/;
 
 /**
- * 201-047 naming ריבית without naming קרן — the instalment is the month's
- * interest and the balance does not move. Not a balloon: a balloon states when
- * the principal falls due (201-054), and these state nothing at all.
+ * The instalment is the month's interest and the balance does not move — as
+ * the importer read it (lib/payment-shape), so the flag and the row agree. Not
+ * a balloon: a balloon states when the principal falls due.
  */
 function isInterestOnly(l: DebtLine): boolean {
-  return /ריבית/.test(l.paymentType) && !/קרן/.test(l.paymentType);
+  return l.interestOnly;
 }
 
 function isLinked(tr: InterestTrack): boolean {
@@ -774,7 +776,9 @@ function toLine(
     purpose: f["201-017"] ?? "",
     frequency,
     paymentType,
-    balloon: BALLOON_RE.test(paymentType) || BALLOON_RE.test(frequency) || !!f["201-054"],
+    // The importer's reading when there is a row; the words alone otherwise.
+    balloon: (loan ? loan.balloon : wordShape(paymentType, frequency) === "balloon") || !!f["201-054"],
+    interestOnly: loan ? loan.interestOnly : wordShape(paymentType, frequency) === "interestOnly",
     overdue: num(f["201-051"]),
     arrearsRange: f["201-050"] ?? "",
     firstMiss: f["201-052"] ?? "",

@@ -168,6 +168,8 @@ export const ENUMS = {
     "קרן",
     "ריבית",
     "בולט",
+    // Leumi's own spelling on its letters; harmless if the bureau never prints it.
+    "בוליט",
   ],
   interestType: ["ללא ריבית", "ריבית משתנה", "ריבית קבועה"],
   collateralType: ["רכב", "נדלִן", "נדלן", "פיקדון", "ניירות ערך", "ערבות"],

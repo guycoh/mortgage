@@ -13,6 +13,7 @@
 
 import { FREQ_FIXED, FREQ_PRIME, FREQ_UNSTATED } from "../rate-frequency";
 import type { CreditReport, Transaction, InterestTrack } from "./types";
+import { creditShape } from "../payment-shape";
 
 /** BDI page-2 grouping: the four liability families + a catch-all. */
 export type LiabilityCategory =
@@ -82,6 +83,16 @@ export interface ExtractedLoan {
    * app/aa102test/lib/credit.ts.
    */
   interestOnly: boolean;
+  /**
+   * Engine schedule the row is priced on (1 שפיצר · 3 בלון חלקי · 4 בלון מלא),
+   * from lib/payment-shape — the words in 201-047/201-044 and the printed
+   * instalment, read independently.
+   */
+  schedule: 1 | 3 | 4;
+  /** The principal falls due in one lump ("תשלום בלון" / "בולט"). */
+  balloon: boolean;
+  /** Which reading set `schedule`: "numbers" = the instalment overrode the words. */
+  shapeBy: "words" | "numbers" | "default";
   /** תדירות שינוי — derived, because this report has no field for it. */
   changeFrequency: string;
   /** עוגן (201-034) of the dominant track, e.g. "ריבית פריים" ("" when blank). */
@@ -214,14 +225,6 @@ function isLoanOrMortgage(t: Transaction): boolean {
 
 const OVERDRAFT_RE = /עובר ושב|עו["״]?ש/;
 const CARD_RE = /מסגרת|כרטיס/;
-// 201-047 spells the instalment out in words: "קרן וריבית", "קרן, ריבית והצמדה",
-// "ריבית", "ריבית והצמדה", and on revolving facilities plain "קרן". Interest
-// without principal is the case that changes the arithmetic, so both halves are
-// tested rather than matching "ריבית" alone — "קרן, ריבית והצמדה" contains it too.
-const INTEREST_ONLY_RE = /ריבית/;
-const PRINCIPAL_RE = /קרן/;
-/** 201-044's monthly answer. Anything else is a cadence the grid cannot model. */
-const MONTHLY_RE = /חודשי/;
 
 /** Classify a transaction into its BDI page-2 section. */
 export function liabilityCategory(t: Transaction): LiabilityCategory {
@@ -355,11 +358,7 @@ function deriveLoan(t: Transaction, asOf: Date): ExtractedLoan {
   const mortgage = isMortgageTxn(t);
   const anchor = anchorOf(t.interestTracks);
   const paymentType = t.fields["201-047"] ?? "";
-  const interestOnly = INTEREST_ONLY_RE.test(paymentType) && !PRINCIPAL_RE.test(paymentType);
   const paymentFrequency = (t.fields["201-044"] ?? "").trim();
-  // Blank counts as monthly: it is the overwhelming default, and every debt the
-  // grid can model is monthly anyway. Only a stated non-monthly cadence is news.
-  const nonMonthly = paymentFrequency !== "" && !MONTHLY_RE.test(paymentFrequency);
 
   // 1) Remaining months from the planned end date (independent of interest).
   //
@@ -384,6 +383,18 @@ function deriveLoan(t: Transaction, asOf: Date): ExtractedLoan {
   // pointed at an interest-only tranche — there the payment IS the interest,
   // and the rate falls straight out of it.
   let interest = interestFromTracks(t);
+  // What the instalment does to the principal — words and printed instalment
+  // read independently in lib/payment-shape. Decided here, before the back-solve
+  // below, because an interest-only payment back-solves to a rate, not a term.
+  const shape = creditShape({
+    paymentType,
+    frequency: paymentFrequency,
+    balance,
+    monthlyRate: parseFloat(interest || "") / 100 / 12,
+    months,
+    printed: knownPayment,
+  });
+  const { interestOnly, nonMonthly } = shape;
   if (interest === "" && knownPayment > 0 && balance > 0) {
     if (interestOnly) {
       interest = round2((knownPayment / balance) * 12 * 100);
@@ -410,7 +421,7 @@ function deriveLoan(t: Transaction, asOf: Date): ExtractedLoan {
   // does not need a term to be known — which is just as well, because a tranche
   // whose principal never falls due has no amortisation to measure.
   const monthlyPayment =
-    balance <= 0
+    balance <= 0 || shape.schedule === 4
       ? 0
       : interestOnly
         ? Math.round(balance * rMonthly)
@@ -435,6 +446,9 @@ function deriveLoan(t: Transaction, asOf: Date): ExtractedLoan {
     eligibility: (t.remarks ?? []).some((r) => SUBSIDISED_RE.test(r)),
     paymentType,
     interestOnly,
+    schedule: shape.schedule,
+    balloon: shape.balloon,
+    shapeBy: shape.by,
     paymentFrequency,
     nonMonthly,
     changeFrequency: changeFrequency(t.interestTracks),
