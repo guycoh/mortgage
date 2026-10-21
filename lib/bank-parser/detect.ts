@@ -106,6 +106,18 @@ const RULES: Rule[] = [
     hints: ["פירוט סילוקית", "הסכם לתיוק", "סיכום הסילוקית", "תשלומים שנותרו"],
     dataPage: ["הסכם לתיוק"],
   },
+  {
+    // הבנק הבינלאומי's "אישור פרטי הלוואה/ות". The bank's name is only in the
+    // signature on the last page, so the form's own field names are the must:
+    // "ריבית נוכחית (ליום מסירת המידע)" and "יתרת משנה" appear on no other
+    // lender's form. Blocks run across page breaks, so the reader takes the
+    // whole file, like Jerusalem.
+    bank: "fibi",
+    template: "fibi/loan-details",
+    must: ["מסירת המידע", "יתרת משנה"],
+    hints: ["הבינלאומי", "אישור פרטי הלוואה", "מספר_משנה", "לצורכי השוואה", "סה\"כ ללווה"],
+    dataPage: ["מספר_הלוואה", "מספר הלוואה", "מסירת המידע"],
+  },
 ];
 
 /**

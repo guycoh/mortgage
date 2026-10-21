@@ -11,6 +11,7 @@ import { parsePoalim } from "./banks/poalim";
 import { parseLeumi } from "./banks/leumi";
 import { parseMizrahi } from "./banks/mizrahi";
 import { parseJerusalem } from "./banks/jerusalem";
+import { parseFibi } from "./banks/fibi";
 import { BANK_LABEL, type BankStatement } from "./types";
 import { toDate } from "./text";
 
@@ -30,7 +31,7 @@ export function parseBankStatement(pages: RawPage[]): BankStatement {
   const det = detectBank(pages);
   if (!det) {
     throw new Error(
-      "לא זוהתה תבנית בנק מוכרת בקובץ. נתמכים: דיסקונט, מרכנתיל, לאומי, הפועלים, מזרחי טפחות, ירושלים."
+      "לא זוהתה תבנית בנק מוכרת בקובץ. נתמכים: דיסקונט, מרכנתיל, לאומי, הפועלים, מזרחי טפחות, ירושלים, הבינלאומי."
     );
   }
 
@@ -53,6 +54,8 @@ export function parseBankStatement(pages: RawPage[]): BankStatement {
       return withMeta(parseMizrahi(pages, det.dataPages), det);
     case "jerusalem":
       return withMeta(parseJerusalem(pages), det);
+    case "fibi":
+      return withMeta(parseFibi(pages), det);
     default:
       throw new Error(
         `זוהה מסמך של ${BANK_LABEL[det.bank]}, אך הקריאה עבור התבנית הזו עדיין לא נתמכת.`
