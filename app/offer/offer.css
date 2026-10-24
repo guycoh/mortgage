@@ -108,6 +108,15 @@
 .ofr-table tbody tr + tr > * { border-top: 1px solid var(--line); }
 .ofr-table .ofr-table-d { color: var(--save); font-weight: 600; }
 .ofr-table thead .ofr-table-d { color: var(--save); }
+/* Column rules (owner, 2026-10-24): a hairline between every column, in the
+   same tone as the row rules, so the figures read as a grid. Each cell after
+   the first draws the rule on its start edge (the right, in RTL) and gets a
+   matching inset so no figure touches it. */
+/* Physical right, not inline-start: the הפרש cells are dir="ltr", and on them
+   inline-start is the LEFT edge — the rule would land on the table's outer
+   edge instead of between columns. The page is RTL-only. */
+.ofr-table tr > * + * { border-right: 1px solid var(--line); padding-right: 14px; }
+.ofr-table tbody th { padding-inline-end: 14px; }
 .ofr-col { display: inline-flex; align-items: center; gap: 8px; }
 .ofr-col i { width: 16px; height: 0; border-top: 2.75px solid var(--next); border-radius: 2px; }
 .ofr-col[data-side="now"] i { border-top: 2px dashed var(--now); }
