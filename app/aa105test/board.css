@@ -498,45 +498,47 @@
   padding: 18px 26px 14px;
 }
 
-/* THE COMPOSITION — one quiet line under the satellites: label, a short bar,
-   and its legend running on beside it. It breaks down the figures above
-   rather than being a figure of its own, so it does not get the band's width
-   (owner, 2026-10-24: "doesn't need to be so big"). */
+/* THE COMPOSITION — two quiet lines under the satellites: the label beside a
+   thin bar, and one line of legend directly under the bar, in its RTL order.
+   The owner found the bar too big at full weight (2026-10-24) and then the
+   two-row legend grid beside it visually noisy: bold figures scattered over
+   uneven columns. Now each item is a dot, its name in the secondary ink and
+   its share right after it — read as one phrase — on a single line. */
 .lgr-root[data-v="v105"] .lgr-rail-cells > .lgr-rail-cell:nth-child(5) {
   grid-row: 2;
   grid-column: 2 / -1;
   display: grid;
-  grid-template-columns: auto minmax(100px, 300px) max-content;
+  grid-template-columns: auto minmax(0, 1fr);
   align-content: center;
   align-items: center;
-  gap: 6px 18px;
+  gap: 8px 18px;
   margin-inline: 26px;
-  padding: 11px 0 13px;
+  padding: 12px 0 14px;
   border-top: 1px solid var(--line);
 }
-.lgr-root[data-v="v105"] .lgr-rail-cells > .lgr-rail-cell:nth-child(5) > * { grid-row: 1; }
-.lgr-root[data-v="v105"] .lgr-rail-cells > .lgr-rail-cell:nth-child(5) > .lgr-rail-hint { grid-column: 2 / -1; }
+.lgr-root[data-v="v105"] .lgr-rail-cells > .lgr-rail-cell:nth-child(5) > .lgr-rail-label { grid-row: 1; grid-column: 1; }
+.lgr-root[data-v="v105"] .lgr-rail-cells > .lgr-rail-cell:nth-child(5) > :not(.lgr-rail-label) { grid-column: 2; }
 .lgr-root[data-v="v105"] .lgr-rail-strip {
   height: 8px;
   border-radius: 4px;
-  /* RTL like the legend beside it, so the first track is on the right in both */
+  /* RTL like the legend under it, so the first track is on the right in both */
   direction: rtl;
 }
 .lgr-root[data-v="v105"] .lgr-rail-strip span + span { box-shadow: inset -1.5px 0 0 #fff; }
-/* at most two rows: five tracks fill columns of two instead of wrapping into
-   a third line under a bar that is meant to be small */
 .lgr-root[data-v="v105"] .lgr-rail-legend {
-  display: grid;
-  grid-auto-flow: column;
-  grid-template-rows: repeat(2, auto);
-  justify-content: start;
-  gap: 3px 18px;
-  white-space: nowrap;
-  color: var(--lgr-2);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 20px;
   font-size: 12px;
+  color: var(--lgr-3);
 }
-.lgr-root[data-v="v105"] .lgr-rail-legend b { margin-inline-start: 6px; }
-.lgr-root[data-v="v105"] .lgr-rail-legend .lgr-dot { width: 8px; height: 8px; border-radius: 2.5px; }
+.lgr-root[data-v="v105"] .lgr-rail-legend > span { gap: 6px !important; white-space: nowrap; }
+.lgr-root[data-v="v105"] .lgr-rail-legend b {
+  margin-inline-start: 0;
+  font-weight: 600;
+  color: var(--ink);
+}
+.lgr-root[data-v="v105"] .lgr-rail-legend .lgr-dot { width: 7px; height: 7px; border-radius: 2px; }
 
 /* THE ASSUMPTIONS — one panel, a row each: what it is, then its control. */
 .lgr-root[data-v="v105"] .lgr-rail > .lgr-rail-assume {

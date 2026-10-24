@@ -1728,7 +1728,16 @@ export default function Simulator({
                     : undefined
                 }
                 onDoubleClick={v105 ? () => setEditingId(m.id) : undefined}
-                title={v105 ? "לחיצה כפולה לשינוי שם" : undefined}
+                // a right-click opens the same menu as the ⋯ button
+                onContextMenu={
+                  v105
+                    ? (e) => {
+                        e.preventDefault();
+                        setMenuFor(m.id);
+                      }
+                    : undefined
+                }
+                title={v105 ? "לחיצה כפולה לשינוי שם · קליק ימני לפעולות" : undefined}
                 onClick={() => setActiveMixId(m.id)}
               >
                 {editingId === m.id ? (
