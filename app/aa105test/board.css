@@ -32,57 +32,111 @@
 .lgr-root[data-v="v105"] > .max-w-\[1300px\] { max-width: var(--v5-col); }
 
 /* ------------------------------------------------------------- buttons */
-/* TACTILE, AND EACH ONE IN ITS OWN INK. One recipe, one variable: --a is the
-   button's accent. The face is white falling into a 7% wash of it, the edge is
-   a third of it with a deeper bottom lip, the top carries a white highlight and
-   the shadow is tinted by the same hue — so a button looks pressed out of its
-   own colour rather than outlined in grey. Neutral buttons use slate. */
+/* ONE KEY, THREE MARKS (round 4, 2026-10-24).
+
+   Round 2 tinted each button in its own colour — face, edge, shadow and
+   label — so the header read as a row of pills that differed by hue and by
+   nothing else. Now every button is the same key: white falling to a whisper
+   of grey, a hairline edge over a deeper bottom lip, an ink label. What sets
+   one apart is said three ways, and colour is the quietest of them:
+
+   · THE MARK'S SHAPE says what kind of thing the button does —
+       a tinted tile    opens a view      סיכום, ניתוח, מסמך, לוח סילוקין
+       a solid disc     adds something    משכנתא, הלוואה, דוח, תמהיל
+       a bare glyph     acts in place     שכפול, אקסל, עוגנים, שחזור
+   · THE GLYPH says which action.
+   · THE HUE (--a) says which subject, and lives only inside the mark.
+
+   Siblings are one joined bar (.v5-join), so a group reads as one panel of
+   keys rather than a row of loose chips. */
+.lgr-root[data-v="v105"] {
+  --key-face: linear-gradient(180deg, #ffffff 0%, #f7f7fa 100%);
+  --key-face-hover: linear-gradient(180deg, #ffffff 0%, #f0f0f4 100%);
+  --key-edge: #d6d8df;
+  --key-lip: #bcc0c9;
+  --key-shadow: inset 0 1px 0 #fff, 0 1px 1px rgba(20, 22, 32, 0.05), 0 2px 5px -3px rgba(20, 22, 32, 0.18);
+  --key-shadow-hover: inset 0 1px 0 #fff, 0 1px 1px rgba(20, 22, 32, 0.06), 0 6px 12px -6px rgba(20, 22, 32, 0.28);
+}
 .lgr-root[data-v="v105"] .lgr-btn {
   --a: #5c6474;
-  --a-ink: color-mix(in oklab, var(--a) 74%, #000);
-  background: linear-gradient(180deg, #fff 0%, color-mix(in oklab, var(--a) 7%, #fff) 100%);
-  border: 1px solid color-mix(in oklab, var(--a) 30%, #d6d8df);
-  border-bottom-color: color-mix(in oklab, var(--a) 48%, #b3b7c1);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.95),
-    0 1px 1px color-mix(in oklab, var(--a) 14%, transparent),
-    0 3px 6px -3px color-mix(in oklab, var(--a) 30%, transparent);
-  color: var(--a-ink);
+  height: 34px;
+  padding-inline: 12px 14px;
+  gap: 8px;
+  background: var(--key-face);
+  border: 1px solid var(--key-edge);
+  border-bottom-color: var(--key-lip);
+  box-shadow: var(--key-shadow);
+  color: #262830;
   font-weight: 600;
 }
 .lgr-root[data-v="v105"] .lgr-btn:hover:not(:disabled) {
-  background: linear-gradient(180deg, color-mix(in oklab, var(--a) 3%, #fff) 0%, color-mix(in oklab, var(--a) 13%, #fff) 100%);
-  border-color: color-mix(in oklab, var(--a) 46%, #c7cad2);
-  border-bottom-color: color-mix(in oklab, var(--a) 62%, #9da2ad);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.9),
-    0 1px 1px color-mix(in oklab, var(--a) 16%, transparent),
-    0 6px 12px -6px color-mix(in oklab, var(--a) 45%, transparent);
-  color: var(--a-ink);
+  background: var(--key-face-hover);
+  border-color: #c5c8d0;
+  border-bottom-color: #a9adb8;
+  box-shadow: var(--key-shadow-hover);
+  color: var(--ink);
   translate: 0 -1px;
 }
 .lgr-root[data-v="v105"] .lgr-btn:active:not(:disabled) {
   translate: 0;
-  background: color-mix(in oklab, var(--a) 12%, #fff);
-  box-shadow: inset 0 1px 2px color-mix(in oklab, var(--a) 30%, transparent);
+  background: #f0f0f3;
+  box-shadow: inset 0 1px 2px rgba(20, 22, 32, 0.16);
 }
 .lgr-root[data-v="v105"] .lgr-btn:focus-visible {
   outline: none;
-  border-color: var(--a);
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--a) 28%, transparent);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--focus-ring-strong);
 }
-.lgr-root[data-v="v105"] .lgr-btn-sm { height: 32px; padding: 0 12px; gap: 7px; }
-/* The icon carries the accent at full strength (several arrive with inline
-   colours from /aa102test, hence the !important). */
-.lgr-root[data-v="v105"] .lgr-btn > svg { color: var(--a) !important; flex: none; }
+.lgr-root[data-v="v105"] .lgr-btn:disabled { opacity: 0.45; }
+.lgr-root[data-v="v105"] .lgr-btn-sm { height: 34px; }
 
+/* the subjects — one hue each, spent only on the mark */
 .lgr-root[data-v="v105"] .lgr-btn[data-tone="violet"] { --a: #5b54d6; }
 .lgr-root[data-v="v105"] .lgr-btn[data-tone="teal"] { --a: #0d8b9b; }
 .lgr-root[data-v="v105"] .lgr-btn[data-tone="red"] { --a: #c4372b; }
 .lgr-root[data-v="v105"] .lgr-btn[data-tone="blue"] { --a: #2563eb; }
+.lgr-root[data-v="v105"] .lgr-btn[data-tone="amber"] { --a: #ad7804; }
+.lgr-root[data-v="v105"] .lgr-btn[data-tone="slate"] { --a: #5c6474; }
+.lgr-root[data-v="v105"] .lgr-btn[data-tone="ink"] { --a: #2f323a; }
 .lgr-root[data-v="v105"] .lgr-btn-excel { --a: #1d7a46; }
-.lgr-root[data-v="v105"] .lgr-btn-fam { --a: var(--fam); --a-ink: var(--fam-text, var(--fam)); }
+.lgr-root[data-v="v105"] .lgr-btn-fam { --a: var(--fam); }
 
+/* THE MARK. Several glyphs arrive with inline colours from /aa102test, hence
+   the !important. */
+.lgr-root[data-v="v105"] .lgr-btn > svg {
+  flex: none;
+  color: var(--a) !important;
+  transition: background-color var(--t) var(--ease), box-shadow var(--t) var(--ease), scale var(--t) var(--ease);
+}
+/* ▢ opens a view — the glyph on a tile of its hue */
+.lgr-root[data-v="v105"] .lgr-btn[data-role="read"] { padding-inline-start: 6px; }
+.lgr-root[data-v="v105"] .lgr-btn[data-role="read"] > svg {
+  box-sizing: content-box;
+  width: 14px;
+  height: 14px;
+  padding: 4px;
+  border-radius: 6px;
+  background: color-mix(in oklab, var(--a) 12%, #fff);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--a) 20%, transparent);
+}
+.lgr-root[data-v="v105"] .lgr-btn[data-role="read"]:hover:not(:disabled) > svg {
+  background: color-mix(in oklab, var(--a) 19%, #fff);
+}
+/* ● adds something — a white plus on a disc of its hue */
+.lgr-root[data-v="v105"] .lgr-btn[data-role="add"] { padding-inline-start: 8px; }
+.lgr-root[data-v="v105"] .lgr-btn[data-role="add"] > svg {
+  box-sizing: content-box;
+  width: 10px;
+  height: 10px;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--a);
+  color: #fff !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 1px 2px color-mix(in oklab, var(--a) 50%, transparent);
+}
+.lgr-root[data-v="v105"] .lgr-btn[data-role="add"]:hover:not(:disabled) > svg { scale: 1.08; }
+/* acts in place — the glyph alone, a size up so it holds its own */
+.lgr-root[data-v="v105"] .lgr-btn[data-role="act"] > svg { width: 15px; height: 15px; }
 /* THE ONE SOLID BUTTON — same build, filled. */
 .lgr-root[data-v="v105"] .lgr-btn-primary,
 .lgr-root[data-v="v105"] .lgr-btn-primary:disabled {
@@ -120,19 +174,51 @@
 }
 .lgr-root[data-v="v105"] .lgr-btn-ghost:hover:not(:disabled) { background: var(--card-3); }
 
-/* Square icon buttons beside a 32px row of controls: same build, 32px. */
+/* The square key beside the readings (התחלה מחדש): the same build, 34px. */
 .lgr-root[data-v="v105"] .lgr-receipt-acts .lgr-act {
-  width: 32px;
-  height: 32px;
-  border: 1px solid #d6d8df;
-  border-bottom-color: #b3b7c1;
-  background: linear-gradient(180deg, #fff, #f3f4f6);
-  box-shadow: inset 0 1px 0 #fff, 0 2px 5px -3px rgba(40, 44, 60, 0.3);
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--key-edge);
+  border-bottom-color: var(--key-lip);
+  border-radius: var(--r-sm);
+  background: var(--key-face);
+  box-shadow: var(--key-shadow);
+  color: var(--lgr-2);
 }
-.lgr-root[data-v="v105"] .lgr-receipt-acts .lgr-act:hover { border-color: #b3b7c1; color: var(--ink); }
+.lgr-root[data-v="v105"] .lgr-receipt-acts .lgr-act:hover {
+  border-color: #c5c8d0;
+  border-bottom-color: #a9adb8;
+  background: var(--key-face-hover);
+  box-shadow: var(--key-shadow-hover);
+  color: var(--ink);
+}
 
-/* The three readings of one document, held together by spacing. */
+/* ONE JOINED BAR. Siblings share their edges, so a group is one object with
+   seams; only the group lifts its shadow, and a hovered key brightens in place
+   instead of rising out of the bar. */
 .v5-join { display: inline-flex; align-items: center; gap: 6px; }
+.lgr-root[data-v="v105"] .v5-join {
+  gap: 0;
+  border-radius: var(--r-sm);
+  box-shadow: 0 1px 1px rgba(20, 22, 32, 0.05), 0 2px 5px -3px rgba(20, 22, 32, 0.18);
+}
+.lgr-root[data-v="v105"] .v5-join > .lgr-btn { position: relative; border-radius: 0; box-shadow: inset 0 1px 0 #fff; }
+.lgr-root[data-v="v105"] .v5-join > .lgr-btn + .lgr-btn { margin-inline-start: -1px; }
+.lgr-root[data-v="v105"] .v5-join > .lgr-btn:first-child {
+  border-start-start-radius: var(--r-sm);
+  border-end-start-radius: var(--r-sm);
+}
+.lgr-root[data-v="v105"] .v5-join > .lgr-btn:last-child {
+  border-start-end-radius: var(--r-sm);
+  border-end-end-radius: var(--r-sm);
+}
+.lgr-root[data-v="v105"] .v5-join > .lgr-btn:hover:not(:disabled) {
+  z-index: 1;
+  translate: 0;
+  box-shadow: inset 0 1px 0 #fff;
+}
+.lgr-root[data-v="v105"] .v5-join > .lgr-btn:active:not(:disabled) { box-shadow: inset 0 1px 2px rgba(20, 22, 32, 0.16); }
+.lgr-root[data-v="v105"] .v5-join > .lgr-btn:focus-visible { z-index: 2; box-shadow: 0 0 0 3px var(--focus-ring-strong); }
 
 /* ONE SEGMENTED SWITCH — the forecast on/off reads like the document picker:
    a quiet track, the chosen side lifted onto white in the identity ink. */
@@ -150,23 +236,6 @@
   box-shadow: 0 1px 2px rgba(20, 22, 32, 0.1), 0 0 0 0.5px rgba(20, 22, 32, 0.06);
 }
 .lgr-root[data-v="v105"] .lgr-econ-src:not(:disabled) { box-shadow: var(--v5-shadow-btn); }
-
-/* -------------------------------------------------------------- read-out */
-/* Figures size to themselves, so the hero never runs past the card edge; the
-   composition takes what is left. */
-.lgr-root[data-v="v105"] .lgr-rail-cells {
-  grid-template-columns: max-content max-content max-content max-content minmax(220px, 1fr);
-  gap: 4px 32px;
-  padding: 14px 20px 14px;
-}
-.lgr-root[data-v="v105"] .lgr-rail-assume { padding: 14px 18px; }
-.lgr-root[data-v="v105"] .lgr-rail-cell { min-height: 56px; gap: 5px; }
-.lgr-root[data-v="v105"] .lgr-rail-cell[data-hero="true"] .lgr-rail-value { color: var(--primary-deep); }
-/* The three inputs are one group of assumptions: one tinted ground, not three
-   ruled cells. */
-.lgr-root[data-v="v105"] .lgr-rail > .lgr-rail-assume { background: var(--card-2); }
-.lgr-root[data-v="v105"] .lgr-rail > .lgr-rail-assume + .lgr-rail-assume { border-inline-start: 0; padding-inline-start: 4px; }
-.lgr-root[data-v="v105"] .lgr-rail > .lgr-rail-assume:last-child { border-start-end-radius: calc(var(--r) - 1px); }
 
 /* --------------------------------------------------- the document band */
 /* The receipt was a card inside the workbench. It is a band of it now. */
@@ -317,3 +386,380 @@
   padding-inline-start: 12px;
   border-inline-start: 1px solid var(--line-2);
 }
+
+/* ============================================================================
+   ROUND 3 (2026-10-24) — THE QUIET SHEET.
+
+   The board read as a form: 27 rows × ten boxed inputs is ~270 rectangles,
+   and the eye lands on the boxes instead of the figures. The selects on the
+   same rows were already bare until touched; the inputs now follow them.
+
+   1. A FIELD AT REST IS A TINTED WELL, NOT A BOX. Editable still differs from
+      calculated (tint vs bare paper), but the hairline arrives only when the
+      row is approached, and the ring only on focus.
+   2. NO STRIPES. Identity is the family chip at the head of every row; the
+      4px spine said it a second time, louder, down the whole sheet edge.
+   3. THE READ-OUT HAS ONE SUBJECT. החזר חודשי is the figure being solved
+      for: it is set at display size and ruled off from its satellites.
+   4. THE OPEN MIX IS LIT. Its tab carries a violet lip, a wash falling from
+      it and a solid count — the "lit lip" picked from the three options.
+   ========================================================================== */
+
+/* -------------------------------------------------------------- masthead */
+.lgr-root[data-v="v105"] .lgr-masthead { margin-bottom: 18px; }
+.lgr-root[data-v="v105"] .lgr-masthead-title { font-size: 28px; letter-spacing: -0.035em; }
+/* Nothing to commit is not a dimmed primary — a washed-out violet slab read as
+   a broken button. It is a plain neutral until there is work to save. */
+.lgr-root[data-v="v105"] .lgr-btn-save:disabled {
+  background: var(--card-3);
+  border-color: var(--line-2);
+  box-shadow: none;
+  color: var(--lgr-3);
+  opacity: 1;
+}
+.lgr-root[data-v="v105"] .lgr-btn-save:disabled > svg { color: var(--lgr-4) !important; }
+.lgr-root[data-v="v105"] .lgr-btn-save[data-state="saved"]:disabled {
+  background: var(--pos-tint);
+  border-color: var(--pos-line);
+  color: var(--pos);
+}
+.lgr-root[data-v="v105"] .lgr-btn-save[data-state="saved"]:disabled > svg { color: var(--pos) !important; }
+
+/* -------------------------------------------------------------- read-out */
+/* ONE INSTRUMENT FACE (round 5, 2026-10-24).
+
+   The owner circled this band as dead space, and it was: a 40px hero beside
+   22px satellites, all bottom-aligned, left the labels floating at three
+   heights; the composition was a long bar with a stacked legend parked off
+   to one side of it, in the opposite reading order; and three assumptions
+   stood as tall columns with air above their controls.
+
+   Now it is a grid of three zones:
+
+     ┌─────────────┬─────────────────────────────────┬──────────────┐
+     │             │ סכום התמהיל · סה"כ ריבית · לשקל │ אינפלציה     │
+     │ החזר חודשי  ├─────────────────────────────────┤ תחזית        │
+     │             │ הרכב לפי מסלול ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬ │ היוון        │
+     │             │                ● legend          │              │
+     └─────────────┴─────────────────────────────────┴──────────────┘
+
+   The hero owns the full height; the satellites share one label line; the
+   composition runs the whole middle width with its legend directly under the
+   bar it names, in the same right-to-left order; the assumptions are one
+   compact panel of label-and-control rows. */
+.lgr-root[data-v="v105"] .lgr-rail {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-auto-rows: 1fr;
+}
+.lgr-root[data-v="v105"] .lgr-rail-cells {
+  grid-row: 1 / span 3;
+  grid-column: 1;
+  display: grid;
+  grid-template-columns: auto repeat(3, minmax(0, 1fr));
+  grid-template-rows: auto 1fr;
+  gap: 0;
+  padding: 0;
+  align-items: stretch;
+}
+.lgr-root[data-v="v105"] .lgr-rail-cell { min-height: 0; gap: 7px; }
+.lgr-root[data-v="v105"] .lgr-rail-label { font-size: 12.5px; color: var(--lgr-3); }
+.lgr-root[data-v="v105"] .lgr-rail-value { font-size: 22px; }
+
+/* THE HERO — the full height of the band, on the faintest wash of the
+   identity, ruled off from everything it is the answer to. */
+.lgr-root[data-v="v105"] .lgr-rail-cell[data-hero="true"] {
+  grid-row: 1 / span 2;
+  justify-content: center;
+  gap: 10px;
+  min-width: 236px;
+  padding: 20px 28px;
+  border-inline-end: 1px solid var(--line);
+  background: color-mix(in oklab, var(--primary) 4%, #fff);
+  border-start-start-radius: calc(var(--r) - 1px);
+}
+.lgr-root[data-v="v105"] .lgr-rail-cell[data-hero="true"] .lgr-rail-label { color: var(--ink); font-size: 13px; font-weight: 700; }
+.lgr-root[data-v="v105"] .lgr-rail-cell[data-hero="true"] .lgr-rail-value {
+  font-size: 44px;
+  font-weight: 650;
+  letter-spacing: -0.045em;
+  color: var(--primary-deep);
+}
+.lgr-root[data-v="v105"] .lgr-rail-cell[data-hero="true"] .lgr-cur { font-size: 0.5em; }
+.lgr-root[data-v="v105"] .lgr-rail-cell[data-hero="true"] .lgr-rail-value[data-empty="true"] {
+  font-size: 28px;
+  font-weight: 400;
+  color: var(--lgr-4);
+}
+
+/* THE SATELLITES — one label line, one figure line, evenly across. */
+.lgr-root[data-v="v105"] .lgr-rail-cells > .lgr-rail-cell:nth-child(n + 2):nth-child(-n + 4) {
+  grid-row: 1;
+  padding: 18px 26px 14px;
+}
+
+/* THE COMPOSITION — one quiet line under the satellites: label, a short bar,
+   and its legend running on beside it. It breaks down the figures above
+   rather than being a figure of its own, so it does not get the band's width
+   (owner, 2026-10-24: "doesn't need to be so big"). */
+.lgr-root[data-v="v105"] .lgr-rail-cells > .lgr-rail-cell:nth-child(5) {
+  grid-row: 2;
+  grid-column: 2 / -1;
+  display: grid;
+  grid-template-columns: auto minmax(100px, 300px) max-content;
+  align-content: center;
+  align-items: center;
+  gap: 6px 18px;
+  margin-inline: 26px;
+  padding: 11px 0 13px;
+  border-top: 1px solid var(--line);
+}
+.lgr-root[data-v="v105"] .lgr-rail-cells > .lgr-rail-cell:nth-child(5) > * { grid-row: 1; }
+.lgr-root[data-v="v105"] .lgr-rail-cells > .lgr-rail-cell:nth-child(5) > .lgr-rail-hint { grid-column: 2 / -1; }
+.lgr-root[data-v="v105"] .lgr-rail-strip {
+  height: 8px;
+  border-radius: 4px;
+  /* RTL like the legend beside it, so the first track is on the right in both */
+  direction: rtl;
+}
+.lgr-root[data-v="v105"] .lgr-rail-strip span + span { box-shadow: inset -1.5px 0 0 #fff; }
+/* at most two rows: five tracks fill columns of two instead of wrapping into
+   a third line under a bar that is meant to be small */
+.lgr-root[data-v="v105"] .lgr-rail-legend {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(2, auto);
+  justify-content: start;
+  gap: 3px 18px;
+  white-space: nowrap;
+  color: var(--lgr-2);
+  font-size: 12px;
+}
+.lgr-root[data-v="v105"] .lgr-rail-legend b { margin-inline-start: 6px; }
+.lgr-root[data-v="v105"] .lgr-rail-legend .lgr-dot { width: 8px; height: 8px; border-radius: 2.5px; }
+
+/* THE ASSUMPTIONS — one panel, a row each: what it is, then its control. */
+.lgr-root[data-v="v105"] .lgr-rail > .lgr-rail-assume {
+  grid-column: 2;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 8px 20px;
+  border-inline-start: 1px solid var(--line);
+  background: var(--card-2);
+}
+.lgr-root[data-v="v105"] .lgr-rail > .lgr-rail-assume + .lgr-rail-assume { border-top: 1px solid var(--line); }
+.lgr-root[data-v="v105"] .lgr-rail > .lgr-rail-assume:nth-child(2) { border-start-end-radius: calc(var(--r) - 1px); }
+.lgr-root[data-v="v105"] .lgr-rail-assume .lgr-rail-label { font-size: 12.5px; color: var(--lgr-2); }
+.lgr-root[data-v="v105"] .lgr-rail-assume-well { height: 30px; padding: 0 10px; background: #fff; }
+
+/* Below the owner's 1917 everything steps down one notch. */
+@media (max-width: 1600px) {
+  .lgr-root[data-v="v105"] .lgr-rail-cell[data-hero="true"] { min-width: 196px; padding-inline: 22px; }
+  .lgr-root[data-v="v105"] .lgr-rail-cell[data-hero="true"] .lgr-rail-value { font-size: 36px; }
+  .lgr-root[data-v="v105"] .lgr-rail-value { font-size: 19px; }
+  .lgr-root[data-v="v105"] .lgr-rail-cells > .lgr-rail-cell:nth-child(n + 2):nth-child(-n + 4) { padding-inline: 20px; }
+  .lgr-root[data-v="v105"] .lgr-rail-cells > .lgr-rail-cell:nth-child(5) { margin-inline: 20px; }
+  .lgr-root[data-v="v105"] .lgr-rail > .lgr-rail-assume { padding-inline: 16px; gap: 14px; }
+}
+
+/* ---------------------------------------------------------- folder tabs */
+.lgr-root[data-v="v105"] .v5-tabs {
+  padding-top: 12px;
+  background: linear-gradient(180deg, #f6f6f9 0%, #f0f0f4 100%);
+}
+.lgr-root[data-v="v105"] .v5-tab[data-on="true"] {
+  background: linear-gradient(180deg, color-mix(in oklab, var(--primary) 11%, #fff) 0%, #fff 70%);
+  border-color: color-mix(in oklab, var(--primary) 32%, var(--line-2));
+  color: var(--primary-deep);
+  box-shadow: 0 -10px 22px -12px rgba(91, 84, 214, 0.6);
+}
+.lgr-root[data-v="v105"] .v5-tab[data-on="true"]::before {
+  height: 3px;
+  box-shadow: 0 1px 8px rgba(91, 84, 214, 0.55);
+}
+.lgr-root[data-v="v105"] .v5-tab[data-on="true"] .v5-tab-n { background: var(--primary); color: #fff; }
+
+/* ------------------------------------------------------------- the sheet */
+.lgr-root[data-v="v105"] .lgr-table thead th {
+  padding-block: 10px;
+  background: var(--card-2);
+  border-bottom-color: var(--line);
+  font-size: 12.5px;
+  color: var(--lgr-2);
+}
+
+/* 1. the quiet field */
+.lgr-root[data-v="v105"] .lgr-table .lgr-well:not([data-auto]):not([data-mismatch]):not([data-flash]) .lgr-cell:not(.lgr-sel-btn):not([data-state]) {
+  border-color: transparent;
+  background: #f4f4f7;
+}
+.lgr-root[data-v="v105"] .lgr-table .lgr-row:hover .lgr-well:not([data-auto]):not([data-mismatch]):not([data-flash]) .lgr-cell:not(.lgr-sel-btn):not([data-state]) {
+  border-color: var(--line-2);
+  background: #fff;
+}
+.lgr-root[data-v="v105"] .lgr-table .lgr-well:not([data-auto]):not([data-mismatch]):not([data-flash]) .lgr-cell:not(.lgr-sel-btn):not([data-state]):focus {
+  border-color: var(--focus);
+  background: #fff;
+}
+/* the joined money pair keeps a seam you can see at rest */
+.lgr-root[data-v="v105"] .lgr-table .lgr-pair-money > .lgr-cell:last-child { box-shadow: inset 1px 0 0 #e4e4ea; }
+.lgr-root[data-v="v105"] .lgr-table .lgr-row:hover .lgr-pair-money > .lgr-cell:last-child { box-shadow: none; }
+.lgr-root[data-v="v105"] .lgr-table .lgr-pair-money > .lgr-cell:last-child:focus { box-shadow: 0 0 0 2px var(--focus-ring-strong); }
+/* a calendar glyph on every row is furniture until you reach for the date */
+.lgr-root[data-v="v105"] .lgr-table .lgr-date-btn { opacity: 0; transition: opacity var(--t) var(--ease); }
+.lgr-root[data-v="v105"] .lgr-table .lgr-row:hover .lgr-date-btn,
+.lgr-root[data-v="v105"] .lgr-table .lgr-row:focus-within .lgr-date-btn { opacity: 1; }
+
+/* 2. no stripes */
+.lgr-root[data-v="v105"] .lgr-row > td:first-child::after { content: none; }
+.lgr-root[data-v="v105"] .lgr-groupbar > td:first-child { border-inline-start: 0; }
+.lgr-root[data-v="v105"] .lgr-cc-table tbody tr[data-on] td:first-child { box-shadow: none; }
+
+/* subtotals and the grand total, a step larger so the column closes */
+.lgr-root[data-v="v105"] .lgr-groupbar-sum { font-size: 16px; }
+.lgr-root[data-v="v105"] .lgr-total-fig { font-size: 21px; letter-spacing: -0.035em; }
+
+/* ---------------------------------------------------------------- charts */
+.lgr-chart-lump {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  margin-inline-start: 4px;
+  padding-inline-start: 10px;
+  border-inline-start: 1px solid var(--line-2);
+}
+/* ● a new mix is something added, so its plus is the same violet disc */
+.lgr-root[data-v="v105"] .v5-tab-add > svg {
+  box-sizing: content-box;
+  width: 10px;
+  height: 10px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--primary);
+  color: #fff;
+}
+
+/* HOVER (round 5) — every key answers in its own hue, and each mark answers
+   in its own way, so a hover says both "this one" and "this kind":
+
+   · all keys   the bottom lip warms to the hue and the shadow takes its tint
+   · ▢ tile     lights: it fills with the hue and the glyph turns white
+   · ● disc     turns: the plus rotates a quarter and the disc swells
+   · bare glyph gains a ground: a wash of the hue rounds in behind it
+
+   Inside a joined bar the key does not rise out of the bar; it is underlined
+   in its hue instead. 200ms out, decelerating — feedback, not a show. */
+.lgr-root[data-v="v105"] .lgr-btn > svg {
+  transition:
+    background-color 200ms cubic-bezier(0.16, 1, 0.3, 1),
+    color 200ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 200ms cubic-bezier(0.16, 1, 0.3, 1),
+    scale 220ms cubic-bezier(0.16, 1, 0.3, 1),
+    rotate 260ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.lgr-root[data-v="v105"] .lgr-btn:not(.lgr-btn-primary):not(.lgr-btn-ghost):hover:not(:disabled) {
+  border-bottom-color: color-mix(in oklab, var(--a) 62%, #a9adb8);
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 1px 1px rgba(20, 22, 32, 0.06),
+    0 7px 14px -7px color-mix(in oklab, var(--a) 55%, transparent);
+}
+.lgr-root[data-v="v105"] .lgr-btn[data-role="read"]:hover:not(:disabled) > svg {
+  background: var(--a);
+  color: #fff !important;
+  box-shadow: 0 1px 3px color-mix(in oklab, var(--a) 50%, transparent);
+}
+.lgr-root[data-v="v105"] .lgr-btn[data-role="add"]:hover:not(:disabled) > svg {
+  scale: 1.12;
+  rotate: 90deg;
+}
+/* the bare glyph reserves its ground at rest (padding cancelled by margin),
+   so the wash arrives without moving the label */
+.lgr-root[data-v="v105"] .lgr-btn[data-role="act"] > svg {
+  box-sizing: content-box;
+  padding: 3px;
+  margin: -3px;
+  border-radius: 6px;
+}
+.lgr-root[data-v="v105"] .lgr-btn[data-role="act"]:hover:not(:disabled) > svg {
+  background: color-mix(in oklab, var(--a) 14%, #fff);
+}
+.lgr-root[data-v="v105"] .lgr-btn:not(.lgr-btn-primary):not(.lgr-btn-ghost):focus-visible {
+  border-color: var(--a);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--a) 32%, transparent);
+}
+
+/* in a joined bar: underlined in its hue, never lifted */
+.lgr-root[data-v="v105"] .v5-join > .lgr-btn:hover:not(:disabled) {
+  translate: 0;
+  border-bottom-color: var(--key-lip);
+  box-shadow: inset 0 1px 0 #fff, inset 0 -2px 0 color-mix(in oklab, var(--a) 70%, transparent);
+}
+.lgr-root[data-v="v105"] .v5-join > .lgr-btn:focus-visible {
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--a) 32%, transparent);
+}
+
+/* the restart key turns the way its arrow points */
+.lgr-root[data-v="v105"] .lgr-receipt-acts .lgr-act > svg { transition: rotate 320ms cubic-bezier(0.16, 1, 0.3, 1); }
+.lgr-root[data-v="v105"] .lgr-receipt-acts .lgr-act:hover > svg { rotate: 90deg; }
+/* the new-mix tab's disc turns like every other add */
+.lgr-root[data-v="v105"] .v5-tab-add > svg { transition: rotate 260ms cubic-bezier(0.16, 1, 0.3, 1), scale 220ms cubic-bezier(0.16, 1, 0.3, 1); }
+.lgr-root[data-v="v105"] .v5-tab-add:hover > svg { rotate: 90deg; scale: 1.12; }
+
+@media (prefers-reduced-motion: reduce) {
+  .lgr-root[data-v="v105"] .lgr-btn[data-role="add"]:hover:not(:disabled) > svg,
+  .lgr-root[data-v="v105"] .lgr-receipt-acts .lgr-act:hover > svg,
+  .lgr-root[data-v="v105"] .v5-tab-add:hover > svg { rotate: none; scale: none; }
+}
+
+/* THE DOCUMENT BAND — the readings sit beside the document they read, and
+   the two housekeeping keys (another report, start over) go to the far end,
+   so the band reads identity → readings … housekeeping instead of a gap in
+   the middle of one sentence. */
+.lgr-root[data-v="v105"] .lgr-receipt-acts { flex: 1; }
+.lgr-root[data-v="v105"] .lgr-receipt-acts > .v5-join { margin-inline-end: auto; }
+.lgr-root[data-v="v105"] .lgr-receipt-acts > .lgr-receipt-sep { display: none; }
+
+/* A menu row is not a key: it keeps its own colour on its glyph (the red of
+   מחיקה) and none of the key's lip or shadow. */
+.lgr-root[data-v="v105"] .lgr-btn-ghost > svg { color: currentColor !important; }
+
+/* THE ORIGINAL (round 6, 2026-10-24). The mix read off the client's documents
+   is the record every copy is measured against, so its tab is in its own ink —
+   teal, open or closed — and the copies stay violet. Closed, it keeps a thin
+   teal cap and a teal-tinted slip, so it is findable among six tabs without
+   being the open one. */
+.lgr-root[data-v="v105"] .v5-tab[data-base] {
+  --tab-a: #0d7f8e;
+  --tab-ink: #0a5f6b;
+  background: linear-gradient(180deg, color-mix(in oklab, var(--tab-a) 6%, #fff) 0%, color-mix(in oklab, var(--tab-a) 11%, #f4f5f8) 100%);
+  border-color: color-mix(in oklab, var(--tab-a) 34%, #dcdde5);
+  color: var(--tab-ink);
+}
+.lgr-root[data-v="v105"] .v5-tab[data-base]:hover { background: color-mix(in oklab, var(--tab-a) 5%, #fff); }
+.lgr-root[data-v="v105"] .v5-tab[data-base] .v5-tab-n {
+  background: color-mix(in oklab, var(--tab-a) 15%, #fff);
+  color: var(--tab-ink);
+}
+.lgr-root[data-v="v105"] .v5-tab[data-base][data-on="false"]::before {
+  content: "";
+  position: absolute;
+  inset: -1px -1px auto;
+  height: 2px;
+  border-radius: 10px 10px 0 0;
+  background: var(--tab-a);
+  opacity: 0.75;
+}
+.lgr-root[data-v="v105"] .v5-tab[data-base][data-on="true"] {
+  background: linear-gradient(180deg, color-mix(in oklab, var(--tab-a) 12%, #fff) 0%, #fff 70%);
+  border-color: color-mix(in oklab, var(--tab-a) 38%, var(--line-2));
+  color: var(--tab-ink);
+  box-shadow: 0 -10px 22px -12px color-mix(in oklab, var(--tab-a) 65%, transparent);
+}
+.lgr-root[data-v="v105"] .v5-tab[data-base][data-on="true"]::before {
+  background: var(--tab-a);
+  box-shadow: 0 1px 8px color-mix(in oklab, var(--tab-a) 55%, transparent);
+}
+.lgr-root[data-v="v105"] .v5-tab[data-base][data-on="true"] .v5-tab-n { background: var(--tab-a); color: #fff; }

@@ -888,6 +888,18 @@ export default function Simulator({
     setActiveMixId(id);
   };
 
+  // שכפל תמהיל from a tab's own menu (/aa105test). duplicateMix copies the
+  // active mix — and for the master it asks about fees first — so a tab that is
+  // not open is opened, and the copy is made once it is.
+  const [dupFor, setDupFor] = useState<string | null>(null);
+  useEffect(() => {
+    if (dupFor && dupFor === activeMixId) {
+      setDupFor(null);
+      duplicateMix();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dupFor, activeMixId]);
+
   /**
    * שכפול משכנתא נוכחית — the master, as a proposal.
    *
@@ -1148,7 +1160,8 @@ export default function Simulator({
     <>
               <Btn
                 className="lgr-btn lgr-btn-sm"
-                data-tone="violet"
+                data-tone="blue"
+                data-role="read"
                 onClick={() => setSchedFor("mix")}
                 disabled={!loans.length}
                 title={loans.length ? "לוח סילוקין של כל התמהיל, חודש בחודש" : "אין שורות בתמהיל"}
@@ -1158,8 +1171,9 @@ export default function Simulator({
               </Btn>
               <Btn
                 className="lgr-btn lgr-btn-sm"
-                data-tone="blue"
-                onClick={duplicateMix}
+                data-tone="slate"
+                data-role="act"
+                onClick={() => duplicateMix()}
                 disabled={!activeMix}
                 title={
                   isPrimaryMix
@@ -1172,6 +1186,7 @@ export default function Simulator({
               </Btn>
               <Btn
               className="lgr-btn lgr-btn-sm lgr-btn-excel"
+              data-role="act"
               onClick={exportExcel}
               disabled={!loans.length || exporting}
               aria-busy={exporting}
@@ -1446,7 +1461,7 @@ export default function Simulator({
                         against a bar that is not showing it, is how a reader
                         ends up believing the segments are families. */}
                     <div className="lgr-rail-legend">
-                      {trackSegs.slice(0, 3).map((s) => (
+                      {(v105 ? trackSegs : trackSegs.slice(0, 3)).map((s) => (
                         <span key={s.id} className="inline-flex items-center gap-1.5">
                           <span className="lgr-dot" style={{ background: TRACK_HEX[s.id] }} />
                           {PATH_LABEL[s.id]}
@@ -1626,6 +1641,7 @@ export default function Simulator({
                           <Btn
                             className="lgr-btn lgr-btn-sm"
                             data-tone="violet"
+                            data-role="read"
                             onClick={() => setShowClient(true)}
                             title={
                               reading === "bank"
@@ -1639,6 +1655,7 @@ export default function Simulator({
                           <Btn
                             className="lgr-btn lgr-btn-sm"
                             data-tone="teal"
+                            data-role="read"
                             onClick={() => setShowAnalysis(true)}
                             title={
                               reading === "bank"
@@ -1652,6 +1669,7 @@ export default function Simulator({
                           <Btn
                             className="lgr-btn lgr-btn-sm"
                             data-tone="red"
+                            data-role="read"
                             onClick={() => setShowDoc(true)}
                             disabled={!reports.some((r) => r.file)}
                             title={
@@ -1686,6 +1704,8 @@ export default function Simulator({
               <div
                 className={v105 ? "v5-tab" : "lgr-tab"}
                 data-on={m.id === activeMixId}
+                // the original — read off the client's documents — wears its own ink
+                data-base={v105 && master?.id === m.id ? "" : undefined}
                 role={v105 ? "tab" : undefined}
                 aria-selected={v105 ? m.id === activeMixId : undefined}
                 tabIndex={v105 ? 0 : undefined}
@@ -1783,6 +1803,22 @@ export default function Simulator({
                         <PencilSimple size={13} />
                         שינוי שם
                       </Btn>
+                      {v105 && (
+                        <Btn
+                          className="lgr-btn lgr-btn-ghost lgr-btn-sm w-full !justify-start"
+                          onClick={() => {
+                            setMenuFor(null);
+                            if (m.id === activeMixId) duplicateMix();
+                            else {
+                              setActiveMixId(m.id);
+                              setDupFor(m.id);
+                            }
+                          }}
+                        >
+                          <Copy size={13} />
+                          שכפל תמהיל
+                        </Btn>
+                      )}
                       <Btn
                         className="lgr-btn lgr-btn-ghost lgr-btn-sm w-full !justify-start"
                         style={{ color: m.is_base ? "var(--lgr-4)" : "var(--neg)" }}
@@ -1855,7 +1891,15 @@ export default function Simulator({
                 onTarget={setTarget}
                 onChange={setLoans}
                 onSchedule={(l) => setSchedFor(l)}
-                tools={v105 ? <div className="v5-sheet-tools">{mixTools}</div> : undefined}
+                tools={
+                  v105 ? (
+                    <div className="v5-sheet-tools">
+                      <span className="v5-join" role="group" aria-label="פעולות על התמהיל">
+                        {mixTools}
+                      </span>
+                    </div>
+                  ) : undefined
+                }
               />
             )
           )}
@@ -1931,6 +1975,7 @@ export default function Simulator({
             isBase={isPrimaryMix}
             name={activeMix?.mix_name}
             compare={chartCompare}
+            variant={variant}
           />
         </motion.div>
 

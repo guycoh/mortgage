@@ -421,7 +421,7 @@ export default function Bay({
             {/* A household holds one mortgage between two people, and each of
                 their reports lists all of it. Joint debts are merged, not
                 doubled — see mergeReportLoans. */}
-            <Btn className="lgr-btn lgr-btn-sm" onClick={pick} disabled={busy}>
+            <Btn className="lgr-btn lgr-btn-sm" data-role="add" data-tone="ink" onClick={pick} disabled={busy}>
               {busy ? (
                 <CircleNotch size={13} weight="bold" className="animate-spin" />
               ) : (

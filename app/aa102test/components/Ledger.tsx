@@ -663,11 +663,12 @@ export default function Ledger({
   };
 
   const addBtns = (size: "sm" | "md" = "sm") => (
-    <div className="flex items-center gap-1.5">
+    <div className="v5-join flex items-center gap-1.5" role="group" aria-label="הוספת שורה">
       {ORDER.map((key) => (
         <Btn
           key={key}
           className={`lgr-btn lgr-btn-fam ${size === "sm" ? "lgr-btn-sm" : ""}`}
+          data-role="add"
           style={
             {
               "--fam": FAMILY[key].color,
@@ -979,7 +980,7 @@ export default function Ledger({
             it instead of a tooltip. */}
         {!isBase && (
           <div className="lgr-anchor-bar">
-            <Btn className="lgr-btn lgr-btn-sm" onClick={refreshAnchors} disabled={anchorBusy}>
+            <Btn className="lgr-btn lgr-btn-sm" data-role="act" data-tone="amber" onClick={refreshAnchors} disabled={anchorBusy}>
               {anchorBusy ? (
                 <CircleNotch size={13} weight="bold" className="lgr-spin" />
               ) : (
@@ -997,7 +998,7 @@ export default function Ledger({
                   exit={{ opacity: 0, x: 6, scale: 0.96, transition: { duration: 0.14 } }}
                   transition={snap}
                 >
-                  <Btn className="lgr-btn lgr-btn-sm" onClick={restoreAnchors}>
+                  <Btn className="lgr-btn lgr-btn-sm" data-role="act" onClick={restoreAnchors}>
                     <ArrowCounterClockwise size={13} weight="bold" />
                     שחזור
                   </Btn>

@@ -58,6 +58,65 @@ const SPLIT = {
 // panel's padding whatever their width.
 const GRID = { top: 14, bottom: 26, left: 8, right: 14, outerBoundsMode: "same" as const, outerBoundsContain: "axisLabel" as const };
 
+/* ------------------------------------------------- balloon lumps (v105) */
+
+// A balloon's closing payment is a lump sum, not a month's repayment. On one
+// axis with the instalments it set the scale — ₪250K at the top, and thirty
+// years of ₪11K stacked tracks pressed into the floor where nobody could read
+// a track. /aa105test scales the panel to the instalments and marks each lump
+// at the top edge instead; the tooltip still states the real month.
+const LUMP_SERIES = "__lump";
+/** A month this many times the typical one is a lump, not an instalment. */
+const LUMP_X = 3;
+
+export type Lumps = { cap: number; peak: number; lumps: [number, number][] };
+
+export function splitLumps(series: TrackSeries[]): Lumps | null {
+  const total = new Map<number, number>();
+  for (const s of series) for (const [m, v] of s.points) total.set(m, (total.get(m) ?? 0) + v);
+  const paid = Array.from(total.values()).filter((v) => v > 0).sort((a, b) => a - b);
+  if (!paid.length) return null;
+  const typical = paid[Math.floor(paid.length / 2)];
+  const lumps = Array.from(total.entries()).filter(([, v]) => v > typical * LUMP_X).sort((a, b) => a[0] - b[0]);
+  if (!lumps.length) return null;
+  const peak = Math.max(...paid.filter((v) => v <= typical * LUMP_X));
+  const step = 10 ** Math.floor(Math.log10(peak * 1.15)) / 2;
+  return { cap: Math.ceil((peak * 1.15) / step) * step, peak, lumps };
+}
+
+function withLumps(option: EChartsCoreOption, l: Lumps | null): EChartsCoreOption {
+  if (!l) return option;
+  return {
+    ...option,
+    yAxis: { ...moneyAxis(), max: l.cap },
+    series: [
+      ...(option.series as object[]),
+      {
+        name: LUMP_SERIES,
+        type: "scatter",
+        data: l.lumps.map(([m]) => [m, l.cap]),
+        symbol: "triangle",
+        symbolSize: 9,
+        symbolOffset: [0, 5],
+        itemStyle: { color: "#3a3d45" },
+        tooltip: { show: false },
+        z: 5,
+      },
+    ],
+  };
+}
+
+/** The lumps, said once in the panel's reading. */
+function LumpNote({ l }: { l: Lumps }) {
+  const top = Math.max(...l.lumps.map(([, v]) => v));
+  return (
+    <span className="lgr-chart-lump">
+      {l.lumps.length === 1 ? "תשלום בלון" : `${l.lumps.length} תשלומי בלון, עד`}{" "}
+      <Money value={top} block={false} weight={600} size={13} color="var(--lgr-2)" />
+    </span>
+  );
+}
+
 /** Stacked-by-track areas — the balance (smooth) or the payment (stepped). */
 export function stackedOption(series: TrackSeries[], maxMonth: number, kind: "balance" | "payment"): EChartsCoreOption {
   return {
@@ -69,7 +128,7 @@ export function stackedOption(series: TrackSeries[], maxMonth: number, kind: "ba
         if (!arr.length) return "";
         const m = arr[0].value[0];
         const { title, sub } = monthLabel(m);
-        const live = arr.filter((x) => Number(x.value[1]) > 0);
+        const live = arr.filter((x) => x.seriesName !== LUMP_SERIES && Number(x.value[1]) > 0);
         const total = live.reduce((s, x) => s + Number(x.value[1]), 0);
         return (
           tipHead(title, sub) +
@@ -487,6 +546,7 @@ export default function Charts({
   isBase = false,
   name = "התמהיל",
   compare = null,
+  variant,
 }: {
   loans: ImportedLoan[];
   /** The board's assumptions — a bare % (flat) or the forecast set. */
@@ -497,6 +557,8 @@ export default function Charts({
   name?: string;
   /** The mix this one is measured against. Absent → the per-track view. */
   compare?: { name: string; loans: ImportedLoan[] } | null;
+  /** "v105" scales the payment panel to the instalments (see splitLumps). */
+  variant?: "v105";
 }) {
   const t = useMemo(() => buildTimeline(loans, annualInflation), [loans, annualInflation]);
   const group = "lgr-mix-timeline";
@@ -515,7 +577,12 @@ export default function Charts({
   );
 
   const balanceOpt = useMemo(() => (t ? stackedOption(t.balance, t.maxMonth, "balance") : null), [t]);
-  const paymentOpt = useMemo(() => (t ? stackedOption(t.payment, t.maxMonth, "payment") : null), [t]);
+  const lumps = useMemo(() => (t && variant === "v105" ? splitLumps(t.payment) : null), [t, variant]);
+  const paymentOpt = useMemo(
+    () => (t ? withLumps(stackedOption(t.payment, t.maxMonth, "payment"), lumps) : null),
+    [t, lumps]
+  );
+  const peak = lumps ? lumps.peak : t?.peak ?? 0;
   const rateOpt = useMemo(() => (t ? rateOption(t.rate, t.maxMonth) : null), [t]);
   const splitOpt = useMemo(() => (t ? splitOption(t.years) : null), [t]);
 
@@ -595,13 +662,14 @@ export default function Charts({
           reading={
             <>
               <Money value={t.first} block={false} weight={700} size={14} />
-              {t.peak > t.first + 1 && (
+              {peak > t.first + 1 && (
                 <>
                   <span className="lgr-chart-arrow">→</span>
-                  <Money value={t.peak} block={false} weight={600} size={13} color="var(--lgr-2)" />
+                  <Money value={peak} block={false} weight={600} size={13} color="var(--lgr-2)" />
                   <span>בשיא</span>
                 </>
               )}
+              {lumps && <LumpNote l={lumps} />}
             </>
           }
         >
@@ -701,13 +769,14 @@ export default function Charts({
             reading={
               <>
                 <Money value={t.first} block={false} weight={700} size={14} />
-                {t.peak > t.first + 1 && (
+                {peak > t.first + 1 && (
                   <>
                     <span className="lgr-chart-arrow">→</span>
-                    <Money value={t.peak} block={false} weight={600} size={13} color="var(--lgr-2)" />
+                    <Money value={peak} block={false} weight={600} size={13} color="var(--lgr-2)" />
                     <span>בשיא</span>
                   </>
                 )}
+                {lumps && <LumpNote l={lumps} />}
               </>
             }
           >

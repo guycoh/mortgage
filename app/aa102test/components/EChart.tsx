@@ -16,12 +16,12 @@
 
 import { useEffect, useLayoutEffect, useRef } from "react";
 import * as echarts from "echarts/core";
-import { BarChart, LineChart } from "echarts/charts";
+import { BarChart, LineChart, ScatterChart } from "echarts/charts";
 import { GridComponent, TooltipComponent } from "echarts/components";
 import { CanvasRenderer } from "echarts/renderers";
 import type { EChartsCoreOption } from "echarts/core";
 
-echarts.use([LineChart, BarChart, GridComponent, TooltipComponent, CanvasRenderer]);
+echarts.use([LineChart, BarChart, ScatterChart, GridComponent, TooltipComponent, CanvasRenderer]);
 
 export const FONT = "'Inter Variable', Assistant, system-ui, sans-serif";
 /** Ink for axes and ticks — the page's quietest text step, 4.5:1 on white. */
