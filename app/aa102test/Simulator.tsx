@@ -1203,6 +1203,53 @@ export default function Simulator({
   );
 
   /* ----------------------------------------------------------------- ui */
+  /* השוואת תמהילים — the judgement, and where the client's /offer link is made.
+     /aa105test lifts it to the top of the board once there is a second mix to
+     judge against (owner, 2026-10-24); with one mix it is only an invitation to
+     duplicate, and it waits under the workbench as before. */
+  const compareOnTop = v105 && list.length > 1;
+  const compareEl = (
+    <Compare
+      activeMixId={activeMixId}
+      mixes={list}
+      annualInflation={econ}
+      discountRate={annualDiscount}
+      compareMixId={compareTarget ? compareTarget.id : ""}
+      onDuplicate={duplicateMix}
+      onShare={setSharePair}
+      source={
+        econMode === "forecast" && activeForecast ? (
+          <button type="button" className="lgr-econ-src" onClick={() => setForecastOpen(true)} title="מקור התחזית">
+            {activeForecast.label}
+          </button>
+        ) : (
+          <span className="lgr-econ-src" data-state="loading">
+            ללא תחזית · אינפלציה {annualInflation}%
+          </span>
+        )
+      }
+      control={
+        list.length > 1 ? (
+          <div style={{ minWidth: 208 }}>
+            <Select
+              variant="input"
+              value={compareTarget ? compareTarget.id : ""}
+              onChange={(v) => setCompareMixId(v ? String(v) : "")}
+              placeholder="בחרו תמהיל להשוואה…"
+              options={[
+                { value: "", label: "ללא השוואה" },
+                ...list
+                  .filter((m) => m.id !== activeMixId)
+                  .map((m) => ({ value: m.id, label: m.mix_name })),
+              ]}
+              ariaLabel="תמהיל להשוואה"
+            />
+          </div>
+        ) : null
+      }
+    />
+  );
+
   return (
     <div className="lgr-root" dir="rtl" data-v={variant}>
       {/* --------------------------------------- 1. the shell, then the title */}
@@ -1365,6 +1412,12 @@ export default function Simulator({
             One shadow for the whole object, and the quiet one — a card this tall
             wearing the console's raised shadow would read as a slab lying on the
             page rather than as the page's working surface. */}
+        {compareOnTop && (
+          <motion.div {...enter(1)} className="mb-5">
+            {compareEl}
+          </motion.div>
+        )}
+
         <motion.section {...enter(1)} className="lgr-workbench mb-5">
           <div className="lgr-rail">
             <div className="lgr-rail-cells">
@@ -1928,47 +1981,7 @@ export default function Simulator({
             decode a minus sign is a legend the column should not have needed.
             Every difference states its direction in a word, an arrow and a
             colour instead. */}
-        <motion.div {...enter(2)}>
-          <Compare
-            activeMixId={activeMixId}
-            mixes={list}
-            annualInflation={econ}
-            discountRate={annualDiscount}
-            compareMixId={compareTarget ? compareTarget.id : ""}
-            onDuplicate={duplicateMix}
-            onShare={setSharePair}
-            source={
-              econMode === "forecast" && activeForecast ? (
-                <button type="button" className="lgr-econ-src" onClick={() => setForecastOpen(true)} title="מקור התחזית">
-                  {activeForecast.label}
-                </button>
-              ) : (
-                <span className="lgr-econ-src" data-state="loading">
-                  ללא תחזית · אינפלציה {annualInflation}%
-                </span>
-              )
-            }
-            control={
-              list.length > 1 ? (
-                <div style={{ minWidth: 208 }}>
-                  <Select
-                    variant="input"
-                    value={compareTarget ? compareTarget.id : ""}
-                    onChange={(v) => setCompareMixId(v ? String(v) : "")}
-                    placeholder="בחרו תמהיל להשוואה…"
-                    options={[
-                      { value: "", label: "ללא השוואה" },
-                      ...list
-                        .filter((m) => m.id !== activeMixId)
-                        .map((m) => ({ value: m.id, label: m.mix_name })),
-                    ]}
-                    ariaLabel="תמהיל להשוואה"
-                  />
-                </div>
-              ) : null
-            }
-          />
-        </motion.div>
+        {!compareOnTop && <motion.div {...enter(2)}>{compareEl}</motion.div>}
 
         {/* ------------------------------------------------------- the charts */}
         {/* What the mix LOOKS like rather than what it is or how it scores. Last,
