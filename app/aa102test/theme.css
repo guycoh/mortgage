@@ -1668,7 +1668,15 @@ html:has(.lgr-root) {
 .lgr-cmx-share { gap: 6px; color: var(--primary); border-color: rgba(91, 84, 214, 0.32); background: #f6f5ff; font-weight: 700; }
 .lgr-cmx-share:hover { background: #efeefc; border-color: var(--primary); }
 
-.lgr-sendo { width: min(100%, 460px); }
+/* Two classes, not one: .lgr-ask (the shared 400px skin) sits later in this
+   sheet and was winning, so the dialog was 400px while its fields were laid out
+   wider and ran off its left edge under overflow:hidden. The height cap lets a
+   short window scroll the dialog instead of cutting it off. */
+.lgr-ask.lgr-sendo {
+  width: min(100%, 460px);
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+}
 .lgr-sendo-body { display: grid; gap: 12px; padding-bottom: 8px; }
 .lgr-sendo-input { display: grid; gap: 5px; font-size: 12.5px; font-weight: 600; color: var(--lgr-2); }
 .lgr-sendo-input input {
@@ -1677,7 +1685,11 @@ html:has(.lgr-root) {
   transition: border-color 140ms var(--ease), box-shadow 140ms var(--ease);
 }
 .lgr-sendo-input input:focus { border-color: var(--focus); box-shadow: 0 0 0 2px var(--focus-ring-strong); }
-.lgr-sendo-two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+/* and the field itself fills its cell rather than keeping its default size */
+.lgr-sendo-input { min-width: 0; }
+.lgr-sendo-input input { width: 100%; min-width: 0; }
+/* minmax(0, …): a bare 1fr will not shrink below an <input>'s intrinsic width */
+.lgr-sendo-two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
 .lgr-sendo-note { margin: 0; font-size: 12.5px; color: var(--lgr-3); line-height: 1.5; }
 .lgr-sendo-field { display: grid; gap: 5px; }
 .lgr-sendo-label { font-size: 12.5px; font-weight: 600; color: var(--lgr-2); }
