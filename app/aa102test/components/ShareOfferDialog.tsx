@@ -7,11 +7,14 @@
 // for the contact line (remembered in this browser). Then the result: the link
 // and its 6-digit code, each one tap to copy, plus a ready message for
 // WhatsApp. The code is shown once; the server keeps only its hash.
+//
+// הורדת PDF, in both steps: the same page as a document (app/offer/pdf.tsx),
+// built in this browser from the same frozen figures — no link needed.
 
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
-import { ArrowSquareOut, Check, Copy, WhatsappLogo, X } from "@phosphor-icons/react";
+import { ArrowSquareOut, Check, CircleNotch, Copy, FilePdf, WhatsappLogo, X } from "@phosphor-icons/react";
 import Btn from "./Btn";
 import Money from "./Money";
 import type { ImportedLoan } from "../lib/credit";
@@ -83,6 +86,7 @@ export default function ShareOfferDialog({
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [result, setResult] = useState<Result | null>(null);
+  const [pdfBusy, setPdfBusy] = useState(false);
 
   useEffect(() => {
     try {
@@ -124,6 +128,38 @@ export default function ShareOfferDialog({
       setBusy(false);
     }
   };
+
+  const downloadPdf = async () => {
+    if (!preview || pdfBusy) return;
+    setPdfBusy(true);
+    setErr(null);
+    try {
+      const { offerPdf } = await import("@/app/offer/pdf");
+      // Without a link the PDF still states a validity: the link's own 14 days.
+      const expires = result?.expiresAt || new Date(Date.now() + 14 * 864e5).toISOString();
+      const blob = await offerPdf(preview, expires);
+      const href = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = href;
+      a.download = `הצעה - ${client.trim() || "מורגי"}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(href), 10_000);
+    } catch (e) {
+      console.error(e);
+      setErr("יצירת ה-PDF נכשלה — נסו שוב");
+    } finally {
+      setPdfBusy(false);
+    }
+  };
+
+  const pdfButton = (
+    <Btn className="lgr-btn lgr-btn-sm" onClick={downloadPdf} disabled={pdfBusy || !preview} aria-busy={pdfBusy}>
+      {pdfBusy ? <CircleNotch size={15} weight="bold" className="animate-spin" /> : <FilePdf size={15} weight="fill" style={{ color: "#c4372b" }} />}
+      {pdfBusy ? "מכין PDF…" : "הורדת PDF"}
+    </Btn>
+  );
 
   const message = result
     ? `${client ? `שלום ${client},\n` : ""}הכנו עבורכם הצעה למחזור המשכנתא. תוכלו לראות את ההשוואה כאן:\n${result.url}\nקוד הכניסה: ${result.code}`
@@ -211,11 +247,13 @@ export default function ShareOfferDialog({
                   <WhatsappLogo size={16} weight="fill" />
                   שליחה בוואטסאפ
                 </a>
+                {pdfButton}
                 <a className="lgr-btn lgr-btn-sm" href={result.url} target="_blank" rel="noopener noreferrer">
                   <ArrowSquareOut size={15} />
                   פתיחת העמוד
                 </a>
               </div>
+              {err && <p className="lgr-fc-err">{err}</p>}
             </motion.div>
           )}
         </AnimatePresence>
@@ -226,6 +264,7 @@ export default function ShareOfferDialog({
               <Btn className="lgr-btn lgr-btn-sm" onClick={onClose}>
                 ביטול
               </Btn>
+              {pdfButton}
               <Btn className="lgr-btn lgr-btn-sm lgr-btn-primary" disabled={busy || !preview} onClick={create}>
                 {busy ? "יצירת הקישור…" : "יצירת קישור ללקוח"}
               </Btn>

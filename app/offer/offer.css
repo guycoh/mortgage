@@ -100,23 +100,37 @@
 @keyframes ofr-shimmer { to { background-position: -200% 0; } }
 
 /* ---------------------------------------------------- side by side table */
+/* A CLOSED GRID (owner, 2026-10-24). The table sits in a box of its own — a
+   firm outer border with rounded corners, a tinted header row and a tinted
+   label column — and every column and row is ruled, so each figure reads in
+   its own cell. The box clips the corners; the table inside is collapsed. */
+.ofr-table-box {
+  overflow: hidden;
+  border: 1px solid rgba(18, 20, 26, 0.2);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(18, 20, 26, 0.04);
+}
 .ofr-table { width: 100%; border-collapse: collapse; font-size: 15.5px; }
-.ofr-table thead th { padding: 0 10px 10px; text-align: start; font-size: 14.5px; font-weight: 700; border-bottom: 1px solid var(--line-2); }
-.ofr-table tbody th { padding: 13px 10px 13px 0; text-align: start; font-weight: 500; }
-.ofr-table td { padding: 13px 10px; text-align: start; font-variant-numeric: tabular-nums; font-weight: 400; white-space: nowrap; }
+.ofr-table thead th {
+  padding: 12px 14px;
+  text-align: start;
+  font-size: 14.5px;
+  font-weight: 700;
+  background: #f1f2f7;
+  border-bottom: 1px solid rgba(18, 20, 26, 0.18);
+}
+.ofr-table tbody th { padding: 13px 14px; text-align: start; font-weight: 500; background: #fafbfd; }
+.ofr-table td { padding: 13px 14px; text-align: start; font-variant-numeric: tabular-nums; font-weight: 400; white-space: nowrap; }
 .ofr-table td[data-side="next"] { color: var(--next-deep); font-weight: 600; }
-.ofr-table tbody tr + tr > * { border-top: 1px solid var(--line); }
+.ofr-table tbody tr + tr > * { border-top: 1px solid rgba(18, 20, 26, 0.12); }
 .ofr-table .ofr-table-d { color: var(--save); font-weight: 600; }
 .ofr-table thead .ofr-table-d { color: var(--save); }
-/* Column rules (owner, 2026-10-24): a hairline between every column, in the
-   same tone as the row rules, so the figures read as a grid. Each cell after
-   the first draws the rule on its start edge (the right, in RTL) and gets a
-   matching inset so no figure touches it. */
-/* Physical right, not inline-start: the הפרש cells are dir="ltr", and on them
-   inline-start is the LEFT edge — the rule would land on the table's outer
-   edge instead of between columns. The page is RTL-only. */
-.ofr-table tr > * + * { border-right: 1px solid var(--line); padding-right: 14px; }
-.ofr-table tbody th { padding-inline-end: 14px; }
+/* Column rules on every cell after the first. Physical right, not
+   inline-start: the הפרש cells are dir="ltr", and on them inline-start is the
+   LEFT edge — the rule would land on the box's outer edge. The page is
+   RTL-only. */
+.ofr-table tr > * + * { border-right: 1px solid rgba(18, 20, 26, 0.14); }
 .ofr-col { display: inline-flex; align-items: center; gap: 8px; }
 .ofr-col i { width: 16px; height: 0; border-top: 2.75px solid var(--next); border-radius: 2px; }
 .ofr-col[data-side="now"] i { border-top: 2px dashed var(--now); }
@@ -124,6 +138,7 @@
   .ofr-table { font-size: 14.5px; }
   .ofr-table .ofr-table-d { display: none; }
   .ofr-table tbody th { white-space: normal; }
+  .ofr-table th, .ofr-table td { padding-inline: 10px; }
 }
 
 /* -------------------------------------------------------- milestones */
@@ -258,3 +273,15 @@
 }
 .ofr-table bdi { font-family: var(--num); }
 @media (max-width: 560px) { .ofr-miles li:last-child:nth-child(odd) { grid-column: 1 / -1; } }
+
+/* STILL (the PDF render): nothing in transit. Every transition and keyframe
+   is skipped, so the capture never catches a strike half drawn or a line
+   half faded in. */
+.ofr-root[data-still],
+.ofr-root[data-still] *,
+.ofr-root[data-still] *::before,
+.ofr-root[data-still] *::after {
+  transition: none !important;
+  animation: none !important;
+}
+.ofr-root[data-still] { min-height: 0; }

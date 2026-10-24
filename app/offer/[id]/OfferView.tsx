@@ -14,7 +14,7 @@
 // mortgage is slate, not red: it is not bad, only dearer. Violet is the new mix
 // (the מורגי identity); emerald is only ever the saving.
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import dynamic from "next/dynamic";
 import NumberFlow from "@number-flow/react";
 import { motion, useInView, useReducedMotion } from "motion/react";
@@ -37,6 +37,15 @@ const C = {
 };
 
 const EASE = [0.16, 1, 0.3, 1] as const;
+
+/**
+ * STILL — the page as a document rather than a moment: every figure already
+ * final, every chart already drawn, nothing waiting to scroll into view. The
+ * PDF (app/offer/pdf.tsx) renders the page this way, off screen, and captures
+ * it; the link renders it live.
+ */
+const Still = createContext(false);
+const useStill = () => useContext(Still);
 const money = (n: number) => `₪${nis(n)}`;
 const yrs = (m: number) => {
   const y = Math.round((m / 12) * 10) / 10;
@@ -56,7 +65,8 @@ const dmy = (iso: string) => {
  * unprompted motion.
  */
 function Divergence({ now, next }: { now: number[]; next: number[] }) {
-  const reduce = useReducedMotion();
+  const still = useStill();
+  const reduce = useReducedMotion() || still;
   const W = 1000;
   const H = 300;
   const n = Math.max(now.length, next.length);
@@ -164,10 +174,11 @@ function Divergence({ now, next }: { now: number[]; next: number[] }) {
 /** Today's payment, struck through as it scrolls into view, and the new one
  *  counting down from it — the one sentence the section exists to say. */
 function Month({ now, next }: { now: number; next: number }) {
-  const reduce = useReducedMotion();
+  const still = useStill();
+  const reduce = useReducedMotion() || still;
   const ref = useRef<HTMLElement>(null);
-  const seen = useInView(ref, { once: true, margin: "0px 0px -120px 0px" });
-  const [shown, setShown] = useState(now);
+  const seen = useInView(ref, { once: true, margin: "0px 0px -120px 0px" }) || still;
+  const [shown, setShown] = useState(still ? next : now);
   useEffect(() => {
     if (!seen) return;
     const t = setTimeout(() => setShown(next), reduce ? 0 : 420);
@@ -193,12 +204,16 @@ function Month({ now, next }: { now: number; next: number }) {
         <span className="ofr-month-label">בתמהיל החדש</span>
         <span className="ofr-month-fig" data-side="next" dir="ltr">
           <span className="ofr-month-cur">₪</span>
-          <NumberFlow
-            value={Math.round(shown)}
-            locales="he-IL"
-            spinTiming={{ duration: reduce ? 0 : 1100, easing: "cubic-bezier(0.16, 1, 0.3, 1)" }}
-            transformTiming={{ duration: reduce ? 0 : 700, easing: "cubic-bezier(0.16, 1, 0.3, 1)" }}
-          />
+          {still ? (
+            nis(next)
+          ) : (
+            <NumberFlow
+              value={Math.round(shown)}
+              locales="he-IL"
+              spinTiming={{ duration: reduce ? 0 : 1100, easing: "cubic-bezier(0.16, 1, 0.3, 1)" }}
+              transformTiming={{ duration: reduce ? 0 : 700, easing: "cubic-bezier(0.16, 1, 0.3, 1)" }}
+            />
+          )}
         </span>
       </div>
       {diff > 0 && (
@@ -300,8 +315,9 @@ function savingOption(cum: number[]): EChartsCoreOption {
 
 /** Mount a chart only once it is on screen, so its draw-in is seen, not missed. */
 function InView({ children, height }: { children: ReactNode; height: number }) {
+  const still = useStill();
   const ref = useRef<HTMLDivElement>(null);
-  const seen = useInView(ref, { once: true, margin: "0px 0px -80px 0px" });
+  const seen = useInView(ref, { once: true, margin: "0px 0px -80px 0px" }) || still;
   return (
     <div ref={ref} style={{ minHeight: height }}>
       {seen ? children : null}
@@ -311,6 +327,7 @@ function InView({ children, height }: { children: ReactNode; height: number }) {
 
 /** The saving at four moments a client plans around — a ruler of dots. */
 function Milestones({ cum }: { cum: number[] }) {
+  const still = useStill();
   const reduce = useReducedMotion();
   const marks = [5, 10, 15, 20].filter((y) => y <= cum.length);
   if (cum.length && !marks.includes(cum.length) && cum.length - (marks[marks.length - 1] ?? 0) >= 3) marks.push(cum.length);
@@ -319,7 +336,7 @@ function Milestones({ cum }: { cum: number[] }) {
       {marks.map((y, i) => (
         <motion.li
           key={y}
-          initial={{ opacity: 0, y: reduce ? 0 : 8 }}
+          initial={still ? false : { opacity: 0, y: reduce ? 0 : 8 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "0px 0px -40px 0px" }}
           transition={{ duration: reduce ? 0 : 0.5, delay: reduce ? 0 : 0.09 * i, ease: EASE }}
@@ -361,8 +378,17 @@ function Key({ items }: { items: { color: string; label: string; dash?: boolean;
   );
 }
 
-export default function OfferView({ offer, expiresAt }: { offer: OfferPayload; expiresAt: string }) {
-  const reduce = useReducedMotion();
+export default function OfferView({
+  offer,
+  expiresAt,
+  still = false,
+}: {
+  offer: OfferPayload;
+  expiresAt: string;
+  /** Render as a finished document — see Still. */
+  still?: boolean;
+}) {
+  const reduce = useReducedMotion() || still;
   const { current: now, proposed: next } = offer;
   const saving = now.cost - next.cost;
   const monthly = now.firstPayment - next.firstPayment;
@@ -378,8 +404,8 @@ export default function OfferView({ offer, expiresAt }: { offer: OfferPayload; e
     const n = Math.max(now.costByYear.length, next.costByYear.length);
     return Array.from({ length: n }, (_, i) => (now.costByYear[Math.min(i, now.costByYear.length - 1)] ?? 0) - (next.costByYear[Math.min(i, next.costByYear.length - 1)] ?? 0));
   }, [now, next]);
-  const balOpt = useMemo(() => balanceOption(next, now), [next, now]);
-  const savOpt = useMemo(() => savingOption(cum), [cum]);
+  const balOpt = useMemo(() => ({ ...balanceOption(next, now), animation: !still }), [next, now, still]);
+  const savOpt = useMemo(() => ({ ...savingOption(cum), animation: !still }), [cum, still]);
 
   const rows: { label: string; a: string; b: string; d?: string }[] = [
     { label: "החזר חודשי ראשון", a: money(now.firstPayment), b: money(next.firstPayment), d: monthly > 0 ? money(monthly) : undefined },
@@ -405,7 +431,8 @@ export default function OfferView({ offer, expiresAt }: { offer: OfferPayload; e
   });
 
   return (
-    <main className="ofr-root" dir="rtl">
+    <Still.Provider value={still}>
+    <main className="ofr-root" dir="rtl" data-still={still || undefined}>
       <div className="ofr-page">
         <motion.header className="ofr-top" {...rise(0)}>
           <span className="ofr-mark">
@@ -418,7 +445,8 @@ export default function OfferView({ offer, expiresAt }: { offer: OfferPayload; e
         {/* ---------------------------------------------- side by side */}
         {/* First on the page (owner, 2026-10-24): the client opens the link to
             compare, so the two mortgages side by side come before the story. */}
-        <Section title="השוואת המשכנתאות">
+        <Section title="השוואת התמהילים">
+          <div className="ofr-table-box">
           <table className="ofr-table">
             <thead>
               <tr>
@@ -455,6 +483,7 @@ export default function OfferView({ offer, expiresAt }: { offer: OfferPayload; e
               ))}
             </tbody>
           </table>
+          </div>
         </Section>
 
         {/* ------------------------------------------------------- hero */}
@@ -472,12 +501,16 @@ export default function OfferView({ offer, expiresAt }: { offer: OfferPayload; e
             <motion.div className="ofr-big" {...rise(3)}>
               <span className="ofr-big-fig" dir="ltr">
                 <span className="ofr-big-cur">₪</span>
-                <NumberFlow
-                  value={shown}
-                  locales="he-IL"
-                  spinTiming={{ duration: reduce ? 0 : 1500, easing: "cubic-bezier(0.16, 1, 0.3, 1)" }}
-                  transformTiming={{ duration: reduce ? 0 : 900, easing: "cubic-bezier(0.16, 1, 0.3, 1)" }}
-                />
+                {still ? (
+                  nis(Math.round(saving))
+                ) : (
+                  <NumberFlow
+                    value={shown}
+                    locales="he-IL"
+                    spinTiming={{ duration: reduce ? 0 : 1500, easing: "cubic-bezier(0.16, 1, 0.3, 1)" }}
+                    transformTiming={{ duration: reduce ? 0 : 900, easing: "cubic-bezier(0.16, 1, 0.3, 1)" }}
+                  />
+                )}
               </span>
               <span className="ofr-big-cap">בריבית ובהצמדה לאורך חיי המשכנתא</span>
             </motion.div>
@@ -547,5 +580,6 @@ export default function OfferView({ offer, expiresAt }: { offer: OfferPayload; e
         </footer>
       </div>
     </main>
+    </Still.Provider>
   );
 }
