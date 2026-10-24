@@ -415,6 +415,48 @@ export default function OfferView({ offer, expiresAt }: { offer: OfferPayload; e
           <span className="ofr-top-date">{dmy(offer.createdAt)}</span>
         </motion.header>
 
+        {/* ---------------------------------------------- side by side */}
+        {/* First on the page (owner, 2026-10-24): the client opens the link to
+            compare, so the two mortgages side by side come before the story. */}
+        <Section title="השוואת המשכנתאות">
+          <table className="ofr-table">
+            <thead>
+              <tr>
+                <th />
+                <th>
+                  <span className="ofr-col" data-side="now">
+                    <i />
+                    הנוכחית
+                  </span>
+                </th>
+                <th>
+                  <span className="ofr-col" data-side="next">
+                    <i />
+                    החדשה
+                  </span>
+                </th>
+                <th className="ofr-table-d">הפרש</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.label}>
+                  <th scope="row">{r.label}</th>
+                  <td>
+                    <bdi>{r.a}</bdi>
+                  </td>
+                  <td data-side="next">
+                    <bdi>{r.b}</bdi>
+                  </td>
+                  <td className="ofr-table-d" dir="ltr">
+                    {r.d ?? ""}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Section>
+
         {/* ------------------------------------------------------- hero */}
         <section className="ofr-hero">
           {offer.client && (
@@ -471,46 +513,6 @@ export default function OfferView({ offer, expiresAt }: { offer: OfferPayload; e
             <Milestones cum={cum} />
           </Section>
         )}
-
-        {/* ---------------------------------------------- side by side */}
-        <Section title="השוואת המשכנתאות">
-          <table className="ofr-table">
-            <thead>
-              <tr>
-                <th />
-                <th>
-                  <span className="ofr-col" data-side="now">
-                    <i />
-                    הנוכחית
-                  </span>
-                </th>
-                <th>
-                  <span className="ofr-col" data-side="next">
-                    <i />
-                    החדשה
-                  </span>
-                </th>
-                <th className="ofr-table-d">הפרש</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr key={r.label}>
-                  <th scope="row">{r.label}</th>
-                  <td>
-                    <bdi>{r.a}</bdi>
-                  </td>
-                  <td data-side="next">
-                    <bdi>{r.b}</bdi>
-                  </td>
-                  <td className="ofr-table-d" dir="ltr">
-                    {r.d ?? ""}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Section>
 
         {/* ------------------------------------------------- the advisor */}
         {(offer.advisor.name || phone) && (
