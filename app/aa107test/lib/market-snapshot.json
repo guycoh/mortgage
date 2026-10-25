@@ -1,0 +1,120 @@
+{
+  "builtAt": "2026-10-25T00:56:26.982Z",
+  "sources": [
+    {
+      "id": "boi_bir_mrtg",
+      "label": "בנק ישראל · ריביות על הלוואות לדיור חדשות (BIR_MRTG_99)",
+      "period": "08/2026",
+      "url": "https://edge.boi.gov.il/FusionEdgeServer/ws/public/sdmxapi/rest/data/BOI.STATISTICS,BIR_MRTG_99,1.0?lastNObservations=6"
+    },
+    {
+      "id": "boi_compare",
+      "label": "בנק ישראל · השוואת ריביות בהלוואות לדיור לפי בנק",
+      "period": "10/2025",
+      "url": "https://www.boi.org.il/en/information-and-service-to-the-public/interest-rates-and-early-repayment-fees/interest-rate-comparisons-housing-loans/"
+    },
+    {
+      "id": "boi_zcm",
+      "label": "בנק ישראל · עקומי אפס (ZCM)",
+      "period": "08/2026",
+      "url": "https://edge.boi.org.il/FusionEdgeServer/sdmx/v2/data/dataflow/BOI.STATISTICS/ZCM/1.0/?lastNObservations=18&format=csv"
+    },
+    {
+      "id": "boi_rate",
+      "label": "בנק ישראל · ריבית בנק ישראל",
+      "period": "2026-09-03",
+      "url": "https://edge.boi.gov.il/FusionEdgeServer/ws/public/sdmxapi/rest/data/BOI.STATISTICS,BR,1.0?lastNObservations=500"
+    }
+  ],
+  "boi": {
+    "rate": 3.25,
+    "prime": 4.75,
+    "since": "2026-09-03"
+  },
+  "levelPeriod": "2026-08",
+  "bankPeriod": "2025-10",
+  "housing": {
+    "klzSpread": 0.5308838385917154,
+    "kzSpread": 1.206969917632566,
+    "primeMargin": -0.6418432863549697,
+    "mlzMargin": 0.9057457326448635,
+    "mzMargin": 1.55,
+    "avg": {
+      "klz": 4.62,
+      "kz": 3.29,
+      "kzTermYears": 17.33,
+      "klzRefTermYears": 20,
+      "prime": 5.35815671364503,
+      "mlz": 4.764961222434,
+      "mz": 3.19
+    }
+  },
+  "allPurposePremium": {
+    "prime": 2.2199999999999998,
+    "klz": 1.9900000000000002,
+    "kz": 1.9900000000000002,
+    "mlz": 2.2199999999999998,
+    "mz": 2.2199999999999998
+  },
+  "bankDelta": {
+    "Mizrahi Tefahot": {
+      "kz": -0.017958604645559983,
+      "mz": 0.4489183268574002,
+      "klz": -0.02531579701310971,
+      "prime": 0.06984360842479997,
+      "mlz": -0.057099872155800036
+    },
+    "Leumi": {
+      "kz": -0.23589862567725994,
+      "mz": -0.1162712308444398,
+      "klz": -0.03848373175979969,
+      "prime": 0.003731576115949764,
+      "mlz": -0.03411270984199
+    },
+    "Hapoalim": {
+      "kz": -0.018605284113500264,
+      "mz": -0.34838167314260016,
+      "klz": 0.031043431721130332,
+      "prime": -0.005626068964390107,
+      "mlz": 0.10388047311284065
+    },
+    "Discount": {
+      "kz": -0.5541109669431501,
+      "mz": -0.5983816731426002,
+      "klz": -0.028916482714000047,
+      "prime": 0.0338303809169096,
+      "mlz": -0.05013100889500954
+    },
+    "Habeinleumi": {
+      "kz": -0.17856312759557014,
+      "mz": -0.2783816731425999,
+      "klz": -0.037073932890150374,
+      "prime": -0.5579894806260599,
+      "mlz": -0.02679580797828951
+    },
+    "Mercantile": {
+      "kz": -0.015445670194340178,
+      "mz": -1.2283816731426,
+      "klz": 0.1762788911918598,
+      "prime": 0.27229056145464003,
+      "mlz": 0.12727130000458065
+    },
+    "Jerusalem": {
+      "kz": 1.8490922016982299,
+      "mz": 1.7616183268574002,
+      "klz": 1.9377645141741704,
+      "prime": 1.9706668157667293,
+      "mlz": 1.9135178783738604
+    }
+  },
+  "bankIrr": {
+    "Mizrahi Tefahot": 4.6598096702733,
+    "Leumi": 4.6218500833649,
+    "Hapoalim": 4.66034825217754,
+    "Discount": 4.44777397243602,
+    "Habeinleumi": 4.60031025955033,
+    "Mercantile": 4.54581193809896,
+    "Jerusalem": 5.8117788393589,
+    "system": 4.65106646964612
+  }
+}
