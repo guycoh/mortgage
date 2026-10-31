@@ -24,6 +24,7 @@ type FundingTrack = {
   notes: string | null;
   mortgage_type: string | null;
   registration_method: string | null;
+  early_repayment_fee: string | null; 
   additions: string | null;
   reverse_or_pension: string | null;
   restricted_customers: boolean;
@@ -97,7 +98,6 @@ export default function SpreadsheetPage() {
     complex: "all",
   });
 
-  // מנגנון מיון חדש (ברירת מחדל: מיון לפי שם גוף מימון)
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: "body_name", direction: "asc" });
 
   const [isAddingBody, setIsAddingBody] = useState(false);
@@ -221,6 +221,7 @@ export default function SpreadsheetPage() {
       max_financing_percent: dataToSave.max_financing_percent ? Number(dataToSave.max_financing_percent) : null,
       reverse_or_pension: dataToSave.reverse_or_pension || null, 
       registration_method: dataToSave.registration_method?.substring(0, 25) || null,
+      early_repayment_fee: dataToSave.early_repayment_fee || null,
       restricted_customers: !!dataToSave.restricted_customers,
       complex_customers: !!dataToSave.complex_customers,
     };
@@ -249,7 +250,6 @@ export default function SpreadsheetPage() {
     }
   };
 
-  // הפעלת סינון
   const filteredRows = rows.filter(row => {
     if (row.is_new && row.ui_id.startsWith("new-")) return true;
     const isFilterActive = Object.values(filters).some(val => val !== "" && val !== "all");
@@ -284,16 +284,35 @@ export default function SpreadsheetPage() {
     return true;
   });
 
-  // הפעלת מיון על הרשומות המסוננות
   const sortedRows = [...filteredRows].sort((a, b) => {
     if (!sortConfig.key) return 0;
 
     let aValue = a[sortConfig.key];
     let bValue = b[sortConfig.key];
 
-    if (aValue === bValue) return 0;
+    // במקרה של שוויון במיון הראשי (או כשהמשתמש לא בחר למיין עמודה ספציפית והיא ברירת המחדל)
+    if (aValue === bValue) {
+      
+      // 1. מיון משני: קודם לפי גוף מימון (אם הוא לא נבחר כמיון הראשי כרגע)
+      if (sortConfig.key !== "body_name") {
+        const aName = a.body_name || "";
+        const bName = b.body_name || "";
+        if (aName !== bName) return aName.localeCompare(bName, "he");
+      }
+      
+      // 2. מיון שלישי: לפי לוח סילוקין
+      if (sortConfig.key !== "amortization_schedule") {
+        const aAmort = a.amortization_schedule || "";
+        const bAmort = b.amortization_schedule || "";
+        // דחיפת ערכים ריקים לסוף
+        if (!aAmort && bAmort) return 1;
+        if (aAmort && !bAmort) return -1;
+        if (aAmort !== bAmort) return aAmort.localeCompare(bAmort, "he");
+      }
+      
+      return 0;
+    }
     
-    // ערכים ריקים תמיד יידחפו לסוף
     if (aValue === null || aValue === undefined || aValue === "") return sortConfig.direction === "asc" ? 1 : -1;
     if (bValue === null || bValue === undefined || bValue === "") return sortConfig.direction === "asc" ? -1 : 1;
 
@@ -316,7 +335,6 @@ export default function SpreadsheetPage() {
     setSortConfig({ key, direction });
   };
 
-  // רכיב ייעודי לכותרת ניתנת למיון
   const SortableHeader = ({ label, sortKey }: { label: React.ReactNode, sortKey: keyof TableRow }) => {
     const isActive = sortConfig.key === sortKey;
     return (
@@ -337,7 +355,6 @@ export default function SpreadsheetPage() {
   };
 
   const exportToExcel = () => {
-    // הייצוא משתמש ב-sortedRows כדי לשמור על סדר המיון באקסל
     const dataToExport = sortedRows
       .filter((row) => !row.is_new)
       .map((row) => {
@@ -357,6 +374,7 @@ export default function SpreadsheetPage() {
           "פתיחת תיק (₪)": row.file_opening_fee_nis || "",
           "פתיחת תיק (%)": row.file_opening_fee_percent || "",
           "שיטת רישום": row.registration_method || "",
+          "עמלת פרעון מוקדם": row.early_repayment_fee || "",
           "תוספות": row.additions || "",
           "הערות": row.notes || "",
         };
@@ -477,7 +495,6 @@ export default function SpreadsheetPage() {
 
         <div className="overflow-auto flex-1 relative bg-white">
           <table className="w-full table-fixed text-center border-collapse">
-            
             <colgroup>
               <col className="w-[9%]" />
               <col className="w-[8%]" />
@@ -541,7 +558,6 @@ export default function SpreadsheetPage() {
               {sortedRows.map((row, idx) => {
                 const isEditing = editingRowId === row.ui_id;
                 const isSelected = selectedRowId === row.ui_id;
-                // מפריד ויזואלי כאשר יש שינוי בשם גוף המימון (עוזר מאוד בזמן מיון לפי עמודות אחרות)
                 const isDiffFromPrev = idx > 0 && sortedRows[idx - 1].body_name !== row.body_name;
 
                 const baseBorderClasses = isSelected ? 'border-orange-500 bg-orange-100/60' : 'border-gray-200 hover:bg-orange-50/30';
@@ -644,6 +660,16 @@ export default function SpreadsheetPage() {
                                 placeholder="הזן שיטת רישום..." 
                               />
                             </div>
+                            <div className="flex-1 flex flex-col gap-1.5">
+                              <label className="text-xs font-bold text-gray-700">עמלת פרעון מוקדם:</label>
+                              <textarea 
+                                name="early_repayment_fee" 
+                                value={editFormData.early_repayment_fee || ""} 
+                                onChange={handleChange} 
+                                className="w-full h-16 p-2 border border-blue-400 rounded text-xs outline-none bg-white shadow-inner focus:ring-2 focus:ring-orange-400 resize-none leading-relaxed" 
+                                placeholder="הזן עמלת פרעון מוקדם..." 
+                              />
+                            </div>
                             <div className="flex-[2] flex flex-col gap-1.5">
                               <label className="text-xs font-bold text-gray-700">הערות (עריכה):</label>
                               <textarea 
@@ -681,7 +707,14 @@ export default function SpreadsheetPage() {
                 </div>
               </div>
               
-              <div className="flex-[3] flex flex-col gap-1">
+              <div className="flex-1 flex flex-col gap-1">
+                <label className="text-xs md:text-sm font-bold text-gray-800">עמלת פרעון מוקדם</label>
+                <div className="text-xs md:text-sm font-medium p-2 bg-white border border-gray-200 rounded h-full overflow-y-auto whitespace-pre-wrap text-gray-800">
+                  {bottomPaneData?.early_repayment_fee || <span className="text-gray-400 italic">אין נתונים</span>}
+                </div>
+              </div>
+
+              <div className="flex-[2] flex flex-col gap-1">
                 <label className="text-xs md:text-sm font-bold text-gray-800">הערות</label>
                 <div className="text-xs md:text-sm font-medium p-2 bg-white border border-gray-200 rounded h-full overflow-y-auto whitespace-pre-wrap leading-relaxed text-gray-800">
                   {bottomPaneData?.notes || <span className="text-gray-400 italic">אין הערות</span>}
@@ -690,7 +723,7 @@ export default function SpreadsheetPage() {
             </div>
           ) : (
             <div className="flex items-center justify-center h-full text-gray-500 font-medium text-sm">
-              לחץ על שורה בטבלה כדי לראות את פרטי שיטת הרישום וההערות שלה
+              לחץ על שורה בטבלה כדי לראות את פרטי שיטת רישום, פרעון מוקדם והערות
             </div>
           )}
         </div>
@@ -699,3 +732,715 @@ export default function SpreadsheetPage() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+// "use client";
+
+// import React, { useEffect, useState } from "react";
+// import { createClient } from "@supabase/supabase-js";
+// import * as XLSX from "xlsx"; 
+
+// const supabase = createClient(
+//   process.env.NEXT_PUBLIC_SUPABASE_URL!,
+//   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+// );
+
+// type FundingBody = { id: string; name: string };
+// type FundingTrack = {
+//   id: string;
+//   funding_body_id: string;
+//   amortization_schedule: string | null;
+//   min_interest_all_purpose_percent: number | null;
+//   track_type: string | null;
+//   max_spread_years: number | null;
+//   max_age: number | null;
+//   file_opening_fee_nis: number | null;
+//   file_opening_fee_percent: number | null;
+//   max_financing_percent: number | null;
+//   notes: string | null;
+//   mortgage_type: string | null;
+//   registration_method: string | null;
+//   additions: string | null;
+//   reverse_or_pension: string | null;
+//   restricted_customers: boolean;
+//   complex_customers: boolean;
+// };
+
+// type TableRow = Partial<FundingTrack> & {
+//   ui_id: string; 
+//   funding_body_id: string;
+//   body_name: string;
+//   is_new?: boolean; 
+// };
+
+// type SortConfig = {
+//   key: keyof TableRow | null;
+//   direction: 'asc' | 'desc';
+// };
+
+// const AMORTIZATION_OPTIONS = ["שפיצר", "בלון חלקי", "בלון מלא", "קרן שווה", "כפי יכולתך"];
+// const TRACK_OPTIONS = ["ק\"צ", "קל\"צ", "פריים", "מ\"צ", "מל\"צ"];
+// const MORTGAGE_TYPE_OPTIONS = ["דרגה ראשונה", "דרגה שניה", "הלוואת סולו"];
+// const REVERSE_PENSION_OPTIONS = ["הפוכה", "פנסיונית"];
+
+// const viewInputStyle = "w-full min-w-0 h-5 py-0 px-1 border border-transparent rounded text-xs font-medium text-center bg-transparent text-gray-800 outline-none cursor-default transition-colors leading-tight";
+// const editInputStyle = "w-full min-w-0 h-6 py-0.5 px-1 border border-blue-400 rounded text-xs font-medium text-center outline-none bg-white shadow-inner focus:bg-orange-50 focus:border-orange-400 focus:ring-2 focus:ring-orange-400 transition-colors leading-tight";
+// const filterInputStyle = "w-full min-w-0 p-1 border border-gray-300 rounded text-xs font-medium bg-white outline-none text-gray-800 focus:bg-orange-50 focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition-colors";
+
+// const getMortgageTypeViewStyle = (val: string | null | undefined) => 
+//   val === "דרגה שניה" 
+//     ? "w-full min-w-0 h-5 py-0 px-1 border border-blue-600 rounded text-xs text-center bg-blue-600 text-white font-bold outline-none cursor-default transition-colors leading-tight" 
+//     : viewInputStyle;
+
+// const getMortgageTypeEditStyle = (val: string | null | undefined) => 
+//   val === "דרגה שניה" 
+//     ? "w-full min-w-0 h-6 py-0.5 px-1 border border-blue-600 rounded text-xs text-center bg-blue-600 text-white font-bold outline-none shadow-inner focus:ring-2 focus:ring-blue-400 transition-colors leading-tight" 
+//     : editInputStyle;
+
+// const getReversePensionViewStyle = (val: string | null | undefined) => {
+//   if (val === "הפוכה") return "w-full min-w-0 h-5 py-0 px-1 border border-teal-600 rounded text-xs text-center bg-teal-600 text-white font-bold outline-none cursor-default transition-colors leading-tight";
+//   if (val === "פנסיונית") return "w-full min-w-0 h-5 py-0 px-1 border border-purple-600 rounded text-xs text-center bg-purple-600 text-white font-bold outline-none cursor-default transition-colors leading-tight";
+//   return viewInputStyle;
+// };
+
+// const getReversePensionEditStyle = (val: string | null | undefined) => {
+//   if (val === "הפוכה") return "w-full min-w-0 h-6 py-0.5 px-1 border border-teal-600 rounded text-xs text-center bg-teal-600 text-white font-bold outline-none shadow-inner focus:ring-2 focus:ring-teal-400 transition-colors leading-tight";
+//   if (val === "פנסיונית") return "w-full min-w-0 h-6 py-0.5 px-1 border border-purple-600 rounded text-xs text-center bg-purple-600 text-white font-bold outline-none shadow-inner focus:ring-2 focus:ring-purple-400 transition-colors leading-tight";
+//   return editInputStyle;
+// };
+
+// export default function SpreadsheetPage() {
+//   const [rows, setRows] = useState<TableRow[]>([]);
+//   const [bodies, setBodies] = useState<FundingBody[]>([]);
+//   const [loading, setLoading] = useState(true);
+
+//   const [editingRowId, setEditingRowId] = useState<string | null>(null);
+//   const [editFormData, setEditFormData] = useState<Partial<TableRow>>({});
+  
+//   const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
+
+//   const [showFilters, setShowFilters] = useState(true);
+//   const [filters, setFilters] = useState({
+//     funding_body_id: "",
+//     amortization_schedule: "",
+//     track_type: "",
+//     mortgage_type: "",
+//     reverse_or_pension: "",
+//     min_financing_percent: "",
+//     min_age_required: "",
+//     min_spread_required: "",
+//     restricted: "all",
+//     complex: "all",
+//   });
+
+//   // מנגנון מיון חדש (ברירת מחדל: מיון לפי שם גוף מימון)
+//   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: "body_name", direction: "asc" });
+
+//   const [isAddingBody, setIsAddingBody] = useState(false);
+//   const [newBodyName, setNewBodyName] = useState("");
+
+//   useEffect(() => {
+//     fetchData();
+//   }, []);
+
+//   const fetchData = async () => {
+//     setLoading(true);
+//     const { data: bodiesData } = await supabase.from("hacamm_funding_bodies").select("*").order("name");
+//     const { data: tracksData } = await supabase.from("hacamm_funding_tracks").select("*");
+
+//     const fetchedBodies = (bodiesData as FundingBody[]) || [];
+//     const tracks = (tracksData as FundingTrack[]) || [];
+
+//     setBodies(fetchedBodies);
+
+//     const tableData: TableRow[] = [];
+
+//     fetchedBodies.forEach((body) => {
+//       const bodyTracks = tracks.filter((t) => t.funding_body_id === body.id);
+//       if (bodyTracks.length === 0) {
+//         tableData.push({ ui_id: `empty-${body.id}`, funding_body_id: body.id, body_name: body.name, is_new: true });
+//       } else {
+//         bodyTracks.forEach((track) => {
+//           tableData.push({ ...track, ui_id: track.id, body_name: body.name, is_new: false });
+//         });
+//       }
+//     });
+//     setRows(tableData);
+//     setLoading(false);
+//   };
+
+//   const handleAddBody = async () => {
+//     if (!newBodyName.trim()) return;
+//     setLoading(true);
+//     const { error } = await supabase
+//       .from("hacamm_funding_bodies")
+//       .insert([{ name: newBodyName.trim() }]);
+    
+//     if (error) {
+//       alert("שגיאה בהוספת גוף מימון: " + error.message);
+//       setLoading(false);
+//     } else {
+//       setNewBodyName("");
+//       setIsAddingBody(false);
+//       fetchData();
+//     }
+//   };
+
+//   const handleEdit = (row: TableRow) => {
+//     setEditingRowId(row.ui_id);
+//     setSelectedRowId(row.ui_id); 
+//     setEditFormData({ ...row });
+//   };
+
+//   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+//     const target = e.target as HTMLInputElement;
+//     const { name, value, type } = target;
+//     if (type === "checkbox") {
+//       setEditFormData((prev) => ({ ...prev, [name]: target.checked }));
+//     } else {
+//       setEditFormData((prev) => ({ ...prev, [name]: value === "" ? null : value }));
+//     }
+//   };
+
+//   const handleFilterChange = (e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>) => {
+//     const { name, value } = e.target;
+//     setFilters(prev => ({ ...prev, [name]: value }));
+//   };
+
+//   const clearFilters = () => {
+//     setFilters({ 
+//       funding_body_id: "", 
+//       amortization_schedule: "", 
+//       track_type: "", 
+//       mortgage_type: "", 
+//       reverse_or_pension: "", 
+//       min_financing_percent: "",
+//       min_age_required: "", 
+//       min_spread_required: "", 
+//       restricted: "all", 
+//       complex: "all" 
+//     });
+//   };
+
+//   const handleAddNewTrackToBody = (body_id: string, body_name: string) => {
+//     const newUiId = `new-${Date.now()}`;
+//     const newRow: TableRow = { ui_id: newUiId, funding_body_id: body_id, body_name: body_name, is_new: true };
+//     setRows((prev) => {
+//       const lastIndex = prev.map(r => r.funding_body_id).lastIndexOf(body_id);
+//       const newRows = [...prev];
+//       newRows.splice(lastIndex + 1, 0, newRow);
+//       return newRows;
+//     });
+//     setEditingRowId(newUiId);
+//     setSelectedRowId(newUiId);
+//     setEditFormData(newRow);
+//   };
+
+//   const handleCancel = (ui_id: string, is_new?: boolean) => {
+//     setEditingRowId(null);
+//     setEditFormData({});
+//     if (is_new && ui_id.startsWith("new-")) {
+//       setRows((prev) => prev.filter((r) => r.ui_id !== ui_id));
+//       if (selectedRowId === ui_id) setSelectedRowId(null);
+//     }
+//   };
+
+//   const handleSave = async () => {
+//     const { ui_id, is_new, body_name, id, ...dataToSave } = editFormData;
+//     const payload = {
+//       ...dataToSave,
+//       min_interest_all_purpose_percent: dataToSave.min_interest_all_purpose_percent ? Number(dataToSave.min_interest_all_purpose_percent) : null,
+//       max_spread_years: dataToSave.max_spread_years ? Number(dataToSave.max_spread_years) : null,
+//       max_age: dataToSave.max_age ? Number(dataToSave.max_age) : null,
+//       file_opening_fee_nis: dataToSave.file_opening_fee_nis ? Number(dataToSave.file_opening_fee_nis) : null,
+//       file_opening_fee_percent: dataToSave.file_opening_fee_percent ? Number(dataToSave.file_opening_fee_percent) : null,
+//       max_financing_percent: dataToSave.max_financing_percent ? Number(dataToSave.max_financing_percent) : null,
+//       reverse_or_pension: dataToSave.reverse_or_pension || null, 
+//       registration_method: dataToSave.registration_method?.substring(0, 25) || null,
+//       restricted_customers: !!dataToSave.restricted_customers,
+//       complex_customers: !!dataToSave.complex_customers,
+//     };
+
+//     if (is_new) {
+//       const { error } = await supabase.from("hacamm_funding_tracks").insert([payload]);
+//       if (error) alert("שגיאה ביצירת המסלול: " + error.message);
+//     } else {
+//       const { error } = await supabase.from("hacamm_funding_tracks").update(payload).eq("id", id!);
+//       if (error) alert("שגיאה בעדכון המסלול: " + error.message);
+//     }
+
+//     setEditingRowId(null);
+//     setEditFormData({});
+//     fetchData();
+//   };
+
+//   const handleDelete = async (row: TableRow) => {
+//     if (row.is_new) return; 
+//     if (!confirm("האם אתה בטוח שברצונך למחוק מסלול זה?")) return;
+//     const { error } = await supabase.from("hacamm_funding_tracks").delete().eq("id", row.id!);
+//     if (error) alert("שגיאה במחיקה: " + error.message);
+//     else {
+//       if (selectedRowId === row.ui_id) setSelectedRowId(null);
+//       fetchData();
+//     }
+//   };
+
+//   // הפעלת סינון
+//   const filteredRows = rows.filter(row => {
+//     if (row.is_new && row.ui_id.startsWith("new-")) return true;
+//     const isFilterActive = Object.values(filters).some(val => val !== "" && val !== "all");
+//     if (isFilterActive && row.ui_id.startsWith("empty-")) return false;
+
+//     if (filters.funding_body_id && row.funding_body_id !== filters.funding_body_id) return false;
+//     if (filters.amortization_schedule && row.amortization_schedule !== filters.amortization_schedule) return false;
+//     if (filters.track_type && row.track_type !== filters.track_type) return false;
+//     if (filters.mortgage_type && row.mortgage_type !== filters.mortgage_type) return false;
+    
+//     if (filters.reverse_or_pension) {
+//       if (filters.reverse_or_pension === "both") {
+//         if (row.reverse_or_pension !== "הפוכה" && row.reverse_or_pension !== "פנסיונית") return false;
+//       } else if (row.reverse_or_pension !== filters.reverse_or_pension) {
+//         return false;
+//       }
+//     }
+    
+//     if (filters.min_financing_percent && (row.max_financing_percent === null || row.max_financing_percent === undefined || row.max_financing_percent < Number(filters.min_financing_percent))) return false;
+//     if (filters.min_age_required && (row.max_age === null || row.max_age === undefined || row.max_age < Number(filters.min_age_required))) return false;
+//     if (filters.min_spread_required && (row.max_spread_years === null || row.max_spread_years === undefined || row.max_spread_years < Number(filters.min_spread_required))) return false;
+
+//     if (filters.restricted !== "all") {
+//       const wantsRestricted = filters.restricted === "yes";
+//       if (!!row.restricted_customers !== wantsRestricted) return false;
+//     }
+//     if (filters.complex !== "all") {
+//       const wantsComplex = filters.complex === "yes";
+//       if (!!row.complex_customers !== wantsComplex) return false;
+//     }
+
+//     return true;
+//   });
+
+//   // הפעלת מיון על הרשומות המסוננות
+//   const sortedRows = [...filteredRows].sort((a, b) => {
+//     if (!sortConfig.key) return 0;
+
+//     let aValue = a[sortConfig.key];
+//     let bValue = b[sortConfig.key];
+
+//     if (aValue === bValue) return 0;
+    
+//     // ערכים ריקים תמיד יידחפו לסוף
+//     if (aValue === null || aValue === undefined || aValue === "") return sortConfig.direction === "asc" ? 1 : -1;
+//     if (bValue === null || bValue === undefined || bValue === "") return sortConfig.direction === "asc" ? -1 : 1;
+
+//     if (typeof aValue === "string" && typeof bValue === "string") {
+//       return sortConfig.direction === "asc" 
+//         ? aValue.localeCompare(bValue, "he") 
+//         : bValue.localeCompare(aValue, "he");
+//     }
+
+//     if (aValue < bValue) return sortConfig.direction === "asc" ? -1 : 1;
+//     if (aValue > bValue) return sortConfig.direction === "asc" ? 1 : -1;
+//     return 0;
+//   });
+
+//   const handleSort = (key: keyof TableRow) => {
+//     let direction: 'asc' | 'desc' = 'asc';
+//     if (sortConfig.key === key && sortConfig.direction === 'asc') {
+//       direction = 'desc';
+//     }
+//     setSortConfig({ key, direction });
+//   };
+
+//   // רכיב ייעודי לכותרת ניתנת למיון
+//   const SortableHeader = ({ label, sortKey }: { label: React.ReactNode, sortKey: keyof TableRow }) => {
+//     const isActive = sortConfig.key === sortKey;
+//     return (
+//       <th 
+//         className="p-1 border border-gray-300 font-bold leading-tight align-middle break-words whitespace-normal text-[11px] cursor-pointer hover:bg-gray-200 transition-colors select-none group"
+//         onClick={() => handleSort(sortKey)}
+//         title="לחץ למיון"
+//       >
+//         <div className="flex items-center justify-center gap-1">
+//           <span>{label}</span>
+//           <div className="flex flex-col text-[8px] leading-[8px] text-gray-300 group-hover:text-gray-400">
+//             <span className={isActive && sortConfig.direction === 'asc' ? '!text-blue-600' : ''}>▲</span>
+//             <span className={isActive && sortConfig.direction === 'desc' ? '!text-blue-600' : ''}>▼</span>
+//           </div>
+//         </div>
+//       </th>
+//     );
+//   };
+
+//   const exportToExcel = () => {
+//     // הייצוא משתמש ב-sortedRows כדי לשמור על סדר המיון באקסל
+//     const dataToExport = sortedRows
+//       .filter((row) => !row.is_new)
+//       .map((row) => {
+//         const isEmptyPlaceholder = row.ui_id.startsWith("empty-");
+//         return {
+//           "גוף מימון": row.body_name || "",
+//           "לוח סילוקין": row.amortization_schedule || "",
+//           "ריביות לכל מטרה מינימום (%)": row.min_interest_all_purpose_percent || "",
+//           "מסלול": row.track_type || "",
+//           "אחוז מימון מקסימלי (%)": row.max_financing_percent || "",
+//           "סוג משכנתא": row.mortgage_type || "",
+//           "פנסיונית/הפוכה": row.reverse_or_pension || "",
+//           "גיל מקס'": row.max_age || "",
+//           "פריסה מקסימלית בשנים": row.max_spread_years || "",
+//           "לקוחות מוגבלים": isEmptyPlaceholder ? "" : (row.restricted_customers ? "כן" : "לא"),
+//           "לקוחות מורכבים": isEmptyPlaceholder ? "" : (row.complex_customers ? "כן" : "לא"),
+//           "פתיחת תיק (₪)": row.file_opening_fee_nis || "",
+//           "פתיחת תיק (%)": row.file_opening_fee_percent || "",
+//           "שיטת רישום": row.registration_method || "",
+//           "תוספות": row.additions || "",
+//           "הערות": row.notes || "",
+//         };
+//       });
+
+//     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+//     const workbook = XLSX.utils.book_new();
+//     XLSX.utils.book_append_sheet(workbook, worksheet, "מסלולי מימון");
+
+//     if (!worksheet["!views"]) worksheet["!views"] = [];
+//     worksheet["!views"].push({ rightToLeft: true });
+
+//     XLSX.writeFile(workbook, "מסלולי_מימון.xlsx");
+//   };
+
+//   const ExpandableTextarea = ({ name, value, isEditing, onChange }: any) => {
+//     const hClass = isEditing ? 'h-6' : 'h-5';
+//     return (
+//       <div className={`relative w-full ${hClass} group/textarea hover:z-[100] focus-within:z-[100]`}>
+//         <textarea
+//           name={name} value={value || ""} onChange={isEditing ? onChange : undefined} readOnly={!isEditing} placeholder={isEditing ? "הקלד..." : ""}
+//           className={`absolute bottom-0 left-0 w-full min-w-0 ${hClass} py-0 px-1 text-xs font-medium text-right border rounded outline-none transition-all duration-200 resize-none overflow-hidden whitespace-pre-wrap leading-tight
+//             group-hover/textarea:w-[220px] group-hover/textarea:h-[120px] group-hover/textarea:z-[100] group-hover/textarea:shadow-2xl group-hover/textarea:overflow-y-auto
+//             focus:w-[220px] focus:h-[120px] focus:z-[100] focus:shadow-2xl focus:overflow-y-auto focus:bg-orange-50 focus:border-orange-400 focus:ring-1 focus:ring-orange-400
+//             ${isEditing 
+//               ? "border-blue-400 bg-white shadow-inner pt-0.5" 
+//               : "border-transparent bg-transparent text-gray-800 cursor-text group-hover/textarea:bg-white group-hover/textarea:border-gray-300"
+//             }`}
+//         />
+//       </div>
+//     );
+//   }
+
+//   const CustomCheckbox = ({ checked, onChange, readOnly = false, name = "" }: { checked: boolean, onChange?: any, readOnly?: boolean, name?: string }) => (
+//     <div className="flex justify-center items-center w-full min-w-0 h-5">
+//       <label className={`relative flex items-center justify-center ${readOnly ? 'cursor-default' : 'cursor-pointer'}`}>
+//         <input 
+//           type="checkbox" name={name} checked={checked} onChange={readOnly ? undefined : onChange} disabled={readOnly}
+//           className={`peer appearance-none w-3.5 h-3.5 border-[1.5px] rounded-sm transition-colors focus:ring-2 focus:ring-orange-400 focus:border-orange-400 focus:bg-orange-50 ${checked ? 'border-red-500 bg-red-50' : 'border-gray-300 bg-white'} ${!readOnly && 'hover:border-red-400 focus:outline-none'}`}
+//         />
+//         <svg className={`absolute w-3 h-3 text-red-500 pointer-events-none transition-opacity ${checked ? 'opacity-100' : 'opacity-0'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+//           <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+//         </svg>
+//       </label>
+//     </div>
+//   );
+
+//   const tdBaseClasses = "border transition-colors duration-150 align-middle cursor-pointer p-0";
+
+//   const selectedRowData = rows.find(r => r.ui_id === selectedRowId);
+//   const isEditingSelected = editingRowId === selectedRowId;
+//   const bottomPaneData = isEditingSelected ? editFormData : selectedRowData;
+
+//   return (
+//     <div className="min-h-screen bg-gray-50 p-2 md:p-4 font-sans text-gray-800 flex flex-col" dir="rtl">
+//       <div className="w-full mx-auto bg-white rounded-xl shadow-sm border border-gray-300 flex flex-col h-[calc(100vh-1rem)] md:h-[calc(100vh-2rem)] overflow-hidden">
+        
+//         <div className="p-3 bg-gray-100 border-b border-gray-300 flex flex-wrap justify-between items-center shrink-0 gap-2">
+//           <div className="flex flex-wrap items-center gap-2 md:gap-3">
+//             <h2 className="text-xl md:text-2xl font-bold text-gray-800 ml-2 md:ml-4">גופי מימון</h2>
+            
+//             <button 
+//               onClick={() => setShowFilters(!showFilters)} 
+//               className={`px-2 md:px-3 py-1.5 rounded-lg text-sm font-bold transition-colors flex items-center gap-1 md:gap-2 border ${showFilters ? 'bg-blue-100 text-blue-800 border-blue-200' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
+//             >
+//               <svg className="w-3.5 h-3.5 md:w-4 md:h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
+//               {showFilters ? 'כיבוי סינון' : 'הפעל סינון'}
+//             </button>
+
+//             {showFilters && (
+//               <button 
+//                 onClick={clearFilters} 
+//                 className="px-2 md:px-3 py-1.5 bg-gray-200 hover:bg-gray-300 focus:bg-gray-300 focus:ring-2 focus:ring-orange-400 text-gray-800 font-bold rounded-lg text-sm transition-colors outline-none shadow-sm"
+//               >
+//                 נקה סינון
+//               </button>
+//             )}
+
+//             <button 
+//               onClick={exportToExcel}
+//               className="px-2 md:px-3 py-1.5 rounded-lg text-sm font-bold transition-colors flex items-center gap-1 md:gap-2 border bg-white text-green-700 border-green-200 hover:bg-green-50 focus:ring-2 focus:ring-green-400 outline-none shadow-sm"
+//             >
+//               <svg className="w-3.5 h-3.5 md:w-4 md:h-4 text-green-600" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+//                 <path d="M2.85858 2.87756L15.4293 1.08175C15.7027 1.04269 15.9559 1.23265 15.995 1.50601C15.9983 1.52943 16 1.55306 16 1.57672V22.4237C16 22.6998 15.7761 22.9237 15.5 22.9237C15.4763 22.9237 15.4527 22.922 15.4293 22.9187L2.85858 21.1229C2.36593 21.0525 2 20.6306 2 20.1329V3.86754C2 3.36986 2.36593 2.94794 2.85858 2.87756ZM17 3H21C21.5523 3 22 3.44772 22 4V20C22 20.5523 21.5523 21 21 21H17V3ZM11.7604 15.5135L8.91883 11.5L11.7346 7.64332L9.84507 7.64332L8.03158 10.3807L6.21639 7.64332L4.36981 7.64332L7.14327 11.5L4.25816 15.5135L6.15579 15.5135L8.03531 12.6397L9.90799 15.5135L11.7604 15.5135Z"></path>
+//               </svg>
+//               ייצוא לאקסל
+//             </button>
+
+//             <div className="border-r border-gray-300 pr-2 md:pr-3 flex items-center gap-1 md:gap-2">
+//               {isAddingBody ? (
+//                 <div className="flex items-center gap-1 md:gap-2 animate-fade-in">
+//                   <input 
+//                     type="text" 
+//                     value={newBodyName} 
+//                     onChange={(e) => setNewBodyName(e.target.value)} 
+//                     placeholder="הזן שם גוף מימון..." 
+//                     className="border border-blue-400 rounded px-2 py-1.5 text-sm font-medium outline-none focus:ring-2 focus:ring-blue-500 w-32 md:w-48 shadow-inner"
+//                     autoFocus
+//                     onKeyDown={(e) => e.key === 'Enter' && handleAddBody()}
+//                   />
+//                   <button onClick={handleAddBody} className="bg-blue-600 hover:bg-blue-700 text-white px-2 py-1.5 rounded text-sm font-bold transition-colors outline-none focus:ring-2 focus:ring-blue-400">שמור</button>
+//                   <button onClick={() => { setIsAddingBody(false); setNewBodyName(""); }} className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-2 py-1.5 rounded text-sm font-bold transition-colors outline-none focus:ring-2 focus:ring-gray-400">ביטול</button>
+//                 </div>
+//               ) : (
+//                 <button 
+//                   onClick={() => setIsAddingBody(true)}
+//                   className="px-2 md:px-3 py-1.5 rounded-lg text-sm font-bold transition-colors flex items-center gap-1 md:gap-2 border bg-white text-blue-700 border-blue-200 hover:bg-blue-50 focus:ring-2 focus:ring-blue-400 outline-none shadow-sm"
+//                 >
+//                   <svg className="w-3.5 h-3.5 md:w-4 md:h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
+//                   הוסף גוף מימון
+//                 </button>
+//               )}
+//             </div>
+            
+//           </div>
+//           {loading && <span className="text-sm font-medium text-gray-500">טוען...</span>}
+//         </div>
+
+//         <div className="overflow-auto flex-1 relative bg-white">
+//           <table className="w-full table-fixed text-center border-collapse">
+            
+//             <colgroup>
+//               <col className="w-[9%]" />
+//               <col className="w-[8%]" />
+//               <col className="w-[6%]" />
+//               <col className="w-[6%]" />
+//               <col className="w-[6%]" />
+//               <col className="w-[8%]" />
+//               <col className="w-[7%]" />
+//               <col className="w-[4%]" />
+//               <col className="w-[5%]" />
+//               <col className="w-[5%]" />
+//               <col className="w-[5%]" />
+//               <col className="w-[6%]" />
+//               <col className="w-[5%]" />
+//               <col className="w-[13%]" />
+//               <col className="w-[7%]" />
+//             </colgroup>
+
+//             <thead className="text-gray-800 sticky top-0 z-20 shadow-sm bg-gray-100">
+              
+//               {showFilters && (
+//                 <tr className="bg-blue-50/50">
+//                   <th className="p-0.5 border border-gray-300 align-middle"><select name="funding_body_id" value={filters.funding_body_id} onChange={handleFilterChange} className={filterInputStyle}><option value="">הכל</option>{bodies.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</select></th>
+//                   <th className="p-0.5 border border-gray-300 align-middle"><select name="amortization_schedule" value={filters.amortization_schedule} onChange={handleFilterChange} className={filterInputStyle}><option value="">הכל</option>{AMORTIZATION_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}</select></th>
+//                   <th className="p-0.5 border border-gray-300"></th>
+//                   <th className="p-0.5 border border-gray-300 align-middle"><select name="track_type" value={filters.track_type} onChange={handleFilterChange} className={filterInputStyle}><option value="">הכל</option>{TRACK_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}</select></th>
+//                   <th className="p-0.5 border border-gray-300 align-middle"><input type="number" name="min_financing_percent" value={filters.min_financing_percent} onChange={handleFilterChange} placeholder="לפחות..." className={filterInputStyle} /></th>
+//                   <th className="p-0.5 border border-gray-300 align-middle"><select name="mortgage_type" value={filters.mortgage_type} onChange={handleFilterChange} className={filterInputStyle}><option value="">הכל</option>{MORTGAGE_TYPE_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}</select></th>
+//                   <th className="p-0.5 border border-gray-300 align-middle"><select name="reverse_or_pension" value={filters.reverse_or_pension} onChange={handleFilterChange} className={filterInputStyle}><option value="">הכל</option><option value="both">שתיהן</option>{REVERSE_PENSION_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}</select></th>
+//                   <th className="p-0.5 border border-gray-300 align-middle"><input type="number" name="min_age_required" value={filters.min_age_required} onChange={handleFilterChange} placeholder="לפחות..." className={filterInputStyle} /></th>
+//                   <th className="p-0.5 border border-gray-300 align-middle"><input type="number" name="min_spread_required" value={filters.min_spread_required} onChange={handleFilterChange} placeholder="לפחות..." className={filterInputStyle} /></th>
+//                   <th className="p-0.5 border border-gray-300 align-middle"><select name="restricted" value={filters.restricted} onChange={handleFilterChange} className={filterInputStyle}><option value="all">הכל</option><option value="yes">כן</option><option value="no">לא</option></select></th>
+//                   <th className="p-0.5 border border-gray-300 align-middle"><select name="complex" value={filters.complex} onChange={handleFilterChange} className={filterInputStyle}><option value="all">הכל</option><option value="yes">כן</option><option value="no">לא</option></select></th>
+//                   <th className="p-0.5 border border-gray-300"></th>
+//                   <th className="p-0.5 border border-gray-300"></th>
+//                   <th className="p-0.5 border border-gray-300"></th>
+//                   <th className="p-0.5 border border-gray-300 sticky left-0 bg-blue-50 z-30 shadow-[-4px_0_6px_-1px_rgba(0,0,0,0.05)] align-middle"></th>
+//                 </tr>
+//               )}
+
+//               <tr>
+//                 <SortableHeader label="גוף מימון" sortKey="body_name" />
+//                 <SortableHeader label="לוח סילוקין" sortKey="amortization_schedule" />
+//                 <SortableHeader label={<span>ריביות<br/>מינימום</span>} sortKey="min_interest_all_purpose_percent" />
+//                 <SortableHeader label="מסלול" sortKey="track_type" />
+//                 <SortableHeader label={<span>אחוז<br/>מימון</span>} sortKey="max_financing_percent" />
+//                 <SortableHeader label="סוג משכנתא" sortKey="mortgage_type" />
+//                 <SortableHeader label={<span>פנסיונית /<br/>הפוכה</span>} sortKey="reverse_or_pension" />
+//                 <SortableHeader label="גיל מקס'" sortKey="max_age" />
+//                 <SortableHeader label={<span>פריסה<br/>בשנים</span>} sortKey="max_spread_years" />
+//                 <SortableHeader label={<span>לקוחות<br/>מוגבלים</span>} sortKey="restricted_customers" />
+//                 <SortableHeader label={<span>לקוחות<br/>מורכבים</span>} sortKey="complex_customers" />
+//                 <SortableHeader label="פתיחת תיק ₪" sortKey="file_opening_fee_nis" />
+//                 <SortableHeader label="פתיחת תיק %" sortKey="file_opening_fee_percent" />
+//                 <th className="p-1 border border-gray-300 font-bold leading-tight align-middle break-words whitespace-normal text-[11px]">תוספות</th>
+//                 <th className="p-1 border border-gray-300 bg-gray-200 font-bold leading-tight align-middle sticky left-0 z-30 shadow-[-4px_0_6px_-1px_rgba(0,0,0,0.05)] text-[11px]">פעולות</th>
+//               </tr>
+//             </thead>
+            
+//             <tbody>
+//               {sortedRows.map((row, idx) => {
+//                 const isEditing = editingRowId === row.ui_id;
+//                 const isSelected = selectedRowId === row.ui_id;
+//                 // מפריד ויזואלי כאשר יש שינוי בשם גוף המימון (עוזר מאוד בזמן מיון לפי עמודות אחרות)
+//                 const isDiffFromPrev = idx > 0 && sortedRows[idx - 1].body_name !== row.body_name;
+
+//                 const baseBorderClasses = isSelected ? 'border-orange-500 bg-orange-100/60' : 'border-gray-200 hover:bg-orange-50/30';
+//                 const tdClasses = `p-0.5 align-middle cursor-pointer transition-all duration-150 border-solid border ${baseBorderClasses} ${isSelected && !isEditing ? 'border-y-[3px]' : ''} ${isSelected && isEditing ? 'border-t-[3px] border-b-0' : ''}`;
+//                 const firstTdClasses = `${tdClasses} ${isSelected ? 'border-r-[3px]' : ''}`;
+//                 const lastTdClasses = `p-1 text-center sticky left-0 shadow-[-4px_0_6px_-1px_rgba(0,0,0,0.05)] z-10 transition-all duration-150 border-solid border ${isSelected ? 'bg-orange-100 border-orange-500 border-l-[3px]' : 'bg-white hover:bg-orange-50/30 border-gray-200'} ${isSelected && !isEditing ? 'border-y-[3px]' : ''} ${isSelected && isEditing ? 'border-t-[3px] border-b-0' : ''}`;
+
+//                 return (
+//                   <React.Fragment key={row.ui_id}>
+//                     <tr 
+//                       onClick={() => setSelectedRowId(row.ui_id)} 
+//                       className={`relative transition-colors ${isSelected ? 'z-10' : ''} ${isDiffFromPrev && !isSelected ? 'border-t-[3px] border-t-gray-300' : ''}`}
+//                     >
+//                       <td className={`font-extrabold text-blue-900 text-right ${firstTdClasses}`}>
+//                         <div className="flex items-center justify-between gap-1 w-full overflow-hidden px-1 h-5">
+//                           <span className="text-xs truncate w-full" title={row.body_name}>{row.body_name}</span>
+//                           {!isEditing && (
+//                             <button 
+//                               onClick={(e) => { e.stopPropagation(); handleAddNewTrackToBody(row.funding_body_id, row.body_name); }} 
+//                               className="flex-shrink-0 bg-green-500 hover:bg-green-600 focus:ring-1 focus:ring-green-400 text-white rounded w-4 h-4 flex items-center justify-center outline-none shadow-sm transition-colors" 
+//                               title="הוסף מסלול"
+//                             >
+//                               <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
+//                             </button>
+//                           )}
+//                         </div>
+//                       </td>
+
+//                       {isEditing ? (
+//                         <>
+//                           <td className={`${tdClasses}`}><select name="amortization_schedule" value={editFormData.amortization_schedule || ""} onChange={handleChange} className={editInputStyle}><option value=""></option>{AMORTIZATION_OPTIONS.map(opt => (<option key={opt} value={opt}>{opt}</option>))}</select></td>
+//                           <td className={`${tdClasses}`}><input type="number" step="0.01" name="min_interest_all_purpose_percent" value={editFormData.min_interest_all_purpose_percent || ""} onChange={handleChange} className={editInputStyle} placeholder="%" /></td>
+//                           <td className={`${tdClasses}`}><select name="track_type" value={editFormData.track_type || ""} onChange={handleChange} className={editInputStyle}><option value=""></option>{TRACK_OPTIONS.map(opt => (<option key={opt} value={opt}>{opt}</option>))}</select></td>
+//                           <td className={`${tdClasses}`}><input type="number" step="0.01" name="max_financing_percent" value={editFormData.max_financing_percent || ""} onChange={handleChange} className={editInputStyle} placeholder="%" /></td>
+//                           <td className={`${tdClasses}`}><select name="mortgage_type" value={editFormData.mortgage_type || ""} onChange={handleChange} className={getMortgageTypeEditStyle(editFormData.mortgage_type)}><option value=""></option>{MORTGAGE_TYPE_OPTIONS.map(opt => (<option key={opt} value={opt}>{opt}</option>))}</select></td>
+//                           <td className={`${tdClasses}`}><select name="reverse_or_pension" value={editFormData.reverse_or_pension || ""} onChange={handleChange} className={getReversePensionEditStyle(editFormData.reverse_or_pension)}><option value=""></option>{REVERSE_PENSION_OPTIONS.map(opt => (<option key={opt} value={opt}>{opt}</option>))}</select></td>
+//                           <td className={`${tdClasses}`}><input type="number" name="max_age" value={editFormData.max_age || ""} onChange={handleChange} className={editInputStyle} /></td>
+//                           <td className={`${tdClasses}`}><input type="number" name="max_spread_years" value={editFormData.max_spread_years || ""} onChange={handleChange} className={editInputStyle} /></td>
+//                           <td className={`${tdClasses}`}><CustomCheckbox name="restricted_customers" checked={!!editFormData.restricted_customers} onChange={handleChange} /></td>
+//                           <td className={`${tdClasses}`}><CustomCheckbox name="complex_customers" checked={!!editFormData.complex_customers} onChange={handleChange} /></td>
+//                           <td className={`${tdClasses}`}><input type="number" name="file_opening_fee_nis" value={editFormData.file_opening_fee_nis || ""} onChange={handleChange} className={editInputStyle} placeholder="₪" /></td>
+//                           <td className={`${tdClasses}`}><input type="number" step="0.01" name="file_opening_fee_percent" value={editFormData.file_opening_fee_percent || ""} onChange={handleChange} className={editInputStyle} placeholder="%" /></td>
+//                           <td className={`${tdClasses}`}><ExpandableTextarea name="additions" value={editFormData.additions} isEditing={true} onChange={handleChange} /></td>
+                          
+//                           <td className={`${lastTdClasses}`}>
+//                             <div className="flex flex-row gap-1 justify-center items-center h-full px-1 py-0.5">
+//                               <button onClick={(e) => { e.stopPropagation(); handleSave(); }} className="bg-green-500 hover:bg-green-600 focus:ring-2 focus:ring-green-400 text-white p-1 rounded transition flex-1 flex justify-center items-center outline-none" title="שמור">
+//                                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+//                               </button>
+//                               <button onClick={(e) => { e.stopPropagation(); handleCancel(row.ui_id, row.is_new); }} className="bg-gray-400 hover:bg-gray-500 focus:ring-2 focus:ring-gray-400 text-white p-1 rounded transition flex-1 flex justify-center items-center outline-none" title="בטל">
+//                                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+//                               </button>
+//                             </div>
+//                           </td>
+//                         </>
+//                       ) : (
+//                         <>
+//                           <td className={`${tdClasses}`}><input readOnly value={row.amortization_schedule || ""} className={viewInputStyle} /></td>
+//                           <td className={`${tdClasses}`}><input readOnly value={row.min_interest_all_purpose_percent ? `${row.min_interest_all_purpose_percent}%` : ""} className={viewInputStyle} /></td>
+//                           <td className={`${tdClasses}`}><input readOnly value={row.track_type || ""} className={viewInputStyle} /></td>
+//                           <td className={`${tdClasses}`}><input readOnly value={row.max_financing_percent ? `${row.max_financing_percent}%` : ""} className={viewInputStyle} /></td>
+//                           <td className={`${tdClasses}`}><input readOnly value={row.mortgage_type || ""} className={getMortgageTypeViewStyle(row.mortgage_type)} /></td>
+//                           <td className={`${tdClasses}`}><input readOnly value={row.reverse_or_pension || ""} className={getReversePensionViewStyle(row.reverse_or_pension)} /></td>
+//                           <td className={`${tdClasses}`}><input readOnly value={row.max_age || ""} className={viewInputStyle} /></td>
+//                           <td className={`${tdClasses}`}><input readOnly value={row.max_spread_years || ""} className={viewInputStyle} /></td>
+//                           <td className={`${tdClasses}`}><CustomCheckbox checked={!!row.restricted_customers} readOnly={true} /></td>
+//                           <td className={`${tdClasses}`}><CustomCheckbox checked={!!row.complex_customers} readOnly={true} /></td>
+//                           <td className={`${tdClasses}`}><input readOnly value={row.file_opening_fee_nis ? `₪${row.file_opening_fee_nis}` : ""} className={viewInputStyle} /></td>
+//                           <td className={`${tdClasses}`}><input readOnly value={row.file_opening_fee_percent ? `${row.file_opening_fee_percent}%` : ""} className={viewInputStyle} /></td>
+//                           <td className={`${tdClasses}`}><ExpandableTextarea name="additions" value={row.additions} isEditing={false} /></td>
+                          
+//                           <td className={`${lastTdClasses}`}>
+//                             <div className="flex flex-row gap-1 justify-center items-center h-full px-1 py-0.5">
+//                               <button onClick={(e) => { e.stopPropagation(); handleEdit(row); }} className="bg-blue-500 hover:bg-blue-600 text-white focus:ring-1 focus:ring-blue-400 p-1 rounded transition flex-1 flex justify-center items-center outline-none shadow-sm" title="ערוך">
+//                                 <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+//                               </button>
+//                               {!row.is_new && (
+//                                 <button onClick={(e) => { e.stopPropagation(); handleDelete(row); }} className="bg-red-500 hover:bg-red-600 text-white focus:ring-1 focus:ring-red-400 p-1 rounded transition flex-1 flex justify-center items-center outline-none shadow-sm" title="מחק">
+//                                   <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+//                                 </button>
+//                               )}
+//                             </div>
+//                           </td>
+//                         </>
+//                       )}
+//                     </tr>
+                    
+//                     {isEditing && (
+//                       <tr className="bg-orange-100/60 relative z-10">
+//                         <td colSpan={14} className="p-3 text-right shadow-inner border-b-[3px] border-r-[3px] border-orange-500">
+//                           <div className="flex flex-col md:flex-row gap-4 w-full">
+//                             <div className="flex-1 flex flex-col gap-1.5">
+//                               <label className="text-xs font-bold text-gray-700">שיטת רישום (עד 25 תווים):</label>
+//                               <textarea 
+//                                 name="registration_method" 
+//                                 maxLength={25}
+//                                 value={editFormData.registration_method || ""} 
+//                                 onChange={handleChange} 
+//                                 className="w-full h-16 p-2 border border-blue-400 rounded text-xs outline-none bg-white shadow-inner focus:ring-2 focus:ring-orange-400 resize-none leading-relaxed" 
+//                                 placeholder="הזן שיטת רישום..." 
+//                               />
+//                             </div>
+//                             <div className="flex-[2] flex flex-col gap-1.5">
+//                               <label className="text-xs font-bold text-gray-700">הערות (עריכה):</label>
+//                               <textarea 
+//                                 name="notes" 
+//                                 value={editFormData.notes || ""} 
+//                                 onChange={handleChange} 
+//                                 className="w-full h-16 p-2 border border-blue-400 rounded text-xs outline-none bg-white shadow-inner focus:ring-2 focus:ring-orange-400 resize-none leading-relaxed" 
+//                                 placeholder="הזן הערות (ניתן לרדת שורות)..." 
+//                               />
+//                             </div>
+//                           </div>
+//                         </td>
+//                         <td className="p-1 sticky left-0 z-10 border-b-[3px] border-l-[3px] border-orange-500 bg-orange-100">
+//                         </td>
+//                       </tr>
+//                     )}
+//                   </React.Fragment>
+//                 );
+//               })}
+//             </tbody>
+//           </table>
+          
+//           {sortedRows.length === 0 && !loading && (
+//             <div className="text-center p-8 text-gray-500 font-medium bg-white">לא נמצאו מסלולים התואמים לסינון</div>
+//           )}
+//         </div>
+
+//         <div className="h-[12vh] min-h-[90px] bg-gray-50 border-t border-gray-300 p-2 md:p-3 shrink-0 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-30 relative flex flex-col">
+//           {selectedRowData || (editingRowId && editFormData.ui_id === selectedRowId) ? (
+//             <div className="flex gap-4 h-full overflow-hidden">
+//               <div className="flex-1 flex flex-col gap-1">
+//                 <label className="text-xs md:text-sm font-bold text-gray-800">שיטת רישום</label>
+//                 <div className="text-xs md:text-sm font-medium p-2 bg-white border border-gray-200 rounded h-full overflow-y-auto whitespace-pre-wrap text-gray-800">
+//                   {bottomPaneData?.registration_method || <span className="text-gray-400 italic">אין נתונים</span>}
+//                 </div>
+//               </div>
+              
+//               <div className="flex-[3] flex flex-col gap-1">
+//                 <label className="text-xs md:text-sm font-bold text-gray-800">הערות</label>
+//                 <div className="text-xs md:text-sm font-medium p-2 bg-white border border-gray-200 rounded h-full overflow-y-auto whitespace-pre-wrap leading-relaxed text-gray-800">
+//                   {bottomPaneData?.notes || <span className="text-gray-400 italic">אין הערות</span>}
+//                 </div>
+//               </div>
+//             </div>
+//           ) : (
+//             <div className="flex items-center justify-center h-full text-gray-500 font-medium text-sm">
+//               לחץ על שורה בטבלה כדי לראות את פרטי שיטת הרישום וההערות שלה
+//             </div>
+//           )}
+//         </div>
+
+//       </div>
+//     </div>
+//   );
+// }
