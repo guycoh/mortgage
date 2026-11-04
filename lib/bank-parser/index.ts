@@ -13,7 +13,7 @@ import { parseMizrahi } from "./banks/mizrahi";
 import { parseJerusalem } from "./banks/jerusalem";
 import { parseFibi } from "./banks/fibi";
 import { BANK_LABEL, type BankStatement } from "./types";
-import { toDate } from "./text";
+import { pageLines, toDate } from "./text";
 
 /** True when this looks like a bank mortgage statement at all. */
 export function isBankStatement(pages: RawPage[]): boolean {
@@ -46,8 +46,16 @@ export function parseBankStatement(pages: RawPage[]): BankStatement {
       // the same borrower, boilerplate and all. Each is parsed against its own
       // pages and the results joined, because reading them together mixes two
       // mortgages into one balance and reading only the first loses half the debt.
+      // And one statement can itself cover two loans — one appendix per loan,
+      // then each loan's grid pages under its own "בהלוואה <number>" heading
+      // (Yaniv, 04/10/2026: 01-65 on pp. 7–8, 02-64 on p. 9). Read as one, every
+      // tranche was filed under the first loan number and that loan took the
+      // second one's printed total. So each document is split by the loan its
+      // pages name, and every part parsed on its own.
       return withMeta(
-        joinStatements(det.documents.map((d) => parseLeumi(pages, d.dataPages))),
+        joinStatements(
+          det.documents.flatMap((d) => byLeumiLoan(pages, d.dataPages).map((dp) => parseLeumi(pages, dp)))
+        ),
         det
       );
     case "mizrahi":
@@ -100,7 +108,24 @@ function joinStatements(parts: BankStatement[]): BankStatement {
   };
 }
 
-const REPRINT_NOTE = "אותה הלוואה מופיעה בקובץ יותר מפעם אחת — נקראה פעם אחת בלבד.";
+/**
+ * Group a Leumi document's grid pages by the loan each one is headed with. A
+ * page that names no loan (a continuation) stays with the loan before it.
+ */
+function byLeumiLoan(pages: RawPage[], dataPages: number[]): number[][] {
+  const groups: { loan: string; pages: number[] }[] = [];
+  for (const n of dataPages) {
+    const page = pages.find((p) => p.page === n);
+    const text = page ? pageLines(page).map((l) => l.text).join("\n") : "";
+    const loan = (text.match(/בהלוואה\s*(\d[\d-]{7,})/) ?? [])[1] ?? "";
+    const last = groups[groups.length - 1];
+    if (last && (!loan || loan === last.loan)) last.pages.push(n);
+    else groups.push({ loan, pages: [n] });
+  }
+  return groups.length ? groups.map((g) => g.pages) : [dataPages];
+}
+
+const REPRINT_NOTE ="אותה הלוואה מופיעה בקובץ יותר מפעם אחת — נקראה פעם אחת בלבד.";
 
 /**
  * Drop a statement that is the same loan printed again.

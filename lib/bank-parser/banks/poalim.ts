@@ -294,7 +294,13 @@ export function parsePoalim(pages: RawPage[], dataPages: number[]): BankStatemen
   const statementDate = date(asOf?.[1] ?? stamped?.[1] ?? "");
   const asOfDate = toDate(statementDate);
 
-  const totals = readTotals(first);
+  // The summary table runs onto page 2 once a client has ~10 loans (Gabay,
+  // 04/11/2026: the 10th loan sat alone on page 2 and was dropped whole). Read
+  // it from every page that is not a transposed detail page, first sighting wins.
+  const totals: LoanTotals[] = [];
+  for (const p of pages.filter((x) => x === pages[0] || !dataPages.includes(x.page)))
+    for (const t of readTotals(p === pages[0] ? first : pageLines(p)))
+      if (!totals.some((x) => x.loanNumber === t.loanNumber)) totals.push(t);
   if (!totals.length) warnings.push("לא נמצאה טבלת הסיכום בעמוד הראשון.");
 
   // Tranche terms, gathered across every transposed page.
@@ -440,6 +446,16 @@ export function parsePoalim(pages: RawPage[], dataPages: number[]): BankStatemen
       },
     });
   }
+
+  // A loan detailed on the transposed pages but missing from the summary has no
+  // balance to import — say so rather than lose it silently.
+  // forEach, not for…of: the repo's TS target has no downlevelIteration.
+  byLoan.forEach((ts, loanNumber) => {
+    if (!totals.some((t) => t.loanNumber === loanNumber))
+      warnings.push(
+        `הלוואה ${loanNumber}: מופיעה בפירוט (${ts.length} מרכיבים) אך לא נמצאה בטבלת הסיכום — לא יובאה.`
+      );
+  });
 
   const tranches = loans.flatMap((l) => l.tranches);
   if (!tranches.length) warnings.push("לא נמצאו מרכיבי משכנתא בתדפיס.");

@@ -217,6 +217,13 @@ export default function Bay({
         // board — so the bank templates are tried first when they match, because
         // the credit-report parser would reject them with a misleading message.
         const pages = await extractPages(pdf);
+        // A screenshot "printed to PDF" (or a scan) is one image per page and no
+        // text layer — nothing here can read it, and the credit-report message
+        // that would otherwise follow sends the advisor looking for the wrong fault.
+        if (!pages.some((p) => p.items.some((i) => i.str.trim())))
+          throw new Error(
+            "הקובץ הוא תמונה (סריקה או צילום מסך שהודפס ל-PDF) ואין בו טקסט לקריאה. יש להוריד את המסמך המקורי מאתר הבנק או ממערכת נתוני אשראי."
+          );
         const summary = detectBank(pages)
           ? bankStatementToLoans(parseBankStatement(pages), mixId, pdf.name)
           : importReportToLoans(await parsePdfFile(pdf), mixId, pdf.name);

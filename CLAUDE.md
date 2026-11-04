@@ -108,7 +108,9 @@ Track identity comes from the STATIC `app/data/paths.ts` (1 פריים · 2 קל
 - `lib/anchors/` — עדכון עוגנים: registry + sources + resolver behind `/api/simulator/anchors`; cache table `mortgage_anchors` (migration in `supabase/migrations/`), refreshed by a cron on `morg`.
 - `lib/verdicts.ts` — shared severity/heat helpers.
 
-Where to test parsers: real PDFs live outside the repo (`../Bank-Templates/*.pdf` = the bank templates; `../דוח/*.pdf` = credit reports).
+Where to test parsers: real PDFs live outside the repo, never inside it (client data). **After any parser change, run both regression checks from this worktree:**
+- `npx tsx --tsconfig tsconfig.json ../Bank-Templates/check.mts` — every bank letter vs `../Bank-Templates/manifest.json` (loans, printed payoff/monthly, a fingerprint of every board row). See its README for adding a letter.
+- `npx tsx --tsconfig tsconfig.json ../credit-report-fixtures/check.mts` — every credit report vs `manifest.json` built by `truth.py`, an independent reading that shares no code with the parser.
 
 ## 6. Persistence and APIs
 
