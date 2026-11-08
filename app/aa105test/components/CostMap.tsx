@@ -530,7 +530,7 @@ function Sheet({ m, lit }: { m: Map_; lit: Set<string> }) {
       case "name":
         return (
           <td {...p} className="cm-sh-name">
-            <FamIcon f={r.family} />
+            <span className="cm-tick" data-f={r.family} title={FAMILY_NAME[r.family][0]} />
             <span>
               <b>{r.track}</b>
               <small>{[r.purpose, r.startYear && `מ-${r.startYear}`].filter(Boolean).join(", ")}</small>
@@ -697,7 +697,11 @@ function Sheet({ m, lit }: { m: Map_; lit: Set<string> }) {
               <div className="cm-shc-gh">
                 <FamIcon f={g.f} size={22} />
                 <b>{FAMILY_NAME[g.f][1]}</b>
-                <span className="cm-num">₪{ils(sumUp(g.rows).balance)}</span>
+                <span className="cm-shc-gh-n">{g.rows.length}</span>
+                <span className="cm-shc-gh-v">
+                  <small>יתרת חוב</small>
+                  <span className="cm-num">₪{ils(sumUp(g.rows).balance)}</span>
+                </span>
               </div>
             )}
             {g.rows.map((r) => (
@@ -705,7 +709,6 @@ function Sheet({ m, lit }: { m: Map_; lit: Set<string> }) {
                 <header>
                   <span className="cm-shc-mark">
                     <BankIcon source={r.bank} size={30} />
-                    <FamIcon f={r.family} size={16} />
                   </span>
                   <span className="cm-shc-id">
                     <b>{r.track}</b>
@@ -718,16 +721,10 @@ function Sheet({ m, lit }: { m: Map_; lit: Set<string> }) {
                 </header>
                 <dl>
                   <div><dt>ריבית שנתית</dt><dd className={(r.rate ?? 0) >= 7 ? "cm-hot" : undefined}>{r.rate !== null ? `${pct(r.rate, 2)}%` : "—"}</dd></div>
-                  <div><dt>החזר חודשי</dt><dd>₪{n0(r.monthly)}</dd></div>
-                  <div><dt>נותרו</dt><dd>{r.months ? `${pct(r.months / 12, 1)} שנים` : "—"}</dd></div>
-                  <div><dt>ריבית והצמדה</dt><dd className={future(r) ? "cm-hot" : undefined}>{future(r) ? `₪${ils(future(r))}` : "—"}</dd></div>
+                  <div><dt>החזר חודשי</dt><dd>{r.monthly ? `₪${ils(r.monthly)}` : "—"}</dd></div>
+                  <div><dt>נותרו</dt><dd>{r.months ? `${pct(r.months / 12, 1)} שנים` : "—"}{endOf(r) && <small>{endOf(r)}</small>}</dd></div>
+                  <div><dt>ריבית והצמדה צפויות</dt><dd className={future(r) ? "cm-hot" : undefined}>{future(r) ? `₪${ils(future(r))}` : "—"}</dd></div>
                 </dl>
-                {future(r) > 0 && (
-                  <span className="cm-sh-bar cm-shc-bar" style={{ width: `${(future(r) / maxFut) * 100}%` }}>
-                    {(r.interest ?? 0) > 0 && <i style={{ flexGrow: r.interest ?? 0, background: C.interest }} />}
-                    {r.indexation > 0 && <i style={{ flexGrow: r.indexation, background: C.indexation }} />}
-                  </span>
-                )}
                 {r.marks.some((x) => !x.text.startsWith("ריבית")) && (
                   <p className="cm-sh-notes">
                     {r.marks.filter((x) => !x.text.startsWith("ריבית")).map((mk) => (
