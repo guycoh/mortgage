@@ -28,7 +28,6 @@ import {
   IdentificationCard,
   UploadSimple,
   WarningCircle,
-  Trash,
   X,
 } from "@phosphor-icons/react";
 import { extractPages, parsePdfFile } from "@/lib/credit-parser/extract.client";
@@ -37,6 +36,7 @@ import { bankStatementToLoans } from "@/lib/bank-parser/to-loans";
 import { track } from "../lib/track.client";
 import { FAMILY, importReportToLoans, type ImportedLoan, type ImportSummary } from "../lib/credit";
 import Btn from "./Btn";
+import ResetKey from "./ResetKey";
 import { settle, snap } from "../lib/transitions";
 
 /**
@@ -438,23 +438,11 @@ export default function Bay({
               {busy ? "מפענח…" : "הוספת דוח נוסף"}
             </Btn>
             {/* RESET THE MIX — and with it, room for a different report. It was
-                a bare circular arrow that read as "refresh" and named itself
-                only on hover, in a tooltip that opened past the window edge.
-                Now it says what it does: a delete glyph in the quiet red of
-                every destructive mark on this board, a one-word label, and
-                the full name on hover, opening inward. The board asks before
-                it wipes anything (see clearImport's Ask in Simulator). */}
-            <Btn
-              className="lgr-btn lgr-btn-sm lgr-tip lgr-reset"
-              data-role="act"
-              data-tone="red"
-              data-tip="איפוס תמהיל"
-              onClick={onClear}
-              aria-label="איפוס תמהיל"
-            >
-              <Trash size={14} weight="bold" style={{ color: "var(--neg)" }} />
-              איפוס
-            </Btn>
+                a bare circular arrow that read as "refresh", named only by a
+                tooltip that ran off the window edge. Now a labelled key with a
+                red bin, a real tooltip that cannot clip, and a question before
+                anything goes (ResetKey, ResetAsk). */}
+            <ResetKey onClick={onClear} />
           </div>
         </div>
 

@@ -78,6 +78,7 @@ import { cardItems, type CardItem } from "./lib/cards";
 import CardsPanel from "./components/CardsPanel";
 import DuplicateMasterModal from "./components/DuplicateMasterModal";
 import Ask from "./components/Ask";
+import ResetAsk from "./components/ResetAsk";
 import { asPurposeId } from "./lib/purposes";
 import { exportMixToExcel } from "./lib/excel";
 import { track } from "./lib/track.client";
@@ -444,6 +445,7 @@ export default function Simulator({
   const [askLeave, setAskLeave] = useState<{ to: string | null; name: string } | null>(null);
   /** איפוס תמהיל — wipes the active mix's rows, so it asks first. */
   const [askClear, setAskClear] = useState(false);
+  const closeClear = useCallback(() => setAskClear(false), []);
   const [toast, setToast] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
   const [flash, setFlash] = useState(false);
   /** Row values as of the last load / import / save — drives the change marks. */
@@ -2113,30 +2115,22 @@ export default function Simulator({
 
       {/* --- RESETTING THE MIX ---
           The rows the report put on the board, and any edits made to them, go
-          with one click — so the board asks, in its danger tone (the safe
-          answer holds focus). The receipt names what is about to go. */}
-      {askClear && (
-        <Ask
-          title="איפוס תמהיל"
-          sub={activeMix?.mix_name}
-          question="למחוק את השורות ולהתחיל מדוח אחר?"
-          rows={[
-            {
-              label: reports.length > 1 ? "דוחות" : "דוח",
-              value: reports.map((r) => r.clientName || "דוח ללא שם").join(" · ") || "—",
-            },
-            { label: "יימחקו", value: `${loans.length} שורות` },
-          ]}
-          confirm="איפוס התמהיל"
-          cancel="חזרה לבורד"
-          tone="danger"
-          onConfirm={() => {
-            setAskClear(false);
+          with one click — so the board asks first (ResetAsk). The rows clear
+          only once the question has left, so the two movements read in order,
+          and the toast confirms it. */}
+      <ResetAsk
+        open={askClear}
+        names={reports.map((r) => r.clientName)}
+        rows={loans.length}
+        onConfirm={() => {
+          setAskClear(false);
+          window.setTimeout(() => {
             clearImport();
-          }}
-          onClose={() => setAskClear(false)}
-        />
-      )}
+            flash4s({ kind: "ok", text: "הדוח נמחק" });
+          }, 170);
+        }}
+        onClose={closeClear}
+      />
 
       {sharePair &&
         (() => {

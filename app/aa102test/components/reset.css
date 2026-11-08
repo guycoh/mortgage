@@ -1,0 +1,171 @@
+/* ==========================================================================
+   איפוס תמהיל — the reset key's tooltip and its question (ResetKey, ResetAsk).
+
+   Both are portalled to <body>, outside .lgr-root, so they carry .lgr-vars for
+   the tokens and own every rule they need here. Prefix .rst-* is theirs alone.
+   ========================================================================== */
+
+/* ------------------------------------------------------------- tooltip */
+.rst-tip {
+  position: fixed;
+  z-index: 140;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 13px 9px 11px;
+  border-radius: 11px;
+  background: #18191f;
+  color: #fff;
+  font-family: var(--ui);
+  white-space: nowrap;
+  pointer-events: none;
+  transform-origin: var(--rst-arrow, 24px) 0;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.06) inset,
+    0 2px 4px rgba(14, 21, 36, 0.12),
+    0 14px 28px -10px rgba(14, 21, 36, 0.5);
+}
+/* the pointer, on the key's centre whatever the edge clamp did */
+.rst-tip::before {
+  content: "";
+  position: absolute;
+  top: -5px;
+  left: calc(var(--rst-arrow, 24px) - 5px);
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: #18191f;
+  rotate: 45deg;
+}
+.rst-tip-mark {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: rgba(239, 98, 84, 0.16);
+  color: #ff8a7d;
+}
+.rst-tip-text { display: grid; gap: 1px; }
+/* every colour stated: .lgr-vars (for the tokens) also sets the ink colour */
+.rst-tip-title { font-size: 12.5px; font-weight: 650; letter-spacing: -0.005em; color: #fff; }
+.rst-tip-sub { font-size: 11.5px; font-weight: 450; color: rgba(255, 255, 255, 0.74); }
+
+/* -------------------------------------------------------------- dialog */
+.rst-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 130;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(14, 21, 36, 0.42);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+.rst-dialog {
+  width: min(400px, 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 28px 28px 22px;
+  border-radius: 18px;
+  background: #fff;
+  font-family: var(--ui);
+  text-align: center;
+  box-shadow:
+    0 0 0 1px rgba(14, 21, 36, 0.06),
+    0 4px 10px -4px rgba(14, 21, 36, 0.12),
+    0 28px 64px -20px rgba(14, 21, 36, 0.45);
+}
+.rst-mark {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  border-radius: 999px;
+  background: var(--neg-tint);
+  color: #c4372b;
+  box-shadow: 0 0 0 7px #fef8f7, inset 0 0 0 1px var(--neg-line);
+}
+.rst-q {
+  margin-top: 18px;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  text-wrap: balance;
+}
+.rst-note {
+  margin-top: 8px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--lgr-2);
+  text-wrap: pretty;
+}
+.rst-note b { font-weight: 650; color: var(--ink); }
+.rst-acts {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+/* the two answers — same build, opposite weight */
+.rst-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 42px;
+  border: 1px solid transparent;
+  border-radius: 11px;
+  font-family: var(--ui);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 160ms var(--ease),
+    border-color 160ms var(--ease),
+    box-shadow 160ms var(--ease),
+    color 160ms var(--ease);
+}
+.rst-btn:focus-visible { outline: none; }
+.rst-btn-quiet {
+  background: linear-gradient(180deg, #ffffff 0%, #f7f7fa 100%);
+  border-color: #d6d8df;
+  border-bottom-color: #bcc0c9;
+  color: #262830;
+  box-shadow: inset 0 1px 0 #fff, 0 1px 1px rgba(20, 22, 32, 0.05);
+}
+.rst-btn-quiet:hover { background: linear-gradient(180deg, #ffffff 0%, #eff0f4 100%); color: var(--ink); }
+.rst-btn-quiet:focus-visible { border-color: var(--primary); box-shadow: 0 0 0 3px var(--focus-ring-strong); }
+.rst-btn-danger {
+  background: linear-gradient(180deg, #dc4a3e 0%, #c0352a 100%);
+  border-color: #b3302a;
+  border-bottom-color: #93251e;
+  color: #fff;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.24),
+    0 1px 2px rgba(180, 35, 24, 0.3),
+    0 6px 14px -6px rgba(180, 35, 24, 0.55);
+}
+.rst-btn-danger:hover {
+  background: linear-gradient(180deg, #d24135 0%, #ad2d23 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.24),
+    0 1px 2px rgba(180, 35, 24, 0.35),
+    0 10px 20px -8px rgba(180, 35, 24, 0.6);
+}
+.rst-btn-danger:focus-visible {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.24),
+    0 0 0 3px rgba(196, 55, 43, 0.35);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rst-btn { transition: none; }
+}
