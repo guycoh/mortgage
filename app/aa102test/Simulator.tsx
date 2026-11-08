@@ -95,6 +95,8 @@ import "@fontsource/assistant/hebrew-500.css";
 import "@fontsource/assistant/hebrew-600.css";
 import "@fontsource/assistant/hebrew-700.css";
 import "./theme.css";
+// The board's own cursors (v105 boards only — the stylesheet scopes itself).
+import "./components/cursor.css";
 
 /**
  * THE OTHER TOOLS, code-split.
