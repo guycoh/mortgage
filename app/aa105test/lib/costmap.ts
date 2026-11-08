@@ -1,0 +1,389 @@
+// מפת עלויות — what every mortgage and loan on the credit report will still cost.
+//
+// One population: the debts the client OWES (not guarantees), open, with a
+// balance, in the repaying families (mortgage, loan, instalment credit on a
+// card). For each, the rest of its life is projected from the report's own
+// figures — balance, nominal rate, months left — and split three ways:
+//
+//   קרן       the balance today
+//   ריבית     annuity interest at today's rate, in today's shekels
+//   הצמדה     what CPI adds on top, at the board's annual inflation, for linked
+//             tracks only (engine convention: monthly factor 1 + infl/12)
+//
+// so קרן + ריבית + הצמדה = everything that will still leave the account, and
+// total ÷ קרן is the board's החזר לשקל. Estimates; the page says "כ-" where a
+// figure is projected rather than printed.
+
+import type { Analysis, DebtLine } from "@/app/aa102test/lib/analysis";
+
+export type Family = "mortgage" | "loan";
+export type PainTone = "pen" | "warn";
+
+export interface CostRow {
+  uid: string;
+  family: Family;
+  bank: string;
+  track: string;
+  purpose: string;
+  startYear: string;
+  endDate: string;
+  original: number;
+  balance: number;
+  rate: number | null;
+  months: number | null;
+  monthly: number;
+  linked: boolean;
+  variable: boolean;
+  interestFree: boolean;
+  interest: number | null;
+  indexation: number;
+  total: number;
+  perShekel: number | null;
+  /** Share of the original advance still owed (can exceed 1 on linked debt). */
+  owedShare: number | null;
+  yearsHeld: number | null;
+  overdue: number;
+  arrearsRange: string;
+  balloon: boolean;
+  interestOnly: boolean;
+  shared: boolean;
+  marks: { text: string; tone: PainTone }[];
+  /** The row's worst mark, for ordering and the rate cell's colour. */
+  heat: 0 | 1 | 2;
+}
+
+export interface Pain {
+  id: string;
+  tone: PainTone;
+  figure: string;
+  title: string;
+  uids: string[];
+}
+
+export interface TrackGroup {
+  label: string;
+  count: number;
+  balance: number;
+  share: number;
+  rate: number | null;
+  interest: number;
+  indexation: number;
+  linked: boolean;
+  variable: boolean;
+}
+
+export interface YearPoint {
+  year: number;
+  principal: number;
+  interest: number;
+  indexation: number;
+  /** Balance left at the end of the year, nominal. */
+  balance: number;
+}
+
+export interface CostMap {
+  client: string;
+  reportDate: string;
+  inflation: number;
+  rows: CostRow[];
+  totals: {
+    balance: number;
+    monthly: number;
+    interest: number;
+    indexation: number;
+    total: number;
+    perShekel: number | null;
+    rate: number | null;
+    count: Record<Family, number>;
+    balanceBy: Record<Family, number>;
+    unpriced: number;
+  };
+  pains: Pain[];
+  tracks: TrackGroup[];
+  years: YearPoint[];
+}
+
+/* ---------------------------------------------------------------- helpers */
+
+const sum = <T,>(xs: T[], f: (x: T) => number) => xs.reduce((s, x) => s + (f(x) || 0), 0);
+export const ils = (n: number) => Math.round(n).toLocaleString("en-US");
+export const pct = (n: number, d = 1) => {
+  const k = Math.pow(10, d);
+  return (Math.round(n * k + 1e-9) / k).toFixed(d).replace(/\.0+$/, "");
+};
+const compact = (n: number) => (n >= 1_000_000 ? `${pct(n / 1_000_000, 2)}M` : n >= 10_000 ? `${Math.round(n / 1000)}K` : ils(n));
+
+function linkedOf(l: DebtLine): boolean {
+  return l.tracks.some((t) => !/לא\s*צמוד/.test(t.linkage) && t.linkage.includes("צמוד"));
+}
+function variableOf(l: DebtLine): boolean {
+  return /משתנה|פריים/.test(l.track) || l.tracks.some((t) => /משתנה/.test(t.type) || t.anchor.includes("פריים"));
+}
+function yearOf(d: string): number | null {
+  const m = /(\d{4})\s*$/.exec(d.trim());
+  return m ? Number(m[1]) : null;
+}
+function reportYear(d: string): number {
+  const m = /(\d{1,2})\/(\d{4})\s*$/.exec(d.trim());
+  if (!m) return new Date().getFullYear();
+  return Number(m[2]) + (Number(m[1]) - 1) / 12;
+}
+
+/**
+ * The rest of one debt, month by month, in the three parts.
+ * Real annuity at the nominal rate; linked tracks scale every payment by CPI.
+ */
+function project(balance: number, ratePct: number, months: number, linked: boolean, infl: number, interestOnly: boolean) {
+  const r = ratePct / 1200;
+  const g = linked ? 1 + infl / 1200 : 1;
+  const pmt = interestOnly ? balance * r : r > 0 ? (balance * r) / (1 - Math.pow(1 + r, -months)) : balance / months;
+  const out: { principal: number; interest: number; indexation: number; balance: number }[] = [];
+  let real = balance;
+  let f = 1;
+  for (let k = 1; k <= months; k++) {
+    f *= g;
+    const i = real * r;
+    let p = interestOnly ? 0 : pmt - i;
+    if (interestOnly && k === months) p = real;
+    real = Math.max(0, real - p);
+    out.push({ principal: p, interest: i, indexation: (p + i) * (f - 1), balance: real * f });
+  }
+  return out;
+}
+
+/* ------------------------------------------------------------------ build */
+
+export function buildCostMap(a: Analysis, inflation: number): CostMap {
+  const client = a.clients.map((c) => c.name).filter(Boolean).join(" ו");
+  const reportDate = a.clients[0]?.reportDate ?? "";
+  const nowY = reportYear(reportDate);
+
+  const own = a.lines.filter(
+    (l) =>
+      l.role === "debtor" &&
+      l.section !== "inactive" &&
+      l.balance > 0 &&
+      (l.category === "mortgage" || l.category === "loan" || l.category === "other" || (l.category === "card" && l.instalment))
+  );
+
+  const series: ReturnType<typeof project>[] = [];
+  const rows: CostRow[] = own.map((l) => {
+    const family: Family = l.category === "mortgage" ? "mortgage" : "loan";
+    const rate = l.interestFree ? 0 : l.rate;
+    const linked = linkedOf(l);
+    const months = l.months && l.months > 0 ? l.months : null;
+    let interest: number | null = null;
+    let indexation = 0;
+    if (months && rate !== null) {
+      const p = project(l.balance, rate, months, linked, inflation, l.interestOnly || l.balloon);
+      series.push(p);
+      interest = sum(p, (x) => x.interest);
+      indexation = sum(p, (x) => x.indexation);
+    }
+    const total = l.balance + (interest ?? 0) + indexation;
+    const start = yearOf(l.startDate);
+    const yearsHeld = start ? Math.max(0, nowY - start) : null;
+    const owedShare = l.original > 0 ? l.balance / l.original : null;
+
+    const marks: CostRow["marks"] = [];
+    const dear = rate !== null && (family === "loan" ? rate >= 8 : rate >= 5);
+    if (l.overdue > 0) marks.push({ text: `₪${ils(l.overdue)} בפיגור`, tone: "pen" });
+    if (dear) marks.push({ text: `ריבית ${pct(rate!, 2)}%`, tone: "pen" });
+    if (l.balloon) marks.push({ text: "תשלום בלון", tone: "pen" });
+    if (l.interestOnly && !l.balloon) marks.push({ text: "משלמים רק ריבית", tone: "pen" });
+    if (linked && owedShare !== null && yearsHeld !== null && yearsHeld >= 5 && owedShare >= 0.8)
+      marks.push({
+        text:
+          owedShare >= 1
+            ? `היתרה מעל הסכום שנלקח`
+            : `נפרעו ${Math.round((1 - owedShare) * 100)}% ב-${Math.round(yearsHeld)} שנים`,
+        tone: "warn",
+      });
+    if (linked && indexation > (interest ?? 0) && indexation > l.balance * 0.1)
+      marks.push({ text: `הצמדה כ-₪${ils(indexation)}`, tone: "warn" });
+    const heat: CostRow["heat"] = marks.some((m) => m.tone === "pen") ? 2 : marks.length ? 1 : 0;
+
+    return {
+      uid: l.uid,
+      family,
+      bank: l.bank,
+      track: l.track || "לא מסווג",
+      purpose: l.purpose,
+      startYear: start ? String(start) : "",
+      endDate: l.endDate,
+      original: l.original,
+      balance: l.balance,
+      rate,
+      months,
+      monthly: l.chargeNotPaid ? 0 : l.monthly,
+      linked,
+      variable: variableOf(l),
+      interestFree: l.interestFree,
+      interest,
+      indexation,
+      total,
+      perShekel: interest !== null ? total / l.balance : null,
+      owedShare,
+      yearsHeld,
+      overdue: l.overdue,
+      arrearsRange: l.arrearsRange,
+      balloon: l.balloon,
+      interestOnly: l.interestOnly,
+      shared: l.shared,
+      marks,
+      heat,
+    };
+  });
+
+  const priced = rows.filter((r) => r.interest !== null);
+  const balance = sum(rows, (r) => r.balance);
+  const interest = sum(rows, (r) => r.interest ?? 0);
+  const indexation = sum(rows, (r) => r.indexation);
+  const total = balance + interest + indexation;
+  const pricedBal = sum(priced, (r) => r.balance);
+  const rateRows = rows.filter((r) => r.rate !== null);
+  const rateBal = sum(rateRows, (r) => r.balance);
+
+  const totals: CostMap["totals"] = {
+    balance,
+    monthly: sum(rows, (r) => r.monthly),
+    interest,
+    indexation,
+    total,
+    perShekel: pricedBal > 0 ? (pricedBal + interest + indexation) / pricedBal : null,
+    rate: rateBal > 0 ? sum(rateRows, (r) => r.balance * (r.rate ?? 0)) / rateBal : null,
+    count: { mortgage: rows.filter((r) => r.family === "mortgage").length, loan: rows.filter((r) => r.family === "loan").length },
+    balanceBy: {
+      mortgage: sum(rows.filter((r) => r.family === "mortgage"), (r) => r.balance),
+      loan: sum(rows.filter((r) => r.family === "loan"), (r) => r.balance),
+    },
+    unpriced: rows.length - priced.length,
+  };
+
+  /* ---------------------------------------------------------------- pains */
+  const pains: Pain[] = [];
+  const late = rows.filter((r) => r.overdue > 0);
+  if (late.length)
+    pains.push({ id: "late", tone: "pen", figure: `₪${ils(sum(late, (r) => r.overdue))}`, title: late.length > 1 ? `בפיגור ב-${late.length} חובות` : "בפיגור", uids: late.map((r) => r.uid) });
+
+  // The debt that will cost the most from here — interest and CPI together.
+  const future = (r: CostRow) => (r.interest ?? 0) + r.indexation;
+  const costliest = rows.slice().sort((x, y) => future(y) - future(x))[0];
+  if (costliest && future(costliest) > 0)
+    pains.push({
+      id: "costliest",
+      tone: "pen",
+      figure: `₪${ils(future(costliest))}`,
+      title: `יעלה החוב היקר בתיק: ${costliest.track}${costliest.rate !== null ? ` ${pct(costliest.rate, 2)}%` : ""} על ₪${ils(costliest.balance)}`,
+      uids: [costliest.uid],
+    });
+
+  // The dearest rate, when it is a real outlier and not a rounding-error balance.
+  const avg = totals.rate ?? 0;
+  const dearest = rows.filter((r) => (r.rate ?? 0) > 0).sort((x, y) => (y.rate ?? 0) - (x.rate ?? 0));
+  if (dearest.length) {
+    const top = dearest[0].rate ?? 0;
+    const same = dearest.filter((r) => Math.abs((r.rate ?? 0) - top) < 0.01);
+    const bal = sum(same, (r) => r.balance);
+    const onlyCostliest = same.length === 1 && same[0].uid === costliest?.uid;
+    if (top >= Math.max(6, avg * 1.4) && !onlyCostliest && (bal >= balance * 0.01 || sum(same, (r) => r.interest ?? 0) >= 5000))
+      pains.push({
+        id: "dear",
+        tone: "pen",
+        figure: `${pct(top, 2)}%`,
+        title: `הריבית הגבוהה בתיק, על ₪${ils(bal)}`,
+        uids: same.map((r) => r.uid),
+      });
+  }
+
+  if (indexation > interest && indexation > balance * 0.08)
+    pains.push({
+      id: "cpi",
+      tone: "warn",
+      figure: `₪${ils(indexation)}`,
+      title: interest > 0 ? `הצמדה צפויה למדד, פי ${pct(indexation / interest, 1)} מכל הריבית` : "הצמדה צפויה למדד",
+      uids: rows.filter((r) => r.indexation > 0).map((r) => r.uid),
+    });
+
+  const slow = rows.filter((r) => r.linked && r.yearsHeld !== null && r.yearsHeld >= 5 && r.owedShare !== null && r.owedShare >= 0.8);
+  if (slow.length) {
+    const orig = sum(slow, (r) => r.original);
+    const bal = sum(slow, (r) => r.balance);
+    const grew = bal >= orig;
+    pains.push({
+      id: "slow",
+      tone: "warn",
+      figure: grew ? `+${Math.round((bal / orig - 1) * 100)}%` : `${Math.round((1 - bal / orig) * 100)}%`,
+      title: grew
+        ? `היתרה מעל הסכום שנלקח, אחרי כ-${Math.round(sum(slow, (r) => r.yearsHeld ?? 0) / slow.length)} שנים של תשלומים`
+        : `מהקרן נפרעו, אחרי כ-${Math.round(sum(slow, (r) => r.yearsHeld ?? 0) / slow.length)} שנים של תשלומים`,
+      uids: slow.map((r) => r.uid),
+    });
+  }
+
+  const balloons = rows.filter((r) => r.balloon || r.interestOnly);
+  if (balloons.length)
+    pains.push({ id: "balloon", tone: "pen", figure: `₪${ils(sum(balloons, (r) => r.balance))}`, title: "יחזרו בתשלום אחד בסוף", uids: balloons.map((r) => r.uid) });
+
+  const varBal = sum(rows.filter((r) => r.variable), (r) => r.balance);
+  if (balance > 0 && varBal / balance >= 0.33)
+    pains.push({ id: "var", tone: "warn", figure: `${Math.round((varBal / balance) * 100)}%`, title: "מהחוב בריבית משתנה", uids: rows.filter((r) => r.variable).map((r) => r.uid) });
+
+  /* --------------------------------------------------------------- tracks */
+  const byTrack = new Map<string, CostRow[]>();
+  rows.forEach((r) => {
+    const k = r.track;
+    byTrack.set(k, [...(byTrack.get(k) ?? []), r]);
+  });
+  const tracks: TrackGroup[] = Array.from(byTrack.entries())
+    .map(([label, rs]) => {
+      const rr = rs.filter((r) => r.rate !== null);
+      const b = sum(rr, (r) => r.balance);
+      return {
+        label,
+        count: rs.length,
+        balance: sum(rs, (r) => r.balance),
+        share: balance > 0 ? sum(rs, (r) => r.balance) / balance : 0,
+        rate: b > 0 ? sum(rr, (r) => r.balance * (r.rate ?? 0)) / b : null,
+        interest: sum(rs, (r) => r.interest ?? 0),
+        indexation: sum(rs, (r) => r.indexation),
+        linked: rs.some((r) => r.linked),
+        variable: rs.some((r) => r.variable),
+      };
+    })
+    .sort((x, y) => y.balance - x.balance);
+
+  /* ---------------------------------------------------------------- years */
+  const longest = Math.max(0, ...series.map((s) => s.length));
+  const years: YearPoint[] = [];
+  const base = Math.floor(nowY);
+  for (let y = 0; y * 12 < longest; y++) {
+    const pt: YearPoint = { year: base + y, principal: 0, interest: 0, indexation: 0, balance: 0 };
+    series.forEach((s) => {
+      for (let m = y * 12; m < Math.min(s.length, y * 12 + 12); m++) {
+        pt.principal += s[m].principal;
+        pt.interest += s[m].interest;
+        pt.indexation += s[m].indexation;
+      }
+      const end = Math.min(s.length, y * 12 + 12) - 1;
+      pt.balance += end >= 0 && y * 12 + 12 <= s.length ? s[end].balance : 0;
+    });
+    years.push(pt);
+  }
+
+  return {
+    client,
+    reportDate,
+    inflation,
+    rows,
+    totals,
+    pains: ["late", "costliest", "dear", "balloon", "cpi", "slow", "var"]
+      .map((id) => pains.find((p) => p.id === id))
+      .filter((p): p is Pain => !!p)
+      .slice(0, 4),
+    tracks,
+    years,
+  };
+}
+
+export { compact };

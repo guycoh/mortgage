@@ -16,6 +16,9 @@
 import { redirect } from "next/navigation";
 import Simulator from "./Simulator";
 import { parseTool } from "./lib/tools";
+// The /aa105test board design (tabs, keys, read-out, analyses) — scoped to
+// .lgr-root[data-v="v105"], so it reaches only boards rendered with that variant.
+import "@/app/aa105test/board.css";
 
 export default async function Aa102TestPage({
   searchParams,
@@ -30,5 +33,5 @@ export default async function Aa102TestPage({
     redirect(`/aa102test/${id}${initialTool === "mix" ? "" : `?tool=${initialTool}`}`);
   }
 
-  return <Simulator lead={null} initialTool={initialTool} />;
+  return <Simulator lead={null} initialTool={initialTool} variant="v105" />;
 }

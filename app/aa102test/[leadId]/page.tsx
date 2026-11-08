@@ -8,6 +8,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import Simulator from "../Simulator";
 import { parseTool } from "../lib/tools";
+import "@/app/aa105test/board.css";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -40,5 +41,5 @@ export default async function LeadBoardPage({
   const { data, error } = await supabase.from("leads").select("id, name").eq("id", id).limit(1);
   if (error || !data?.length) notFound();
 
-  return <Simulator lead={data[0]} initialTool={parseTool(tool)} />;
+  return <Simulator lead={data[0]} initialTool={parseTool(tool)} variant="v105" />;
 }

@@ -32,6 +32,7 @@ import {
   FilePdf,
   Stethoscope,
   UserFocus,
+  ChartBar,
 } from "@phosphor-icons/react";
 import type { LoanPath } from "@/app/data/hooks/useLoanPaths";
 import { paths as STATIC_PATHS } from "@/app/data/paths";
@@ -129,6 +130,8 @@ const AbilityTool = dynamic(() => import("./ability/AbilityCalculator"), { loadi
 const ClientBrief = dynamic(() => import("@/app/aa105test/components/ClientBrief"), { ssr: false });
 const CreditDeepDive = dynamic(() => import("@/app/aa105test/components/CreditModal"), { ssr: false });
 const MortgageDeepDive = dynamic(() => import("@/app/aa105test/components/MortgageModal"), { ssr: false });
+// מפת עלויות — every mortgage and loan on the credit report and what it will still cost.
+const CostMap = dynamic(() => import("@/app/aa105test/components/CostMap"), { ssr: false });
 
 type Mix = {
   id: string;
@@ -475,6 +478,7 @@ export default function Simulator({
   const [showDoc, setShowDoc] = useState(false);
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [showClient, setShowClient] = useState(false);
+  const [showCost, setShowCost] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [saving, setSaving] = useState(false);
   /** Held for a beat after a save lands, so the button can confirm it. */
@@ -1666,6 +1670,18 @@ export default function Simulator({
                             <Stethoscope size={14} weight="bold" style={{ color: "var(--primary)" }} />
                             {reading === "bank" ? "ניתוח משכנתא" : "ניתוח חיווי"}
                           </Btn>
+                          {v105 && reading === "credit" && creditReports.length > 0 && (
+                            <Btn
+                              className="lgr-btn lgr-btn-sm"
+                              data-tone="amber"
+                              data-role="read"
+                              onClick={() => setShowCost(true)}
+                              title="כל המשכנתאות וההלוואות בדוח — כמה כל אחת תעלה עד הסוף, בריבית ובהצמדה"
+                            >
+                              <ChartBar size={14} weight="fill" style={{ color: "#d6336c" }} />
+                              מפת עלויות
+                            </Btn>
+                          )}
                           <Btn
                             className="lgr-btn lgr-btn-sm"
                             data-tone="red"
@@ -2176,6 +2192,13 @@ export default function Simulator({
               credit={analyseReports(creditReports, creditDocs.map((r) => r.fileName))}
               leadId={lead?.id ?? null}
               onClose={() => setShowClient(false)}
+            />
+          )}
+          {showCost && creditReports.length > 0 && reading === "credit" && (
+            <CostMap
+              analysis={analyseReports(creditReports, creditDocs.map((r) => r.fileName))}
+              inflation={annualInflation}
+              onClose={() => setShowCost(false)}
             />
           )}
           {showAnalysis && creditReports.length > 0 && reading === "credit" && (

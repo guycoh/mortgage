@@ -14,6 +14,8 @@ import { createClient } from "@supabase/supabase-js";
 // component (see its own imports), so this route declares neither.
 import Simulator from "@/app/aa102test/Simulator";
 import { parseTool } from "@/app/aa102test/lib/tools";
+// The /aa105test board design; the same סיכום ללקוח, analyses and מפת עלויות.
+import "@/app/aa105test/board.css";
 import { FB_COOKIE, readCookieSession } from "../lib/fblink";
 import { recordEvent } from "../lib/telemetry";
 
@@ -63,6 +65,7 @@ export default async function BoardPage({
       endpoint="/api/simulator/mixes"
       locked
       initialTool={parseTool(tool)}
+      variant="v105"
     />
   );
 }
