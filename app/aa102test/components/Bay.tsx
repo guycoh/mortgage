@@ -28,6 +28,7 @@ import {
   IdentificationCard,
   UploadSimple,
   WarningCircle,
+  Trash,
   X,
 } from "@phosphor-icons/react";
 import { extractPages, parsePdfFile } from "@/lib/credit-parser/extract.client";
@@ -436,8 +437,23 @@ export default function Bay({
               )}
               {busy ? "מפענח…" : "הוספת דוח נוסף"}
             </Btn>
-            <Btn className="lgr-act lgr-tip" data-tip-side="start" data-tip="התחלה מחדש" onClick={onClear} aria-label="התחלה מחדש">
-              <ArrowClockwise size={14} weight="bold" />
+            {/* RESET THE MIX — and with it, room for a different report. It was
+                a bare circular arrow that read as "refresh" and named itself
+                only on hover, in a tooltip that opened past the window edge.
+                Now it says what it does: a delete glyph in the quiet red of
+                every destructive mark on this board, a one-word label, and
+                the full name on hover, opening inward. The board asks before
+                it wipes anything (see clearImport's Ask in Simulator). */}
+            <Btn
+              className="lgr-btn lgr-btn-sm lgr-tip lgr-reset"
+              data-role="act"
+              data-tone="red"
+              data-tip="איפוס תמהיל"
+              onClick={onClear}
+              aria-label="איפוס תמהיל"
+            >
+              <Trash size={14} weight="bold" style={{ color: "var(--neg)" }} />
+              איפוס
             </Btn>
           </div>
         </div>

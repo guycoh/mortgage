@@ -442,6 +442,8 @@ export default function Simulator({
    * null there means out of the lead entirely.
    */
   const [askLeave, setAskLeave] = useState<{ to: string | null; name: string } | null>(null);
+  /** איפוס תמהיל — wipes the active mix's rows, so it asks first. */
+  const [askClear, setAskClear] = useState(false);
   const [toast, setToast] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
   const [flash, setFlash] = useState(false);
   /** Row values as of the last load / import / save — drives the change marks. */
@@ -1601,7 +1603,7 @@ export default function Simulator({
                     reports={reports}
                     onBoard={loans}
                     onImport={applyImport}
-                    onClear={clearImport}
+                    onClear={() => setAskClear(true)}
                     // The three readings of the loaded document, on the
                     // document's own receipt. A credit report and a bank
                     // statement are alternatives — only one is ever loaded — so
@@ -2106,6 +2108,33 @@ export default function Simulator({
             router.push(to ?? base);
           }}
           onClose={() => setAskLeave(null)}
+        />
+      )}
+
+      {/* --- RESETTING THE MIX ---
+          The rows the report put on the board, and any edits made to them, go
+          with one click — so the board asks, in its danger tone (the safe
+          answer holds focus). The receipt names what is about to go. */}
+      {askClear && (
+        <Ask
+          title="איפוס תמהיל"
+          sub={activeMix?.mix_name}
+          question="למחוק את השורות ולהתחיל מדוח אחר?"
+          rows={[
+            {
+              label: reports.length > 1 ? "דוחות" : "דוח",
+              value: reports.map((r) => r.clientName || "דוח ללא שם").join(" · ") || "—",
+            },
+            { label: "יימחקו", value: `${loans.length} שורות` },
+          ]}
+          confirm="איפוס התמהיל"
+          cancel="חזרה לבורד"
+          tone="danger"
+          onConfirm={() => {
+            setAskClear(false);
+            clearImport();
+          }}
+          onClose={() => setAskClear(false)}
         />
       )}
 
