@@ -10,7 +10,8 @@
 
 import { cloneElement, useEffect, useMemo, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
-import { CaretDown } from "@phosphor-icons/react";
+import { Bank, CaretDown, HandCoins } from "@phosphor-icons/react";
+import { BankIcon } from "@/app/aa102test/components/bankIcons";
 import * as echarts from "echarts/core";
 import { PieChart } from "echarts/charts";
 import type { Analysis } from "@/app/aa102test/lib/analysis";
@@ -31,6 +32,16 @@ const C = {
 /** Track hues for the composition donut — calm, distinct, none of them the cost colours. */
 const TRACK_HUES = ["#5b54d6", "#0d8b9b", "#7c93c9", "#2f9e6e", "#9b6fd0", "#5c6474", "#b9a27a"];
 const FAMILY_NAME: Record<Family, [string, string]> = { mortgage: ["משכנתא", "משכנתאות"], loan: ["הלוואה", "הלוואות"] };
+
+/** The family as the board marks it — the same glyph, in a small tinted disc. */
+function FamIcon({ f, size = 24 }: { f: Family; size?: number }) {
+  const G = f === "mortgage" ? Bank : HandCoins;
+  return (
+    <span className="cm-famico" data-f={f} style={{ width: size, height: size }} title={FAMILY_NAME[f][0]} aria-label={FAMILY_NAME[f][0]}>
+      <G size={Math.round(size * 0.54)} weight="fill" />
+    </span>
+  );
+}
 
 const TIP: Record<string, unknown> = {
   backgroundColor: "#fff",
@@ -519,7 +530,7 @@ function Sheet({ m, lit }: { m: Map_; lit: Set<string> }) {
       case "name":
         return (
           <td {...p} className="cm-sh-name">
-            <span className="cm-fam" style={{ background: C[r.family] }} />
+            <FamIcon f={r.family} />
             <span>
               <b>{r.track}</b>
               <small>{[r.purpose, r.startYear && `מ-${r.startYear}`].filter(Boolean).join(", ")}</small>
@@ -527,7 +538,14 @@ function Sheet({ m, lit }: { m: Map_; lit: Set<string> }) {
           </td>
         );
       case "bank":
-        return <td {...p} className="cm-sh-bank">{bankShort(r.bank)}</td>;
+        return (
+          <td {...p} className="cm-sh-bank">
+            <span className="cm-bank">
+              <BankIcon source={r.bank} size={22} />
+              {bankShort(r.bank)}
+            </span>
+          </td>
+        );
       case "original":
         return <td {...p}>{n0(r.original)}</td>;
       case "balance":
@@ -590,7 +608,7 @@ function Sheet({ m, lit }: { m: Map_; lit: Set<string> }) {
         case "rate": return <td {...p}>{s.rate !== null ? `${pct(s.rate, 2)}%` : "—"}</td>;
         case "monthly": return <td {...p}>{ils(s.monthly)}</td>;
         case "interest": return <td {...p} className="cm-sh-num cm-hot">{ils(s.interest)}</td>;
-        case "indexation": return <td {...p} className="cm-sh-num cm-warm">{ils(s.indexation)}</td>;
+        case "indexation": return <td {...p} className={`cm-sh-num${s.indexation ? " cm-warm" : " cm-sh-mute"}`}>{s.indexation ? ils(s.indexation) : "—"}</td>;
         case "future": return <td {...p} className="cm-sh-num cm-sh-fut"><span className="cm-sh-fut-v">{ils(s.future)}</span></td>;
         case "ps": return <td {...p}>{s.ps ? pct(s.ps, 2) : "—"}</td>;
       }
@@ -641,7 +659,7 @@ function Sheet({ m, lit }: { m: Map_; lit: Set<string> }) {
                 <tr className="cm-sh-group">
                   <td className="cm-sh-gut" />
                   <td colSpan={cols.length}>
-                    <span className="cm-fam" style={{ background: C[g.f] }} />
+                    <FamIcon f={g.f} size={22} />
                     {FAMILY_NAME[g.f][1]}
                   </td>
                 </tr>
@@ -677,7 +695,7 @@ function Sheet({ m, lit }: { m: Map_; lit: Set<string> }) {
           <div key={g.f} className="cm-shc-group">
             {fams.length > 1 && (
               <div className="cm-shc-gh">
-                <span className="cm-fam" style={{ background: C[g.f] }} />
+                <FamIcon f={g.f} size={22} />
                 <b>{FAMILY_NAME[g.f][1]}</b>
                 <span className="cm-num">₪{ils(sumUp(g.rows).balance)}</span>
               </div>
@@ -685,7 +703,10 @@ function Sheet({ m, lit }: { m: Map_; lit: Set<string> }) {
             {g.rows.map((r) => (
               <article key={r.uid} className="cm-shc" data-lit={lit.has(r.uid) || undefined}>
                 <header>
-                  <span className="cm-fam" style={{ background: C[r.family] }} />
+                  <span className="cm-shc-mark">
+                    <BankIcon source={r.bank} size={30} />
+                    <FamIcon f={r.family} size={16} />
+                  </span>
                   <span className="cm-shc-id">
                     <b>{r.track}</b>
                     <small>{[bankShort(r.bank), r.startYear && `מ-${r.startYear}`].filter(Boolean).join(", ")}</small>
