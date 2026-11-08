@@ -350,6 +350,7 @@ export function parseFibi(pages: RawPage[]): BankStatement {
       monthly: tranches.reduce((s, t) => s + (t.monthly ?? 0), 0),
       breakFee: tranches.reduce((s, t) => s + (t.breakFee ?? 0), 0),
     },
+    printedPayoff: printedTotal,
     warnings,
   };
 }

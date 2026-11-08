@@ -270,6 +270,10 @@ export function analyseStatement(st: BankStatement): StatementAnalysis {
 
   const balance = sum((t) => t.balance);
   const operationalFee = st.loans.reduce((s, l) => s + (l.printed.operationalFee ?? 0), 0);
+  // Loan-level arrears and charges (Mizrahi prints them once, on the summary
+  // page): in the payoff and in the arrears, in no tranche.
+  const loanArrears = st.loans.reduce((s, l) => s + (l.printed.arrears ?? 0), 0);
+  const loanOther = st.loans.reduce((s, l) => s + (l.printed.otherCharges ?? 0), 0);
   const trancheFees = sum((t) => t.breakFee);
 
   /* ---- composition */
@@ -362,12 +366,12 @@ export function analyseStatement(st: BankStatement): StatementAnalysis {
       // carries its own break fee, and the loan-level operational fee sits on
       // top of all of them. Adding it makes this equal the lender's own printed
       // figure to the agora.
-      payoff: (sum((t) => t.payoff) || balance) + operationalFee,
+      payoff: (sum((t) => t.payoff) || balance) + operationalFee + loanArrears + loanOther,
       monthly: sum((t) => t.monthly),
       breakFee: trancheFees + operationalFee,
       operationalFee,
       accruedInterest: sum((t) => t.accruedInterest),
-      arrears: sum((t) => t.arrears),
+      arrears: sum((t) => t.arrears) + loanArrears,
       rate: weighted(live.map((t) => ({ balance: t.balance, value: t.rate }))),
       forecastRate: weighted(live.map((t) => ({ balance: t.balance, value: t.forecastRate }))),
       longestMonths: live.reduce<number | null>(
@@ -462,10 +466,13 @@ function buildFindings(a: StatementAnalysis): Finding[] {
   /* ---- arrears first: nothing else matters until it is cleared */
   if (a.totals.arrears > 0) {
     const late = a.live.filter((t) => (t.arrears ?? 0) > 0);
+    // Printed for the file as a whole, the arrears sit in no tranche — "במסלול
+    // אחד" would name a place the document does not.
+    const where = late.length ? inTranches(late.length) : "ברמת התיק";
     push({
       id: "arrears",
       client: show(
-        `במסמך מופיע סכום של ${money(a.totals.arrears)} ₪ בפיגור ${inTranches(late.length)}, ${asOf}.`,
+        `במסמך מופיע סכום של ${money(a.totals.arrears)} ₪ בפיגור ${where}, ${asOf}.`,
         late.map((t) => t.uid),
         { title: `פיגור בתשלומים — ${a.statement.bankLabel}`, next: "יש לברר אם הפיגור הוסדר מאז תאריך המסמך." }
       ),
@@ -474,7 +481,7 @@ function buildFindings(a: StatementAnalysis): Finding[] {
       title: "פיגור בתשלומים",
       // The amount sits beside the title; the sentence says where and what to check.
       // "פיגור פתוח חוסם מיחזור" was a verdict the statement cannot support.
-      detail: `הפיגור רשום ${inTranches(late.length)}, ${asOf}. יש לברר אם הוסדר מאז, ולבדוק את השפעתו על אפשרות המיחזור.`,
+      detail: `הפיגור רשום ${where}, ${asOf}. יש לברר אם הוסדר מאז, ולבדוק את השפעתו על אפשרות המיחזור.`,
       amount: a.totals.arrears,
       uids: late.map((t) => t.uid),
     });

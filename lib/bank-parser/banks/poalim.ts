@@ -242,10 +242,13 @@ function readRate(rateType: string, basis: string, linkage: string): { kind: Rat
   const t = norm(rateType);
   const b = norm(basis);
   const l = norm(linkage);
-  // "P + 0.15%" is prime; "F + 3.00%" is the bond anchor and is not. Matched on
-  // the raw cell rather than the normalised one, so the letter still stands
-  // alone — and anchored to a word boundary so it cannot be caught mid-token.
-  const kind: RateKind = /(^|\s)P\s*\+/i.test(basis) || /פריים/.test(b) || /פריים/.test(l)
+  // "P + 0.15%" is prime, and so is "P - 1.60%" — a prime part priced under
+  // the anchor; "F + 3.00%" is the bond anchor and is not. Matched on the raw
+  // cell rather than the normalised one, so the letter still stands alone — and
+  // anchored to a word boundary so it cannot be caught mid-token. The sign was
+  // once "+" only, and every prime-minus מרכיב (רואי סלע, 01/09/2026: three of
+  // them, P - 0.50% and P - 1.60%) imported as a variable unlinked track.
+  const kind: RateKind = /(^|\s)P\s*[+\-−–]/i.test(basis) || /פריים/.test(b) || /פריים/.test(l)
     ? "prime"
     : /משתנה/.test(t)
       ? "variable"
@@ -415,13 +418,26 @@ export function parsePoalim(pages: RawPage[], dataPages: number[]): BankStatemen
       t.principal = Math.round(loanPrincipal * share);
       t.deferredInterest = deferred ? Math.round(deferred * share * 100) / 100 : null;
       t.indexation = Math.round((tot.indexation ?? 0) * share);
-      t.payoff = tot.payoff !== null ? Math.round(tot.payoff * share) : null;
+      t.payoff = tot.payoff !== null ? Math.round(tot.payoff * share * 100) / 100 : null;
       t.monthly = tot.monthly !== null ? Math.round(tot.monthly * share * 100) / 100 : null;
       t.breakFee = tot.breakFee !== null ? Math.round(tot.breakFee * share * 100) / 100 : null;
       t.arrears = i === 0 ? tot.arrears : null;
       t.accruedInterest = i === 0 ? tot.interest : null;
       t.balanceApportioned = tranches.length > 1;
     });
+    // Shares are rounded one by one, so they drift off the printed figure by up
+    // to a shekel a loan (₪1.61 on one letter) — and the analysis then quotes a
+    // payoff the bank never printed. Split to the agora, with what rounding
+    // leaves going to the largest share.
+    if (tot.payoff !== null && tranches.length > 1) {
+      tranches.forEach((t, i) => {
+        const share = modelSum > 0 ? modelled[i] / modelSum : 1 / tranches.length;
+        t.payoff = Math.round(tot.payoff! * share * 100) / 100;
+      });
+      const largest = tranches.reduce((b, t) => ((t.payoff ?? 0) > (b.payoff ?? 0) ? t : b), tranches[0]);
+      const rest = tranches.reduce((s, t) => s + (t === largest ? 0 : t.payoff ?? 0), 0);
+      largest.payoff = Math.round((tot.payoff - rest) * 100) / 100;
+    }
 
     if (tranches.length > 1) {
       warnings.push(
@@ -481,6 +497,7 @@ export function parsePoalim(pages: RawPage[], dataPages: number[]): BankStatemen
       monthly: loans.reduce((s, l) => s + (l.printed.monthly ?? 0), 0),
       breakFee: loans.reduce((s, l) => s + (l.printed.breakFee ?? 0), 0),
     },
+    printedPayoff: totals.length && totals.every((t) => t.payoff !== null) ? Math.round(totals.reduce((s, t) => s + t.payoff!, 0) * 100) / 100 : null,
     warnings,
   };
 }

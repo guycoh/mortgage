@@ -182,6 +182,16 @@ export interface BankLoan {
      * like a parsing error; captured, the arithmetic closes.
      */
     operationalFee: number | null;
+    /**
+     * פיגורים printed for the loan as a whole rather than per tranche (Mizrahi's
+     * summary page). Part of the payoff, part of no tranche's balance.
+     */
+    arrears?: number | null;
+    /**
+     * Other loan-level charges inside the printed payoff — נלוים, חיובים
+     * עתידיים, less a credit balance (עודף). Same standing as `operationalFee`.
+     */
+    otherCharges?: number | null;
   };
 }
 
@@ -205,6 +215,13 @@ export interface BankStatement {
     monthly: number;
     breakFee: number;
   };
+  /**
+   * The file's grand total to close, as the lender printed it — the figure
+   * every part, fee and file-level charge must add up to. Null where the
+   * template prints none. Kept so the import can be checked against the
+   * letter itself rather than against an earlier run of the reader.
+   */
+  printedPayoff?: number | null;
   /**
    * Where the parse and the lender's own totals disagree, or a field the
    * template does not carry. Surfaced, never swallowed.

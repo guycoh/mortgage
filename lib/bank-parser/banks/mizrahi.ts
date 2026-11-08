@@ -436,10 +436,79 @@ interface Summary {
   breakFee: number | null;
   /** עמלת עלות — the flat charge, printed rather than deduced. */
   operationalFee: number | null;
+  /** נלוים — file-level charges (legal costs, insurance) owed with the payoff. */
+  ancillary: number | null;
+  /** פיגורים — the file's arrears, principal and interest, never split by חלק. */
+  arrears: number | null;
+  /** מזה ריבית פיגורים — the penalty interest inside `arrears`. */
+  arrearsInterest: number | null;
+  /** חיובים עתידיים — charges already raised for the next debit. */
+  futureCharges: number | null;
+  /** עודף — a credit balance on the file, deducted from the payoff. */
+  surplus: number | null;
   /** סה"כ לסילוק. */
   payoff: number | null;
+  /**
+   * קרן ריבית והצמדה — what the חלק pages hold between them, before any fee.
+   * With עמלות לסילוק ההלוואה it is exactly the sum of the parts' payoffs, so
+   * it answers "was every חלק read" without touching the file-level lines.
+   */
+  partsCore: number | null;
   forecastRate: number | null;
   comparisonRate: number | null;
+  /**
+   * Amount lines on the page that this reader does not know. Every line it
+   * does know is listed in KNOWN_SUMMARY_LINES; a new one is named to the
+   * advisor rather than left to fall into a residual and be guessed at.
+   */
+  unknownLines: { label: string; amount: number }[];
+}
+
+/**
+ * Every labelled figure the summary page has been seen to print (46 letters,
+ * 2026-11-08), whether or not it is part of the payoff. A label outside this
+ * list that carries a non-zero amount is surfaced by name.
+ */
+const KNOWN_SUMMARY_LINES = [
+  "מדד ידוע",
+  "שער אירו",
+  "שער דולר",
+  "קרן ריבית והצמדה",
+  "עמלות לסילוק ההלוואה",
+  "עמלת עלות",
+  'סה"כ לסילוק',
+  "נלוים",
+  "פיגורים",
+  "מזה ריבית פיגורים",
+  "חיובים עתידיים",
+  "עודף",
+  "הריבית הכוללת החזויה",
+  "שיעור הריבית לצרכי השוואה",
+  // The account block some letters carry: the current account's own position,
+  // informational, inside no payoff figure.
+  "יתרה בחשבון",
+  "יתרה נוכחית",
+  "ריבית עתידית בחשבון",
+].map((l) => norm(l));
+
+/** A money amount as the page prints one: "8,340.53", "0.00", "12.50-". */
+const MONEY = /^-?[\d,]+\.\d{2}-?$/;
+
+/** Labelled amounts on the summary page that no known line accounts for. */
+function unknownSummaryLines(items: RawItem[]): { label: string; amount: number }[] {
+  const out: { label: string; amount: number }[] = [];
+  // Labels sit right of x≈420; the boilerplate and the branch block to the left.
+  for (const label of items.filter((i) => i.x > 380 && /[֐-׿]/.test(i.str))) {
+    const key = norm(label.str).replace(/[:*\s]+$/, "");
+    if (KNOWN_SUMMARY_LINES.some((k) => key === k || key.startsWith(k))) continue;
+    const near = items
+      .filter((i) => i !== label && i.x < label.x && Math.abs(i.y - label.y) <= 8 && /\d/.test(i.str))
+      .sort((a, b) => Math.abs(a.y - label.y) - Math.abs(b.y - label.y) || b.x - a.x)[0];
+    if (!near || !MONEY.test(near.str.trim())) continue;
+    const amount = num(near.str);
+    if (amount) out.push({ label: clean(label.str).replace(/[:\s]+$/, ""), amount });
+  }
+  return out;
 }
 
 /**
@@ -460,6 +529,18 @@ function summaryFigure(items: RawItem[], phrase: string, top = false): number | 
   return near.length ? num(near[0].str) : null;
 }
 
+/**
+ * Same, but the label must BE the phrase: "פיגורים" also spells the tail of
+ * "מזה ריבית פיגורים" one line below it, and the two figures are a total and
+ * the part of it that is penalty interest.
+ */
+function summaryExact(items: RawItem[], phrase: string): number | null {
+  const want = norm(phrase);
+  const label = items.find((i) => norm(i.str).replace(/[:\s]+$/, "") === want);
+  if (!label) return null;
+  return summaryFigure([label, ...items.filter((i) => i !== label)], label.str);
+}
+
 function readSummary(pages: RawPage[]): Summary {
   const page = pages.find((p) =>
     p.items.some((i: RawItem) => has(i.str, "מידע נוסף לחישוב הסכומים"))
@@ -469,9 +550,16 @@ function readSummary(pages: RawPage[]): Summary {
     fxRate: null,
     breakFee: null,
     operationalFee: null,
+    ancillary: null,
+    arrears: null,
+    arrearsInterest: null,
+    futureCharges: null,
+    surplus: null,
     payoff: null,
+    partsCore: null,
     forecastRate: null,
     comparisonRate: null,
+    unknownLines: [],
   };
   if (!page) return empty;
   const it = page.items;
@@ -482,9 +570,16 @@ function readSummary(pages: RawPage[]): Summary {
     fxRate: summaryFigure(it, "שער אירו") ?? summaryFigure(it, "שער דולר"),
     breakFee: summaryFigure(it, "עמלות לסילוק ההלוואה"),
     operationalFee: summaryFigure(it, "עמלת עלות"),
+    ancillary: summaryExact(it, "נלוים"),
+    arrears: summaryExact(it, "פיגורים"),
+    arrearsInterest: summaryExact(it, "מזה ריבית פיגורים"),
+    futureCharges: summaryExact(it, "חיובים עתידיים"),
+    surplus: summaryExact(it, "עודף"),
     payoff: summaryFigure(it, 'סה"כ לסילוק'),
+    partsCore: summaryFigure(it, "קרן ריבית והצמדה"),
     forecastRate: summaryFigure(it, "הריבית הכוללת החזויה"),
     comparisonRate: summaryFigure(it, "שיעור הריבית לצרכי השוואה"),
+    unknownLines: unknownSummaryLines(it),
   };
 }
 
@@ -549,10 +644,12 @@ export function parseMizrahi(pages: RawPage[], dataPages: number[]): BankStateme
   // רכישת דירה יד שניה". The purpose is the Hebrew tail; everything before the
   // first Hebrew letter belongs to another field.
   const purpose = clean(
+    // …except a quote that opens the Hebrew: `"כל מטרה" - מסלול ירוק` lost its
+    // first quote and read `כל מטרה" - מסלול ירוק`.
     ((headText.match(/מטרת הלוואה\s*(.+)/) ?? [])[1] ?? "").replace(
-      /^[^֐-׿]+/,
-      ""
-    )
+      /^[^֐-׿]*?("?)(?=[֐-׿])/,
+      "$1"
+    ).replace(/^[^֐-׿]*$/, "")
   );
   const purposeKind = classifyPurpose(purpose);
   const loanNumber = fileNo?.[1] ?? "";
@@ -638,6 +735,16 @@ export function parseMizrahi(pages: RawPage[], dataPages: number[]): BankStateme
       }
     }
 
+    // "ריבית:" — the interest accrued since the last debit. Looked up by the
+    // exact label: every other run in this column that mentions ריבית ("צבירת
+    // ריבית נדחית", "הפרשי הצמדה על הריבית", and on a prime part the track
+    // sentence "לא צמוד, ריבית פריים, שפיצר") sits above or beside it, and a
+    // loose match read the track sentence and came back empty.
+    const interestLabel = left.items.find((i: RawItem) => /^ריבית\s*:/.test(norm(i.str)));
+    const accrued = interestLabel
+      ? num(beside([interestLabel, ...left.items.filter((i: RawItem) => i !== interestLabel)], interestLabel.str))
+      : num(P("ריבית"));
+
     const fees = [
       { label: "עמלת אי הודעה", amount: num(P("עמלת אי הודעה")) },
       { label: "פיצוי מדד", amount: num(P("פיצוי מדד")) },
@@ -660,7 +767,7 @@ export function parseMizrahi(pages: RawPage[], dataPages: number[]): BankStateme
       funding: classifyFunding(G("סוג ההלוואה")),
       principal,
       indexation,
-      accruedInterest: num(P("ריבית")),
+      accruedInterest: accrued,
       deferredInterest: deferred !== null || deferredIdx !== null ? (deferred ?? 0) + (deferredIdx ?? 0) : null,
       arrears: null,
       balance,
@@ -712,43 +819,102 @@ export function parseMizrahi(pages: RawPage[], dataPages: number[]): BankStateme
   });
 
   if (!tranches.length) warnings.push("לא נמצאו חלקי הלוואה בתדפיס.");
-  // The bank prints the whole-file position on page 1; a gap means a חלק page
-  // was missed rather than that the arithmetic is wrong.
-  const printedPayoff = headerFigure(pages[0].items, "היתרה לסילוק בתיק");
-  const sumPayoff = tranches.reduce((s, t) => s + (t.payoff ?? 0), 0);
-  // A small gap is the file-level operational fee, which this lender adds to the
-  // whole-file position without attributing it to any one חלק. A large one means
-  // a חלק page really was missed, and those are different problems.
-  if (printedPayoff) {
-    const gap = printedPayoff - sumPayoff;
-    if (Math.abs(gap) > Math.max(200, printedPayoff * 0.005)) {
-      warnings.push(
-        `היתרה לסילוק בתיק המודפסת (${Math.round(printedPayoff).toLocaleString("en-US")} ₪) שונה מסכום החלקים ב-${Math.round(gap).toLocaleString("en-US")} ₪ — ייתכן שלא כל עמודי החלקים נקראו.`
-      );
-    } else if (Math.abs(gap) > 1) {
-      warnings.push(
-        `היתרה לסילוק בתיק כוללת עמלה תפעולית של ${Math.round(gap).toLocaleString("en-US")} ₪ ברמת התיק, שאינה משויכת לחלק.`
-      );
+
+  // A letter dated ON a payment day, printed after the day's debit, owes no
+  // interest since it: every priced part reads "ריבית: 0.00". The monthly
+  // proves the count — נתן ביטו, 01/11/2026, ₪157,165.62 at 3.42% amortises to
+  // the printed 773.59 over 304 payments and to 771.99 over 305, and its four
+  // 0% parts divide to their printed charge only over the shorter term. The
+  // note that payments due BEFORE the letter are assumed paid is about the
+  // payoff figure; here the bank shows the day's payment already taken. Read
+  // off the priced parts only — a 0% part accrues nothing on any day.
+  const pricedParts = tranches.filter((t) => (t.rate ?? 0) > 0 && t.accruedInterest !== null);
+  if (asOfDate && pricedParts.length && pricedParts.every((t) => t.accruedInterest === 0)) {
+    for (const t of tranches) {
+      const to = toDate(t.endDate);
+      if (to) t.months = paymentsLeft(asOfDate, to, true);
     }
   }
-
-  // The fee is printed, on the summary page, as "עמלת עלות". It used to be
-  // deduced from the residual between the printed file payoff and the sum of the
-  // parts, under a cap taken from the explanatory pages — sound arithmetic that
-  // happened to be unnecessary, and that would have quietly attributed a real
-  // shortfall to a fee had a חלק page ever been missed. The residual is still
-  // computed, but only as a fallback and as a check on the printed figure.
+  // The bank prints the whole-file position on page 1, and on the summary page
+  // takes it apart: the parts (קרן ריבית והצמדה + עמלות לסילוק ההלוואה, which
+  // is what the חלק pages sum to), then file-level lines that belong to no חלק —
+  // עמלת עלות, נלוים, פיגורים, חיובים עתידיים, less any עודף. Every one of them
+  // is printed, so the arithmetic must close; a gap left after all of them is a
+  // חלק page that was not read. Before these lines were read, a file in arrears
+  // (ועקנין, ₪8,340.53 פיגורים) was reported as "not every page was read", and a
+  // new loan's ₪320 נלוים as an unexplained fee.
+  const printedPayoff = headerFigure(pages[0].items, "היתרה לסילוק בתיק");
+  const sumPayoff = tranches.reduce((s, t) => s + (t.payoff ?? 0), 0);
   const residual = printedPayoff ? Math.round((printedPayoff - sumPayoff) * 100) / 100 : 0;
+  const ancillary = summary.ancillary ?? 0;
+  const arrears = summary.arrears ?? 0;
+  const future = summary.futureCharges ?? 0;
+  const surplus = summary.surplus ?? 0;
+  const otherCharges = Math.round((ancillary + future - surplus) * 100) / 100;
+  // The fee is printed, as "עמלת עלות". The residual stands in for it only on a
+  // letter whose summary page was not found, and only when it is fee-sized.
+  const leftOver = residual - arrears - otherCharges;
   const operationalFee =
-    summary.operationalFee ?? (residual > 0 && residual <= 200 ? residual : null);
-  if (
-    summary.operationalFee !== null &&
-    residual > 0 &&
-    Math.abs(summary.operationalFee - residual) > 1
-  ) {
+    summary.operationalFee ?? (leftOver > 0 && leftOver <= 200 ? Math.round(leftOver * 100) / 100 : null);
+  const unexplained = Math.round((leftOver - (operationalFee ?? 0)) * 100) / 100;
+  const ils = (n: number) => `${Math.round(n).toLocaleString("en-US")} ₪`;
+  const ils2 = (n: number) => `${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₪`;
+
+  // Were the parts all read? The summary page answers it outright: its
+  // קרן ריבית והצמדה + עמלות לסילוק ההלוואה is the parts' own total. Asked of
+  // the residual instead, a file-level charge the reader did not know looked
+  // exactly like a missing page — which is how ועקנין's arrears were reported.
+  const partsPrinted =
+    summary.partsCore !== null ? Math.round((summary.partsCore + (summary.breakFee ?? 0)) * 100) / 100 : null;
+  const partsGap = partsPrinted !== null ? Math.round((partsPrinted - sumPayoff) * 100) / 100 : null;
+  const unknownLines = summary.unknownLines;
+  if (partsGap !== null && Math.abs(partsGap) > 1) {
     warnings.push(
-      `עמלת העלות המודפסת (${summary.operationalFee} ₪) אינה מסבירה את הפער בין היתרה לסילוק בתיק לסכום החלקים (${Math.round(residual).toLocaleString("en-US")} ₪).`
+      `סכום החלקים שנקראו (${ils2(sumPayoff)}) שונה מסכום החלקים בעמוד הסיכום (${ils2(partsPrinted!)}) ב-${ils2(partsGap)} — ייתכן שלא כל עמודי החלקים נקראו.`
     );
+  } else if (partsGap === null && printedPayoff && Math.abs(unexplained) > Math.max(200, printedPayoff * 0.005)) {
+    // No summary page to ask: the residual is all there is.
+    warnings.push(
+      `היתרה לסילוק בתיק המודפסת (${ils(printedPayoff)}) שונה מסכום החלקים ב-${ils(unexplained)} — ייתכן שלא כל עמודי החלקים נקראו.`
+    );
+  } else if (printedPayoff && Math.abs(unexplained) > 1) {
+    // The parts are all here, so what is left is a file-level line — named when
+    // the page printed one this reader does not know.
+    const named = unknownLines.length
+      ? ` בעמוד הסיכום מופיעות שורות שהמערכת אינה מכירה: ${unknownLines.map((l) => `"${l.label}" ${ils2(l.amount)}`).join(", ")}.`
+      : "";
+    warnings.push(
+      `נותר פער של ${ils2(unexplained)} בין היתרה לסילוק בתיק לבין סכום החלקים והחיובים ברמת התיק — יש לוודא מול עמוד הסיכום.${named}`
+    );
+  }
+  // A line nobody has seen before is worth naming even when the totals close:
+  // it may be informational, or it may be a charge the next letter does not
+  // net out the same way.
+  if (unknownLines.length && !(printedPayoff && Math.abs(unexplained) > 1)) {
+    warnings.push(
+      `בעמוד הסיכום מופיעות שורות שהמערכת אינה מכירה: ${unknownLines.map((l) => `"${l.label}" ${ils2(l.amount)}`).join(", ")} — יש לבדוק אם הן חלק מהסכום לסילוק.`
+    );
+  }
+  // Arrears first: an advisor must see them before anything is priced.
+  if (arrears > 0) {
+    const pen = summary.arrearsInterest ? `, מזה ריבית פיגורים ${ils2(summary.arrearsInterest)}` : "";
+    warnings.push(
+      `בתיק פיגורים של ${ils2(arrears)}${pen}. הסכום כלול ביתרה לסילוק בתיק ואינו חלק מיתרת החלקים בלוח.`
+    );
+  }
+  if (operationalFee && operationalFee > 0) {
+    warnings.push(
+      `היתרה לסילוק בתיק כוללת עמלה תפעולית של ${ils(operationalFee)} ברמת התיק, שאינה משויכת לחלק.`
+    );
+  }
+  if (ancillary > 0) {
+    warnings.push(`היתרה לסילוק בתיק כוללת נלווים של ${ils2(ancillary)} ברמת התיק.`);
+  }
+  if (future > 0) {
+    warnings.push(`היתרה לסילוק בתיק כוללת חיובים עתידיים של ${ils2(future)}.`);
+  }
+  if (surplus > 0) {
+    warnings.push(`מהיתרה לסילוק בתיק נוכה עודף של ${ils2(surplus)}.`);
   }
   // Two printed payoffs, on two pages, which must agree. They are produced by
   // different parts of the form and a disagreement means one of them was read
@@ -776,6 +942,8 @@ export function parseMizrahi(pages: RawPage[], dataPages: number[]): BankStateme
       breakFee: summary.breakFee,
       forecastRate: summary.forecastRate,
       operationalFee,
+      arrears: summary.arrears,
+      otherCharges: otherCharges || null,
     },
   };
 
@@ -794,6 +962,7 @@ export function parseMizrahi(pages: RawPage[], dataPages: number[]): BankStateme
       monthly: tranches.reduce((s, t) => s + (t.monthly ?? 0), 0),
       breakFee: tranches.reduce((s, t) => s + (t.breakFee ?? 0), 0) + (operationalFee ?? 0),
     },
+    printedPayoff: printedPayoff ?? summary.payoff,
     warnings,
   };
 }

@@ -14,6 +14,7 @@ import { parseJerusalem } from "./banks/jerusalem";
 import { parseFibi } from "./banks/fibi";
 import { BANK_LABEL, type BankStatement } from "./types";
 import { pageLines, toDate } from "./text";
+import { primeByAnchor, settlePaymentDay, termAgainstMonthly } from "./checks";
 
 /** True when this looks like a bank mortgage statement at all. */
 export function isBankStatement(pages: RawPage[]): boolean {
@@ -94,6 +95,9 @@ function joinStatements(parts: BankStatement[]): BankStatement {
     },
     loans: live.flatMap((p) => p.loans),
     tranches: live.flatMap((p) => p.tranches),
+    printedPayoff: live.every((p) => p.printedPayoff != null)
+      ? Math.round(live.reduce((s, p) => s + p.printedPayoff!, 0) * 100) / 100
+      : null,
     totals: {
       balance: live.reduce((s, p) => s + p.totals.balance, 0),
       payoff: live.reduce((s, p) => s + p.totals.payoff, 0),
@@ -180,7 +184,8 @@ function auditTranches(st: BankStatement): string[] {
 
 /** Carry the detection's own findings onto the statement. */
 function withMeta(st: BankStatement, det: Detection): BankStatement {
-  const warnings = [...st.warnings, ...auditTranches(st)];
+  settlePaymentDay(st);
+  const warnings = [...st.warnings, ...auditTranches(st), ...primeByAnchor(st), ...termAgainstMonthly(st)];
   if (det.confidence < 0.8) {
     warnings.push(`זיהוי התבנית בביטחון ${Math.round(det.confidence * 100)}% בלבד — כדאי לוודא את הנתונים.`);
   }

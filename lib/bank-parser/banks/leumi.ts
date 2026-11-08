@@ -420,6 +420,7 @@ export function parseLeumi(pages: RawPage[], dataPages: number[]): BankStatement
       monthly: tranches.reduce((s, t) => s + (t.monthly ?? 0), 0),
       breakFee: tranches.reduce((s, t) => s + (t.breakFee ?? 0), 0) + (operationalFee ?? 0),
     },
+    printedPayoff: printedTotalBalance,
     warnings,
   };
 }
