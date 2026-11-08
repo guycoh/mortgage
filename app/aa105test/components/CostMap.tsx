@@ -92,8 +92,8 @@ function Card({ id, title, aside, className = "", children }: { id?: string; tit
 function heroDonut(m: Map_) {
   const t = m.totals;
   const data = [
-    { name: "קרן", value: Math.round(t.balance), itemStyle: { color: C.principal } },
-    { name: "ריבית", value: Math.round(t.interest), itemStyle: { color: C.interest } },
+    { name: "יתרת חוב", value: Math.round(t.balance), itemStyle: { color: C.principal } },
+    { name: "ריבית צפויה", value: Math.round(t.interest), itemStyle: { color: C.interest } },
     { name: "הצמדה צפויה", value: Math.round(t.indexation), itemStyle: { color: C.indexation } },
   ].filter((d) => d.value > 0);
   return {
@@ -103,7 +103,7 @@ function heroDonut(m: Map_) {
       ...TIP,
       trigger: "item",
       formatter: (p: { name: string; value: number; percent: number; color: string }) =>
-        `<b>${p.name}</b>${tipLine(p.color, "סכום", `₪${ils(p.value)}`)}${tipLine(p.color, "מכל מה שישולם", `${Math.round(p.percent)}%`)}`,
+        `<b>${p.name}</b>${tipLine(p.color, "סכום", `₪${ils(p.value)}`)}${tipLine(p.color, "מסך התשלומים הצפויים", `${Math.round(p.percent)}%`)}`,
     },
     series: [
       {
@@ -125,14 +125,14 @@ function Hero({ m }: { m: Map_ }) {
   const t = m.totals;
   const option = useMemo(() => heroDonut(m), [m]);
   const parts = [
-    { key: "p", label: "קרן", note: "היתרה שנשארה", v: t.balance, c: C.principal },
-    { key: "i", label: "ריבית", note: "עד סוף התקופה", v: t.interest, c: C.interest },
+    { key: "p", label: "יתרת חוב", note: "נכון להיום", v: t.balance, c: C.principal },
+    { key: "i", label: "ריבית צפויה", note: "עד סוף התקופה", v: t.interest, c: C.interest },
     { key: "x", label: "הצמדה צפויה", note: `לפי מדד של ${pct(m.inflation, 1)}% בשנה`, v: t.indexation, c: C.indexation },
   ].filter((p) => p.v > 0);
   return (
     <section id="cm-top" className="cm-card cm-hero">
       <div className="cm-hero-text">
-        <h2 className="cm-hero-q">כמה יעלו לכם ההלוואות עד הסוף?</h2>
+        <h2 className="cm-hero-q">כמה עוד תשלמו עד סוף ההלוואות?</h2>
         <div className="cm-hero-total">
           <N v={t.total} />
         </div>
@@ -155,7 +155,7 @@ function Hero({ m }: { m: Map_ }) {
       <div className="cm-hero-chart">
         <EChart option={option} height={260} />
         <div className="cm-donut-c" aria-hidden>
-          <span>על כל ₪1 קרן</span>
+          <span>החזר לשקל חוב</span>
           <b className="cm-num" dir="ltr">
             <span className="cm-cur">₪</span>
             {t.perShekel ? pct(t.perShekel, 2) : "—"}
@@ -168,11 +168,11 @@ function Hero({ m }: { m: Map_ }) {
           <dd><N v={t.monthly} /></dd>
         </div>
         <div>
-          <dt>מעבר לקרן</dt>
+          <dt>ריבית והצמדה</dt>
           <dd className="cm-hot"><N v={t.interest + t.indexation} approx /></dd>
         </div>
         <div>
-          <dt>ריבית ממוצעת</dt>
+          <dt>ריבית שנתית ממוצעת</dt>
           <dd>
             <span className="cm-num" dir="ltr">{t.rate !== null ? pct(t.rate, 2) : "—"}<span className="cm-cur">%</span></span>
           </dd>
@@ -265,7 +265,7 @@ function rankedOption(m: Map_, narrow = false) {
         axisPointer: { type: "shadow", shadowStyle: { color: "rgba(91,84,214,0.05)" } },
         formatter: (ps: { dataIndex: number }[]) => {
           const it = items[ps[0].dataIndex];
-          return `<b>${it.name}</b>${tipLine(C.principal, "יתרה", `₪${ils(it.balance)}`)}${tipLine(C.interest, "ריבית שתשולם", `₪${ils(it.interest)}`)}${it.indexation ? tipLine(C.indexation, "הצמדה צפויה", `₪${ils(it.indexation)}`) : ""}`;
+          return `<b>${it.name}</b>${tipLine(C.principal, "יתרת חוב", `₪${ils(it.balance)}`)}${tipLine(C.interest, "ריבית צפויה", `₪${ils(it.interest)}`)}${it.indexation ? tipLine(C.indexation, "הצמדה צפויה", `₪${ils(it.indexation)}`) : ""}`;
         },
       },
       xAxis: { type: "value", inverse: true, show: false },
@@ -326,7 +326,7 @@ function tracksOption(m: Map_) {
       ...TIP,
       trigger: "item",
       formatter: (p: { name: string; value: number; percent: number; color: string }) =>
-        `<b>${p.name}</b>${tipLine(p.color, "יתרה", `₪${ils(p.value)}`)}${tipLine(p.color, "מהחוב", `${Math.round(p.percent)}%`)}`,
+        `<b>${p.name}</b>${tipLine(p.color, "יתרת חוב", `₪${ils(p.value)}`)}${tipLine(p.color, "מהחוב", `${Math.round(p.percent)}%`)}`,
     },
     series: [
       {
@@ -392,7 +392,7 @@ function timeOption(m: Map_, narrow = false) {
       trigger: "axis",
       axisPointer: { type: "shadow", shadowStyle: { color: "rgba(91,84,214,0.06)" } },
       formatter: (ps: { seriesName: string; value: number; color: string; axisValue: string }[]) => {
-        const pay = ps.filter((p) => p.seriesName !== "יתרה").reduce((s, p) => s + p.value, 0);
+        const pay = ps.filter((p) => p.seriesName !== "יתרת חוב").reduce((s, p) => s + p.value, 0);
         return `<b>${ps[0]?.axisValue}</b>${tipLine("#15171c", "סה״כ בשנה", `₪${ils(pay)}`)}${ps.map((p) => tipLine(p.color, p.seriesName, `₪${ils(p.value)}`)).join("")}`;
       },
     },
@@ -402,12 +402,12 @@ function timeOption(m: Map_, narrow = false) {
       { type: "value", ...axisBase, axisLabel: { ...axisBase.axisLabel, color: AXIS_INK, formatter: (v: number) => short(v) }, splitLine: { show: false }, splitNumber: 4 },
     ],
     series: [
-      bar("קרן", "principal", C.principal, false),
+      bar("החזר קרן", "principal", C.principal, false),
       bar("ריבית", "interest", C.interest, !hasIdx),
       ...(hasIdx ? [bar("הצמדה", "indexation", C.indexation, true)] : []),
       {
         type: "line",
-        name: "יתרה",
+        name: "יתרת חוב",
         yAxisIndex: 1,
         data: m.years.map((y) => Math.round(y.balance)),
         smooth: 0.25,
@@ -440,15 +440,15 @@ interface Col {
 const COLS: Col[] = [
   { key: "name", label: "הלוואה" },
   { key: "bank", label: "גוף מממן" },
-  { key: "original", label: "נלקח", sort: "original", num: true },
-  { key: "balance", label: "יתרה", sort: "balance", num: true },
-  { key: "rate", label: "ריבית", sort: "rate", num: true },
+  { key: "original", label: "סכום מקורי", sort: "original", num: true },
+  { key: "balance", label: "יתרת חוב", sort: "balance", num: true },
+  { key: "rate", label: "ריבית שנתית", sort: "rate", num: true },
   { key: "monthly", label: "החזר חודשי", sort: "monthly", num: true },
   { key: "left", label: "נותרו", sort: "left", num: true },
-  { key: "interest", label: "ריבית שתשולם", sort: "interest", num: true },
+  { key: "interest", label: "ריבית צפויה", sort: "interest", num: true },
   { key: "indexation", label: "הצמדה צפויה", sort: "indexation", num: true, show: (m) => m.totals.indexation > 0 },
-  { key: "future", label: "עוד ישולם מעבר לקרן", sort: "future", num: true },
-  { key: "ps", label: "לכל ₪1", sort: "ps", num: true },
+  { key: "future", label: "סה״כ ריבית והצמדה", sort: "future", num: true },
+  { key: "ps", label: "החזר לשקל חוב", sort: "ps", num: true },
   { key: "notes", label: "שימו לב" },
 ];
 
@@ -691,15 +691,15 @@ function Sheet({ m, lit }: { m: Map_; lit: Set<string> }) {
                     <small>{[bankShort(r.bank), r.startYear && `מ-${r.startYear}`].filter(Boolean).join(", ")}</small>
                   </span>
                   <span className="cm-shc-bal">
-                    <small>יתרה</small>
+                    <small>יתרת חוב</small>
                     <b className="cm-num">₪{ils(r.balance)}</b>
                   </span>
                 </header>
                 <dl>
-                  <div><dt>ריבית</dt><dd className={(r.rate ?? 0) >= 7 ? "cm-hot" : undefined}>{r.rate !== null ? `${pct(r.rate, 2)}%` : "—"}</dd></div>
+                  <div><dt>ריבית שנתית</dt><dd className={(r.rate ?? 0) >= 7 ? "cm-hot" : undefined}>{r.rate !== null ? `${pct(r.rate, 2)}%` : "—"}</dd></div>
                   <div><dt>החזר חודשי</dt><dd>₪{n0(r.monthly)}</dd></div>
                   <div><dt>נותרו</dt><dd>{r.months ? `${pct(r.months / 12, 1)} שנים` : "—"}</dd></div>
-                  <div><dt>עוד ישולם</dt><dd className={future(r) ? "cm-hot" : undefined}>{future(r) ? `₪${ils(future(r))}` : "—"}</dd></div>
+                  <div><dt>ריבית והצמדה</dt><dd className={future(r) ? "cm-hot" : undefined}>{future(r) ? `₪${ils(future(r))}` : "—"}</dd></div>
                 </dl>
                 {future(r) > 0 && (
                   <span className="cm-sh-bar cm-shc-bar" style={{ width: `${(future(r) / maxFut) * 100}%` }}>
@@ -719,9 +719,9 @@ function Sheet({ m, lit }: { m: Map_; lit: Set<string> }) {
           </div>
         ))}
         <div className="cm-shc-total">
-          <span>סה״כ יתרה</span>
+          <span>סה״כ יתרת חוב</span>
           <b className="cm-num">₪{ils(total.balance)}</b>
-          <span>עוד ישולם מעבר לקרן</span>
+          <span>סה״כ ריבית והצמדה</span>
           <b className="cm-num cm-hot">₪{ils(total.future)}</b>
         </div>
       </div>
@@ -739,10 +739,10 @@ function FragmentCell({ children, onEnter }: { children: React.ReactElement<{ on
 function Legend({ idx, line, principal = true }: { idx: boolean; line?: boolean; principal?: boolean }) {
   return (
     <div className="cm-legend">
-      {principal && <span><i style={{ background: C.principal }} />קרן</span>}
+      {principal && <span><i style={{ background: C.principal }} />{line ? "החזר קרן" : "יתרת חוב"}</span>}
       <span><i style={{ background: C.interest }} />ריבית</span>
       {idx && <span><i style={{ background: C.indexation }} />הצמדה</span>}
-      {line && <span><i className="cm-legend-line" />יתרה</span>}
+      {line && <span><i className="cm-legend-line" />יתרת חוב</span>}
     </div>
   );
 }
@@ -770,14 +770,14 @@ function Body({ m }: { m: Map_ }) {
       />
       <div id="cm-cost" className="cm-row2">
         <Card title="איזו הלוואה עולה הכי הרבה?" aside={<Legend idx={idx} principal={false} />}>
-          <p className="cm-card-sub">מה עוד ישולם על כל הלוואה מעבר לקרן</p>
+          <p className="cm-card-sub">ריבית והצמדה צפויות בכל הלוואה</p>
           <EChart option={ranked.option} height={ranked.height} />
         </Card>
         <Card title="באילו מסלולים החוב?">
           <Tracks m={m} />
         </Card>
       </div>
-      <Card id="cm-time" title="כמה תשלמו כל שנה?" aside={<Legend idx={idx} line />}>
+      <Card id="cm-time" title="כמה צפוי שתשלמו בכל שנה?" aside={<Legend idx={idx} line />}>
         <EChart option={time} height={narrow ? 240 : 320} />
       </Card>
     </div>
@@ -808,7 +808,7 @@ export default function CostMap({ analysis, inflation, onClose }: { analysis: An
         <Body m={m} />
       ) : (
         <div className="cm-page">
-          <p className="cm-empty">בדוח אין משכנתאות או הלוואות פעילות על שם הלקוח.</p>
+          <p className="cm-empty">בדוח אין משכנתאות או הלוואות פעילות על שמכם.</p>
         </div>
       )}
     </Stage>

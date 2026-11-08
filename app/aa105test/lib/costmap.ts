@@ -199,8 +199,8 @@ export function buildCostMap(a: Analysis, inflation: number): CostMap {
       marks.push({
         text:
           owedShare >= 1
-            ? `היתרה מעל הסכום שנלקח`
-            : `נפרעו ${Math.round((1 - owedShare) * 100)}% ב-${Math.round(yearsHeld)} שנים`,
+            ? `היתרה מעל הסכום המקורי`
+            : `היתרה ירדה ב-${Math.round((1 - owedShare) * 100)}% ב-${Math.round(yearsHeld)} שנים`,
         tone: "warn",
       });
     const heat: CostRow["heat"] = marks.some((m) => m.tone === "pen") ? 2 : marks.length ? 1 : 0;
@@ -278,7 +278,7 @@ export function buildCostMap(a: Analysis, inflation: number): CostMap {
       label: "ההלוואה היקרה ביותר",
       tone: "pen",
       figure: `₪${ils(future(costliest))}`,
-      title: `עוד ישולמו מעבר לקרן על ${costliest.track}${costliest.rate !== null ? ` ב-${pct(costliest.rate, 2)}%` : ""}, יתרה ₪${ils(costliest.balance)}`,
+      title: `ריבית והצמדה צפויות על ${costliest.track}${costliest.rate !== null ? ` בריבית ${pct(costliest.rate, 2)}%` : ""}, יתרת חוב ₪${ils(costliest.balance)}`,
       uids: [costliest.uid],
     });
 
@@ -296,7 +296,7 @@ export function buildCostMap(a: Analysis, inflation: number): CostMap {
         label: "הריבית הגבוהה ביותר",
         tone: "pen",
         figure: `${pct(top, 2)}%`,
-        title: `על יתרה של ₪${ils(bal)}${avg >= 1 && top / avg < 10 ? `, פי ${pct(top / avg, 1)} מהממוצע שלכם` : ""}`,
+        title: `על יתרה של ₪${ils(bal)}${avg >= 1 && top / avg < 10 ? `, פי ${pct(top / avg, 1)} מהריבית הממוצעת שלכם` : ""}`,
         uids: same.map((r) => r.uid),
       });
   }
@@ -304,10 +304,10 @@ export function buildCostMap(a: Analysis, inflation: number): CostMap {
   if (indexation > interest && indexation > balance * 0.08)
     pains.push({
       id: "cpi",
-      label: "הצמדה למדד",
+      label: "הצמדה צפויה",
       tone: "warn",
       figure: `₪${ils(indexation)}`,
-      title: interest > 0 ? `תוספת צפויה בגלל המדד, פי ${pct(indexation / interest, 1)} מכל הריבית` : "תוספת צפויה בגלל המדד",
+      title: interest > 0 ? `תוספת צפויה בגלל המדד, פי ${pct(indexation / interest, 1)} מהריבית הצפויה` : "תוספת צפויה בגלל המדד",
       uids: rows.filter((r) => r.indexation > 0).map((r) => r.uid),
     });
 
@@ -318,12 +318,12 @@ export function buildCostMap(a: Analysis, inflation: number): CostMap {
     const grew = bal >= orig;
     pains.push({
       id: "slow",
-      label: grew ? "הקרן גדלה" : "הקרן כמעט לא יורדת",
+      label: grew ? "היתרה גדלה" : "היתרה כמעט לא ירדה",
       tone: "warn",
       figure: grew ? `+${Math.round((bal / orig - 1) * 100)}%` : `${Math.round((1 - bal / orig) * 100)}%`,
       title: grew
-        ? `היתרה מעל הסכום שנלקח, אחרי כ-${Math.round(sum(slow, (r) => r.yearsHeld ?? 0) / slow.length)} שנים של תשלומים`
-        : `מהקרן נפרעו עד היום, אחרי כ-${Math.round(sum(slow, (r) => r.yearsHeld ?? 0) / slow.length)} שנים של תשלומים`,
+        ? `מעל הסכום המקורי, אחרי כ-${Math.round(sum(slow, (r) => r.yearsHeld ?? 0) / slow.length)} שנים`
+        : `פחות מהסכום המקורי, אחרי כ-${Math.round(sum(slow, (r) => r.yearsHeld ?? 0) / slow.length)} שנים`,
       uids: slow.map((r) => r.uid),
     });
   }
