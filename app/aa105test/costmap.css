@@ -179,7 +179,14 @@
 .cm-sh-sub td { height: 42px; background: #f8f8fb; font-weight: 700; }
 .cm-sh-sub .cm-sh-name, .cm-sh-total .cm-sh-name { font-size: 13.5px; }
 .cm-sh-sub .cm-sh-name small, .cm-sh-total .cm-sh-name small { display: inline; margin-inline-start: 8px; font-weight: 500; }
-.cm-sh-total td { height: 64px; font-weight: 800; font-size: 15.5px; background: #fff; border-top: 3px double var(--cm-line-2); }
+/* the grand total: a quiet band under a thin ink rule, so it reads as the answer */
+.cm-sh-total td { height: 68px; font-weight: 800; font-size: 16px; background: #f8f8fc; border-top-color: transparent; box-shadow: inset 0 1.5px 0 #1d1f2c; }
+.cm-sh-t .cm-sh-total .cm-sh-gut { background: #f1f0f9; color: #5b54d6; font-family: inherit; font-size: 15px; font-weight: 600; }
+.cm-sh-t .cm-sh-total .cm-sh-name { font-size: 16.5px; font-weight: 800; color: #1d1f2c; }
+.cm-sh-t .cm-sh-total .cm-sh-tname { display: inline-flex; flex-direction: row; align-items: center; gap: 10px; }
+.cm-sh-t .cm-sh-total .cm-sh-tname::before { content: ""; width: 3px; height: 26px; border-radius: 2px; background: #1d1f2c; }
+.cm-sh-cur { unicode-bidi: isolate; white-space: nowrap; }
+.cm-sh-cur i { font-style: normal; font-size: 0.82em; font-weight: 600; opacity: 0.55; margin-inline-end: 3px; }
 .cm-sh-tv { display: inline-grid; justify-items: center; gap: 3px; line-height: 1.1; }
 .cm-sh-tv small { font-size: 11px; font-weight: 600; color: var(--cm-label); letter-spacing: 0; white-space: nowrap; }
 

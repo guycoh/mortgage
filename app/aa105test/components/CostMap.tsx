@@ -614,18 +614,31 @@ function Sheet({ m, lit }: { m: Map_; lit: Set<string> }) {
     {
       const p = { "data-c": i, className: c.num ? "cm-sh-num" : undefined };
       // the grand total sits far below the header, so each figure carries its own name
+      // money totals carry ₪ on the left of the digits, as everywhere on the board
+      const money = c.key !== "rate" && c.key !== "ps";
       const v = (value: string) =>
         labelled ? (
           <span className="cm-sh-tv">
             <small>{TOTAL_LABEL[c.key] ?? c.label}</small>
-            {value}
+            {money && value !== "—" ? (
+              <span className="cm-sh-cur" dir="ltr">
+                <i>₪</i>
+                {value}
+              </span>
+            ) : (
+              value
+            )}
           </span>
         ) : (
           value
         );
       switch (c.key) {
         case "name":
-          return <td {...p} className="cm-sh-name">{label}<small>{count} {count === 1 ? "הלוואה" : "הלוואות"}</small></td>;
+          return labelled ? (
+            <td {...p} className="cm-sh-name"><span className="cm-sh-tname">{label}</span></td>
+          ) : (
+            <td {...p} className="cm-sh-name">{label}<small>{count} {count === 1 ? "הלוואה" : "הלוואות"}</small></td>
+          );
         case "original": return <td {...p}>{v(ils(s.original))}</td>;
         case "balance": return <td {...p}>{v(ils(s.balance))}</td>;
         case "rate": return <td {...p}>{v(s.rate !== null ? `${pct(s.rate, 2)}%` : "—")}</td>;
@@ -705,7 +718,7 @@ function Sheet({ m, lit }: { m: Map_; lit: Set<string> }) {
           ))}
           <tfoot>
             <tr className="cm-sh-total">
-              <td className="cm-sh-gut" />
+              <td className="cm-sh-gut" aria-hidden>Σ</td>
               {sumCells(total, "סה״כ", all.length, true)}
             </tr>
           </tfoot>
