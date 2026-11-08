@@ -293,7 +293,7 @@ function finish(debts: Debt[], client: string, reportDate: string, inflation: nu
 
     return {
       uid: d.uid,
-      name: [d.track || "הלוואה", start ? `מ-${start}` : ""].filter(Boolean).join(" "),
+      name: [d.track || "הלוואה", start ? String(start) : ""].filter(Boolean).join(" "),
       family,
       bank: d.bank,
       track: d.track || "לא מסווג",

@@ -534,7 +534,7 @@ function Sheet({ m, lit }: { m: Map_; lit: Set<string> }) {
             <span className="cm-tick" data-f={r.family} title={FAMILY_NAME[r.family][0]} />
             <span>
               <b>{r.track}</b>
-              <small>{[r.purpose, r.startYear && `מ-${r.startYear}`].filter(Boolean).join(", ")}</small>
+              <small>{[r.purpose, r.startYear].filter(Boolean).join(", ")}</small>
             </span>
           </td>
         );
@@ -713,7 +713,7 @@ function Sheet({ m, lit }: { m: Map_; lit: Set<string> }) {
                   </span>
                   <span className="cm-shc-id">
                     <b>{r.track}</b>
-                    <small>{[bankShort(r.bank), r.startYear && `מ-${r.startYear}`].filter(Boolean).join(", ")}</small>
+                    <small>{[bankShort(r.bank), r.startYear].filter(Boolean).join(", ")}</small>
                   </span>
                   <span className="cm-shc-bal">
                     <small>יתרת חוב</small>
