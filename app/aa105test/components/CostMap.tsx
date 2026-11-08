@@ -464,6 +464,18 @@ const COLS: Col[] = [
   { key: "notes", label: "שימו לב" },
 ];
 
+/** Names for the grand-total figures, where the column header is out of sight. */
+const TOTAL_LABEL: Partial<Record<string, string>> = {
+  original: "סכום מקורי",
+  balance: "יתרת חוב",
+  rate: "ריבית ממוצעת",
+  monthly: "החזר חודשי",
+  interest: "ריבית צפויה",
+  indexation: "הצמדה צפויה",
+  future: "ריבית והצמדה",
+  ps: "החזר לשקל חוב",
+};
+
 const SORTERS: Record<Sort, (r: CostRow) => number> = {
   future,
   original: (r) => r.original,
@@ -596,22 +608,32 @@ function Sheet({ m, lit }: { m: Map_; lit: Set<string> }) {
     return <td {...p} />;
   };
 
-  const sumCells = (s: ReturnType<typeof sumUp>, label: string, count: number) =>
-    cols.map((c, i) => <FragmentCell key={c.key} onEnter={() => setHc(i)}>{sumCell(s, label, count, c, i)}</FragmentCell>);
-  const sumCell = (s: ReturnType<typeof sumUp>, label: string, count: number, c: Col, i: number) => {
+  const sumCells = (s: ReturnType<typeof sumUp>, label: string, count: number, labelled = false) =>
+    cols.map((c, i) => <FragmentCell key={c.key} onEnter={() => setHc(i)}>{sumCell(s, label, count, c, i, labelled)}</FragmentCell>);
+  const sumCell = (s: ReturnType<typeof sumUp>, label: string, count: number, c: Col, i: number, labelled: boolean) => {
     {
       const p = { "data-c": i, className: c.num ? "cm-sh-num" : undefined };
+      // the grand total sits far below the header, so each figure carries its own name
+      const v = (value: string) =>
+        labelled ? (
+          <span className="cm-sh-tv">
+            <small>{TOTAL_LABEL[c.key] ?? c.label}</small>
+            {value}
+          </span>
+        ) : (
+          value
+        );
       switch (c.key) {
         case "name":
           return <td {...p} className="cm-sh-name">{label}<small>{count} {count === 1 ? "הלוואה" : "הלוואות"}</small></td>;
-        case "original": return <td {...p}>{ils(s.original)}</td>;
-        case "balance": return <td {...p}>{ils(s.balance)}</td>;
-        case "rate": return <td {...p}>{s.rate !== null ? `${pct(s.rate, 2)}%` : "—"}</td>;
-        case "monthly": return <td {...p}>{ils(s.monthly)}</td>;
-        case "interest": return <td {...p} className="cm-sh-num cm-hot">{ils(s.interest)}</td>;
-        case "indexation": return <td {...p} className={`cm-sh-num${s.indexation ? " cm-warm" : " cm-sh-mute"}`}>{s.indexation ? ils(s.indexation) : "—"}</td>;
-        case "future": return <td {...p} className="cm-sh-num cm-sh-fut"><span className="cm-sh-fut-v">{ils(s.future)}</span></td>;
-        case "ps": return <td {...p}>{s.ps ? pct(s.ps, 2) : "—"}</td>;
+        case "original": return <td {...p}>{v(ils(s.original))}</td>;
+        case "balance": return <td {...p}>{v(ils(s.balance))}</td>;
+        case "rate": return <td {...p}>{v(s.rate !== null ? `${pct(s.rate, 2)}%` : "—")}</td>;
+        case "monthly": return <td {...p}>{v(ils(s.monthly))}</td>;
+        case "interest": return <td {...p} className="cm-sh-num cm-hot">{v(ils(s.interest))}</td>;
+        case "indexation": return <td {...p} className={`cm-sh-num${s.indexation ? " cm-warm" : " cm-sh-mute"}`}>{v(s.indexation ? ils(s.indexation) : "—")}</td>;
+        case "future": return <td {...p} className="cm-sh-num cm-sh-fut"><span className="cm-sh-fut-v">{v(ils(s.future))}</span></td>;
+        case "ps": return <td {...p}>{v(s.ps ? pct(s.ps, 2) : "—")}</td>;
       }
       return <td {...p} />;
     }
@@ -684,7 +706,7 @@ function Sheet({ m, lit }: { m: Map_; lit: Set<string> }) {
           <tfoot>
             <tr className="cm-sh-total">
               <td className="cm-sh-gut" />
-              {sumCells(total, "סה״כ", all.length)}
+              {sumCells(total, "סה״כ", all.length, true)}
             </tr>
           </tfoot>
         </table>

@@ -179,7 +179,9 @@
 .cm-sh-sub td { height: 42px; background: #f8f8fb; font-weight: 700; }
 .cm-sh-sub .cm-sh-name, .cm-sh-total .cm-sh-name { font-size: 13.5px; }
 .cm-sh-sub .cm-sh-name small, .cm-sh-total .cm-sh-name small { display: inline; margin-inline-start: 8px; font-weight: 500; }
-.cm-sh-total td { height: 50px; font-weight: 800; font-size: 15px; background: #fff; border-top: 3px double var(--cm-line-2); }
+.cm-sh-total td { height: 64px; font-weight: 800; font-size: 15.5px; background: #fff; border-top: 3px double var(--cm-line-2); }
+.cm-sh-tv { display: inline-grid; justify-items: center; gap: 3px; line-height: 1.1; }
+.cm-sh-tv small { font-size: 11px; font-weight: 600; color: var(--cm-label); letter-spacing: 0; white-space: nowrap; }
 
 /* phone cards: hidden until the grid cannot be read */
 .cm-sh-cards { display: none; }
