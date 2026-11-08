@@ -1,0 +1,220 @@
+/* ==========================================================================
+   איפוס תמהיל — the reset key's tooltip and its question (ResetKey, ResetAsk).
+
+   Both are portalled to <body>, outside .lgr-root, so they carry .lgr-vars for
+   the tokens and own every rule they need here. Prefix .rst-* is theirs alone.
+   ========================================================================== */
+
+/* ------------------------------------------------------------- tooltip */
+.rst-tip {
+  position: fixed;
+  z-index: 140;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 13px 9px 11px;
+  border-radius: 11px;
+  background: #18191f;
+  color: #fff;
+  font-family: var(--ui);
+  white-space: nowrap;
+  pointer-events: none;
+  transform-origin: var(--rst-arrow, 24px) 0;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.06) inset,
+    0 2px 4px rgba(14, 21, 36, 0.12),
+    0 14px 28px -10px rgba(14, 21, 36, 0.5);
+}
+/* the pointer, on the key's centre whatever the edge clamp did */
+.rst-tip::before {
+  content: "";
+  position: absolute;
+  top: -5px;
+  left: calc(var(--rst-arrow, 24px) - 5px);
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: #18191f;
+  rotate: 45deg;
+}
+.rst-tip-mark {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: rgba(239, 98, 84, 0.16);
+  color: #ff8a7d;
+}
+.rst-tip-text { display: grid; gap: 1px; }
+/* every colour stated: .lgr-vars (for the tokens) also sets the ink colour */
+.rst-tip-title { font-size: 12.5px; font-weight: 650; letter-spacing: -0.005em; color: #fff; }
+.rst-tip-sub { font-size: 11.5px; font-weight: 450; color: rgba(255, 255, 255, 0.74); }
+
+/* -------------------------------------------------------------- dialog */
+.rst-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 130;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(14, 21, 36, 0.42);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+.rst-dialog {
+  width: min(400px, 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 28px 28px 22px;
+  border-radius: 18px;
+  background: #fff;
+  font-family: var(--ui);
+  text-align: center;
+  box-shadow:
+    0 0 0 1px rgba(14, 21, 36, 0.06),
+    0 4px 10px -4px rgba(14, 21, 36, 0.12),
+    0 28px 64px -20px rgba(14, 21, 36, 0.45);
+}
+.rst-mark {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  border-radius: 999px;
+  background: var(--neg-tint);
+  color: #c4372b;
+  box-shadow: 0 0 0 7px #fef8f7, inset 0 0 0 1px var(--neg-line);
+}
+.rst-q {
+  margin-top: 18px;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  text-wrap: balance;
+}
+.rst-note {
+  margin-top: 8px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--lgr-2);
+  text-wrap: pretty;
+}
+.rst-note b { font-weight: 650; color: var(--ink); }
+.rst-acts {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+/* THE TWO ANSWERS — one key, built like a keycap.
+   Flat face, a hairline edge, and a 2px base edge (the lip) drawn as a hard
+   shadow under it. Hover lifts the key 1px onto a 3px lip; a press (Motion,
+   y: 2) sinks it onto the base and the lip collapses, so the button travels
+   and lands. The hues are the decision's: ביטול is the board's white key,
+   מחיקת הדוח is the board's red, solid — the one loud thing in the card. */
+.rst-btn {
+  --face: #ffffff;
+  --face-hover: #f7f8fa;
+  --edge: #d3d6de;
+  --lip: #c3c7d0;
+  --ring: rgba(91, 84, 214, 0.5);
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 44px;
+  margin-bottom: 3px;
+  border: 1px solid var(--edge);
+  border-radius: 12px;
+  background: var(--face);
+  color: #23252c;
+  font-family: var(--ui);
+  font-size: 14.5px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  cursor: pointer;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 2px 0 var(--lip),
+    0 3px 8px -4px rgba(20, 22, 32, 0.16);
+  transition:
+    background-color 140ms var(--ease),
+    border-color 140ms var(--ease),
+    box-shadow 140ms var(--ease),
+    translate 140ms var(--ease);
+}
+.rst-btn > svg { flex: none; transition: rotate 220ms cubic-bezier(0.16, 1, 0.3, 1); }
+.rst-btn:hover {
+  background: var(--face-hover);
+  translate: 0 -1px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 3px 0 var(--lip),
+    0 8px 16px -8px rgba(20, 22, 32, 0.24);
+}
+.rst-btn:active {
+  translate: 0;
+  transition-duration: 60ms;
+  box-shadow:
+    inset 0 1px 2px rgba(20, 22, 32, 0.12),
+    0 0 0 var(--lip);
+}
+/* focus: a white gap, then the ring, so it reads on white and on red alike */
+.rst-btn:focus-visible {
+  outline: none;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 2px 0 var(--lip),
+    0 0 0 3px #fff,
+    0 0 0 5px var(--ring);
+}
+
+/* ביטול — the calm answer, and still plainly a key */
+.rst-btn-quiet:hover { color: var(--ink); border-color: #c4c8d1; --lip: #b4b9c4; }
+
+/* מחיקת הדוח — solid red on a deeper red base */
+.rst-btn-danger {
+  --face: #cf3a2e;
+  --face-hover: #c23327;
+  --edge: #b52f25;
+  --lip: #8f231b;
+  --ring: rgba(207, 58, 46, 0.55);
+  color: #fff;
+  text-shadow: 0 1px 0 rgba(120, 20, 12, 0.25);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 2px 0 var(--lip),
+    0 6px 14px -6px rgba(207, 58, 46, 0.55);
+}
+.rst-btn-danger:hover {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 3px 0 var(--lip),
+    0 12px 22px -10px rgba(207, 58, 46, 0.6);
+}
+.rst-btn-danger:active { box-shadow: inset 0 2px 3px rgba(90, 14, 8, 0.35), 0 0 0 var(--lip); }
+.rst-btn-danger:focus-visible {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 2px 0 var(--lip),
+    0 0 0 3px #fff,
+    0 0 0 5px var(--ring);
+}
+/* the bin tips as the hand arrives — the same gesture as the band's key */
+.rst-btn-danger:hover > svg { rotate: -12deg; }
+
+@media (prefers-reduced-motion: reduce) {
+  .rst-btn,
+  .rst-btn > svg { transition: background-color 140ms, border-color 140ms, box-shadow 140ms; }
+  .rst-btn:hover { translate: 0; }
+  .rst-btn-danger:hover > svg { rotate: none; }
+}

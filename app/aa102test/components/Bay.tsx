@@ -36,6 +36,7 @@ import { bankStatementToLoans } from "@/lib/bank-parser/to-loans";
 import { track } from "../lib/track.client";
 import { FAMILY, importReportToLoans, type ImportedLoan, type ImportSummary } from "../lib/credit";
 import Btn from "./Btn";
+import ResetKey from "./ResetKey";
 import { settle, snap } from "../lib/transitions";
 
 /**
@@ -436,9 +437,12 @@ export default function Bay({
               )}
               {busy ? "מפענח…" : "הוספת דוח נוסף"}
             </Btn>
-            <Btn className="lgr-act lgr-tip" data-tip-side="start" data-tip="התחלה מחדש" onClick={onClear} aria-label="התחלה מחדש">
-              <ArrowClockwise size={14} weight="bold" />
-            </Btn>
+            {/* RESET THE MIX — and with it, room for a different report. It was
+                a bare circular arrow that read as "refresh", named only by a
+                tooltip that ran off the window edge. Now a labelled key with a
+                red bin, a real tooltip that cannot clip, and a question before
+                anything goes (ResetKey, ResetAsk). */}
+            <ResetKey onClick={onClear} />
           </div>
         </div>
 

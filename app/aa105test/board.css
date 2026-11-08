@@ -174,24 +174,16 @@
 }
 .lgr-root[data-v="v105"] .lgr-btn-ghost:hover:not(:disabled) { background: var(--card-3); }
 
-/* The square key beside the readings (התחלה מחדש): the same build, 34px. */
-.lgr-root[data-v="v105"] .lgr-receipt-acts .lgr-act {
-  width: 34px;
-  height: 34px;
-  border: 1px solid var(--key-edge);
-  border-bottom-color: var(--key-lip);
-  border-radius: var(--r-sm);
-  background: var(--key-face);
-  box-shadow: var(--key-shadow);
-  color: var(--lgr-2);
-}
-.lgr-root[data-v="v105"] .lgr-receipt-acts .lgr-act:hover {
-  border-color: #c5c8d0;
-  border-bottom-color: #a9adb8;
-  background: var(--key-face-hover);
-  box-shadow: var(--key-shadow-hover);
-  color: var(--ink);
-}
+/* איפוס תמהיל — the one destructive key on the band. The same key as its
+   neighbours, its mark a bare glyph (it acts in place) in the board's red.
+   On approach the bin tips, so it reads as "throw these away" before the
+   tooltip names it (the shared round-5 hover supplies the red wash and lip);
+   the label stays ink — the hue lives only in the mark. */
+.lgr-root[data-v="v105"] .lgr-reset { padding-inline: 10px 12px; gap: 6px; }
+.lgr-root[data-v="v105"] .lgr-reset > svg { transform-origin: 70% 85%; }
+.lgr-root[data-v="v105"] .lgr-reset:hover:not(:disabled) > svg { rotate: -12deg; }
+/* on approach the whole key admits what it is: the label takes the deep red */
+.lgr-root[data-v="v105"] .lgr-reset:hover:not(:disabled) { color: #a3291f; }
 
 /* ONE JOINED BAR. Siblings share their edges, so a group is one object with
    seams; only the group lifts its shadow, and a hovered key brightens in place
@@ -703,21 +695,18 @@
   box-shadow: 0 0 0 3px color-mix(in oklab, var(--a) 32%, transparent);
 }
 
-/* the restart key turns the way its arrow points */
-.lgr-root[data-v="v105"] .lgr-receipt-acts .lgr-act > svg { transition: rotate 320ms cubic-bezier(0.16, 1, 0.3, 1); }
-.lgr-root[data-v="v105"] .lgr-receipt-acts .lgr-act:hover > svg { rotate: 90deg; }
 /* the new-mix tab's disc turns like every other add */
 .lgr-root[data-v="v105"] .v5-tab-add > svg { transition: rotate 260ms cubic-bezier(0.16, 1, 0.3, 1), scale 220ms cubic-bezier(0.16, 1, 0.3, 1); }
 .lgr-root[data-v="v105"] .v5-tab-add:hover > svg { rotate: 90deg; scale: 1.12; }
 
 @media (prefers-reduced-motion: reduce) {
   .lgr-root[data-v="v105"] .lgr-btn[data-role="add"]:hover:not(:disabled) > svg,
-  .lgr-root[data-v="v105"] .lgr-receipt-acts .lgr-act:hover > svg,
+  .lgr-root[data-v="v105"] .lgr-reset:hover:not(:disabled) > svg,
   .lgr-root[data-v="v105"] .v5-tab-add:hover > svg { rotate: none; scale: none; }
 }
 
 /* THE DOCUMENT BAND — the readings sit beside the document they read, and
-   the two housekeeping keys (another report, start over) go to the far end,
+   the two housekeeping keys (another report, איפוס תמהיל) go to the far end,
    so the band reads identity → readings … housekeeping instead of a gap in
    the middle of one sentence. */
 .lgr-root[data-v="v105"] .lgr-receipt-acts { flex: 1; }

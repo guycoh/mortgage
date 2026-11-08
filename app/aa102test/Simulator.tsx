@@ -79,6 +79,7 @@ import { cardItems, type CardItem } from "./lib/cards";
 import CardsPanel from "./components/CardsPanel";
 import DuplicateMasterModal from "./components/DuplicateMasterModal";
 import Ask from "./components/Ask";
+import ResetAsk from "./components/ResetAsk";
 import { asPurposeId } from "./lib/purposes";
 import { exportMixToExcel } from "./lib/excel";
 import { track } from "./lib/track.client";
@@ -445,6 +446,9 @@ export default function Simulator({
    * null there means out of the lead entirely.
    */
   const [askLeave, setAskLeave] = useState<{ to: string | null; name: string } | null>(null);
+  /** איפוס תמהיל — wipes the active mix's rows, so it asks first. */
+  const [askClear, setAskClear] = useState(false);
+  const closeClear = useCallback(() => setAskClear(false), []);
   const [toast, setToast] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
   const [flash, setFlash] = useState(false);
   /** Row values as of the last load / import / save — drives the change marks. */
@@ -1605,7 +1609,7 @@ export default function Simulator({
                     reports={reports}
                     onBoard={loans}
                     onImport={applyImport}
-                    onClear={clearImport}
+                    onClear={() => setAskClear(true)}
                     // The three readings of the loaded document, on the
                     // document's own receipt. A credit report and a bank
                     // statement are alternatives — only one is ever loaded — so
@@ -2124,6 +2128,25 @@ export default function Simulator({
           onClose={() => setAskLeave(null)}
         />
       )}
+
+      {/* --- RESETTING THE MIX ---
+          The rows the report put on the board, and any edits made to them, go
+          with one click — so the board asks first (ResetAsk). The rows clear
+          only once the question has left, so the two movements read in order,
+          and the toast confirms it. */}
+      <ResetAsk
+        open={askClear}
+        names={reports.map((r) => r.clientName)}
+        rows={loans.length}
+        onConfirm={() => {
+          setAskClear(false);
+          window.setTimeout(() => {
+            clearImport();
+            flash4s({ kind: "ok", text: "הדוח נמחק" });
+          }, 170);
+        }}
+        onClose={closeClear}
+      />
 
       {sharePair &&
         (() => {
