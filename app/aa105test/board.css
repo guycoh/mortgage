@@ -182,6 +182,8 @@
 .lgr-root[data-v="v105"] .lgr-reset { padding-inline: 10px 12px; gap: 6px; }
 .lgr-root[data-v="v105"] .lgr-reset > svg { transform-origin: 70% 85%; }
 .lgr-root[data-v="v105"] .lgr-reset:hover:not(:disabled) > svg { rotate: -12deg; }
+/* on approach the whole key admits what it is: the label takes the deep red */
+.lgr-root[data-v="v105"] .lgr-reset:hover:not(:disabled) { color: #a3291f; }
 
 /* ONE JOINED BAR. Siblings share their edges, so a group is one object with
    seams; only the group lifts its shadow, and a hovered key brightens in place

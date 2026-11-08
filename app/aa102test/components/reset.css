@@ -114,58 +114,107 @@
   margin-top: 24px;
 }
 
-/* the two answers — same build, opposite weight */
+/* THE TWO ANSWERS — one key, built like a keycap.
+   Flat face, a hairline edge, and a 2px base edge (the lip) drawn as a hard
+   shadow under it. Hover lifts the key 1px onto a 3px lip; a press (Motion,
+   y: 2) sinks it onto the base and the lip collapses, so the button travels
+   and lands. The hues are the decision's: ביטול is the board's white key,
+   מחיקת הדוח is the board's red, solid — the one loud thing in the card. */
 .rst-btn {
+  --face: #ffffff;
+  --face-hover: #f7f8fa;
+  --edge: #d3d6de;
+  --lip: #c3c7d0;
+  --ring: rgba(91, 84, 214, 0.5);
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
-  height: 42px;
-  border: 1px solid transparent;
-  border-radius: 11px;
+  gap: 8px;
+  height: 44px;
+  margin-bottom: 3px;
+  border: 1px solid var(--edge);
+  border-radius: 12px;
+  background: var(--face);
+  color: #23252c;
   font-family: var(--ui);
-  font-size: 14px;
+  font-size: 14.5px;
   font-weight: 600;
+  letter-spacing: -0.005em;
   cursor: pointer;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 2px 0 var(--lip),
+    0 3px 8px -4px rgba(20, 22, 32, 0.16);
   transition:
-    background 160ms var(--ease),
-    border-color 160ms var(--ease),
-    box-shadow 160ms var(--ease),
-    color 160ms var(--ease);
+    background-color 140ms var(--ease),
+    border-color 140ms var(--ease),
+    box-shadow 140ms var(--ease),
+    translate 140ms var(--ease);
 }
-.rst-btn:focus-visible { outline: none; }
-.rst-btn-quiet {
-  background: linear-gradient(180deg, #ffffff 0%, #f7f7fa 100%);
-  border-color: #d6d8df;
-  border-bottom-color: #bcc0c9;
-  color: #262830;
-  box-shadow: inset 0 1px 0 #fff, 0 1px 1px rgba(20, 22, 32, 0.05);
-}
-.rst-btn-quiet:hover { background: linear-gradient(180deg, #ffffff 0%, #eff0f4 100%); color: var(--ink); }
-.rst-btn-quiet:focus-visible { border-color: var(--primary); box-shadow: 0 0 0 3px var(--focus-ring-strong); }
-.rst-btn-danger {
-  background: linear-gradient(180deg, #dc4a3e 0%, #c0352a 100%);
-  border-color: #b3302a;
-  border-bottom-color: #93251e;
-  color: #fff;
+.rst-btn > svg { flex: none; transition: rotate 220ms cubic-bezier(0.16, 1, 0.3, 1); }
+.rst-btn:hover {
+  background: var(--face-hover);
+  translate: 0 -1px;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.24),
-    0 1px 2px rgba(180, 35, 24, 0.3),
-    0 6px 14px -6px rgba(180, 35, 24, 0.55);
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 3px 0 var(--lip),
+    0 8px 16px -8px rgba(20, 22, 32, 0.24);
 }
-.rst-btn-danger:hover {
-  background: linear-gradient(180deg, #d24135 0%, #ad2d23 100%);
+.rst-btn:active {
+  translate: 0;
+  transition-duration: 60ms;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.24),
-    0 1px 2px rgba(180, 35, 24, 0.35),
-    0 10px 20px -8px rgba(180, 35, 24, 0.6);
+    inset 0 1px 2px rgba(20, 22, 32, 0.12),
+    0 0 0 var(--lip);
 }
-.rst-btn-danger:focus-visible {
+/* focus: a white gap, then the ring, so it reads on white and on red alike */
+.rst-btn:focus-visible {
+  outline: none;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.24),
-    0 0 0 3px rgba(196, 55, 43, 0.35);
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 2px 0 var(--lip),
+    0 0 0 3px #fff,
+    0 0 0 5px var(--ring);
 }
 
+/* ביטול — the calm answer, and still plainly a key */
+.rst-btn-quiet:hover { color: var(--ink); border-color: #c4c8d1; --lip: #b4b9c4; }
+
+/* מחיקת הדוח — solid red on a deeper red base */
+.rst-btn-danger {
+  --face: #cf3a2e;
+  --face-hover: #c23327;
+  --edge: #b52f25;
+  --lip: #8f231b;
+  --ring: rgba(207, 58, 46, 0.55);
+  color: #fff;
+  text-shadow: 0 1px 0 rgba(120, 20, 12, 0.25);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 2px 0 var(--lip),
+    0 6px 14px -6px rgba(207, 58, 46, 0.55);
+}
+.rst-btn-danger:hover {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 3px 0 var(--lip),
+    0 12px 22px -10px rgba(207, 58, 46, 0.6);
+}
+.rst-btn-danger:active { box-shadow: inset 0 2px 3px rgba(90, 14, 8, 0.35), 0 0 0 var(--lip); }
+.rst-btn-danger:focus-visible {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 2px 0 var(--lip),
+    0 0 0 3px #fff,
+    0 0 0 5px var(--ring);
+}
+/* the bin tips as the hand arrives — the same gesture as the band's key */
+.rst-btn-danger:hover > svg { rotate: -12deg; }
+
 @media (prefers-reduced-motion: reduce) {
-  .rst-btn { transition: none; }
+  .rst-btn,
+  .rst-btn > svg { transition: background-color 140ms, border-color 140ms, box-shadow 140ms; }
+  .rst-btn:hover { translate: 0; }
+  .rst-btn-danger:hover > svg { rotate: none; }
 }

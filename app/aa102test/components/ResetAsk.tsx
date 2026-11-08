@@ -20,7 +20,7 @@ import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Trash } from "@phosphor-icons/react";
-import Btn from "./Btn";
+import { snap } from "../lib/transitions";
 import "./reset.css";
 
 export default function ResetAsk({
@@ -39,7 +39,10 @@ export default function ResetAsk({
   onClose: () => void;
 }) {
   const reduce = useReducedMotion();
+  // The press: the key sinks onto its lip (see .rst-btn in reset.css).
+  const press = reduce ? undefined : { y: 2 };
   const cancel = useRef<HTMLButtonElement>(null);
+  const downOnScrim = useRef(false);
   const confirm = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -76,7 +79,13 @@ export default function ResetAsk({
           dir="rtl"
           className="lgr-vars rst-scrim"
           role="presentation"
-          onClick={onClose}
+          // Only a click that starts AND ends on the scrim closes: a press that
+          // began on a button and slid off must not count as "outside".
+          onPointerDown={(e) => (downOnScrim.current = e.target === e.currentTarget)}
+          onClick={(e) => {
+            if (downOnScrim.current && e.target === e.currentTarget) onClose();
+            downOnScrim.current = false;
+          }}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0, transition: { duration: 0.16 } }}
@@ -129,13 +138,27 @@ export default function ResetAsk({
             </p>
 
             <div className="rst-acts">
-              <Btn ref={cancel} className="rst-btn rst-btn-quiet" onClick={onClose}>
+              <motion.button
+                ref={cancel}
+                type="button"
+                className="rst-btn rst-btn-quiet"
+                whileTap={press}
+                transition={snap}
+                onClick={onClose}
+              >
                 ביטול
-              </Btn>
-              <Btn ref={confirm} className="rst-btn rst-btn-danger" onClick={onConfirm}>
-                <Trash size={15} weight="bold" />
+              </motion.button>
+              <motion.button
+                ref={confirm}
+                type="button"
+                className="rst-btn rst-btn-danger"
+                whileTap={press}
+                transition={snap}
+                onClick={onConfirm}
+              >
+                <Trash size={16} weight="bold" />
                 מחיקת הדוח
-              </Btn>
+              </motion.button>
             </div>
           </motion.div>
         </motion.div>
