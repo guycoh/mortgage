@@ -21,6 +21,8 @@ export type PainTone = "pen" | "warn";
 
 export interface CostRow {
   uid: string;
+  /** How a client tells this debt from its neighbours: track + the year it began. */
+  name: string;
   family: Family;
   bank: string;
   track: string;
@@ -54,6 +56,8 @@ export interface CostRow {
 
 export interface Pain {
   id: string;
+  /** What kind of pain, in two or three words — the card's name. */
+  label: string;
   tone: PainTone;
   figure: string;
   title: string;
@@ -205,6 +209,7 @@ export function buildCostMap(a: Analysis, inflation: number): CostMap {
 
     return {
       uid: l.uid,
+      name: [l.track || "הלוואה", start ? `מ-${start}` : ""].filter(Boolean).join(" "),
       family,
       bank: l.bank,
       track: l.track || "לא מסווג",
@@ -264,7 +269,7 @@ export function buildCostMap(a: Analysis, inflation: number): CostMap {
   const pains: Pain[] = [];
   const late = rows.filter((r) => r.overdue > 0);
   if (late.length)
-    pains.push({ id: "late", tone: "pen", figure: `₪${ils(sum(late, (r) => r.overdue))}`, title: late.length > 1 ? `בפיגור ב-${late.length} חובות` : "בפיגור", uids: late.map((r) => r.uid) });
+    pains.push({ id: "late", label: "פיגור בתשלומים", tone: "pen", figure: `₪${ils(sum(late, (r) => r.overdue))}`, title: late.length > 1 ? `לא שולמו בזמן, ב-${late.length} הלוואות` : "לא שולמו בזמן", uids: late.map((r) => r.uid) });
 
   // The debt that will cost the most from here — interest and CPI together.
   const future = (r: CostRow) => (r.interest ?? 0) + r.indexation;
@@ -272,9 +277,10 @@ export function buildCostMap(a: Analysis, inflation: number): CostMap {
   if (costliest && future(costliest) > 0)
     pains.push({
       id: "costliest",
+      label: "ההלוואה היקרה ביותר",
       tone: "pen",
       figure: `₪${ils(future(costliest))}`,
-      title: `יעלה החוב היקר בתיק: ${costliest.track}${costliest.rate !== null ? ` ${pct(costliest.rate, 2)}%` : ""} על ₪${ils(costliest.balance)}`,
+      title: `עוד ישולמו מעבר לקרן על ${costliest.track}${costliest.rate !== null ? ` ב-${pct(costliest.rate, 2)}%` : ""}, יתרה ₪${ils(costliest.balance)}`,
       uids: [costliest.uid],
     });
 
@@ -289,9 +295,10 @@ export function buildCostMap(a: Analysis, inflation: number): CostMap {
     if (top >= Math.max(6, avg * 1.4) && !onlyCostliest && (bal >= balance * 0.01 || sum(same, (r) => r.interest ?? 0) >= 5000))
       pains.push({
         id: "dear",
+        label: "הריבית הגבוהה ביותר",
         tone: "pen",
         figure: `${pct(top, 2)}%`,
-        title: `הריבית הגבוהה בתיק, על ₪${ils(bal)}`,
+        title: `על יתרה של ₪${ils(bal)}${avg >= 1 && top / avg < 10 ? `, פי ${pct(top / avg, 1)} מהממוצע שלכם` : ""}`,
         uids: same.map((r) => r.uid),
       });
   }
@@ -299,9 +306,10 @@ export function buildCostMap(a: Analysis, inflation: number): CostMap {
   if (indexation > interest && indexation > balance * 0.08)
     pains.push({
       id: "cpi",
+      label: "הצמדה למדד",
       tone: "warn",
       figure: `₪${ils(indexation)}`,
-      title: interest > 0 ? `הצמדה צפויה למדד, פי ${pct(indexation / interest, 1)} מכל הריבית` : "הצמדה צפויה למדד",
+      title: interest > 0 ? `תוספת צפויה בגלל המדד, פי ${pct(indexation / interest, 1)} מכל הריבית` : "תוספת צפויה בגלל המדד",
       uids: rows.filter((r) => r.indexation > 0).map((r) => r.uid),
     });
 
@@ -312,22 +320,23 @@ export function buildCostMap(a: Analysis, inflation: number): CostMap {
     const grew = bal >= orig;
     pains.push({
       id: "slow",
+      label: grew ? "הקרן גדלה" : "הקרן כמעט לא יורדת",
       tone: "warn",
       figure: grew ? `+${Math.round((bal / orig - 1) * 100)}%` : `${Math.round((1 - bal / orig) * 100)}%`,
       title: grew
         ? `היתרה מעל הסכום שנלקח, אחרי כ-${Math.round(sum(slow, (r) => r.yearsHeld ?? 0) / slow.length)} שנים של תשלומים`
-        : `מהקרן נפרעו, אחרי כ-${Math.round(sum(slow, (r) => r.yearsHeld ?? 0) / slow.length)} שנים של תשלומים`,
+        : `מהקרן נפרעו עד היום, אחרי כ-${Math.round(sum(slow, (r) => r.yearsHeld ?? 0) / slow.length)} שנים של תשלומים`,
       uids: slow.map((r) => r.uid),
     });
   }
 
   const balloons = rows.filter((r) => r.balloon || r.interestOnly);
   if (balloons.length)
-    pains.push({ id: "balloon", tone: "pen", figure: `₪${ils(sum(balloons, (r) => r.balance))}`, title: "יחזרו בתשלום אחד בסוף", uids: balloons.map((r) => r.uid) });
+    pains.push({ id: "balloon", label: "תשלום בלון", tone: "pen", figure: `₪${ils(sum(balloons, (r) => r.balance))}`, title: "יוחזרו בתשלום אחד בסוף התקופה", uids: balloons.map((r) => r.uid) });
 
   const varBal = sum(rows.filter((r) => r.variable), (r) => r.balance);
   if (balance > 0 && varBal / balance >= 0.33)
-    pains.push({ id: "var", tone: "warn", figure: `${Math.round((varBal / balance) * 100)}%`, title: "מהחוב בריבית משתנה", uids: rows.filter((r) => r.variable).map((r) => r.uid) });
+    pains.push({ id: "var", label: "ריבית משתנה", tone: "warn", figure: `${Math.round((varBal / balance) * 100)}%`, title: "מהחוב עלול להתייקר כשהריבית עולה", uids: rows.filter((r) => r.variable).map((r) => r.uid) });
 
   /* --------------------------------------------------------------- tracks */
   const byTrack = new Map<string, CostRow[]>();
