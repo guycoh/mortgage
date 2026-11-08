@@ -8,7 +8,7 @@
 // which loan costs most (ranked bars), what is it made of (tracks donut), how
 // much leaves every year (yearly bars), and the full list.
 
-import { useMemo, useState } from "react";
+import { cloneElement, useEffect, useMemo, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { CaretDown } from "@phosphor-icons/react";
 import * as echarts from "echarts/core";
@@ -43,6 +43,19 @@ const tipLine = (color: string, name: string, v: string) =>
   `<div style="display:flex;gap:10px;align-items:center;margin-top:3px"><span style="width:9px;height:9px;border-radius:3px;background:${color}"></span>${name}<b dir="ltr" style="margin-inline-start:auto;font-family:${FONT}">${v}</b></div>`;
 
 const future = (r: CostRow) => (r.interest ?? 0) + r.indexation;
+
+/** Phone width — the charts re-lay their labels, the sheet becomes cards (CSS). */
+function useNarrow() {
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    const q = window.matchMedia("(max-width: 760px)");
+    const on = () => setNarrow(q.matches);
+    on();
+    q.addEventListener("change", on);
+    return () => q.removeEventListener("change", on);
+  }, []);
+  return narrow;
+}
 
 function N({ v, cur = true, approx = false }: { v: number; cur?: boolean; approx?: boolean }) {
   return (
@@ -85,7 +98,7 @@ function heroDonut(m: Map_) {
   ].filter((d) => d.value > 0);
   return {
     animationDuration: 900,
-    animationEasing: "cubicOut",
+    animationEasing: "cubicOut" as const,
     tooltip: {
       ...TIP,
       trigger: "item",
@@ -140,7 +153,7 @@ function Hero({ m }: { m: Map_ }) {
         </ul>
       </div>
       <div className="cm-hero-chart">
-        <EChart option={option} height={300} />
+        <EChart option={option} height={260} />
         <div className="cm-donut-c" aria-hidden>
           <span>על כל ₪1 קרן</span>
           <b className="cm-num" dir="ltr">
@@ -206,7 +219,7 @@ function Pains({ pains, onPick, picked }: { pains: Pain[]; onPick: (p: Pain) => 
           </span>
           <span className="cm-pain-fig" dir="ltr">{p.figure}</span>
           <span className="cm-pain-t">{p.title}</span>
-          <span className="cm-pain-go">{picked === p.id ? "מסומן בטבלה" : "הצגה בטבלה"}</span>
+          <span className="cm-pain-go">{picked === p.id ? "מסומן ברשימה" : "סימון ברשימה"}</span>
         </motion.button>
       ))}
     </section>
@@ -217,7 +230,8 @@ function Pains({ pains, onPick, picked }: { pains: Pain[]; onPick: (p: Pain) => 
 
 const TOP = 8;
 
-function rankedOption(m: Map_) {
+function rankedOption(m: Map_, narrow = false) {
+  const W = narrow ? 118 : 176;
   const sorted = m.rows.filter((r) => future(r) > 0).sort((x, y) => future(y) - future(x));
   const top = sorted.slice(0, TOP);
   const rest = sorted.slice(TOP);
@@ -238,13 +252,13 @@ function rankedOption(m: Map_) {
     formatter: (p: { dataIndex: number }) => `₪${ils(items[p.dataIndex].interest + items[p.dataIndex].indexation)}`,
     fontFamily: FONT,
     fontWeight: 700,
-    fontSize: 12.5,
+    fontSize: narrow ? 11 : 12.5,
     color: "#15171c",
-    distance: 8,
+    distance: 6,
   };
   return {
     option: {
-      grid: { top: 6, right: 6, bottom: 6, left: 84, outerBoundsMode: "same" },
+      grid: { top: 6, right: 6, bottom: 6, left: narrow ? 64 : 84, outerBoundsMode: "same" },
       tooltip: {
         ...TIP,
         trigger: "axis",
@@ -267,11 +281,11 @@ function rankedOption(m: Map_) {
             const it = items[i];
             return `{n|${it.name}}\n{b|${it.rate !== null ? `${pct(it.rate, 2)}%   ` : ""}₪${ils(it.balance)}}`;
           },
-          margin: 18,
+          margin: narrow ? 10 : 18,
           align: "left",
           rich: {
-            n: { fontFamily: FONT, fontSize: 13, fontWeight: 600, color: "#15171c", lineHeight: 18, align: "right", width: 176 },
-            b: { fontFamily: FONT, fontSize: 11.5, color: "#5c606b", lineHeight: 16, align: "right", width: 176 },
+            n: { fontFamily: FONT, fontSize: narrow ? 11.5 : 13, fontWeight: 600, color: "#15171c", lineHeight: 17, align: "right", width: W, overflow: "truncate" },
+            b: { fontFamily: FONT, fontSize: narrow ? 10.5 : 11.5, color: "#5c606b", lineHeight: 15, align: "right", width: W },
           },
         },
       },
@@ -280,7 +294,7 @@ function rankedOption(m: Map_) {
           type: "bar",
           name: "ריבית",
           stack: "c",
-          barWidth: 18,
+          barWidth: narrow ? 14 : 18,
           data: items.map((it) => it.interest),
           itemStyle: { color: C.interest, borderRadius: hasIdx ? 0 : [6, 0, 0, 6] },
           ...(hasIdx ? {} : { label: endLabel }),
@@ -291,7 +305,7 @@ function rankedOption(m: Map_) {
                 type: "bar",
                 name: "הצמדה",
                 stack: "c",
-                barWidth: 18,
+                barWidth: narrow ? 14 : 18,
                 data: items.map((it) => it.indexation),
                 itemStyle: { color: C.indexation, borderRadius: [6, 0, 0, 6] },
                 label: endLabel,
@@ -359,7 +373,7 @@ function Tracks({ m }: { m: Map_ }) {
 
 /* ------------------------------------------------------------- years */
 
-function timeOption(m: Map_) {
+function timeOption(m: Map_, narrow = false) {
   const ys = m.years.map((y) => String(y.year));
   const hasIdx = m.totals.indexation > 0;
   const bar = (name: string, key: "principal" | "interest" | "indexation", color: string, top: boolean) => ({
@@ -372,7 +386,7 @@ function timeOption(m: Map_) {
     emphasis: { focus: "series" },
   });
   return {
-    grid: { top: 26, right: 58, bottom: 30, left: 52 },
+    grid: narrow ? { top: 20, right: 40, bottom: 28, left: 38 } : { top: 26, right: 58, bottom: 30, left: 52 },
     tooltip: {
       ...TIP,
       trigger: "axis",
@@ -382,7 +396,7 @@ function timeOption(m: Map_) {
         return `<b>${ps[0]?.axisValue}</b>${tipLine("#15171c", "סה״כ בשנה", `₪${ils(pay)}`)}${ps.map((p) => tipLine(p.color, p.seriesName, `₪${ils(p.value)}`)).join("")}`;
       },
     },
-    xAxis: { type: "category", data: ys, ...axisBase, axisLabel: { ...axisBase.axisLabel, interval: ys.length > 16 ? 2 : ys.length > 8 ? 1 : 0 } },
+    xAxis: { type: "category", data: ys, ...axisBase, axisLabel: { ...axisBase.axisLabel, interval: narrow ? Math.ceil(ys.length / 5) - 1 : ys.length > 16 ? 2 : ys.length > 8 ? 1 : 0 } },
     yAxis: [
       { type: "value", ...axisBase, axisLabel: { ...axisBase.axisLabel, formatter: (v: number) => short(v) }, splitNumber: 4, splitLine: { lineStyle: { color: GRID_LINE } } },
       { type: "value", ...axisBase, axisLabel: { ...axisBase.axisLabel, color: AXIS_INK, formatter: (v: number) => short(v) }, splitLine: { show: false }, splitNumber: 4 },
@@ -404,103 +418,320 @@ function timeOption(m: Map_) {
   };
 }
 
-/* ------------------------------------------------------------- table */
+/* ------------------------------------------------------------- the sheet */
 
-type Sort = "future" | "balance" | "rate" | "monthly" | "left";
+// Every loan and mortgage on the report, as a spreadsheet you would want to
+// read: a row-number gutter, hairline grid, families grouped with their own
+// subtotal, one double-ruled total. Conditional formatting does the talking —
+// rates tint toward raspberry as they climb, the "עוד ישולם" cell carries its
+// own cost bar. Hovering a cell lights its row and its column.
+// On a phone the same rows become cards: the grid cannot be read at 390px.
+
+type Sort = "future" | "original" | "balance" | "rate" | "monthly" | "left" | "interest" | "indexation" | "ps";
 type Filter = "all" | Family;
 
-function Table({ m, lit }: { m: Map_; lit: Set<string> }) {
+interface Col {
+  key: string;
+  label: string;
+  sort?: Sort;
+  num?: boolean;
+  show?: (m: Map_) => boolean;
+}
+const COLS: Col[] = [
+  { key: "name", label: "הלוואה" },
+  { key: "bank", label: "גוף מממן" },
+  { key: "original", label: "נלקח", sort: "original", num: true },
+  { key: "balance", label: "יתרה", sort: "balance", num: true },
+  { key: "rate", label: "ריבית", sort: "rate", num: true },
+  { key: "monthly", label: "החזר חודשי", sort: "monthly", num: true },
+  { key: "left", label: "נותרו", sort: "left", num: true },
+  { key: "interest", label: "ריבית שתשולם", sort: "interest", num: true },
+  { key: "indexation", label: "הצמדה צפויה", sort: "indexation", num: true, show: (m) => m.totals.indexation > 0 },
+  { key: "future", label: "עוד ישולם מעבר לקרן", sort: "future", num: true },
+  { key: "ps", label: "לכל ₪1", sort: "ps", num: true },
+  { key: "notes", label: "שימו לב" },
+];
+
+const SORTERS: Record<Sort, (r: CostRow) => number> = {
+  future,
+  original: (r) => r.original,
+  balance: (r) => r.balance,
+  rate: (r) => r.rate ?? -1,
+  monthly: (r) => r.monthly,
+  left: (r) => r.months ?? 0,
+  interest: (r) => r.interest ?? 0,
+  indexation: (r) => r.indexation,
+  ps: (r) => r.perShekel ?? 0,
+};
+
+const bankShort = (b: string) => b.replace(/\s*בע"מ\s*$/, "").replace(/^בנק\s+/, "");
+const n0 = (v: number) => (v ? ils(v) : "—");
+
+function endOf(r: CostRow) {
+  const m = /(\d{2})\/(\d{4})\s*$/.exec(r.endDate || "");
+  return m ? `${m[1]}/${m[2]}` : "";
+}
+
+function sumUp(rows: CostRow[]) {
+  const s = (f: (r: CostRow) => number) => rows.reduce((a, r) => a + (f(r) || 0), 0);
+  const rated = rows.filter((r) => r.rate !== null);
+  const rb = rated.reduce((a, r) => a + r.balance, 0);
+  const balance = s((r) => r.balance);
+  const fut = s(future);
+  return {
+    original: s((r) => r.original),
+    balance,
+    monthly: s((r) => r.monthly),
+    interest: s((r) => r.interest ?? 0),
+    indexation: s((r) => r.indexation),
+    future: fut,
+    rate: rb > 0 ? rated.reduce((a, r) => a + r.balance * (r.rate ?? 0), 0) / rb : null,
+    ps: balance > 0 ? (balance + fut) / balance : null,
+  };
+}
+
+function rateTint(rate: number | null, max: number) {
+  if (rate === null || rate <= 0) return undefined;
+  const k = Math.min(1, rate / Math.max(max, 1));
+  return `rgba(214, 51, 108, ${(0.04 + k * 0.16).toFixed(3)})`;
+}
+
+function Sheet({ m, lit }: { m: Map_; lit: Set<string> }) {
   const [sort, setSort] = useState<Sort>("future");
   const [filter, setFilter] = useState<Filter>("all");
+  const [hc, setHc] = useState<number | null>(null);
+  const cols = COLS.filter((c) => !c.show || c.show(m));
   const fams = (["mortgage", "loan"] as Family[]).filter((f) => m.totals.count[f]);
-  const key: Record<Sort, (r: CostRow) => number> = {
-    future,
-    balance: (r) => r.balance,
-    rate: (r) => r.rate ?? -1,
-    monthly: (r) => r.monthly,
-    left: (r) => r.months ?? 0,
-  };
-  const rows = m.rows.filter((r) => filter === "all" || r.family === filter).sort((x, y) => key[sort](y) - key[sort](x));
+  const shownFams = fams.filter((f) => filter === "all" || filter === f);
+  const maxRate = Math.max(1, ...m.rows.map((r) => r.rate ?? 0));
   const maxFut = Math.max(1, ...m.rows.map(future));
-  const hasIdx = m.totals.indexation > 0;
-  const th = (k: Sort, label: string) => (
-    <th>
-      <button className="cm-th" data-on={sort === k || undefined} onClick={() => setSort(k)}>
-        {label}
-        <CaretDown size={11} weight="bold" />
-      </button>
-    </th>
-  );
+  const groups = shownFams.map((f) => ({
+    f,
+    rows: m.rows.filter((r) => r.family === f).sort((x, y) => SORTERS[sort](y) - SORTERS[sort](x)),
+  }));
+  const all = groups.flatMap((g) => g.rows);
+  const total = sumUp(all);
+  let n = 0;
+
+  const cell = (r: CostRow, c: Col, i: number) => {
+    const p = { "data-c": i, className: c.num ? "cm-sh-num" : undefined };
+    switch (c.key) {
+      case "name":
+        return (
+          <td {...p} className="cm-sh-name">
+            <span className="cm-fam" style={{ background: C[r.family] }} />
+            <span>
+              <b>{r.track}</b>
+              <small>{[r.purpose, r.startYear && `מ-${r.startYear}`].filter(Boolean).join(", ")}</small>
+            </span>
+          </td>
+        );
+      case "bank":
+        return <td {...p} className="cm-sh-bank">{bankShort(r.bank)}</td>;
+      case "original":
+        return <td {...p}>{n0(r.original)}</td>;
+      case "balance":
+        return <td {...p} className="cm-sh-num cm-sh-strong">{ils(r.balance)}</td>;
+      case "rate":
+        return (
+          <td {...p} className={`cm-sh-num cm-sh-rate${(r.rate ?? 0) >= 7 ? " cm-hot" : ""}`} style={{ background: rateTint(r.rate, maxRate) }}>
+            {r.rate !== null ? `${pct(r.rate, 2)}%` : "—"}
+          </td>
+        );
+      case "monthly":
+        return <td {...p}>{n0(r.monthly)}</td>;
+      case "left":
+        return (
+          <td {...p} className="cm-sh-num cm-sh-left">
+            {r.months ? pct(r.months / 12, 1) : "—"}
+            {endOf(r) && <small>{endOf(r)}</small>}
+          </td>
+        );
+      case "interest":
+        return <td {...p} className={`cm-sh-num${(r.interest ?? 0) > 0 ? " cm-hot" : " cm-sh-mute"}`}>{r.interest ? ils(r.interest) : "—"}</td>;
+      case "indexation":
+        return <td {...p} className={`cm-sh-num${r.indexation > 0 ? " cm-warm" : " cm-sh-mute"}`}>{r.indexation ? ils(r.indexation) : "—"}</td>;
+      case "future":
+        return (
+          <td {...p} className="cm-sh-num cm-sh-fut">
+            <span className="cm-sh-fut-v">{future(r) ? ils(future(r)) : "—"}</span>
+            {future(r) > 0 && (
+              <span className="cm-sh-bar" style={{ width: `${(future(r) / maxFut) * 100}%` }}>
+                {(r.interest ?? 0) > 0 && <i style={{ flexGrow: r.interest ?? 0, background: C.interest }} />}
+                {r.indexation > 0 && <i style={{ flexGrow: r.indexation, background: C.indexation }} />}
+              </span>
+            )}
+          </td>
+        );
+      case "ps":
+        return <td {...p} className={`cm-sh-num${(r.perShekel ?? 0) >= 1.5 ? " cm-hot" : ""}`}>{r.perShekel ? pct(r.perShekel, 2) : "—"}</td>;
+      case "notes":
+        return (
+          <td {...p} className="cm-sh-notes">
+            {r.marks.filter((x) => !x.text.startsWith("ריבית")).map((mk) => (
+              <span key={mk.text} data-tone={mk.tone}>{mk.text}</span>
+            ))}
+          </td>
+        );
+    }
+    return <td {...p} />;
+  };
+
+  const sumCells = (s: ReturnType<typeof sumUp>, label: string, count: number) =>
+    cols.map((c, i) => <FragmentCell key={c.key} onEnter={() => setHc(i)}>{sumCell(s, label, count, c, i)}</FragmentCell>);
+  const sumCell = (s: ReturnType<typeof sumUp>, label: string, count: number, c: Col, i: number) => {
+    {
+      const p = { "data-c": i, className: c.num ? "cm-sh-num" : undefined };
+      switch (c.key) {
+        case "name":
+          return <td {...p} className="cm-sh-name">{label}<small>{count} {count === 1 ? "הלוואה" : "הלוואות"}</small></td>;
+        case "original": return <td {...p}>{ils(s.original)}</td>;
+        case "balance": return <td {...p}>{ils(s.balance)}</td>;
+        case "rate": return <td {...p}>{s.rate !== null ? `${pct(s.rate, 2)}%` : "—"}</td>;
+        case "monthly": return <td {...p}>{ils(s.monthly)}</td>;
+        case "interest": return <td {...p} className="cm-sh-num cm-hot">{ils(s.interest)}</td>;
+        case "indexation": return <td {...p} className="cm-sh-num cm-warm">{ils(s.indexation)}</td>;
+        case "future": return <td {...p} className="cm-sh-num cm-sh-fut"><span className="cm-sh-fut-v">{ils(s.future)}</span></td>;
+        case "ps": return <td {...p}>{s.ps ? pct(s.ps, 2) : "—"}</td>;
+      }
+      return <td {...p} />;
+    }
+  };
+
   return (
-    <Card
-      id="cm-all"
-      title="כל ההלוואות"
-      aside={
-        fams.length > 1 ? (
+    <section id="cm-all" className="cm-card cm-sheet">
+      <header className="cm-card-h">
+        <h3>כל ההלוואות והמשכנתאות</h3>
+        <span className="cm-sh-count">{all.length}</span>
+        {fams.length > 1 && (
           <div className="cm-seg" role="radiogroup" aria-label="סינון">
             {(["all", ...fams] as Filter[]).map((f) => (
               <button key={f} role="radio" aria-checked={filter === f} onClick={() => setFilter(f)}>
                 {f === "all" ? "הכול" : FAMILY_NAME[f][1]}
-                <span className="cm-num">{f === "all" ? m.rows.length : m.totals.count[f]}</span>
               </button>
             ))}
           </div>
-        ) : undefined
-      }
-    >
-      <table className="cm-table">
-        <thead>
-          <tr>
-            <th>הלוואה</th>
-            {th("balance", "יתרה")}
-            {th("rate", "ריבית")}
-            {th("monthly", "החזר חודשי")}
-            {th("left", "נותרו")}
-            <th>ריבית שתשולם</th>
-            {hasIdx && <th>הצמדה צפויה</th>}
-            {th("future", "עוד ישולם מעבר לקרן")}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => (
-            <tr key={r.uid} data-lit={lit.has(r.uid) || undefined}>
-              <td className="cm-t-name">
-                <span className="cm-fam" style={{ background: C[r.family] }} title={FAMILY_NAME[r.family][0]} />
-                <span className="cm-t-id">
-                  <b>{r.name}</b>
-                  <small>{r.bank.replace(/\s*בע"מ\s*$/, "")}</small>
-                  {r.marks.some((x) => !x.text.startsWith("ריבית")) && (
-                    <span className="cm-marks">
-                      {r.marks.filter((x) => !x.text.startsWith("ריבית")).map((mk) => (
-                        <span key={mk.text} data-tone={mk.tone}>{mk.text}</span>
-                      ))}
-                    </span>
+        )}
+      </header>
+
+      {/* desktop and tablet: the grid */}
+      <div className="cm-sh-scroll">
+        <style>{hc !== null ? `.cm-sh-t [data-c="${hc}"]{background-color:rgba(91,84,214,.045)}.cm-sh-t thead [data-c="${hc}"]{background-color:#ebeaf9;color:#2e2a8f}` : ""}</style>
+        <table className="cm-sh-t" onMouseLeave={() => setHc(null)}>
+          <thead>
+            <tr>
+              <th className="cm-sh-gut" aria-hidden />
+              {cols.map((c, i) => (
+                <th key={c.key} data-c={i} className={c.num ? "cm-sh-num" : undefined} onMouseEnter={() => setHc(i)}>
+                  {c.sort ? (
+                    <button className="cm-sh-th" data-on={sort === c.sort || undefined} onClick={() => setSort(c.sort!)}>
+                      {c.label}
+                      <CaretDown size={10} weight="bold" />
+                    </button>
+                  ) : (
+                    c.label
                   )}
-                </span>
-              </td>
-              <td><N v={r.balance} /></td>
-              <td className={r.marks.some((x) => x.text.startsWith("ריבית")) ? "cm-hot" : undefined}>
-                <span className="cm-num" dir="ltr">{r.rate !== null ? `${pct(r.rate, 2)}%` : "—"}</span>
-              </td>
-              <td>{r.monthly > 0 ? <N v={r.monthly} /> : "—"}</td>
-              <td className="cm-t-soft">{years(r.months)}</td>
-              <td className={(r.interest ?? 0) > 0 ? "cm-hot" : "cm-t-soft"}>{r.interest !== null && r.interest > 0 ? <N v={r.interest} /> : "—"}</td>
-              {hasIdx && <td className={r.indexation > 0 ? "cm-warm" : "cm-t-soft"}>{r.indexation > 0 ? <N v={r.indexation} /> : "—"}</td>}
-              <td className="cm-t-fut">
-                <span className="cm-t-bar">
-                  <span style={{ width: `${(future(r) / maxFut) * 100}%` }}>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          {groups.map((g) => (
+            <tbody key={g.f}>
+              {fams.length > 1 && (
+                <tr className="cm-sh-group">
+                  <td className="cm-sh-gut" />
+                  <td colSpan={cols.length}>
+                    <span className="cm-fam" style={{ background: C[g.f] }} />
+                    {FAMILY_NAME[g.f][1]}
+                  </td>
+                </tr>
+              )}
+              {g.rows.map((r) => (
+                <tr key={r.uid} data-lit={lit.has(r.uid) || undefined} data-heat={r.heat || undefined}>
+                  <td className="cm-sh-gut">{++n}</td>
+                  {cols.map((c, i) => (
+                    <FragmentCell key={c.key} onEnter={() => setHc(i)}>{cell(r, c, i)}</FragmentCell>
+                  ))}
+                </tr>
+              ))}
+              {fams.length > 1 && filter === "all" && (
+                <tr className="cm-sh-sub">
+                  <td className="cm-sh-gut" />
+                  {sumCells(sumUp(g.rows), `סה״כ ${FAMILY_NAME[g.f][1]}`, g.rows.length)}
+                </tr>
+              )}
+            </tbody>
+          ))}
+          <tfoot>
+            <tr className="cm-sh-total">
+              <td className="cm-sh-gut" />
+              {sumCells(total, "סה״כ", all.length)}
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      {/* phone: one card per loan */}
+      <div className="cm-sh-cards">
+        {groups.map((g) => (
+          <div key={g.f} className="cm-shc-group">
+            {fams.length > 1 && (
+              <div className="cm-shc-gh">
+                <span className="cm-fam" style={{ background: C[g.f] }} />
+                <b>{FAMILY_NAME[g.f][1]}</b>
+                <span className="cm-num">₪{ils(sumUp(g.rows).balance)}</span>
+              </div>
+            )}
+            {g.rows.map((r) => (
+              <article key={r.uid} className="cm-shc" data-lit={lit.has(r.uid) || undefined}>
+                <header>
+                  <span className="cm-fam" style={{ background: C[r.family] }} />
+                  <span className="cm-shc-id">
+                    <b>{r.track}</b>
+                    <small>{[bankShort(r.bank), r.startYear && `מ-${r.startYear}`].filter(Boolean).join(", ")}</small>
+                  </span>
+                  <span className="cm-shc-bal">
+                    <small>יתרה</small>
+                    <b className="cm-num">₪{ils(r.balance)}</b>
+                  </span>
+                </header>
+                <dl>
+                  <div><dt>ריבית</dt><dd className={(r.rate ?? 0) >= 7 ? "cm-hot" : undefined}>{r.rate !== null ? `${pct(r.rate, 2)}%` : "—"}</dd></div>
+                  <div><dt>החזר חודשי</dt><dd>₪{n0(r.monthly)}</dd></div>
+                  <div><dt>נותרו</dt><dd>{r.months ? `${pct(r.months / 12, 1)} שנים` : "—"}</dd></div>
+                  <div><dt>עוד ישולם</dt><dd className={future(r) ? "cm-hot" : undefined}>{future(r) ? `₪${ils(future(r))}` : "—"}</dd></div>
+                </dl>
+                {future(r) > 0 && (
+                  <span className="cm-sh-bar cm-shc-bar" style={{ width: `${(future(r) / maxFut) * 100}%` }}>
                     {(r.interest ?? 0) > 0 && <i style={{ flexGrow: r.interest ?? 0, background: C.interest }} />}
                     {r.indexation > 0 && <i style={{ flexGrow: r.indexation, background: C.indexation }} />}
                   </span>
-                </span>
-                <b><N v={future(r)} /></b>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </Card>
+                )}
+                {r.marks.some((x) => !x.text.startsWith("ריבית")) && (
+                  <p className="cm-sh-notes">
+                    {r.marks.filter((x) => !x.text.startsWith("ריבית")).map((mk) => (
+                      <span key={mk.text} data-tone={mk.tone}>{mk.text}</span>
+                    ))}
+                  </p>
+                )}
+              </article>
+            ))}
+          </div>
+        ))}
+        <div className="cm-shc-total">
+          <span>סה״כ יתרה</span>
+          <b className="cm-num">₪{ils(total.balance)}</b>
+          <span>עוד ישולם מעבר לקרן</span>
+          <b className="cm-num cm-hot">₪{ils(total.future)}</b>
+        </div>
+      </div>
+    </section>
   );
+}
+
+/** A cell that reports hover to the sheet's crosshair without wrapping the td. */
+function FragmentCell({ children, onEnter }: { children: React.ReactElement<{ onMouseEnter?: () => void }>; onEnter: () => void }) {
+  return cloneElement(children, { onMouseEnter: onEnter });
 }
 
 /* ------------------------------------------------------------------ page */
@@ -520,11 +751,13 @@ function Body({ m }: { m: Map_ }) {
   const go = useStageGo();
   const [picked, setPicked] = useState<Pain | null>(null);
   const lit = useMemo(() => new Set(picked?.uids ?? []), [picked]);
-  const ranked = useMemo(() => rankedOption(m), [m]);
-  const time = useMemo(() => timeOption(m), [m]);
+  const narrow = useNarrow();
+  const ranked = useMemo(() => rankedOption(m, narrow), [m, narrow]);
+  const time = useMemo(() => timeOption(m, narrow), [m, narrow]);
   const idx = m.totals.indexation > 0;
   return (
     <div className="cm-page">
+      <Sheet m={m} lit={lit} />
       <Hero m={m} />
       <Pains
         pains={m.pains}
@@ -545,9 +778,8 @@ function Body({ m }: { m: Map_ }) {
         </Card>
       </div>
       <Card id="cm-time" title="כמה תשלמו כל שנה?" aside={<Legend idx={idx} line />}>
-        <EChart option={time} height={320} />
+        <EChart option={time} height={narrow ? 240 : 320} />
       </Card>
-      <Table m={m} lit={lit} />
     </div>
   );
 }
@@ -564,11 +796,11 @@ export default function CostMap({ analysis, inflation, onClose }: { analysis: An
         </>
       }
       tabs={[
+        { id: "cm-all", label: "כל ההלוואות" },
         { id: "cm-top", label: "סך הכול" },
         { id: "cm-pains", label: "מה בולט" },
         { id: "cm-cost", label: "מה עולה הכי הרבה" },
         { id: "cm-time", label: "לאורך השנים" },
-        { id: "cm-all", label: "כל ההלוואות" },
       ]}
       onClose={onClose}
     >

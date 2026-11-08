@@ -203,8 +203,6 @@ export function buildCostMap(a: Analysis, inflation: number): CostMap {
             : `נפרעו ${Math.round((1 - owedShare) * 100)}% ב-${Math.round(yearsHeld)} שנים`,
         tone: "warn",
       });
-    if (linked && indexation > (interest ?? 0) && indexation > l.balance * 0.1)
-      marks.push({ text: `הצמדה כ-₪${ils(indexation)}`, tone: "warn" });
     const heat: CostRow["heat"] = marks.some((m) => m.tone === "pen") ? 2 : marks.length ? 1 : 0;
 
     return {
