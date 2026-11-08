@@ -1674,13 +1674,13 @@ export default function Simulator({
                             <Stethoscope size={14} weight="bold" style={{ color: "var(--primary)" }} />
                             {reading === "bank" ? "ניתוח משכנתא" : "ניתוח חיווי"}
                           </Btn>
-                          {v105 && reading === "credit" && creditReports.length > 0 && (
+                          {v105 && ((reading === "credit" && creditReports.length > 0) || (reading === "bank" && !!statement)) && (
                             <Btn
                               className="lgr-btn lgr-btn-sm"
                               data-tone="amber"
                               data-role="read"
                               onClick={() => setShowCost(true)}
-                              title="כל המשכנתאות וההלוואות בדוח — כמה כל אחת תעלה עד הסוף, בריבית ובהצמדה"
+                              title={reading === "bank" ? "כל מסלולי המשכנתא בתדפיס — כמה כל אחד יעלה עד הסוף, בריבית ובהצמדה" : "כל המשכנתאות וההלוואות בדוח — כמה כל אחת תעלה עד הסוף, בריבית ובהצמדה"}
                             >
                               <ChartBar size={14} weight="fill" style={{ color: "#d6336c" }} />
                               מפת עלויות
@@ -2216,6 +2216,9 @@ export default function Simulator({
               leadId={lead?.id ?? null}
               onClose={() => setShowClient(false)}
             />
+          )}
+          {showCost && statement && reading === "bank" && (
+            <CostMap statement={analyseStatement(statement)} inflation={annualInflation} onClose={() => setShowCost(false)} />
           )}
           {showCost && creditReports.length > 0 && reading === "credit" && (
             <CostMap

@@ -15,9 +15,10 @@ import { BankIcon } from "@/app/aa102test/components/bankIcons";
 import * as echarts from "echarts/core";
 import { PieChart } from "echarts/charts";
 import type { Analysis } from "@/app/aa102test/lib/analysis";
+import type { StatementAnalysis } from "@/lib/bank-parser/analysis";
 import EChart, { FONT, AXIS_INK, GRID_LINE, axisBase, short } from "@/app/aa102test/components/EChart";
 import Stage, { useStageGo } from "./Stage";
-import { buildCostMap, ils, pct, type CostMap as Map_, type CostRow, type Family, type Pain } from "../lib/costmap";
+import { buildCostMap, buildCostMapFromStatement, ils, pct, type CostMap as Map_, type CostRow, type Family, type Pain } from "../lib/costmap";
 import "../costmap.css";
 
 echarts.use([PieChart]);
@@ -802,8 +803,23 @@ function Body({ m }: { m: Map_ }) {
   );
 }
 
-export default function CostMap({ analysis, inflation, onClose }: { analysis: Analysis; inflation: number; onClose: () => void }) {
-  const m = useMemo(() => buildCostMap(analysis, inflation), [analysis, inflation]);
+export default function CostMap({
+  analysis,
+  statement,
+  inflation,
+  onClose,
+}: {
+  /** A credit report's analysis, or… */
+  analysis?: Analysis;
+  /** …a bank payoff letter's. */
+  statement?: StatementAnalysis;
+  inflation: number;
+  onClose: () => void;
+}) {
+  const m = useMemo(
+    () => (analysis ? buildCostMap(analysis, inflation) : buildCostMapFromStatement(statement!, inflation)),
+    [analysis, statement, inflation]
+  );
   return (
     <Stage
       label="מפת עלויות"

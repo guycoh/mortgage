@@ -15,6 +15,8 @@
 // figure is projected rather than printed.
 
 import type { Analysis, DebtLine } from "@/app/aa102test/lib/analysis";
+import { TRACK_LABEL, trackKey, type StatementAnalysis } from "@/lib/bank-parser/analysis";
+import { scheduleFromText } from "@/lib/payment-shape";
 
 export type Family = "mortgage" | "loan";
 export type PainTone = "pen" | "warn";
@@ -157,44 +159,127 @@ function project(balance: number, ratePct: number, months: number, linked: boole
 
 /* ------------------------------------------------------------------ build */
 
+/** One debt, whichever document it came from. */
+interface Debt {
+  uid: string;
+  family: Family;
+  bank: string;
+  track: string;
+  purpose: string;
+  startDate: string;
+  endDate: string;
+  original: number;
+  balance: number;
+  rate: number | null;
+  months: number | null;
+  monthly: number;
+  linked: boolean;
+  variable: boolean;
+  interestFree: boolean;
+  overdue: number;
+  arrearsRange: string;
+  balloon: boolean;
+  interestOnly: boolean;
+  shared: boolean;
+  breakFee?: number | null;
+}
+
+/** From a credit report (דוח ריכוז נתונים). */
 export function buildCostMap(a: Analysis, inflation: number): CostMap {
   const client = a.clients.map((c) => c.name).filter(Boolean).join(" ו");
   const reportDate = a.clients[0]?.reportDate ?? "";
+  const debts: Debt[] = a.lines
+    .filter(
+      (l) =>
+        l.role === "debtor" &&
+        l.section !== "inactive" &&
+        l.balance > 0 &&
+        (l.category === "mortgage" || l.category === "loan" || l.category === "other" || (l.category === "card" && l.instalment))
+    )
+    .map((l): Debt => ({
+      uid: l.uid,
+      family: l.category === "mortgage" ? "mortgage" : "loan",
+      bank: l.bank,
+      track: l.track,
+      purpose: l.purpose,
+      startDate: l.startDate,
+      endDate: l.endDate,
+      original: l.original,
+      balance: l.balance,
+      rate: l.rate,
+      months: l.months,
+      monthly: l.chargeNotPaid ? 0 : l.monthly,
+      linked: linkedOf(l),
+      variable: variableOf(l),
+      interestFree: l.interestFree,
+      overdue: l.overdue,
+      arrearsRange: l.arrearsRange,
+      balloon: l.balloon,
+      interestOnly: l.interestOnly,
+      shared: l.shared,
+    }));
+  return finish(debts, client, reportDate, inflation);
+}
+
+/** From a bank payoff letter (תדפיס / אישור יתרות) — every live tranche is a row. */
+export function buildCostMapFromStatement(a: StatementAnalysis, inflation: number): CostMap {
+  const st = a.statement;
+  const debts: Debt[] = a.live
+    .filter((t) => (t.balance ?? 0) > 0)
+    .map((t): Debt => ({
+      uid: t.uid,
+      family: "mortgage",
+      bank: st.bankLabel,
+      track: TRACK_LABEL[trackKey(t)] ?? "לא מסווג",
+      purpose: t.purpose,
+      startDate: t.startDate,
+      endDate: t.endDate,
+      original: t.originalAmount ?? 0,
+      balance: t.balance ?? 0,
+      rate: t.rate,
+      months: t.months,
+      monthly: t.monthly ?? 0,
+      linked: t.linkage === "linked",
+      variable: t.rateKind === "variable" || t.rateKind === "prime",
+      interestFree: false,
+      overdue: t.arrears ?? 0,
+      arrearsRange: "",
+      // the board's own reading of the lender's words (Leumi spells it בוליט)
+      balloon: scheduleFromText(t.amortization) === 3,
+      interestOnly: false,
+      shared: false,
+      breakFee: t.breakFee,
+    }));
+  return finish(debts, st.client.name, st.statementDate, inflation);
+}
+
+function finish(debts: Debt[], client: string, reportDate: string, inflation: number): CostMap {
   const nowY = reportYear(reportDate);
-
-  const own = a.lines.filter(
-    (l) =>
-      l.role === "debtor" &&
-      l.section !== "inactive" &&
-      l.balance > 0 &&
-      (l.category === "mortgage" || l.category === "loan" || l.category === "other" || (l.category === "card" && l.instalment))
-  );
-
   const series: ReturnType<typeof project>[] = [];
-  const rows: CostRow[] = own.map((l) => {
-    const family: Family = l.category === "mortgage" ? "mortgage" : "loan";
-    const rate = l.interestFree ? 0 : l.rate;
-    const linked = linkedOf(l);
-    const months = l.months && l.months > 0 ? l.months : null;
+  const rows: CostRow[] = debts.map((d) => {
+    const family = d.family;
+    const rate = d.interestFree ? 0 : d.rate;
+    const linked = d.linked;
+    const months = d.months && d.months > 0 ? d.months : null;
     let interest: number | null = null;
     let indexation = 0;
     if (months && rate !== null) {
-      const p = project(l.balance, rate, months, linked, inflation, l.interestOnly || l.balloon);
+      const p = project(d.balance, rate, months, linked, inflation, d.interestOnly || d.balloon);
       series.push(p);
       interest = sum(p, (x) => x.interest);
       indexation = sum(p, (x) => x.indexation);
     }
-    const total = l.balance + (interest ?? 0) + indexation;
-    const start = yearOf(l.startDate);
+    const total = d.balance + (interest ?? 0) + indexation;
+    const start = yearOf(d.startDate);
     const yearsHeld = start ? Math.max(0, nowY - start) : null;
-    const owedShare = l.original > 0 ? l.balance / l.original : null;
+    const owedShare = d.original > 0 ? d.balance / d.original : null;
 
     const marks: CostRow["marks"] = [];
     const dear = rate !== null && (family === "loan" ? rate >= 8 : rate >= 5);
-    if (l.overdue > 0) marks.push({ text: `₪${ils(l.overdue)} בפיגור`, tone: "pen" });
+    if (d.overdue > 0) marks.push({ text: `₪${ils(d.overdue)} בפיגור`, tone: "pen" });
     if (dear) marks.push({ text: `ריבית ${pct(rate!, 2)}%`, tone: "pen" });
-    if (l.balloon) marks.push({ text: "תשלום בלון", tone: "pen" });
-    if (l.interestOnly && !l.balloon) marks.push({ text: "משלמים רק ריבית", tone: "pen" });
+    if (d.balloon) marks.push({ text: "תשלום בלון", tone: "pen" });
+    if (d.interestOnly && !d.balloon) marks.push({ text: "משלמים רק ריבית", tone: "pen" });
     if (linked && owedShare !== null && yearsHeld !== null && yearsHeld >= 5 && owedShare >= 0.8)
       marks.push({
         text:
@@ -203,36 +288,37 @@ export function buildCostMap(a: Analysis, inflation: number): CostMap {
             : `היתרה ירדה ב-${Math.round((1 - owedShare) * 100)}% ב-${Math.round(yearsHeld)} שנים`,
         tone: "warn",
       });
+    if (d.breakFee && d.breakFee > 0) marks.push({ text: `עמלת פירעון מוקדם ₪${ils(d.breakFee)}`, tone: "warn" });
     const heat: CostRow["heat"] = marks.some((m) => m.tone === "pen") ? 2 : marks.length ? 1 : 0;
 
     return {
-      uid: l.uid,
-      name: [l.track || "הלוואה", start ? `מ-${start}` : ""].filter(Boolean).join(" "),
+      uid: d.uid,
+      name: [d.track || "הלוואה", start ? `מ-${start}` : ""].filter(Boolean).join(" "),
       family,
-      bank: l.bank,
-      track: l.track || "לא מסווג",
-      purpose: l.purpose,
+      bank: d.bank,
+      track: d.track || "לא מסווג",
+      purpose: d.purpose,
       startYear: start ? String(start) : "",
-      endDate: l.endDate,
-      original: l.original,
-      balance: l.balance,
+      endDate: d.endDate,
+      original: d.original,
+      balance: d.balance,
       rate,
       months,
-      monthly: l.chargeNotPaid ? 0 : l.monthly,
+      monthly: d.monthly,
       linked,
-      variable: variableOf(l),
-      interestFree: l.interestFree,
+      variable: d.variable,
+      interestFree: d.interestFree,
       interest,
       indexation,
       total,
-      perShekel: interest !== null ? total / l.balance : null,
+      perShekel: interest !== null ? total / d.balance : null,
       owedShare,
       yearsHeld,
-      overdue: l.overdue,
-      arrearsRange: l.arrearsRange,
-      balloon: l.balloon,
-      interestOnly: l.interestOnly,
-      shared: l.shared,
+      overdue: d.overdue,
+      arrearsRange: d.arrearsRange,
+      balloon: d.balloon,
+      interestOnly: d.interestOnly,
+      shared: d.shared,
       marks,
       heat,
     };
