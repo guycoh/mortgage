@@ -1,16 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import Calculator1 from "public/assets/images/svg/Calculator1";
-import Calculator2 from "public/assets/images/svg/Calculator2";
-import Calculator3 from "public/assets/images/svg/Calculator3";
-import Calculator4 from "public/assets/images/svg/Calculator4";
-import Calculator5 from "public/assets/images/svg/Calculator5";
+import Calculator1 from "@/public/assets/images/svg/Calculator1";
+import Calculator2 from "@/public/assets/images/svg/Calculator2";
+import Calculator3 from "@/public/assets/images/svg/Calculator3";
+import Calculator4 from "@/public/assets/images/svg/Calculator4";
+import Calculator5 from "@/public/assets/images/svg/Calculator5";
 import Calculator6 from "@/public/assets/images/svg/Calculator6";
 import Calculator7 from "@/public/assets/images/svg/Calculator7";
 import Calculator8 from "@/public/assets/images/svg/Calculator8";
 import BaloonIcon from "@/public/assets/images/svg/calculators/baloon";
 import ReverseIcon from "@/public/assets/images/svg/calculators/calculatorerverse";
+
+
 //ReverseIcon
 
 
