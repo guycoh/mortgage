@@ -39,12 +39,20 @@ export default function AbilityCalculator() {
 
   const [mainLoans, setMainLoans] = useState("");
   const [secondaryLoans, setSecondaryLoans] = useState("");
+  
+  const [mainLoanBalance, setMainLoanBalance] = useState("");
+  const [secondaryLoanBalance, setSecondaryLoanBalance] = useState("");
 
   const [guarantorAge, setGuarantorAge] = useState("");
   const [guarantorIncome, setGuarantorIncome] = useState("");
   const [guarantorLoans, setGuarantorLoans] = useState("");
+  const [guarantorLoanBalance, setGuarantorLoanBalance] = useState("");
 
   const [assetValue, setAssetValue] = useState("");
+  const [isDiscounted, setIsDiscounted] = useState(false);
+  const [contractPrice, setContractPrice] = useState("");
+  const [locationGrant, setLocationGrant] = useState("");
+  
   const [equity, setEquity] = useState("");
 
   // מסלולי משכנתא דינמיים
@@ -68,11 +76,17 @@ export default function AbilityCalculator() {
     setSecondaryIncome("");
     setMainLoans("");
     setSecondaryLoans("");
+    setMainLoanBalance("");
+    setSecondaryLoanBalance("");
     setAssetValue("");
+    setIsDiscounted(false);
+    setContractPrice("");
+    setLocationGrant("");
     setEquity("");
     setGuarantorAge("");
     setGuarantorIncome("");
     setGuarantorLoans("");
+    setGuarantorLoanBalance("");
     setTracks([{ id: "1", name: "פריים", amount: "", months: "360", interest: "4.8" }]);
   };
 
@@ -90,6 +104,11 @@ export default function AbilityCalculator() {
     parseNumber(mainLoans || "0") +
     parseNumber(secondaryLoans || "0") +
     parseNumber(guarantorLoans || "0");
+    
+  const totalLoanBalance =
+    parseNumber(mainLoanBalance || "0") +
+    parseNumber(secondaryLoanBalance || "0") +
+    parseNumber(guarantorLoanBalance || "0");
 
   const maxMortgageAllowed = asset * (PURPOSES[purpose].maxLtv / 100);
   const requestedMortgage = Math.max(asset - equityAmount, 0);
@@ -130,9 +149,12 @@ export default function AbilityCalculator() {
   const crmText = [
     purpose && `מטרת המשכנתא:${PURPOSES[purpose].label}`,
     asset > 0 && `שווי נכס:${asset.toLocaleString()} ₪`,
+    isDiscounted && contractPrice && `מחיר חוזה (בהנחה):${contractPrice} ₪`,
+    isDiscounted && locationGrant && `מענק מקום:${locationGrant} ₪`,
     equityAmount > 0 && `הון עצמי:${equityAmount.toLocaleString()} ₪`,
     totalIncome > 0 && `הכנסה כוללת:${totalIncome.toLocaleString()} ₪`,
-    totalLoans > 0 && `הלוואות:${totalLoans.toLocaleString()} ₪`,
+    totalLoans > 0 && `החזר הלוואות:${totalLoans.toLocaleString()} ₪`,
+    totalLoanBalance > 0 && `יתרת הלוואות:${totalLoanBalance.toLocaleString()} ₪`,
     mainAge && `גיל1:${mainAge}`,
     secondaryAge && `גיל2:${secondaryAge}`,
     guarantorAge && `גיל ערב:${guarantorAge}`,
@@ -180,16 +202,57 @@ export default function AbilityCalculator() {
 
         {/* שווי נכס */}
         <div>
-          <label className="block font-semibold mb-1">
-            שווי נכס
-          </label>
+          <div className="flex items-center gap-4 mb-1">
+            <label className="font-semibold">
+              שווי נכס
+            </label>
+            <label className="flex items-center cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={isDiscounted}
+                onChange={(e) => setIsDiscounted(e.target.checked)}
+                className="w-4 h-4 rounded text-orange-500 focus:ring-orange-400 accent-orange-500"
+              />
+              <span className="text-sm text-gray-700 mr-2">דירה בהנחה</span>
+            </label>
+          </div>
           <input
             type="text"
             value={assetValue}
             onChange={(e) => setAssetValue(formatNumber(e.target.value))}
             placeholder="₪"
-            className="w-full border rounded-lg p-2 focus:bg-orange-50 last:focus:border-orange-400 focus:ring-1 focus:ring-orange-300 focus:outline-none"
+            className="w-full border rounded-lg p-2 focus:bg-orange-50 focus:border-orange-400 focus:ring-1 focus:ring-orange-300 focus:outline-none mb-3"
           />
+
+          {isDiscounted && (
+            <>
+              <div className="mb-3">
+                <label className="block text-sm font-semibold mb-1 text-orange-700">
+                  מחיר חוזה (דירה בהנחה)
+                </label>
+                <input
+                  type="text"
+                  value={contractPrice}
+                  onChange={(e) => setContractPrice(formatNumber(e.target.value))}
+                  placeholder="₪"
+                  className="w-full border rounded-lg p-2 focus:bg-orange-50 focus:border-orange-400 focus:ring-1 focus:ring-orange-300 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold mb-1">
+                  מענק מקום (אם קיים)
+                </label>
+                <input
+                  type="text"
+                  value={locationGrant}
+                  onChange={(e) => setLocationGrant(formatNumber(e.target.value))}
+                  placeholder="₪"
+                  className="w-full border rounded-lg p-2 focus:bg-orange-50 focus:border-orange-400 focus:ring-1 focus:ring-orange-300 focus:outline-none"
+                />
+              </div>
+            </>
+          )}
         </div>
 
         {/* הון עצמי */}
@@ -202,7 +265,7 @@ export default function AbilityCalculator() {
             value={equity}
             onChange={(e) => setEquity(formatNumber(e.target.value))}
             placeholder="₪"
-            className="w-full border rounded-lg p-2 focus:bg-orange-50 last:focus:border-orange-400 focus:ring-1 focus:ring-orange-300 focus:outline-none"
+            className="w-full border rounded-lg p-2 focus:bg-orange-50 focus:border-orange-400 focus:ring-1 focus:ring-orange-300 focus:outline-none"
           />
 
           {asset > 0 && equityAmount > 0 && (
@@ -266,6 +329,15 @@ export default function AbilityCalculator() {
               className="w-full border rounded-lg p-2 focus:bg-orange-50 focus:ring-1 focus:ring-orange-300 outline-none"
             />
           </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">יתרת הלוואה</label>
+            <input
+              value={mainLoanBalance}
+              onChange={(e) => setMainLoanBalance(formatNumber(e.target.value))}
+              placeholder="₪"
+              className="w-full border rounded-lg p-2 focus:bg-orange-50 focus:ring-1 focus:ring-orange-300 outline-none"
+            />
+          </div>
         </div>
 
         {/* בן זוג משני */}
@@ -294,6 +366,15 @@ export default function AbilityCalculator() {
             <input
               value={secondaryLoans}
               onChange={(e) => setSecondaryLoans(formatNumber(e.target.value))}
+              placeholder="₪"
+              className="w-full border rounded-lg p-2 focus:bg-orange-50 focus:ring-1 focus:ring-orange-300 outline-none"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">יתרת הלוואה</label>
+            <input
+              value={secondaryLoanBalance}
+              onChange={(e) => setSecondaryLoanBalance(formatNumber(e.target.value))}
               placeholder="₪"
               className="w-full border rounded-lg p-2 focus:bg-orange-50 focus:ring-1 focus:ring-orange-300 outline-none"
             />
@@ -330,6 +411,15 @@ export default function AbilityCalculator() {
               className="w-full border rounded-lg p-2 focus:bg-orange-50 focus:ring-1 focus:ring-orange-300 outline-none"
             />
           </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">יתרת הלוואה</label>
+            <input
+              value={guarantorLoanBalance}
+              onChange={(e) => setGuarantorLoanBalance(formatNumber(e.target.value))}
+              placeholder="₪"
+              className="w-full border rounded-lg p-2 focus:bg-orange-50 focus:ring-1 focus:ring-orange-300 outline-none"
+            />
+          </div>
         </div>
 
         {/* סיכום */}
@@ -346,9 +436,15 @@ export default function AbilityCalculator() {
             </div>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1">סה״כ הלוואות</label>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">סה״כ החזר הלוואות</label>
             <div className="border rounded-lg p-2 bg-white text-center font-semibold text-red-600">
               {totalLoans.toLocaleString()} ₪
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">סה״כ יתרת הלוואות</label>
+            <div className="border rounded-lg p-2 bg-white text-center font-semibold text-red-600">
+              {totalLoanBalance.toLocaleString()} ₪
             </div>
           </div>
         </div>
@@ -403,7 +499,7 @@ export default function AbilityCalculator() {
               <span>{Math.round(Math.max((totalIncome * 0.40) - totalLoans, 0)).toLocaleString()} ₪</span>
             </div>
             <div className="pt-2 border-t text-xs text-gray-500">
-              * מחושב לפי רגולציית בנק ישראל החדשה: סך ההחזרים (משכנתא+הלוואות) מתוך ההכנסה.
+- מחושב לפי רגולציית בנק ישראל החדשה: סך ההחזרים (משכנתא+הלוואות) מתוך ההכנסה.
             </div>
           </div>
 
@@ -538,7 +634,7 @@ export default function AbilityCalculator() {
 }
 
 
-// "use client"
+
 
 // import { useState ,ReactNode,  } from "react";
 // import BalloonLoanModal from "./BalloonLoanModal"
