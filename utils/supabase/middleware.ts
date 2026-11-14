@@ -1,9 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
 
-
 import { routePermissions } from "../auth/roles";
-
 
 export const updateSession = async (request: NextRequest) => {
   try {
@@ -17,7 +15,7 @@ export const updateSession = async (request: NextRequest) => {
       {
         cookies: {
           getAll: () => request.cookies.getAll(),
-          setAll: (cookiesToSet) => {
+          setAll: (cookiesToSet: { name: string; value: string; options: any }[]) => {
             cookiesToSet.forEach(({ name, value }) =>
               request.cookies.set(name, value)
             );
@@ -64,6 +62,78 @@ export const updateSession = async (request: NextRequest) => {
     return NextResponse.next({ request: { headers: request.headers } });
   }
 };
+
+
+
+
+
+
+// import { createServerClient } from "@supabase/ssr";
+// import { type NextRequest, NextResponse } from "next/server";
+
+
+// import { routePermissions } from "../auth/roles";
+
+
+// export const updateSession = async (request: NextRequest) => {
+//   try {
+//     let response = NextResponse.next({
+//       request: { headers: request.headers },
+//     });
+
+//     const supabase = createServerClient(
+//       process.env.NEXT_PUBLIC_SUPABASE_URL!,
+//       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+//       {
+//         cookies: {
+//           getAll: () => request.cookies.getAll(),
+//           setAll: (cookiesToSet) => {
+//             cookiesToSet.forEach(({ name, value }) =>
+//               request.cookies.set(name, value)
+//             );
+//             response = NextResponse.next({ request });
+//             cookiesToSet.forEach(({ name, value, options }) =>
+//               response.cookies.set(name, value, options)
+//             );
+//           },
+//         },
+//       }
+//     );
+
+//     const {
+//       data: { user },
+//     } = await supabase.auth.getUser();
+
+//     if (!user) {
+//       return NextResponse.redirect(new URL("/", request.url));
+//     }
+
+//     const pathname = request.nextUrl.pathname;
+
+//     const permission = routePermissions.find(({ pathPrefix }) =>
+//       pathname.startsWith(pathPrefix)
+//     );
+
+//     if (permission) {
+//       const { data: profile, error: profileError } = await supabase
+//         .from("profiles")
+//         .select("role")
+//         .eq("id", user.id)
+//         .single();
+
+//       const role = profile?.role ?? null;
+
+//       if (profileError || !permission.allowedRoles.includes(role)) {
+//         return NextResponse.redirect(new URL("/", request.url));
+//       }
+//     }
+
+//     return response;
+//   } catch (e) {
+//     console.error("Middleware error:", e);
+//     return NextResponse.next({ request: { headers: request.headers } });
+//   }
+// };
 
 
 
