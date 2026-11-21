@@ -17,6 +17,7 @@ import { household, FIXTURE_SETS } from "./automix-fixtures.mts";
 import { buildAutoMix, DEFAULT_PROFILE, __test, type AutoMixInput, type AutoMixResult, type ClientProfile, type GoalId, type Proposal } from "../app/aa105test/lib/automix";
 import { ECONOMIES, scheduleIn } from "../app/aa105test/lib/automix/econ";
 import { MIN_TRANCHE, FIXED_MIN, LINKED_MAX, TRACK_SHARE_MAX, LTV_MAX, PTI_MAX } from "../app/aa105test/lib/automix/rules";
+import { NONBANK_LTV } from "../app/aa105test/lib/automix/tiers";
 import { EARLY } from "../app/aa105test/lib/automix/solve";
 import { priceLoan } from "../app/aa102test/lib/price";
 import { boardMonthly, foldMasterRow, owedOnly, type ImportedLoan } from "../app/aa102test/lib/credit";
@@ -25,6 +26,66 @@ import type { MarketSnapshot } from "../app/aa107test/lib/market";
 import snapshotJson from "../app/aa107test/lib/market-snapshot.json" with { type: "json" };
 
 const QUICK = process.argv.includes("--quick");
+/**
+ * Golden outputs: `--write-golden DIR` stores every case's result (minus `ms`
+ * and `blocks`); `--golden DIR` compares against them byte for byte. The
+ * engine reads today's date and the live curve, so a golden set is valid on the
+ * day and market it was written — a regression tool for a change, kept outside
+ * the repo (it holds client figures).
+ */
+const argAfter = (flag: string) => {
+  const i = process.argv.indexOf(flag);
+  return i >= 0 ? process.argv[i + 1] : null;
+};
+const WRITE_GOLDEN = argAfter("--write-golden");
+const READ_GOLDEN = argAfter("--golden");
+const { writeFileSync: wf, readFileSync: rf, existsSync: ex, mkdirSync: mk } = await import("node:fs");
+function golden(name: string, r: AutoMixResult, input: AutoMixInput) {
+  const { ms: _ms, blocks: _b, ...rest } = r as AutoMixResult & { blocks?: unknown };
+  void _ms;
+  void _b;
+  // Fields added after the golden copy was written (additive contract fields) are not part of the comparison.
+  const ADDED = new Set(["structure", "structureWhy", "dueNow", "cure", "due"]);
+  // The parser gives every row a fresh random id: compare by position in the master instead.
+  let json = JSON.stringify(rest, (k, v) => (ADDED.has(k) ? undefined : v));
+  input.master.forEach((l, i) => (json = json.split(l.id).join(`#row${i}`)));
+  const file = (d: string) => `${d}/${name.replace(/[^a-z0-9+-]/gi, "_")}.json`;
+  if (WRITE_GOLDEN) {
+    mk(WRITE_GOLDEN, { recursive: true });
+    wf(file(WRITE_GOLDEN), json);
+  }
+  if (READ_GOLDEN) {
+    const f = file(READ_GOLDEN);
+    const scope = GOLDEN_SCOPE[name];
+    if (!scope) {
+      check(ex(f) && rf(f, "utf8") === json, `${name}: output differs from the golden copy (override off must be unchanged)`);
+      return;
+    }
+    if (scope.drop.includes("*")) {
+      console.log(`  golden ${name}: not compared (${scope.why})`);
+      return;
+    }
+    const cut = (x: Record<string, unknown>) => {
+      for (const path of scope.drop) {
+        const keys = path.split(".");
+        let o = x as Record<string, unknown>;
+        for (const k of keys.slice(0, -1)) o = (o?.[k] ?? {}) as Record<string, unknown>;
+        delete o[keys[keys.length - 1]];
+      }
+      return JSON.stringify(x);
+    };
+    check(ex(f) && cut(JSON.parse(rf(f, "utf8"))) === cut(JSON.parse(json)), `${name}: output differs from the golden copy beyond ${scope.drop.join(", ")}`);
+    console.log(`  golden ${name}: compared without ${scope.drop.join(", ")} (${scope.why})`);
+  }
+}
+/**
+ * Where override-off output is MEANT to differ from the shipped engine: the
+ * non-bank model was this round's subject. Every bank-tier file stays byte-identical.
+ */
+const GOLDEN_SCOPE: Record<string, { drop: string[]; why: string }> = {
+  r05: { drop: ["pricing.tierWhy", "pricing.rows"], why: "grade D ladder prices; every goal still unavailable" },
+  "tier-nonbank": { drop: ["*"], why: "the non-bank model changed by design: ladder, second or first lien, Fair Credit law instead of 329, file fee" },
+};
 const market = snapshotJson as unknown as MarketSnapshot;
 const forecast = await latestCurve();
 const fmt = (x: number) => Math.round(x).toLocaleString("en-US");
@@ -136,7 +197,10 @@ function verify(name: string, input: AutoMixInput, r: AutoMixResult, expect: { o
   lint(name, r);
   check(r.ok === (expect.ok ?? true), `${name}: ok=${r.ok} ${r.reason ?? ""}`);
   if (!r.ok) return;
-  const budget = input.profile.budget ?? r.today.monthly;
+  // With debt due now (override) the budget and every "versus today" are the reference's.
+  const due = r.dueNow;
+  const budget = due?.budget ?? input.profile.budget ?? r.today.monthly;
+  const nonbank = r.pricing.tier === "nonbank";
   const masterById = new Map(input.master.map((l) => [l.id, l]));
   for (const p of r.proposals) {
     if (p.status === "unavailable") {
@@ -147,12 +211,14 @@ function verify(name: string, input: AutoMixInput, r: AutoMixResult, expect: { o
     for (const seg of ["housing", "allPurpose"] as const) {
       const fresh = p.tranches.filter((t) => t.segment === seg).reduce((a, t) => a + t.amount, 0);
       const moved = p.moves.filter((m) => m.action !== "keep" && m.segment === seg);
-      const owed = moved.reduce((a, m) => a + m.balance + m.fee, 0);
-      if (!moved.length) check(fresh === 0, `${tag(p.goal)}: ${seg} money without a debt to refinance (${fresh})`);
+      // Arrears on a kept debt are brought current from the all-purpose money.
+      const cures = seg === "allPurpose" ? p.moves.filter((m) => m.action === "keep").reduce((a, m) => a + (m.cure ?? 0), 0) : 0;
+      const owed = moved.reduce((a, m) => a + m.balance + m.fee, 0) + cures;
+      if (!moved.length && !cures) check(fresh === 0, `${tag(p.goal)}: ${seg} money without a debt to refinance (${fresh})`);
       else check(fresh - owed > 0 && fresh - owed <= p.costs.setup + 2, `${tag(p.goal)}: ${seg} new ${fresh} vs refinanced ${owed} + setup`);
     }
     const allNew = p.tranches.reduce((a, t) => a + t.amount, 0);
-    const allMoved = p.moves.filter((m) => m.action !== "keep").reduce((a, m) => a + m.balance + m.fee, 0);
+    const allMoved = p.moves.filter((m) => m.action !== "keep").reduce((a, m) => a + m.balance + m.fee, 0) + p.moves.reduce((a, m) => a + (m.action === "keep" ? m.cure ?? 0 : 0), 0);
     check(Math.abs(allNew - allMoved - (allMoved ? p.costs.setup : 0)) <= 2, `${tag(p.goal)}: Σ new ${allNew} ≠ Σ refinanced ${allMoved} + setup ${p.costs.setup}`);
     check(p.costs.prepaymentFees === p.moves.reduce((a, m) => a + m.fee, 0), `${tag(p.goal)}: fees ≠ Σ move fees`);
     // 2. rows re-priced independently reproduce the metrics
@@ -182,7 +248,8 @@ function verify(name: string, input: AutoMixInput, r: AutoMixResult, expect: { o
       if (!ts.length) continue;
       const N = ts.reduce((a, t) => a + t.amount, 0);
       const fixed = ts.filter((t) => t.track === "klz" || t.track === "kz").reduce((a, t) => a + t.amount, 0);
-      check(fixed / N >= FIXED_MIN - 0.005, `${tag(p.goal)}: ${seg} fixed ${(fixed / N).toFixed(3)} < ⅓ (329 §7)`);
+      // 329 binds banks only (circular 2852); a non-bank mix answers to the Fair Credit Law below.
+      if (!nonbank) check(fixed / N >= FIXED_MIN - 0.005, `${tag(p.goal)}: ${seg} fixed ${(fixed / N).toFixed(3)} < ⅓ (329 §7)`);
       check(new Set(ts.map((t) => t.track)).size === ts.length, `${tag(p.goal)}: ${seg} two tranches on one track`);
       check(ts.length <= (seg === "housing" ? 4 : 2), `${tag(p.goal)}: ${seg} has ${ts.length} tranches`);
       if (ts.length > 1) check(ts.every((t) => t.amount >= MIN_TRANCHE - 1000), `${tag(p.goal)}: ${seg} tranche under ₪${MIN_TRANCHE}`);
@@ -192,7 +259,7 @@ function verify(name: string, input: AutoMixInput, r: AutoMixResult, expect: { o
       }
       for (const t of ts) {
         check(Number.isInteger(t.years) && t.years >= 1 && t.years <= 30, `${tag(p.goal)}: term ${t.years}`);
-        if (input.profile.age) check(input.profile.age + t.years <= 80, `${tag(p.goal)}: age ${input.profile.age}+${t.years} > 80`);
+        if (input.profile.age && !input.profile.override) check(input.profile.age + t.years <= 80, `${tag(p.goal)}: age ${input.profile.age}+${t.years} > 80`);
         check(t.amount > 0 && Number.isInteger(t.amount), `${tag(p.goal)}: tranche ${t.amount}`);
       }
       // Every tranche in ₪1,000s except the one that takes the remainder.
@@ -204,7 +271,42 @@ function verify(name: string, input: AutoMixInput, r: AutoMixResult, expect: { o
     }
     if (input.profile.propertyValue && p.status === "ok") {
       const housing = owed.filter((l) => l.group !== "loan").reduce((a, l) => a + Number(l.amount), 0);
-      check(housing <= LTV_MAX[input.profile.propertyType] * input.profile.propertyValue + 1, `${tag(p.goal)}: LTV ${(housing / input.profile.propertyValue).toFixed(3)}`);
+      if (!nonbank) check(housing <= LTV_MAX[input.profile.propertyType] * input.profile.propertyValue + 1, `${tag(p.goal)}: LTV ${(housing / input.profile.propertyValue).toFixed(3)}`);
+      else {
+        // The non-bank lender's own policy: first lien, or first + second together.
+        const secured = owed.filter((l) => l.group !== "loan" || l.source_type === "תמהיל אוטומטי").reduce((a, l) => a + Number(l.amount), 0);
+        const cap = p.structure === "secondLien" ? NONBANK_LTV.combined : NONBANK_LTV.first;
+        check(secured <= cap * input.profile.propertyValue + 1, `${tag(p.goal)}: non-bank LTV ${(secured / input.profile.propertyValue).toFixed(3)} > ${cap}`);
+      }
+    }
+    // The law that binds the lender chosen. A non-bank: the Fair Credit Law's
+    // ceiling on the all-in cost, recomputed here from the board's own schedule
+    // (priceLoan at the typed inflation) as an IRR on the money received.
+    if (nonbank && p.status !== "unavailable") {
+      const fresh = owed.filter((l) => l.source_type === "תמהיל אוטומטי");
+      const fee = 0.01;
+      const received = fresh.reduce((a, l) => a + Number(l.amount), 0) * (1 - fee);
+      if (fresh.length && received <= 1_197_707) {
+        const ceiling = market.boi.rate + 15;
+        for (const l of fresh) {
+          const sch = priceLoan(l, typed(input.inflation)).schedule.map((x) => x.payment);
+          const P = Number(l.amount) * (1 - fee);
+          let lo = 0;
+          let hi = 0.05;
+          for (let k = 0; k < 80; k++) {
+            const mid = (lo + hi) / 2;
+            let pv = 0;
+            let df = 1;
+            for (const x of sch) pv += x * (df /= 1 + mid);
+            if (pv > P) lo = mid;
+            else hi = mid;
+          }
+          const eff = (Math.pow(1 + (lo + hi) / 2, 12) - 1) * 100;
+          check(eff <= ceiling + 0.02, `${tag(p.goal)}: Fair Credit all-in ${eff.toFixed(2)}% > ${ceiling.toFixed(2)}% on a ${l.path_id === 1 ? "prime" : "kz"} tranche`);
+        }
+        check(p.checks.some((c) => c.label === "תקרת העלות בחוק אשראי הוגן" && c.ok), `${tag(p.goal)}: non-bank proposal without a holding Fair Credit check`);
+      }
+      check(!p.checks.some((c) => c.rule.includes("הוראה 329 סעיף 7")), `${tag(p.goal)}: a 329 check on a non-bank mix`);
     }
     if (p.status === "ok") check(p.checks.every((c) => c.ok), `${tag(p.goal)}: ok with a failing check ${p.checks.filter((c) => !c.ok).map((c) => c.label)}`);
     // 4. kept rows are the board's own copy of the master row
@@ -219,19 +321,30 @@ function verify(name: string, input: AutoMixInput, r: AutoMixResult, expect: { o
     check(p.rows.filter((l) => l.is_guarantor).length === guar, `${tag(p.goal)}: guarantees ${p.rows.filter((l) => l.is_guarantor).length} ≠ ${guar}`);
     // 6. budget-holding goals hold it
     if (BUDGET_GOALS.includes(p.goal) && p.status !== "no-gain") check(p.metrics.monthly <= budget + 0.5, `${tag(p.goal)}: ${p.metrics.monthly} over budget ${budget}`);
-    // 7. no "ok" proposal is worse than today on its own goal
+    // 7. no "ok" proposal is worse than today on its own goal — or, with debt due
+    // now, than the reference (today + the cheapest clearing of that debt).
     if (p.status === "ok") {
       const s0 = p.stress[0];
       const worst = (k: "totalPaid" | "todayTotalPaid") => Math.max(...p.stress.slice(1).map((x) => x[k]));
-      const own: Record<GoalId, boolean> = {
-        payment: d.monthly < 0,
-        consolidate: d.monthly < 0,
-        years: d.months < 0,
-        savings: s0.totalPaid < s0.todayTotalPaid && d.totalPaid < 0,
-        balanced: d.monthly < 0 && s0.totalPaid <= s0.todayTotalPaid && d.totalPaid <= 0,
-        stable: worst("totalPaid") < worst("todayTotalPaid"),
-      };
-      check(own[p.goal], `${tag(p.goal)}: "ok" but not better than today on its own goal`);
+      const ref = due?.reference;
+      const own: Record<GoalId, boolean> = ref
+        ? {
+            payment: p.metrics.monthly <= ref.monthly + 0.5,
+            consolidate: p.metrics.monthly <= ref.monthly + 0.5,
+            years: p.metrics.months < ref.months,
+            savings: s0.totalPaid < s0.todayTotalPaid && p.metrics.totalPaid < ref.totalPaid,
+            balanced: p.metrics.monthly < ref.monthly && s0.totalPaid <= s0.todayTotalPaid && p.metrics.totalPaid <= ref.totalPaid,
+            stable: worst("totalPaid") < worst("todayTotalPaid"),
+          }
+        : {
+            payment: d.monthly < 0,
+            consolidate: d.monthly < 0,
+            years: d.months < 0,
+            savings: s0.totalPaid < s0.todayTotalPaid && d.totalPaid < 0,
+            balanced: d.monthly < 0 && s0.totalPaid <= s0.todayTotalPaid && d.totalPaid <= 0,
+            stable: worst("totalPaid") < worst("todayTotalPaid"),
+          };
+      check(own[p.goal], `${tag(p.goal)}: "ok" but not better than ${ref ? "the reference" : "today"} on its own goal`);
     }
     // The cost column (typed interest + indexation): a disagreement in sign with the forecast, or a
     // cost-claiming "ok" goal that shows a higher cost than today, is stated in the FIRST reason with its figures.
@@ -240,12 +353,12 @@ function verify(name: string, input: AutoMixInput, r: AutoMixResult, expect: { o
       const has = (x: string, v: number) => figures(x).some((f) => Math.abs(f - Math.round(Math.abs(v))) <= 2);
       const first = p.reasons[0] ?? "";
       const tC = d.totalCost;
-      if (p.metrics.outlook && r.today.outlook) {
+      if (p.metrics.outlook && r.today.outlook && !due) {
         const fC = p.metrics.outlook.totalCost - r.today.outlook.totalCost;
         if (Math.abs(tC) >= 1000 && Math.abs(fC) >= 1000 && Math.sign(tC) !== Math.sign(fC) && p.moves.some((m) => m.action !== "keep"))
           check(has(first, tC) && has(first, fC), `${tag(p.goal)}: typed cost ${fmt(tC)} and forecast ${fmt(fC)} disagree in sign, first reason must name both: ${first}`);
       }
-      if (p.status === "ok" && ["savings", "balanced", "stable"].includes(p.goal) && tC > 0)
+      if (p.status === "ok" && !due && ["savings", "balanced", "stable"].includes(p.goal) && tC > 0)
         check(first.includes("הריבית וההצמדה") && has(first, tC), `${tag(p.goal)}: shows a higher cost (${fmt(tC)}) than today, first reason must say so: ${first}`);
     }
     // reasons and caveats exist and carry numbers
@@ -290,6 +403,49 @@ function verify(name: string, input: AutoMixInput, r: AutoMixResult, expect: { o
   check(r.recommended === null || r.proposals.some((p) => p.goal === r.recommended && p.status === "ok"), `${name}: recommended ${r.recommended} is not an ok proposal`);
 }
 
+/**
+ * THE OVERRIDE. Blocks are returned always; a block is overridden exactly when
+ * the override is on and it is not law for the lender chosen; every proposal
+ * built past a lifted block names it, with its condition, in its FIRST caveat;
+ * debt due now is paid off in every proposal at its stated balance; a forced
+ * bank tier on a client a bank would refuse says so first.
+ */
+function verifyOverride(name: string, input: AutoMixInput, r: AutoMixResult) {
+  const o = !!input.profile.override;
+  for (const b of r.blocks) check(b.overridden === (o && !b.law), `${name}: block ${b.id} overridden=${b.overridden} with override ${o}, law ${b.law}`);
+  const lifted = r.blocks.filter((b) => b.overridden);
+  if (!o) check(!r.dueNow, `${name}: dueNow without the override`);
+  if (!r.ok) return;
+  for (const p of r.proposals) {
+    if (p.status === "unavailable" && !o) continue;
+    const first = p.caveats[0] ?? "";
+    for (const b of lifted)
+      check(first.includes(b.title) && first.includes(b.condition.replace(/\.$/, "")), `${name}/${p.goal}: first caveat does not name block ${b.id} with its condition: ${first.slice(0, 120)}`);
+  }
+  if (!o && r.blocks.some((b) => b.effect === "refuses"))
+    check(r.proposals.every((p) => p.status === "unavailable"), `${name}: a standing "refuses" block, yet a goal was built`);
+  const due = r.dueNow;
+  if (due) {
+    const items = due.items.reduce((a, x) => a + x.balance, 0);
+    const cures = due.cures.reduce((a, x) => a + x.overdue, 0);
+    check(Math.abs(due.total - items - cures) <= 1, `${name}: dueNow total ${due.total} ≠ items ${items} + cures ${cures}`);
+    check(due.budgetSource === (input.profile.budget ? "profile" : "reference"), `${name}: budget source ${due.budgetSource}`);
+    for (const p of r.proposals) {
+      if (p.status === "unavailable") continue;
+      for (const x of due.items) {
+        const m = p.moves.find((mv) => mv.id === x.id);
+        check(!!m && m.action !== "keep" && m.due === true && m.balance === x.balance, `${name}/${p.goal}: due debt ${x.label} ${x.balance} not paid off (${m?.action})`);
+      }
+      check(p.reasons.some((x) => x.includes(`₪${due.total.toLocaleString("en-US")}`)), `${name}/${p.goal}: no reason names the ${due.total} due now`);
+      check(p.caveats.some((x) => x.includes("מכתב סילוק")), `${name}/${p.goal}: no caveat on the growth of debt due now`);
+      if (r.today.outlook) check(p.stress[0].todayTotalPaid > r.today.outlook.totalPaid, `${name}/${p.goal}: stress "today" leaves the due debt out`);
+    }
+  }
+  // A bank tier forced on a client the engine would send to a non-bank.
+  const forcedBank = o && (input.profile.tier === "bank" || input.profile.tier === "bankPremium") && r.blocks.some((b) => ["insolvency", "enforcement", "arrears", "past-due", "outside"].includes(b.id));
+  if (forcedBank) for (const p of r.proposals) check((p.caveats[0] ?? "").includes("בנק מסרב"), `${name}/${p.goal}: forced bank tier without the refusal caveat first`);
+}
+
 /* ================================================================ B. real reports */
 
 section("B. real reports (figures only)");
@@ -302,6 +458,7 @@ for (const s of FIXTURE_SETS) {
   const input = inputOf(h.master, { analysis: h.analysis });
   const r = buildAutoMix(input);
   reals.push({ id: s.id, input, r });
+  golden(s.id, r, input);
   verify(s.id, input, r);
   const first = `${s.id.padEnd(8)} ${String(h.master.length).padStart(4)} ${r.pricing.tier.padEnd(12)} ${fmt(r.today.monthly).padStart(10)} ${String(r.today.months).padStart(7)}`;
   r.proposals.forEach((p, i) => {
@@ -311,6 +468,33 @@ for (const s of FIXTURE_SETS) {
     table.push(line);
   });
   console.log(" ".repeat(first.length) + ` | recommended: ${r.recommended ?? "—"} · findings: ${r.findings.map((f) => f.id).join(", ")}`);
+  verifyOverride(s.id, input, r);
+  // The same report with the override: a clean file is unchanged; a blocked one is built past its blocks.
+  const inputO = inputOf(h.master, { analysis: h.analysis }, { override: true });
+  const rO = buildAutoMix(inputO);
+  verify(`${s.id}+override`, inputO, rO);
+  verifyOverride(`${s.id}+override`, inputO, rO);
+  if (!r.blocks.length) {
+    const strip = (x: AutoMixResult) => JSON.stringify({ ...x, ms: 0 });
+    check(strip(rO) === strip(r), `${s.id}: a clean file changed under the override`);
+  } else reals.push({ id: `${s.id}+override`, input: inputO, r: rO });
+}
+
+section("B2. r05 under the override, at every tier");
+{
+  const s = FIXTURE_SETS.find((x) => x.id === "r05")!;
+  const h = await household(s.id, s.files);
+  for (const tier of ["auto", "nonbank", "bankPremium", "bank"] as const) {
+    const input = inputOf(h.master, { analysis: h.analysis }, { override: true, tier });
+    const r = buildAutoMix(input);
+    verify(`r05+override/${tier}`, input, r);
+    verifyOverride(`r05+override/${tier}`, input, r);
+    check(r.proposals.some((p) => p.status === "ok"), `r05+override/${tier}: no proposal built`);
+    console.log(
+      `  ${tier.padEnd(12)} ${r.pricing.tier.padEnd(12)} ${r.ms.toFixed(0).padStart(4)}ms due ${fmt(r.dueNow?.total ?? 0)} ref ${fmt(r.dueNow?.reference.monthly ?? 0)} | ` +
+        r.proposals.map((p) => `${p.goal.slice(0, 4)}:${p.status === "ok" ? "ok" : p.status === "no-gain" ? "ng" : "na"}${p.status === "unavailable" ? "" : `(${fmt(p.metrics.monthly)} ${p.structure ?? ""})`}`).join(" ")
+    );
+  }
 }
 
 /* ================================================================ C. synthetic */
@@ -396,6 +580,7 @@ const cases: Case[] = [
 for (const c of cases) {
   const input = inputOf(c.master, c.over ?? {}, c.profile ?? {});
   const r = buildAutoMix(input);
+  golden(c.name, r, input);
   verify(c.name, input, r, { ok: c.name !== "no-forecast" });
   for (const [ok, what] of c.expect?.(r) ?? []) check(ok, `${c.name}: ${what}`);
   console.log(
@@ -403,6 +588,165 @@ for (const c of cases) {
       r.proposals.map((p) => `${p.goal.slice(0, 4)}:${p.status === "ok" ? "ok" : p.status === "no-gain" ? "ng" : "na"}${p.status === "unavailable" ? "" : `(${fmt(p.delta.monthly)})`}`).join(" ")
   );
   if (c.name === "26-tranches") check(r.ms < 2000, `26-tranche build took ${r.ms.toFixed(0)}ms`);
+}
+
+/* ================================================================ C2. bad shape */
+
+section("C2. bad-shape households (override on, and off)");
+// The parts of the board's analysis the engine reads (condition.ts, tiers.ts, findings).
+type LineIn = { balance: number; overdue?: number; arrearsRange?: string; chargeNotPaid?: boolean; remarks?: string[]; category?: string; bank?: string };
+const analysisOf = (o: { lines?: LineIn[]; execution?: number; insolvency?: "insolvency" | "bankruptcy"; flags?: string[]; overdue?: number; arrearsMonths?: number }) =>
+  ({
+    flags: (o.flags ?? []).map((id) => ({ id })),
+    totals: { overdue: o.overdue ?? 0 },
+    behaviour: { arrearsMonths: o.arrearsMonths ?? 0 },
+    legal: {
+      insolvency: o.insolvency ? [{ "151-003": o.insolvency === "bankruptcy" ? "פשיטת רגל" : "חדלות פירעון", "151-015": o.insolvency === "bankruptcy" ? "צו כינוס" : "צו לפתיחת הליכים", "151-016": "01/03/2025", "151-009": "240000" }] : [],
+      executionOpen: o.execution ? [{ "197-003": "77" }] : [],
+      executionDebt: o.execution ?? 0,
+    },
+    mortgage: { collateralValue: 0 },
+    lines: (o.lines ?? []).map((l, i) => ({ uid: `u:${i}`, role: "debtor", overdue: 0, arrearsRange: "", chargeNotPaid: false, remarks: [], category: "card", bank: "ישראכרט", ...l })),
+  }) as unknown as AutoMixInput["analysis"];
+// The first mortgage row carries a report reference, so the analysis can point at it.
+const tagged = () => {
+  const m = mortgage();
+  m[0] = { ...m[0], source_refs: ["r#0"] } as ImportedLoan;
+  return m;
+};
+type BadCase = { name: string; master: ImportedLoan[]; analysis?: AutoMixInput["analysis"]; profile?: Partial<ClientProfile>; expect?: (on: AutoMixResult, off: AutoMixResult) => [boolean, string][] };
+const bad: BadCase[] = [
+  {
+    // 90+ days on the mortgage itself: the bank is calling it — it is cleared in full, so only a first lien can stand.
+    name: "mortgage-90-days",
+    master: tagged(),
+    analysis: analysisOf({ lines: [{ balance: 420_000, overdue: 14_000, arrearsRange: "90-119", category: "mortgage", bank: "מזרחי טפחות" }], flags: ["arrears-now"], overdue: 14_000, arrearsMonths: 4 }),
+    expect: (on, off) => [
+      [off.pricing.tier === "nonbank" && off.blocks.some((b) => b.id === "arrears" && !b.overridden), "off: arrears block standing, non-bank pricing"],
+      [on.proposals.filter((p) => p.status !== "unavailable").every((p) => p.moves.find((m) => m.balance === 420_000)?.action !== "keep"), "the called tranche is cleared in every proposal"],
+      [on.proposals.filter((p) => p.status !== "unavailable").every((p) => p.structure === "firstLien"), "nothing stands behind a called mortgage: first lien only"],
+      [!!on.dueNow && on.dueNow.items.some((x) => x.kind === "called" && x.balance === 420_000), "the called tranche is due now"],
+      [by(on, "payment")?.status === "ok", "the lowest payment that clears it is a proposal"],
+    ],
+  },
+  {
+    // 30–59 days on the mortgage: kept, it is brought current from the new money.
+    name: "mortgage-30-days",
+    master: tagged(),
+    analysis: analysisOf({ lines: [{ balance: 420_000, overdue: 6_200, arrearsRange: "30-59", category: "mortgage", bank: "מזרחי טפחות" }], flags: ["arrears-now"], overdue: 6_200, arrearsMonths: 1 }),
+    expect: (on) => [
+      [!!on.dueNow && on.dueNow.cures.some((c) => c.overdue === 6_200), "the arrears are a cure in dueNow"],
+      [on.proposals.filter((p) => p.status !== "unavailable").every((p) => { const m = p.moves.find((x) => x.balance === 420_000); return !!m && (m.action !== "keep" || m.cure === 6_200); }), "kept, the tranche is cured; else it is refinanced"],
+      [by(on, "payment")?.caveats.some((c) => c.includes("קטנה בהרבה מהמקובל")) ?? false, "a cure-only loan says it is far below what lenders write"],
+    ],
+  },
+  {
+    // An enforcement file no account line covers: due now in full.
+    name: "enforcement-file",
+    master: mortgage(),
+    analysis: analysisOf({ execution: 45_000, flags: ["execution"] }),
+    expect: (on, off) => [
+      [off.proposals.every((p) => !p.moves.some((m) => m.due)), "off: the file is not in the mix"],
+      [!!on.dueNow && on.dueNow.items.some((x) => x.kind === "enforcement" && x.balance === 45_000), "on: the file is due now"],
+      [on.proposals.some((p) => p.status === "ok"), "on: a proposal clears it"],
+    ],
+  },
+  {
+    name: "insolvency-2018-law",
+    master: mortgage(),
+    analysis: analysisOf({ insolvency: "insolvency", flags: ["insolvency"] }),
+    expect: (on, off) => [
+      [off.proposals.every((p) => p.status === "unavailable"), "off: every goal unavailable"],
+      // A bank mortgage priced well, and nothing due: at grade D nothing beats it, and each goal says so.
+      [on.proposals.every((p) => p.status !== "unavailable" && !!p.note), "on: every goal built, each no-gain with its reason"],
+      [on.proposals.every((p) => p.caveats[0].includes("סעיף 123")), "on: the Commissioner's approval (§123) leads"],
+      [on.proposals.filter((p) => p.status !== "unavailable").every((p) => p.caveats.some((c) => c.includes("לא נמצא מלווה"))), "on: no published lender, said"],
+    ],
+  },
+  {
+    // Only debts past their term, no property known.
+    name: "past-due-only",
+    master: [row({ group: "loan", path_id: 2, amount: 52_000, rate: 11, months: 0, source_bank: "כאל" }), row({ group: "loan", path_id: 2, amount: 9_000, rate: 8, months: 0, source_bank: "טריא" })],
+    expect: (on, off) => [
+      [!off.ok, "off: nothing to build from"],
+      [on.ok && on.proposals.some((p) => p.status === "ok"), "on: the due debt is cleared by an all-purpose loan"],
+      [on.blocks.some((b) => b.id === "no-collateral" && b.overridden && /₪[\d,]+/.test(b.condition)), "on: the property it needs is named with a value"],
+    ],
+  },
+  {
+    name: "no-property",
+    master: loans(),
+    profile: { tier: "nonbank" },
+    expect: (on, off) => [
+      [off.proposals.every((p) => p.status !== "ok"), "off: nothing moves without collateral"],
+      [on.proposals.some((p) => p.goal === "consolidate" && p.status === "ok"), "on: consolidation against a property to be pledged"],
+    ],
+  },
+  {
+    name: "elderly-override",
+    master: mortgage(),
+    profile: { age: 68 },
+    expect: (on, off) => [
+      [off.proposals.every((p) => p.tranches.every((t) => t.years <= 12)), "off: 68 + term ≤ 80"],
+      [on.proposals.some((p) => p.tranches.some((t) => t.years > 12)), "on: the age limit (practice, not law) is lifted"],
+    ],
+  },
+  {
+    // 86% LTV at a bank: 329 is law for the bank, so the override does not lift it.
+    name: "ltv-over-ceiling",
+    master: mortgage(),
+    profile: { propertyValue: 1_400_000 },
+    expect: (on) => [
+      [on.blocks.some((b) => b.id === "ltv" && b.law && !b.overridden), "on: the LTV block stands (law)"],
+      [on.proposals.every((p) => p.status !== "ok" || p.tranches.reduce((a, t) => a + t.amount, 0) <= p.moves.filter((m) => m.action !== "keep").reduce((a, m) => a + m.balance, 0)), "on: not enlarged"],
+    ],
+  },
+  {
+    // A clean non-bank client with a property that leaves ₪7k above the combined cap after the mortgage.
+    name: "second-lien-ltv-binds",
+    master: [...mortgage(), ...loans()],
+    profile: { tier: "nonbank", propertyValue: 1_700_000 },
+    expect: (on, off) => [
+      [!off.blocks.length, "off: a clean non-bank file has no blocks"],
+      [off.proposals.filter((p) => p.structure === "secondLien" && p.status === "ok").every((p) => p.checks.some((c) => c.label === "שיעור מימון, שעבוד ראשון ושני" && c.ok)), "off: combined LTV reported and holding"],
+    ],
+  },
+  {
+    name: "clean-nonbank",
+    master: [...mortgage(), ...loans()],
+    profile: { tier: "nonbank" },
+    expect: (on, off) => [
+      [!off.blocks.length && JSON.stringify({ ...on, ms: 0 }) === JSON.stringify({ ...off, ms: 0 }), "no blocks, and the override changes nothing"],
+      [off.proposals.filter((p) => p.tranches.length).every((p) => p.checks.some((c) => c.label === "תקרת העלות בחוק אשראי הוגן")), "every proposal with new money checks the Fair Credit ceiling"],
+      [off.proposals.some((p) => p.status === "ok"), "a clean non-bank file builds"],
+    ],
+  },
+  {
+    // A bank tier forced on a client in enforcement: built, and the first caveat says a bank would normally refuse.
+    name: "forced-bank-on-enforcement",
+    master: mortgage(),
+    analysis: analysisOf({ execution: 45_000, flags: ["execution"] }),
+    profile: { tier: "bank" },
+    expect: (on) => [[on.pricing.tier === "bank" && on.proposals.some((p) => p.status === "ok"), "on: computed at bank prices"]],
+  },
+];
+for (const c of bad) {
+  const res: AutoMixResult[] = [];
+  for (const override of [false, true]) {
+    const input = inputOf(c.master, { analysis: c.analysis ?? null }, { ...(c.profile ?? {}), override });
+    const r = buildAutoMix(input);
+    res.push(r);
+    const name = `${c.name}${override ? "+override" : ""}`;
+    verify(name, input, r, { ok: r.ok || c.name === "past-due-only" ? r.ok : true });
+    verifyOverride(name, input, r);
+    const again = buildAutoMix(input);
+    check(JSON.stringify({ ...again, ms: 0 }) === JSON.stringify({ ...r, ms: 0 }), `${name}: two runs differ`);
+    console.log(
+      `  ${name.padEnd(36)} ${r.ok ? "" : "!ok "}${r.pricing.tier.padEnd(11)} ${r.ms.toFixed(0).padStart(4)}ms [${r.blocks.map((b) => b.id + (b.overridden ? "*" : "")).join(",")}] ` +
+        r.proposals.map((p) => `${p.goal.slice(0, 4)}:${p.status === "ok" ? "ok" : p.status === "no-gain" ? "ng" : "na"}${p.status === "unavailable" ? "" : `(${fmt(p.metrics.monthly)}${p.structure && p.structure !== "bank" ? " " + p.structure : ""})`}`).join(" ")
+    );
+  }
+  for (const [ok, what] of c.expect?.(res[1], res[0]) ?? []) check(ok, `${c.name}: ${what}`);
 }
 
 /* ================================================================ E. determinism */

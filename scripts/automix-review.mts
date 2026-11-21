@@ -4,17 +4,22 @@
 //
 //   npx tsx --tsconfig tsconfig.json scripts/automix-review.mts r04 [goal]
 //   ALLMOVES=1 … also lists the locked (state-eligibility) rows
+//   --override [--tier nonbank|bank|bankPremium]   build past the client's blocks
 import { household, FIXTURE_SETS } from "./automix-fixtures.mts";
 import { buildAutoMix, DEFAULT_PROFILE } from "../app/aa105test/lib/automix";
 import snapshot from "../app/aa107test/lib/market-snapshot.json" with { type: "json" };
 import { latestCurve } from "../app/aa107test/lib/market-boi";
 const f = await latestCurve();
 const fmt = (x: number) => Math.round(x).toLocaleString("en-US");
-const [id, goal] = process.argv.slice(2);
+const args = process.argv.slice(2);
+const flag = (f: string) => args.includes(f);
+const opt = (f: string) => (args.includes(f) ? args[args.indexOf(f) + 1] : null);
+const [id, goal] = args.filter((a, i) => !a.startsWith("--") && !(i > 0 && args[i - 1].startsWith("--tier")));
 const s = FIXTURE_SETS.find(x => x.id === id)!;
 const h = await household(s.id, s.files);
-const r = buildAutoMix({ master: h.master, market: snapshot as any, forecast: f, forecastOn: true, inflation: 2, discountRate: 4.5, profile: DEFAULT_PROFILE, analysis: h.analysis });
+const r = buildAutoMix({ master: h.master, market: snapshot as any, forecast: f, forecastOn: true, inflation: 2, discountRate: 4.5, profile: { ...DEFAULT_PROFILE, override: flag("--override"), tier: (opt("--tier") as any) ?? "auto" }, analysis: h.analysis });
 console.log(`== ${id} ${r.ms.toFixed(0)}ms tier ${r.pricing.tier}: ${r.pricing.tierWhy}`);
+for (const b of r.blocks ?? []) console.log(`  BLOCK ${b.id} [${b.overridden ? "overridden" : "standing"}${b.law ? ", law" : ""}, ${b.effect}] ${b.title}: ${b.detail} => ${b.condition}`);
 console.log("pricing", r.pricing.rows.map(x => `${x.label} ${x.rate10}/${x.rate20}/${x.rate30}`).join(" | "));
 if (!goal) { for (const x of r.findings) console.log(`  F[${x.severity}] ${x.title} — ${x.detail} ${x.annualCost ? "(₪" + fmt(x.annualCost) + "/yr)" : ""}`); for (const x of r.skipped) console.log("  skip", x.label, x.why); }
 for (const p of r.proposals.filter(p => !goal || p.goal === goal)) {

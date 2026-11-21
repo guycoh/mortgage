@@ -72,6 +72,10 @@ export type SolverDebt = {
   early: number[][];
   /** null = may move; a string = why it may not (kept). */
   lock: string | null;
+  /** Must be cleared in full (a debt due now, or one its lender has called). */
+  forced?: boolean;
+  /** Kept, it needs this much all-purpose money to be brought current (its arrears), ₪. */
+  cure?: number;
 };
 
 export type Column = {
@@ -147,6 +151,13 @@ export type Spec = {
   setupAp: number;
   /** Debt decisions held fixed (the term walk): ids refinanced; every other movable debt kept. */
   fixZ?: string[] | null;
+  /**
+   * Whose law the new money is under. "bank": directive 329 (⅓ fixed on the new
+   * money and on the property, no enlarging an LTV breach). "nonbank": 329 does
+   * not bind a non-bank lender — its own LTV policy (`ltv`) and the Fair Credit
+   * Law ceiling (applied to the columns) do. Default "bank".
+   */
+  law?: "bank" | "nonbank";
 };
 
 export type Plan = {
@@ -210,8 +221,12 @@ function solveOnceInner(debts: SolverDebt[], colsIn: Column[], s: Spec, relaxed:
   const nE = cols[0]?.paid.length ?? debts[0]?.paid.length ?? 1;
   const stressK = Array.from({ length: nE }, (_, k) => k);
 
-  const movable = debts.filter((d) => !d.lock && (d.group === "mortgage" ? !s.keepMortgage : s.loansAllowed));
+  const movable = debts.filter((d) => d.forced || (!d.lock && (d.group === "mortgage" ? !s.keepMortgage : s.loansAllowed)));
   const kept = (d: SolverDebt) => !movable.includes(d);
+  const bankLaw = (s.law ?? "bank") === "bank";
+  // Arrears to bring current on a debt that stays: needed only while it stays.
+  const cureOf = (d: SolverDebt) => (d.forced ? 0 : d.cure ?? 0);
+  const cureAll = sum(debts.map(cureOf));
 
   // Constants carried by every kept debt (as if z = 0), and the z coefficients that undo them.
   const keptPaid = stressK.map((k) => sum(debts.map((d) => d.paid[k])));
@@ -222,12 +237,13 @@ function solveOnceInner(debts: SolverDebt[], colsIn: Column[], s: Spec, relaxed:
   const mortgageMonthly = sum(debts.filter((d) => d.group === "mortgage").map((d) => d.monthly));
 
   const needH = movable.some((d) => d.segment === "housing");
-  const needAp = movable.some((d) => d.segment === "allPurpose");
+  const needAp = movable.some((d) => d.segment === "allPurpose") || cureAll > 0;
   const use = cols.filter((c) => (c.segment === "housing" ? needH : needAp));
 
   // ---- money
   C.set("fund_h", { equal: 0 });
-  C.set("fund_ap", { equal: 0 });
+  // A kept debt in arrears is brought current from all-purpose money: Σx − … − cure·(1 − z) = 0.
+  C.set("fund_ap", { equal: cureAll / U });
   // ---- objective pieces
   const costW = s.wCost;
   const lam = Math.min(1, Math.max(0, s.lambda));
@@ -248,12 +264,14 @@ function solveOnceInner(debts: SolverDebt[], colsIn: Column[], s: Spec, relaxed:
   if (s.typedCostCap != null) C.set("tcost", { max: (s.typedCostCap - keptCost) / U });
   if (s.ptiCap !== null) C.set("pti", { max: s.ptiCap - mortgageMonthly });
   if (s.peakCap !== null) for (const k of stressK) EARLY.forEach((_, i) => C.set(`pk${k}_${i}`, { max: s.peakCap! - keptEarly[k][i] }));
-  // 329 §7 on the new money, per segment
-  C.set("fix_h", { min: 0 });
-  C.set("fix_ap", { min: 0 });
-  // 329 Q&A 5.1 / §9 on everything the property secures afterwards
+  // 329 §7 on the new money, per segment — bank law only.
+  if (bankLaw) {
+    C.set("fix_h", { min: 0 });
+    C.set("fix_ap", { min: 0 });
+  }
+  // 329 Q&A 5.1 / §9 on everything the property secures afterwards — bank law only.
   const phi = Math.min(FIXED_MIN, s.fixedToday);
-  C.set("fix_all", { min: -(mortgageFixed - phi * mortgageBal) / U });
+  if (bankLaw) C.set("fix_all", { min: -(mortgageFixed - phi * mortgageBal) / U });
   C.set("link_h", { max: 0 });
   // Practice on the whole secured mix: the move may not leave it more CPI-linked than max(⅓, today).
   const psi = Math.max(LINKED_MAX, s.linkedToday);
@@ -263,7 +281,8 @@ function solveOnceInner(debts: SolverDebt[], colsIn: Column[], s: Spec, relaxed:
     // 329 §9: a refinance may not create a breach or enlarge one — so the cap is
     // the rule or today's balance, whichever is higher (a household already over
     // it may move only if the move does not add to it).
-    const capH = Math.max(s.ltv.housing * s.ltv.value, mortgageBal);
+    // A non-bank lender is bound by its own LTV policy only (329 §9 is bank law).
+    const capH = bankLaw ? Math.max(s.ltv.housing * s.ltv.value, mortgageBal) : s.ltv.housing * s.ltv.value;
     C.set("ltv_h", { max: (capH - mortgageBal) / U });
     C.set("ltv_all", { max: (s.ltv.withAp * s.ltv.value - mortgageBal) / U + (capH / s.ltv.value - s.ltv.withAp) * (s.ltv.value / U) });
   }
@@ -284,8 +303,10 @@ function solveOnceInner(debts: SolverDebt[], colsIn: Column[], s: Spec, relaxed:
     if (s.typedCostCap != null) add(v, "tcost", c.typedPaid - 1);
     if (s.ptiCap !== null) add(v, "pti", c.monthly * U);
     if (s.peakCap !== null) for (const k of stressK) EARLY.forEach((_, i) => add(v, `pk${k}_${i}`, c.early[k][i] * U));
-    add(v, `fix_${seg}`, (FIXED[c.track] ? 1 : 0) - FIXED_MIN);
-    add(v, "fix_all", (FIXED[c.track] ? 1 : 0) - phi);
+    if (bankLaw) {
+      add(v, `fix_${seg}`, (FIXED[c.track] ? 1 : 0) - FIXED_MIN);
+      add(v, "fix_all", (FIXED[c.track] ? 1 : 0) - phi);
+    }
     if (seg === "h") add(v, "link_h", (LINKED[c.track] ? 1 : 0) - LINKED_MAX);
     add(v, "link_all", (LINKED[c.track] ? 1 : 0) - psi);
     if (s.ltv) {
@@ -297,7 +318,7 @@ function solveOnceInner(debts: SolverDebt[], colsIn: Column[], s: Spec, relaxed:
     tracksOf.get(tk)!.push(c);
   }
   // ---- tranche structure: open binaries, minimum size, count, share cap
-  const bigM = (sum(debts.map((d) => d.balance + d.fee)) + s.setupHousing + s.setupAp) / U + 1;
+  const bigM = (sum(debts.map((d) => d.balance + d.fee)) + cureAll + s.setupHousing + s.setupAp) / U + 1;
   for (const seg of ["h", "ap"] as const) {
     const maxTr = seg === "h" ? MAX_HOUSING_TRANCHES : MAX_AP_TRANCHES;
     const single = `single_${seg}`;
@@ -350,13 +371,20 @@ function solveOnceInner(debts: SolverDebt[], colsIn: Column[], s: Spec, relaxed:
   if (needAp) {
     add("s_ap", "fund_ap", -s.setupAp / U);
     bins.push("s_ap");
-    if (s.ltv) add("s_ap", "ltv_all", (Math.max(s.ltv.housing * s.ltv.value, mortgageBal) / s.ltv.value - s.ltv.withAp) * (s.ltv.value / U));
+    // A debt that cannot move (kept by the structure or its lock) and must be brought
+    // current opens the all-purpose file whatever else happens.
+    if (sum(debts.filter((d) => kept(d)).map(cureOf)) > 0) {
+      C.set("cu:kept", { min: 1 });
+      add("s_ap", "cu:kept", 1);
+    }
+    if (s.ltv) add("s_ap", "ltv_all", ((bankLaw ? Math.max(s.ltv.housing * s.ltv.value, mortgageBal) : s.ltv.housing * s.ltv.value) / s.ltv.value - s.ltv.withAp) * (s.ltv.value / U));
   }
   // ---- debts. A decision that is held (fixZ) or forced (the deadline) is not a
   // variable at all: its column is folded into the constraint bounds.
   const shift = new Map<string, number>();
   const zConst = (id: string): 0 | 1 | null => {
     const d = debts.find((x) => x.id === id)!;
+    if (d.forced) return 1;
     if (s.finish !== null && d.months > s.finish) return 1;
     if (s.fixZ) return s.fixZ.includes(id) ? 1 : 0;
     return null;
@@ -389,8 +417,21 @@ function solveOnceInner(debts: SolverDebt[], colsIn: Column[], s: Spec, relaxed:
     if (s.typedCostCap != null) put("tcost", -(d.typedPaid - d.balance) / U);
     if (s.ptiCap !== null && d.group === "mortgage") put("pti", -d.monthly);
     if (s.peakCap !== null) for (const kk of stressK) EARLY.forEach((_, i) => put(`pk${kk}_${i}`, -d.early[kk][i]));
+    // Cleared, a debt in arrears needs no cure; kept, it needs its cure (fund_ap above, and an all-purpose file).
+    const cure = cureOf(d);
+    if (cure > 0) {
+      C.set(`cu:${d.id}`, { min: 1 });
+      add("s_ap", `cu:${d.id}`, 1);
+      if (k === null) {
+        add(z, "fund_ap", cure / U);
+        add(z, `cu:${d.id}`, 1);
+      } else if (k === 1) {
+        shift.set("fund_ap", (shift.get("fund_ap") ?? 0) + cure / U);
+        shift.set(`cu:${d.id}`, (shift.get(`cu:${d.id}`) ?? 0) + 1);
+      }
+    }
     if (d.group === "mortgage") {
-      put("fix_all", -((d.fixed ? 1 : 0) - phi) * (d.balance / U));
+      if (bankLaw) put("fix_all", -((d.fixed ? 1 : 0) - phi) * (d.balance / U));
       put("link_all", ((d.linked ? 1 : 0) - psi) * (d.balance / U));
       if (s.ltv) {
         // Refinanced, its balance leaves the kept side (and returns as x).
@@ -461,7 +502,8 @@ function solveOnceInner(debts: SolverDebt[], colsIn: Column[], s: Spec, relaxed:
   };
   const refinance = movable.filter((d) => zOf(d) > 0.5).map((d) => d.id);
   const anyH = refinance.some((id) => debts.find((d) => d.id === id)!.segment === "housing");
-  const anyAp = refinance.some((id) => debts.find((d) => d.id === id)!.segment === "allPurpose");
+  // An all-purpose file is opened for refinanced consumer debt, or to bring a kept debt current.
+  const anyAp = refinance.some((id) => debts.find((d) => d.id === id)!.segment === "allPurpose") || debts.some((d) => !refinance.includes(d.id) && cureOf(d) > 0);
   return {
     ok: true,
     status: incumbent ? "incumbent" : relaxed ? "relaxed" : "optimal",

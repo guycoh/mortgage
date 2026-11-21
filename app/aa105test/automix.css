@@ -239,6 +239,11 @@ li[data-sev="medium"] > .am-sev { background: var(--warn-tint); color: var(--war
   border-radius: var(--r-sm);
   background: var(--card-3);
 }
+/* The line every goal is measured against when debt is due now: today's mix
+   plus the cheapest loan that clears it. Joined to "today" above it. */
+.am-ref { margin-top: 2px; min-height: 44px; background: var(--neg-tint); box-shadow: inset 0 0 0 1px var(--neg-line); }
+.am-ref .am-goal-name > b { display: block; font-size: 13.5px; font-weight: 600; line-height: 1.35; }
+.am-ref .am-fig { color: var(--ink); }
 .am-goal {
   min-height: 62px;
   margin-top: 4px;
@@ -348,6 +353,8 @@ li[data-sev="medium"] > .am-sev { background: var(--warn-tint); color: var(--war
   font-size: 11px;
   font-weight: 650;
 }
+.am-tag[data-tone="neg"] { background: var(--neg-tint); box-shadow: inset 0 0 0 1px var(--neg-line); color: var(--neg); }
+.am-detail-h > .am-tag { vertical-align: 3px; font-size: 11.5px; letter-spacing: 0; }
 .am-fam { display: inline-block; width: 8px; height: 8px; margin-inline-end: 8px; border-radius: 50%; background: var(--mortgage); }
 .am-fam[data-f="loan"] { background: var(--loan); }
 
@@ -432,6 +439,54 @@ p.am-detail.am-quiet { margin: 0; max-width: 60ch; font-size: 14px; }
 .am-checks li[data-ok="false"] b { color: var(--neg); }
 
 .am-stress { font-size: 13px; }
+
+/* ------------------------------------------------------- blocks, override */
+/* THE FILE CANNOT BE BUILT AS IT STANDS. Facts first (what the document
+   shows), then the single way forward, ruled off like every other band. */
+.am-stop { padding: 20px 24px 22px; }
+.am-blocks { list-style: none; margin: 10px 0 0; padding: 0; }
+.am-blocks li {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  column-gap: 10px;
+  align-items: start;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+.am-blocks li:first-child { border-top: 0; padding-top: 2px; }
+.am-blocks li > svg { margin-top: 3px; color: var(--loan); }
+.am-blocks li > span { display: grid; gap: 2px; }
+.am-blocks li b { font-size: 14.5px; font-weight: 650; }
+.am-blocks li span > span { font-size: 13.5px; line-height: 1.5; color: var(--lgr-2); max-width: 78ch; text-wrap: pretty; }
+.am-stop-note { margin: 10px 0 0; font-size: 14.5px; line-height: 1.5; max-width: 76ch; text-wrap: pretty; }
+.am-stop-act {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line-2);
+}
+.am-stop-act > p { flex: 1; margin: 0; align-self: center; font-size: 13.5px; line-height: 1.5; color: var(--ink); max-width: 52ch; text-wrap: pretty; }
+
+/* BUILT PAST A BLOCK — or blocked in part. One band above the comparison, in
+   the warning hue's tint, never a stripe. */
+.am-over {
+  margin: 14px 24px 0;
+  padding: 10px 12px 10px 8px;
+  border-radius: var(--r-sm);
+  background: var(--neg-tint);
+  box-shadow: inset 0 0 0 1px var(--neg-line);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.am-over[data-open] { background: var(--warn-tint); box-shadow: inset 0 0 0 1px var(--warn-line); }
+.am-over > header { display: flex; align-items: baseline; gap: 12px; }
+.am-over > header > b { flex: 1; font-weight: 650; }
+.am-over > header > .am-more { margin: 0; white-space: nowrap; }
+.am-over > ul { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 4px; }
+.am-over > ul b { font-weight: 650; }
+.am-over + .am-tier { margin-top: 8px; }
 
 /* ------------------------------------------------------------------ states */
 .am-empty {

@@ -66,6 +66,17 @@ export type ClientProfile = {
    * arrears) — the resolved answer and its reason come back in `pricing`.
    */
   tier: PricingTier | "auto";
+  /**
+   * "Build it anyway." The advisor's override of everything in the client's
+   * condition that would otherwise refuse a mix — insolvency or enforcement
+   * proceedings, active arrears, debts past their due date, no known
+   * collateral, an age that cuts the term. With it on, nothing in `blocks` is a
+   * refusal any more: the engine builds the best case that a lender of the
+   * chosen tier would still write, prices it for that reality, and says on
+   * every proposal what was overridden and what has to happen for it to be
+   * filed. Rules that are LAW for the lender in question are never overridden.
+   */
+  override: boolean;
 };
 
 /**
@@ -173,6 +184,14 @@ export type DebtMove = {
   /** הפרשי היוון + statutory fees charged for prepaying this debt, ₪ (0 when kept). */
   fee: number;
   feeEstimated: boolean;
+  /**
+   * Override only: a debt due now (AutoMixResult.dueNow.items), always paid off
+   * from the new money. For arrears on an account the mix leaves out, `id` is
+   * that item's id ("line:<uid>" or "file:<case>"), NOT a master row.
+   */
+  due?: boolean;
+  /** Override only: arrears on this KEPT debt, brought current from the new money, ₪. */
+  cure?: number;
 };
 
 export type NewTranche = {
@@ -198,7 +217,11 @@ export type StressRow = {
   /** Highest monthly payment in this economy. */
   peakMonthly: number;
   totalPaid: number;
-  /** The same two figures for the master in the same economy. */
+  /**
+   * The same two figures for the master in the same economy, or, when debt is
+   * due now (AutoMixResult.dueNow), for the reference: today's mix cannot go on
+   * as it is, so the comparison is today plus clearing that debt.
+   */
   todayPeakMonthly: number;
   todayTotalPaid: number;
 };
@@ -218,6 +241,14 @@ export type Proposal = {
   note?: string;
   /** Same mix as another goal's answer → that goal's id (the sheet folds them). */
   sameAs?: GoalId;
+  /**
+   * How the new money is secured: "bank" (a bank refinance), "firstLien" (a
+   * non-bank lender takes the first lien, the bank mortgage is repaid in full),
+   * "secondLien" (the bank mortgage stays; the non-bank loan is registered
+   * behind it). `structureWhy` says why, with the other structure's figures.
+   */
+  structure?: "bank" | "firstLien" | "secondLien";
+  structureWhy?: string;
 
   /** The complete proposal mix, ready for the board: kept rows + new tranches. */
   rows: ImportedLoan[];
@@ -267,6 +298,33 @@ export type Finding = {
   annualCost?: number;
 };
 
+/** One thing in the client's condition that refuses a mix, or would without the override. */
+export type Block = {
+  id: string;
+  /** Short name of the obstacle, e.g. "הליך חדלות פירעון". */
+  title: string;
+  /** One sentence: what the document shows and what it means for new credit. */
+  detail: string;
+  /** Master row ids it is about. */
+  rows: string[];
+  /** Did `profile.override` lift it? */
+  overridden: boolean;
+  /** What has to happen in the real world before a mix built past it can be filed. */
+  condition: string;
+  /**
+   * What the block does while it is NOT overridden:
+   *   refuses — no goal is built (insolvency);
+   *   limits  — something is left out or cut (past-due debt outside the mix, no
+   *             all-purpose money without collateral, a shorter term for age,
+   *             no enlarging an LTV breach);
+   *   prices  — the mix is still built, at the lender who would take it
+   *             (arrears, enforcement → non-bank).
+   */
+  effect: "refuses" | "limits" | "prices";
+  /** Is it law for the lender chosen (never lifted by the override)? */
+  law: boolean;
+};
+
 export type AutoMixResult = {
   ok: boolean;
   /** When !ok: why nothing could be built, in Hebrew. */
@@ -287,6 +345,31 @@ export type AutoMixResult = {
   };
   /** Master rows the engine could not use, and why. */
   skipped: { id: string; label: string; why: string }[];
+  /**
+   * Everything in the client's condition that stands between them and a mix,
+   * whether or not it was overridden. Empty for a clean file. While any block
+   * with `overridden: false` remains, the goals it touches are "unavailable".
+   */
+  blocks: Block[];
+  /**
+   * Override only, when the condition puts debt due now in the picture (null
+   * otherwise): what it is, and the REFERENCE every proposal's "versus today" is
+   * measured from: today's mix kept, plus the cheapest monthly way this lender
+   * clears the due debt and cures the arrears (solved as a mix, costs included).
+   * Balances are as the report states them; the growth until payoff is a caveat.
+   */
+  dueNow: {
+    total: number;
+    /** kind "called": a row in the mix in arrears of 90+ days (or in legal hands), which its lender calls in full. */
+    items: { id: string; label: string; balance: number; kind: "past-due" | "outside" | "enforcement" | "called"; rowId: string | null }[];
+    /** Arrears on kept rows, brought current from the new money. */
+    cures: { rowId: string; overdue: number }[];
+    reference: { monthly: number; totalPaid: number; months: number };
+    /** The budget the budget goals were held to. */
+    budget: number;
+    /** "profile": profile.budget; "reference": the reference's own payment (the default). */
+    budgetSource: "profile" | "reference";
+  } | null;
   ms: number;
 };
 
@@ -300,4 +383,5 @@ export const DEFAULT_PROFILE: ClientProfile = {
   budget: null,
   consolidate: true,
   tier: "auto",
+  override: false,
 };

@@ -342,6 +342,38 @@ export default function AutoMix({ master, forecast, forecastOn, inflation, disco
     return notes.length === 1 ? (notes[0] as string) : null;
   }, [result, usable, offered]);
 
+  // What stands in the way, and what the advisor chose to build past.
+  const blocks = result?.blocks ?? [];
+  const openBlocks = blocks.filter((b) => !b.overridden);
+  const lifted = blocks.filter((b) => b.overridden);
+  /** Some standing block is the lender's own law: no override lifts that one. */
+  const canLift = openBlocks.some((b) => !b.law);
+  /** Nothing can be offered as things stand: the sheet shows why, and the way past it. */
+  const stopped = !failed && !!result?.ok && usable.length === 0 && (openBlocks.length > 0 || !!blocked);
+
+  // DEBT DUE NOW. Today's החזר חודשי does not carry it, so a plain "versus
+  // today" would show every honest mix as a rise. The engine measures each goal
+  // against today's mix PLUS the cheapest loan that clears the due debt; the
+  // sheet shows that reference as its own line and takes its differences from
+  // it. The reference's cost is read back from a proposal (same balance, so the
+  // difference in total paid IS the difference in interest and indexation).
+  const due = result?.dueNow ?? null;
+  const reference = useMemo(() => {
+    if (!due) return null;
+    const p = usable[0];
+    return {
+      monthly: due.reference.monthly,
+      months: due.reference.months,
+      totalPaid: due.reference.totalPaid,
+      totalCost: p ? p.metrics.totalCost - (p.metrics.totalPaid - due.reference.totalPaid) : null,
+    };
+  }, [due, usable]);
+  /** A goal's differences: against the reference when debt is due now, else against today. */
+  const versus = (p: Proposal) =>
+    reference
+      ? { monthly: p.metrics.monthly - reference.monthly, months: p.metrics.months - reference.months, cost: p.metrics.totalPaid - reference.totalPaid }
+      : { monthly: p.delta.monthly, months: p.delta.months, cost: p.delta.totalCost };
+
   const hasLoans = master.some((l) => !l.is_guarantor && l.group === "loan" && (Number(l.amount) || 0) > 0);
   const today = result?.today ?? null;
 
@@ -363,7 +395,7 @@ export default function AutoMix({ master, forecast, forecastOn, inflation, disco
         aria-modal="true"
         aria-label="תמהיל אופטימלי"
         tabIndex={-1}
-        data-empty={((failed || blocked) && !busy) || undefined}
+        data-empty={((failed && !busy) || stopped) || undefined}
         data-ms={result ? Math.round(result.ms) : undefined}
         initial={reduce ? false : { opacity: 0, y: 14, scale: 0.985 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -380,7 +412,7 @@ export default function AutoMix({ master, forecast, forecastOn, inflation, disco
         <div className="am-body">
           {/* WHAT THE DOCUMENT CANNOT SAY. Everything here is optional; a field
               left empty is a rule not checked, never a number invented. */}
-          {!(blocked && !busy) && (
+          {!stopped && (
           <section className="am-profile" aria-label="נתוני הלקוח">
             <h3>נתוני הלקוח</h3>
             <div className="am-fields">
@@ -440,13 +472,82 @@ export default function AutoMix({ master, forecast, forecastOn, inflation, disco
           </section>
           )}
 
-          {(failed || blocked) && !busy ? (
+          {failed && !busy ? (
             <p className="am-empty" role="status">
               <Warning size={18} weight="fill" />
               <span>
-                <Rich text={failed ?? blocked ?? ""} />
+                <Rich text={failed} />
               </span>
             </p>
+          ) : stopped && result ? (
+            /* NOTHING CAN BE OFFERED AS THINGS STAND. The sheet says what is in
+               the way, in the document's own facts, and then offers the one
+               thing an advisor can still do: build the best case past it. */
+            <section className="am-stop" role="status" aria-label="מה עומד בדרך">
+              <h3>מה עומד בדרך</h3>
+              {openBlocks.length > 0 ? (
+                <ul className="am-blocks">
+                  {openBlocks.map((b) => (
+                    <li key={b.id}>
+                      <Warning size={16} weight="fill" />
+                      <span>
+                        <b>{b.title}</b>
+                        <span>
+                          <Rich text={b.detail} />
+                        </span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="am-stop-note">
+                  <Rich text={blocked ?? ""} />
+                </p>
+              )}
+              {profile.override ? (
+                <div className="am-stop-act">
+                  <p>גם אחרי העקיפה אין תמהיל שמלווה כזה רשאי לתת. אפשר לנסות סוג מלווה אחר.</p>
+                  <label className="am-field">
+                    <span>מי מלווה</span>
+                    <Select
+                      variant="input"
+                      ariaLabel="סוג המלווה שלפיו מתומחר הכסף החדש"
+                      value={profile.tier}
+                      options={TIER_OPTIONS.map((o) =>
+                        o.value === "auto" && result?.ok ? { ...o, label: `לפי הדוח: ${TIER_LABEL[result.pricing.tier]}` } : o
+                      )}
+                      onChange={(v) => set("tier", v as ClientProfile["tier"])}
+                      style={{ width: 196 }}
+                      minWidth={210}
+                    />
+                  </label>
+                  <Btn className="lgr-btn" onClick={() => set("override", false)} disabled={busy}>
+                    ביטול העקיפה
+                  </Btn>
+                </div>
+              ) : (
+                <div className="am-stop-act">
+                  <p>אפשר לבנות בכל זאת את התרחיש המיטבי: התמהיל שמלווה מהסוג הנבחר עדיין נותן במצב הזה, עם התנאים להגשתו.</p>
+                  <label className="am-field">
+                    <span>מי מלווה</span>
+                    <Select
+                      variant="input"
+                      ariaLabel="סוג המלווה שלפיו מתומחר הכסף החדש"
+                      value={profile.tier}
+                      options={TIER_OPTIONS.map((o) =>
+                        o.value === "auto" && result?.ok ? { ...o, label: `לפי הדוח: ${TIER_LABEL[result.pricing.tier]}` } : o
+                      )}
+                      onChange={(v) => set("tier", v as ClientProfile["tier"])}
+                      style={{ width: 196 }}
+                      minWidth={210}
+                    />
+                  </label>
+                  <Btn className="lgr-btn lgr-btn-primary" onClick={() => set("override", true)} disabled={busy}>
+                    {busy ? "בונה…" : "בנייה בכל זאת"}
+                  </Btn>
+                </div>
+              )}
+            </section>
           ) : !result ? (
             <div className="am-skel" role="status" aria-label="בונה תמהילים">
               {[0, 1, 2, 3, 4, 5].map((i) => (
@@ -456,7 +557,37 @@ export default function AutoMix({ master, forecast, forecastOn, inflation, disco
           ) : (
             <div className="am-split">
               <div className="am-side">
-              {result.pricing.tier !== "bank" && result.pricing.tierWhy && (
+              {/* BUILT PAST A BLOCK. Said first and in full: every figure below
+                  assumes these were overcome, and each names what that takes. */}
+              {lifted.length > 0 && (
+                <section className="am-over" aria-label="נבנה למרות חסמים">
+                  <header>
+                    <b>תרחיש מיטבי, נבנה למרות {lifted.length === 1 ? "חסם אחד" : `${lifted.length} חסמים`} בדוח</b>
+                    <button type="button" className="am-more" onClick={() => set("override", false)}>
+                      ביטול
+                    </button>
+                  </header>
+                  <ul>
+                    {lifted.map((b) => (
+                      <li key={b.id}>
+                        <b>{b.title}.</b> <Rich text={b.condition} />
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )}
+              {lifted.length === 0 && canLift && (
+                <section className="am-over" data-open aria-label="חסמים בדוח">
+                  <header>
+                    <b>{openBlocks.filter((b) => !b.law).map((b) => b.title).join(", ")}</b>
+                    <button type="button" className="am-more" onClick={() => set("override", true)}>
+                      בנייה בכל זאת
+                    </button>
+                  </header>
+                </section>
+              )}
+              {/* Said only when the blocks above do not already say it. */}
+              {lifted.length === 0 && result.pricing.tier !== "bank" && result.pricing.tierWhy && (
                 <p className="am-tier">
                   <b>הכסף החדש מתומחר כ{TIER_LABEL[result.pricing.tier]}.</b> <Rich text={result.pricing.tierWhy} />
                 </p>
@@ -488,6 +619,24 @@ export default function AutoMix({ master, forecast, forecastOn, inflation, disco
                       <Nis v={today.totalCost} className="am-fig" />
                     </span>
                     <MixBar m={today} />
+                  </div>
+                )}
+                {due && reference && (
+                  <div className="am-grid am-today am-ref" title="התמהיל של היום ועוד ההלוואה בהחזר הנמוך ביותר שמסלקת את החוב שעומד לפירעון. מולו נמדדת כל מטרה.">
+                    <span />
+                    <span className="am-goal-name">
+                      <b>
+                        היום, אחרי סילוק <Nis v={due.total} /> שעומדים לפירעון מיידי
+                      </b>
+                    </span>
+                    <span className="am-cell">
+                      <Nis v={reference.monthly} className="am-fig" />
+                    </span>
+                    <span className="am-cell">
+                      <span className="am-fig">{span(reference.months)}</span>
+                    </span>
+                    <span className="am-cell">{reference.totalCost !== null && <Nis v={reference.totalCost} className="am-fig" />}</span>
+                    <span />
                   </div>
                 )}
                 <div role="radiogroup" aria-label="מטרת התמהיל">
@@ -525,15 +674,15 @@ export default function AutoMix({ master, forecast, forecastOn, inflation, disco
                           <>
                             <span className="am-cell">
                               <Nis v={p.metrics.monthly} className="am-fig" />
-                              <Delta v={p.delta.monthly} kind="money" />
+                              <Delta v={versus(p).monthly} kind="money" />
                             </span>
                             <span className="am-cell">
                               <span className="am-fig">{span(p.metrics.months)}</span>
-                              <Delta v={p.delta.months} kind="months" />
+                              <Delta v={versus(p).months} kind="months" />
                             </span>
                             <span className="am-cell">
                               <Nis v={p.metrics.totalCost} className="am-fig" />
-                              <Delta v={p.delta.totalCost} kind="money" />
+                              <Delta v={versus(p).cost} kind="money" />
                             </span>
                             <MixBar m={p.metrics} />
                           </>
@@ -583,7 +732,14 @@ export default function AutoMix({ master, forecast, forecastOn, inflation, disco
               {current && (
                 <section className="am-detail" data-busy={busy || undefined} aria-label={`פירוט: ${current.label}`} key={current.goal}>
                   <div className="am-col">
-                    <h2 className="am-detail-h">{current.label}</h2>
+                    <h2 className="am-detail-h">
+                      {current.label}
+                      {current.structure && current.structure !== "bank" && (
+                        <span className="am-tag" title={current.structureWhy}>
+                          {current.structure === "secondLien" ? "שעבוד שני, מאחורי המשכנתא בבנק" : "שעבוד ראשון, במקום המשכנתא בבנק"}
+                        </span>
+                      )}
+                    </h2>
                     <h3>הכסף החדש</h3>
                     {current.tranches.length > 0 ? (
                       <table className="am-table">
@@ -685,6 +841,7 @@ export default function AutoMix({ master, forecast, forecastOn, inflation, disco
                               <td>
                                 <span className="am-fam" data-f={m.group} />
                                 {m.label}
+                                {m.due && <span className="am-tag" data-tone="neg">לפירעון מיידי</span>}
                               </td>
                               <td>
                                 <Nis v={m.balance} />
@@ -734,6 +891,11 @@ export default function AutoMix({ master, forecast, forecastOn, inflation, disco
                                 <span className="am-n">{m.rate > 0 ? pct(m.rate) : ""}</span>
                                 <Nis v={m.balance} />
                                 <p>
+                                  {m.cure ? (
+                                    <>
+                                      פיגור של <Nis v={m.cure} /> מוסדר מהכסף החדש.{" "}
+                                    </>
+                                  ) : null}
                                   <Rich text={m.why} />
                                 </p>
                               </li>
@@ -815,7 +977,7 @@ export default function AutoMix({ master, forecast, forecastOn, inflation, disco
         </div>
 
         <footer className="am-foot">
-          {result?.ok && !blocked && (
+          {result?.ok && !stopped && (
             <details className="am-rates">
               <summary>
                 <CaretDown size={11} weight="bold" />
@@ -852,7 +1014,7 @@ export default function AutoMix({ master, forecast, forecastOn, inflation, disco
             </details>
           )}
           <span className="am-foot-acts">
-            {blocked && !busy && (
+            {stopped && (
               <Btn className="lgr-btn" onClick={onClose}>
                 סגירה
               </Btn>
@@ -862,7 +1024,7 @@ export default function AutoMix({ master, forecast, forecastOn, inflation, disco
                 יצירת כל {usable.length} התמהילים
               </Btn>
             )}
-            {!(blocked && !busy) && (
+            {!stopped && (
               <Btn className="lgr-btn lgr-btn-primary" onClick={() => current && create([current])} disabled={busy || !current}>
                 <Plus size={14} weight="bold" />
                 {current ? `יצירת התמהיל: ${current.label}` : "יצירת התמהיל"}

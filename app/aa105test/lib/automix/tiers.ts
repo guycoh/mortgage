@@ -39,9 +39,14 @@ const nominalOf = (eff: number) => (Math.pow(1 + eff / 100, 1 / 12) - 1) * 1200;
  *   · Opening fees 0.5–1% (Comptroller, with Capital Market Authority data;
  *     banks are capped at ₪360). Legal ceiling BoI + 15pp.
  * So: ק"צ at 7.40%, variable at prime + 4.00 (= 8.75% today, the middle of the
- * 8.5–9% nominal range), 30 years, 1% opening fee. Directive 329 does not bind
- * non-banks; the engine holds them to it anyway — a mix that is legal at a bank
- * is the one an advisor can later refinance back into one.
+ * 8.5–9% nominal range), 30 years, 1% opening fee.
+ *
+ * Directive 329 does not bind non-banks: circular ח-06-2852 (30/06/2026) is
+ * addressed to banking corporations and stablecoin payment licensees only
+ * (https://boi.org.il/media/hjrlkrse/h2852.pdf). A non-bank mix is held to the
+ * law that does bind its lender (חוק אשראי הוגן, index.ts FAIR_CREDIT) and to
+ * the lender's own policy (NONBANK_LTV); the engine's practice guardrails
+ * (linked share, tranche count) still apply.
  */
 export const NONBANK = {
   primeMargin: 4,
@@ -51,6 +56,77 @@ export const NONBANK = {
   tracks: ["prime", "kz"] as TrackKey[],
   source: "Midroog, Mimun Yashir Mortgages Series 5 pool report 10/11/2026; State Comptroller 2025; Bizportal 03/2026",
 };
+
+/**
+ * The non-bank price ladder by the client's grade (research-nonbank-distress §1).
+ * No lender, rating agency or regulator publishes prices by borrower grade (the
+ * Capital Market Authority declined to publish non-bank rates because the
+ * borrowers are often "לווים שסורבו במערכת הבנקאית": State Comptroller, June
+ * 2026, non-bank chapter,
+ * https://library.mevaker.gov.il/sites/DigitalLibrary/Documents/2026/Economic-Report/2026-Economic-Report-201.pdf),
+ * so the ladder is SPREADS OVER GRADE A, anchored on the few published prices:
+ *
+ *   A  +0.0  clean borrower choosing a non-bank: Mimun Yashir, "about 7.5%" vs
+ *            banks' "about 5% linked" (CEO, Nadlan Center 23/06/2026,
+ *            https://www.nadlancenter.co.il/article/14773); average lending rate
+ *            8.5–9% (Comptroller); variable P+4.2 in 2024 (Bizportal 24/03/2025).
+ *   B  +1.5  refused by a bank, a non-bank mortgage today, or debt past its
+ *            term: Meitav Mimun's published floor for borrowers who do not meet
+ *            bank underwriting is prime + 5.5 (https://www.meitav.co.il/loans/),
+ *            and the one printed ladder puts a "medium" borrower (past
+ *            enforcement, liens) 1–2 points over a good one (Calcalist
+ *            advertorial 03/08/2021, https://www.calcalist.co.il/article/h1fmsvljk;
+ *            UNVERIFIED, used as a spread only). Its midpoint is Meitav's floor.
+ *   C  +3.0  arrears now or an open enforcement file: the same advertorial's
+ *            "bad" borrower (restricted account, enforcement, bankruptcy), 2–4
+ *            points over a good one; inside Meitav's P+5.5 to P+10.5.
+ *   D  +6.5  in insolvency or bankruptcy proceedings: no lender was found that
+ *            offers this; priced at the TOP of the only published range for
+ *            borrowers banks refuse (Meitav, prime + 10.5). The law's ceiling
+ *            stops it (index.ts FAIR_CREDIT), and any credit needs the
+ *            Official Receiver's approval (Insolvency Law §123).
+ *
+ * Second lien behind a bank mortgage: +1.5, an ESTIMATE. No lender publishes
+ * the premium; Mimun Yashir's all-second-lien Series 4 pays its senior notes
+ * 7.00% linked or BoI + 5.50 with positive excess spread (S&P Maalot final
+ * rating 12/07/2026, https://www.maalot.co.il/Publications/5049/FRDir20260712085550.pdf),
+ * which puts its loans above grade A's 7.40% / P+4.00; the research reads the
+ * gap at 1.5–2.5 points and the low end is used. S&P assumes about 3.2 times
+ * the default frequency of a first-lien pool, so the estimate is not generous.
+ *
+ * Opening fee 1% at every grade: the Comptroller found 1% at one lender and
+ * 0.5% capped at ₪25,000 at another; the higher is used. It replaces the bank
+ * file fee (the ₪360 cap binds non-banks only on sole-home purchase loans) and
+ * counts inside the Fair Credit cost ceiling.
+ */
+export const LADDER_SPREAD: Record<Grade, number> = { A: 0, B: 1.5, C: 3, D: 6.5 };
+export const SECOND_LIEN_SPREAD = 1.5;
+const GRADE_LABEL: Record<Grade, string> = { A: "לקוח תקין", B: "סירוב בנק או חוב שמועד פירעונו חלף", C: "פיגור פעיל או תיק הוצאה לפועל", D: "הליך חדלות פירעון" };
+const GRADE_NAME: Record<Grade, string> = { A: "א", B: "ב", C: "ג", D: "ד" };
+export const LADDER: Record<Grade, { primeMargin: number; kzRate: number; secondLien: number; openingFee: number; label: string }> = Object.fromEntries(
+  (["A", "B", "C", "D"] as Grade[]).map((g) => [
+    g,
+    { primeMargin: NONBANK.primeMargin + LADDER_SPREAD[g], kzRate: NONBANK.kzRate + LADDER_SPREAD[g], secondLien: SECOND_LIEN_SPREAD, openingFee: NONBANK.openingFee, label: GRADE_LABEL[g] },
+  ])
+) as never;
+
+/** The grade's price in one sentence, for pricing.tierWhy. */
+export function gradeWords(grade: Grade): string {
+  const g = LADDER[grade];
+  return `דרגת סיכון ${GRADE_NAME[grade]} (${g.label}): פריים ועוד ${g.primeMargin.toFixed(2)} וק"צ ${g.kzRate.toFixed(2)}% בשעבוד ראשון, ועוד ${g.secondLien.toFixed(2)} נק׳ בשעבוד שני (הערכה).`;
+}
+
+/**
+ * A non-bank lender's own LTV policy — no law sets one (the CMA has no numeric
+ * cap; circular 2020-10-4 forbids lending on collateral alone and requires
+ * verified income). First lien: Mimun Yashir lends to 80% (CEO 06/2026; S&P
+ * Maalot: original LTV up to 80% in its underwriting). First + second combined:
+ * the all-second-lien Series 4 pool's underwriting cap is 80% including the
+ * prior-ranking balance (S&P Maalot 12/07/2026; average 67%). Now-On's 85%
+ * (secondary) and the Comptroller's "in practice up to about 90%" are higher;
+ * the published underwriting cap is used.
+ */
+export const NONBANK_LTV = { first: 0.8, combined: 0.8 };
 
 export const PREMIUM_CLAMP = [0.5, 2.5] as const;
 /**
@@ -126,10 +202,22 @@ export type TierInfo = {
   maxYears: number;
   /** Opening fee as a share of the new money (non-bank). */
   openingFee: number;
-  /** No lender will refinance this file now — why. */
+  /** No lender will refinance this file now — why (null under the override). */
   blocked: string | null;
   evidence: TierEvidence[];
+  /**
+   * The non-bank risk grade the condition puts the client in (see LADDER):
+   * A clean · B bank refusal, a non-bank mortgage today or debts past due ·
+   * C arrears or enforcement · D insolvency. Bank tiers carry it too, for the
+   * override's caveat ("a bank would normally refuse").
+   */
+  grade: Grade;
 };
+
+export type Grade = "A" | "B" | "C" | "D";
+
+/** What in the client's condition the tier reads beyond the analysis flags (from condition.ts). */
+export type TierOptions = { override?: boolean; pastDue?: boolean };
 
 /**
  * The client's own pricing record: for every mortgage-secured row whose
@@ -169,14 +257,22 @@ const median = (xs: number[]) => {
   return n ? (n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2) : NaN;
 };
 
-export function resolveTier(rows: ImportedLoan[], analysis: Analysis | null | undefined, profile: ClientProfile): TierInfo {
+export function resolveTier(rows: ImportedLoan[], analysis: Analysis | null | undefined, profile: ClientProfile, opts: TierOptions = {}): TierInfo {
   const evidence = pricingRecord(rows);
   const med = median(evidence.map((e) => e.excess));
   const premiumFromRecord = Number.isFinite(med) ? Math.min(PREMIUM_CLAMP[1], Math.max(PREMIUM_CLAMP[0], med)) : PREMIUM_CLAMP[0];
   const bankAll: TrackKey[] = ["prime", "klz", "kz", "mlz", "mz"];
+  // Hard signals first: what no bank refinances.
+  const flags = new Set((analysis?.flags ?? []).map((f) => f.id));
+  const insolvency = flags.has("insolvency") || (analysis?.legal.insolvency.length ?? 0) > 0;
+  const arrearsNow = flags.has("arrears-now");
+  const enforced = flags.has("execution") || (analysis?.legal.executionOpen.length ?? 0) > 0;
+  const nonbankMortgage = rows.some((r) => r.group === "mortgage" && !r.is_guarantor && lenderOf(r.source_bank).kind === "nonbank");
+  const grade: Grade = insolvency ? "D" : arrearsNow || enforced ? "C" : nonbankMortgage || opts.pastDue ? "B" : "A";
   const base = (tier: PricingTier, why: string, blocked: string | null = null, short = why): TierInfo => ({
+    grade,
     tier,
-    why,
+    why: tier === "nonbank" ? `${why} ${gradeWords(grade)}` : why,
     short,
     premium: tier === "bankPremium" ? premiumFromRecord : 0,
     tracks: tier === "nonbank" ? NONBANK.tracks : bankAll,
@@ -186,14 +282,8 @@ export function resolveTier(rows: ImportedLoan[], analysis: Analysis | null | un
     evidence,
   });
 
-  // Hard signals first: what no bank refinances.
-  const flags = new Set((analysis?.flags ?? []).map((f) => f.id));
-  const insolvency = flags.has("insolvency") || (analysis?.legal.insolvency.length ?? 0) > 0;
-  const arrearsNow = flags.has("arrears-now");
-  const enforced = flags.has("execution") || (analysis?.legal.executionOpen.length ?? 0) > 0;
-  const blocked = insolvency
-    ? "בדוח מופיע הליך חדלות פירעון, ואשראי חדש מותנה באישור הנאמן או בית המשפט. אין לבנות עליו תמהיל."
-    : null;
+  const blocked =
+    insolvency && !opts.override ? "בדוח מופיע הליך חדלות פירעון, ואשראי חדש מותנה באישור הנאמן או בית המשפט. אין לבנות עליו תמהיל." : null;
 
   if (profile.tier !== "auto") {
     const t = base(profile.tier, "נקבע ידנית בפרופיל הלקוח.", blocked);
@@ -208,8 +298,15 @@ export function resolveTier(rows: ImportedLoan[], analysis: Analysis | null | un
       `בדוח יש ${what}, ובנקים כמעט אינם ממחזרים אשראי בפיגור.`
     );
   }
-  const nonbankMortgage = rows.some((r) => r.group === "mortgage" && !r.is_guarantor && lenderOf(r.source_bank).kind === "nonbank");
   if (nonbankMortgage) return base("nonbank", "המשכנתא הקיימת היא מגוף חוץ־בנקאי, סימן שבנק לא אישר אותה.");
+  // Under the override, debts left unpaid past their due date put the file outside a bank's appetite.
+  if (opts.override && opts.pastDue)
+    return base(
+      "nonbank",
+      "בדוח יש חובות שמועד פירעונם חלף ולא נפרעו, ובנק לא ממחזר אשראי לפני שהם מוסדרים, ולכן התמחור הוא של גוף חוץ־בנקאי.",
+      null,
+      "בדוח חובות שמועד פירעונם חלף, ובנק לא ממחזר לפני שהם מוסדרים."
+    );
   // One tranche is an anecdote: the record counts when it covers two tranches
   // or half the mortgage.
   const mortgageBal = rows.filter((r) => r.group === "mortgage" && !r.is_guarantor).reduce((a, r) => a + (Number(r.amount) || 0), 0);
