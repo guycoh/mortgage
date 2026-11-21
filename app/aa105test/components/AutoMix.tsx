@@ -27,8 +27,8 @@ import { readProfile } from "@/app/aa102test/lib/profile-cache";
 import type { AbilityProfile } from "@/app/api/simulator/ability-profile/route";
 import { BANKS, TRACK_PATH, TRACK_SHORT, type BankId, type MarketSnapshot, type TrackKey } from "@/app/aa107test/lib/market";
 import fallback from "@/app/aa107test/lib/market-snapshot.json";
-import { buildAutoMix } from "../lib/automix";
-import { DEFAULT_PROFILE, type AutoMixResult, type ClientProfile, type GoalId, type MixMetrics, type PricingTier, type Proposal } from "../lib/automix/types";
+import type { SolveReply, SolveRequest } from "./automix.worker";
+import { DEFAULT_PROFILE, type AutoMixInput, type AutoMixResult, type ClientProfile, type GoalId, type MixMetrics, type PricingTier, type Proposal } from "../lib/automix/types";
 import "../automix.css";
 
 type Props = {
@@ -298,22 +298,64 @@ export default function AutoMix({ master, forecast, forecastOn, inflation, disco
     } catch {}
   }, [profile.bank]);
 
-  // Solve after the frame that shows the sheet (and after a pause in typing):
-  // the solver is synchronous and the first paint must not wait for it.
+  // THE SOLVER RUNS IN A WORKER (automix.worker.ts): a large report takes about
+  // a second for all goals, and the sheet must keep painting and typing while
+  // it does. One worker for the life of the sheet; every request carries an id
+  // and only the newest one's answer is taken. If a worker cannot be had (an
+  // old browser, a blocked script, data that will not clone) the same engine
+  // runs on the main thread instead — slower to the eye, identical in result.
+  const worker = useRef<Worker | null>(null);
+  const noWorker = useRef(false);
+  const seq = useRef(0);
+  useEffect(() => {
+    try {
+      worker.current = new Worker(new URL("./automix.worker.ts", import.meta.url), { type: "module" });
+    } catch {
+      noWorker.current = true;
+    }
+    return () => {
+      worker.current?.terminate();
+      worker.current = null;
+    };
+  }, []);
+
+  // Solve after the frame that shows the sheet, and after a pause in typing.
   useEffect(() => {
     if (!marketReady) return;
     setBusy(true);
+    const id = ++seq.current;
+    const input: AutoMixInput = { master, market, forecast, forecastOn, inflation, discountRate, profile, analysis };
+    const settle = (reply: SolveReply) => {
+      if (reply.id !== seq.current) return; // answered an older question
+      if (reply.result) {
+        setResult(reply.result);
+        setFailed(reply.result.ok ? null : reply.result.reason ?? "לא ניתן לבנות תמהיל מהנתונים שבדוח");
+      } else {
+        setResult(null);
+        setFailed(reply.error || "החישוב נכשל");
+      }
+      setBusy(false);
+    };
+    const onMain = () =>
+      import("../lib/automix")
+        .then((m) => settle({ id, result: m.buildAutoMix(input) }))
+        .catch((e) => settle({ id, error: e instanceof Error ? e.message : "החישוב נכשל" }));
     const t = window.setTimeout(
       () => {
+        const w = worker.current;
+        if (!w || noWorker.current) return void onMain();
+        w.onmessage = (e: MessageEvent<SolveReply>) => settle(e.data);
+        w.onerror = () => {
+          noWorker.current = true;
+          if (id === seq.current) void onMain();
+        };
         try {
-          const r = buildAutoMix({ master, market, forecast, forecastOn, inflation, discountRate, profile, analysis });
-          setResult(r);
-          setFailed(r.ok ? null : r.reason ?? "לא ניתן לבנות תמהיל מהנתונים שבדוח");
-        } catch (e) {
-          setResult(null);
-          setFailed(e instanceof Error ? e.message : "החישוב נכשל");
+          const request: SolveRequest = { id, input };
+          w.postMessage(request);
+        } catch {
+          noWorker.current = true;
+          void onMain();
         }
-        setBusy(false);
       },
       result ? 320 : 40
     );
@@ -734,6 +776,12 @@ export default function AutoMix({ master, forecast, forecastOn, inflation, disco
                   <div className="am-col">
                     <h2 className="am-detail-h">
                       {current.label}
+                      {current.structure === "bank" && current.refinance && current.priceBank && (
+                        <span className="am-tag" data-tone="bank">
+                          {current.refinance === "internal" ? "מחזור פנימי" : "מעבר בנק"}
+                          {current.priceBank !== "system" ? `, ${BANKS.find((b) => b.id === current.priceBank)?.label ?? ""}` : ""}
+                        </span>
+                      )}
                       {current.structure && current.structure !== "bank" && (
                         <span className="am-tag" title={current.structureWhy}>
                           {current.structure === "secondLien" ? "שעבוד שני, מאחורי המשכנתא בבנק" : "שעבוד ראשון, במקום המשכנתא בבנק"}
