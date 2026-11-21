@@ -5,7 +5,7 @@ import { ECONOMIES, scheduleIn } from "../app/aa105test/lib/automix/econ";
 import { MIN_TRANCHE, FIXED_MIN, LINKED_MAX, TRACK_SHARE_MAX, LTV_MAX, PTI_MAX, MATERIAL, AP_LTV, AP_LTV_RELIEF, AP_RELIEF_CAP } from "../app/aa105test/lib/automix/rules";
 import { NONBANK_LTV } from "../app/aa105test/lib/automix/tiers";
 import { EARLY } from "../app/aa105test/lib/automix/solve";
-import { priceLoan } from "../app/aa102test/lib/price";
+import { priceLoan, todayPayment } from "../app/aa102test/lib/price";
 import { boardMonthly, foldMasterRow, owedOnly, type ImportedLoan } from "../app/aa102test/lib/credit";
 import type { MarketSnapshot } from "../app/aa107test/lib/market";
 import type { Forecast } from "../app/aa102test/lib/forecast";
@@ -31,7 +31,7 @@ export function verifier(market: MarketSnapshot, forecast: Forecast | null) {
         for (const l of owed) {
           const sch = Number(l.amortization_schedule_id) || 1;
           const lump = sch === 3 || sch === 4 ? Math.round(Number(l.months)) : 0;
-          if (m === 1) sum += Math.round(boardMonthly(l, priceLoan(l, typed(inflation)).monthlyPayment));
+          if (m === 1) sum += Math.round(boardMonthly(l, todayPayment(priceLoan(l, typed(inflation)))));
           else if (m !== lump) sum += scheduleIn(l, forecast, e).pay[m - 1] ?? 0;
         }
         if (sum > cap + 1) return false;
@@ -115,7 +115,7 @@ export function verifier(market: MarketSnapshot, forecast: Forecast | null) {
       let fPaid = 0;
       for (const l of owed) {
         const t = priceLoan(l, typed(input.inflation));
-        monthly += Math.round(boardMonthly(l, t.monthlyPayment));
+        monthly += Math.round(boardMonthly(l, todayPayment(t))); // month one in today's money, as the read-out's `totals` memo states it
         interest += t.totalInterest;
         balance += Math.round(Number(l.amount) || 0);
         if (Number(l.months) > 0) fPaid += priceLoan(l, { inflation: input.inflation, forecast }).totalPaid;
@@ -152,7 +152,7 @@ export function verifier(market: MarketSnapshot, forecast: Forecast | null) {
         check(ts.filter((t) => !Number.isInteger(t.amount / 1000)).length <= 1, `${tag(p.goal)}: ${seg} has more than one unrounded tranche`);
       }
       if (input.profile.income) {
-        const housing = owed.filter((l) => l.group !== "loan" || l.source_type === "תמהיל אוטומטי").reduce((a, l) => a + Math.round(boardMonthly(l, priceLoan(l, typed(input.inflation)).monthlyPayment)), 0);
+        const housing = owed.filter((l) => l.group !== "loan" || l.source_type === "תמהיל אוטומטי").reduce((a, l) => a + Math.round(boardMonthly(l, todayPayment(priceLoan(l, typed(input.inflation))))), 0);
         if (p.status === "ok") check(housing <= PTI_MAX * input.profile.income + 0.5, `${tag(p.goal)}: PTI ${(housing / input.profile.income).toFixed(3)} > 50%`);
       }
       // ALL the credit the property secures, recomputed from the rows: the fixed

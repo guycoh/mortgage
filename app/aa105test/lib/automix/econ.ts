@@ -20,7 +20,7 @@
 //               forecast's own paths it reproduces priceLoan to the agora
 //               (scripts/automix-check.mts proves it on every row).
 
-import { priceLoan, ratePath, intervalOf, firstResetOf, type Econ } from "@/app/aa102test/lib/price";
+import { priceLoan, ratePath, intervalOf, firstResetOf, todayPayment, type Econ } from "@/app/aa102test/lib/price";
 import { indexFactor, inflationAt, nominalAt, type Forecast } from "@/app/aa102test/lib/forecast";
 import { boardMonthly, type ImportedLoan } from "@/app/aa102test/lib/credit";
 import history from "./history.json";
@@ -211,7 +211,10 @@ export const typedEcon = (inflation: number): Econ => ({ inflation, forecast: nu
 export function typedRow(l: ImportedLoan, inflation: number) {
   const r = priceLoan(l, typedEcon(inflation));
   return {
-    monthly: Math.round(boardMonthly(l, r.monthlyPayment)),
+    // Month one in TODAY's money, exactly as the read-out's `totals` memo in
+    // Simulator.tsx states it (todayPayment: without the month of CPI the
+    // schedule has already grown a צמוד row by).
+    monthly: Math.round(boardMonthly(l, todayPayment(r))),
     totalInterest: r.totalInterest,
     totalPaid: r.totalPaid,
     pay: r.schedule.map((x) => x.payment),
