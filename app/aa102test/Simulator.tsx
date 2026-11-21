@@ -33,7 +33,7 @@ import {
   Stethoscope,
   UserFocus,
   ChartBar,
-  Sparkle,
+  Target,
 } from "@phosphor-icons/react";
 import type { LoanPath } from "@/app/data/hooks/useLoanPaths";
 import { paths as STATIC_PATHS } from "@/app/data/paths";
@@ -136,8 +136,9 @@ const CreditDeepDive = dynamic(() => import("@/app/aa105test/components/CreditMo
 const MortgageDeepDive = dynamic(() => import("@/app/aa105test/components/MortgageModal"), { ssr: false });
 // מפת עלויות — every mortgage and loan on the credit report and what it will still cost.
 const CostMap = dynamic(() => import("@/app/aa105test/components/CostMap"), { ssr: false });
-// /aa107test: the optimal-mix generator, code-split — /aa102 and /aa105 never load it.
-const Optimizer = dynamic(() => import("@/app/aa107test/components/Optimizer"), { ssr: false });
+// תמהיל אופטימלי — the goal-driven mix builder, code-split and offered only where
+// the route asks for it (`autoMix`), so the other boards never load the solver.
+const AutoMix = dynamic(() => import("@/app/aa105test/components/AutoMix"), { ssr: false });
 
 type Mix = {
   id: string;
@@ -310,7 +311,7 @@ export default function Simulator({
   initialTool = "mix",
   variant,
   base = "/aa102test",
-  optimizer = false,
+  autoMix = false,
 }: {
   lead: Lead | null;
   /**
@@ -339,8 +340,8 @@ export default function Simulator({
   variant?: "v105";
   /** The route this board lives under — where the lead picker navigates. */
   base?: string;
-  /** /aa107test: offer the optimal-mix generator (app/aa107test). */
-  optimizer?: boolean;
+  /** /aa107test: offer תמהיל אופטימלי — the goal-driven mix builder (app/aa105test/components/AutoMix). */
+  autoMix?: boolean;
 }) {
   const v105 = variant === "v105";
   const [mixes, setMixes] = useState<Mix[] | null>(null);
@@ -469,6 +470,15 @@ export default function Simulator({
   // inquiries — so those buttons belong only to the reports that can answer them.
   const creditDocs = reports.filter((r) => r.report);
   const creditReports = creditDocs.map((r) => r.report!);
+  // תמהיל אופטימלי reads arrears, enforcement and the reported collateral from the
+  // same analysis the modal shows. Held steady across renders: the sheet
+  // re-solves whenever its inputs change identity.
+  const [autoOpen, setAutoOpen] = useState(false);
+  const autoAnalysis = useMemo(
+    () => (autoMix && autoOpen && reports.some((r) => r.report) ? analyseReports(reports.filter((r) => r.report).map((r) => r.report!), reports.filter((r) => r.report).map((r) => r.fileName)) : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [autoMix, autoOpen, reports]
+  );
   // A statement analysis reads one bank's mortgage; a credit report reads a whole
   // household. Only one of the two is ever loaded, so the buttons follow the
   // document rather than being shown and then explaining themselves away.
@@ -645,6 +655,8 @@ export default function Simulator({
      The rows belong to the master, whichever mix is on screen — a report is
      what the client owes today, the same reason applyImport fills it. */
   const master = list.find((m) => m.is_base) ?? list[0] ?? null;
+  /** תמהיל אופטימלי needs something to build from: a master row with money on it. */
+  const canAutoMix = !!master?.loans.some((l) => !l.is_guarantor && (Number(l.amount) || 0) > 0);
 
   /**
    * What a proposal's charts are drawn against: the mix picked in השוואת
@@ -852,15 +864,22 @@ export default function Simulator({
     setActiveMixId(m.id);
   };
 
-  /* /aa107test — the optimizer lands its answer as an ordinary proposal tab. */
-  const [optOpen, setOptOpen] = useState(false);
-  const applyOptimized = (rows: ImportedLoan[], name: string, target: number) => {
-    const id = crypto.randomUUID();
+  /* תמהיל אופטימלי — each answer lands as an ordinary proposal tab beside the
+     master, every row editable like any other. The first one made is opened. */
+  const applyAutoMix = (made: { rows: ImportedLoan[]; name: string; target: number }[]) => {
+    if (!made.length) return;
     const taken = new Set(list.map((m) => m.mix_name));
-    let label = name;
-    for (let i = 2; taken.has(label); i++) label = `${name} ${i}`;
-    setMixes((prev) => [...(prev ?? []), { id, mix_name: label, is_base: false, target_amount: Math.round(target) || null, loans: rows.map((r) => ({ ...r, mix_id: id })) }]);
-    setActiveMixId(id);
+    const fresh: Mix[] = made.map((p) => {
+      const id = crypto.randomUUID();
+      let label = p.name;
+      for (let i = 2; taken.has(label); i++) label = `${p.name} ${i}`;
+      taken.add(label);
+      return { id, mix_name: label, is_base: false, target_amount: Math.round(p.target) || null, loans: p.rows.map((r) => ({ ...r, id: crypto.randomUUID(), mix_id: id })) };
+    });
+    setMixes((prev) => [...(prev ?? []), ...fresh]);
+    setActiveMixId(fresh[0].id);
+    setAutoOpen(false);
+    flash4s({ kind: "ok", text: fresh.length === 1 ? `נוצר ${fresh[0].mix_name}` : `נוצרו ${fresh.length} תמהילים` });
   };
 
   /** גובה התמהיל, on the mix being looked at. */
@@ -1888,18 +1907,14 @@ export default function Simulator({
             {v105 ? "תמהיל חדש" : "תמהיל"}
           </Btn>
 
-          {optimizer && (
+          {autoMix && (
             <Btn
-              className="v7-opt"
-              onClick={() => setOptOpen(true)}
-              disabled={!master?.loans.some((l) => (Number(l.amount) || 0) > 0)}
-              title={
-                master?.loans.some((l) => (Number(l.amount) || 0) > 0)
-                  ? "בניית התמהיל הטוב ביותר מהחובות שבמשכנתא הנוכחית, לפי נתוני בנק ישראל"
-                  : "גררו דוח אשראי או תדפיס משכנתא קודם"
-              }
+              className="v5-tab-auto"
+              onClick={() => setAutoOpen(true)}
+              disabled={!canAutoMix}
+              title={canAutoMix ? "בניית תמהיל מיטבי מנתוני הדוח, לפי מטרה" : "גררו דוח אשראי או תדפיס משכנתא קודם"}
             >
-              <Sparkle size={14} weight="fill" />
+              <Target size={14} weight="bold" />
               תמהיל אופטימלי
             </Btn>
           )}
@@ -2182,16 +2197,18 @@ export default function Simulator({
         }}
         onClose={closeClear}
       />
-      {optimizer && optOpen && master && (
-        <Optimizer
+      {autoMix && autoOpen && master && (
+        <AutoMix
           master={master.loans}
           forecast={forecastState?.boi ?? null}
+          forecastOn={econMode === "forecast" && !!activeForecast}
           inflation={annualInflation}
           discountRate={annualDiscount}
-          leadId={lead?.id ?? null}
           clientName={reports[0]?.clientName || lead?.name || ""}
-          onApply={applyOptimized}
-          onClose={() => setOptOpen(false)}
+          analysis={autoAnalysis}
+          profileUrl={profileUrlFor("ability")}
+          onApply={applyAutoMix}
+          onClose={() => setAutoOpen(false)}
         />
       )}
 

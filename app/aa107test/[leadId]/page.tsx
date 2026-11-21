@@ -1,4 +1,4 @@
-// /aa107test/<leadId> — one lead's board with the optimal-mix generator.
+// /aa107test/<leadId> — one lead's board with תמהיל אופטימלי.
 // Same lead resolution as /aa105test/<leadId>.
 
 import { notFound } from "next/navigation";
@@ -6,7 +6,6 @@ import { createClient } from "@supabase/supabase-js";
 import Simulator from "@/app/aa102test/Simulator";
 import { parseTool } from "@/app/aa102test/lib/tools";
 import "../../aa105test/board.css";
-import "../board.css";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -35,5 +34,5 @@ export default async function LeadBoardPage({
   const { data, error } = await supabase.from("leads").select("id, name").eq("id", id).limit(1);
   if (error || !data?.length) notFound();
 
-  return <Simulator lead={data[0]} initialTool={parseTool(tool)} variant="v105" base="/aa107test" optimizer />;
+  return <Simulator lead={data[0]} initialTool={parseTool(tool)} variant="v105" base="/aa107test" autoMix />;
 }

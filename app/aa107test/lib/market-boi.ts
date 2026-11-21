@@ -153,7 +153,7 @@ export async function latestCurve(): Promise<Forecast> {
 
 /* ---------------------------------- 4. per-bank comparison (Power BI DSR) */
 
-type PbiRow = { mmyy: string; bank: string | null; series: string; obs: number | null };
+export type PbiRow = { mmyy: string; bank: string | null; series: string; obs: number | null };
 
 /** Power BI's compressed DSR → rows. R = repeat-from-previous bitmask, Ø = null bitmask. */
 function flattenDsr(resp: unknown, names: string[]): Record<string, unknown>[] {
@@ -187,7 +187,7 @@ function flattenDsr(resp: unknown, names: string[]): Record<string, unknown>[] {
   return out;
 }
 
-async function perBank(): Promise<PbiRow[]> {
+export async function perBank(): Promise<PbiRow[]> {
   const col = (p: string) => ({ Column: { Expression: { SourceRef: { Source: "f" } }, Property: p }, Name: `FactData.${p}` });
   const select = [
     col("MMYY"),
@@ -258,6 +258,24 @@ const PBI_SERIES: Record<string, { track: TrackKey | "all"; metric: "rate" | "sh
   "269": { track: "all", metric: "irr" },
 };
 
+/**
+ * The banking system's own rate per track, every month the comparison covers
+ * (BNK_99034 = all banks). What the market charged a typical borrower in the
+ * month a client's loan was taken — the yardstick tier inference measures the
+ * client's own margins against.
+ */
+export function systemHistory(rows: PbiRow[]): Record<string, Partial<Record<TrackKey, number>>> {
+  const out: Record<string, Partial<Record<TrackKey, number>>> = {};
+  for (const r of rows) {
+    if (!r.series.startsWith("BNK_99034_") || r.obs === null || !(r.obs > 0)) continue;
+    const meta = PBI_SERIES[r.series.split("_").pop()!];
+    if (!meta || meta.metric !== "rate" || meta.track === "all") continue;
+    const [mm, yy] = r.mmyy.split("/");
+    (out[`${yy}-${mm}`] ??= {})[meta.track] = r.obs;
+  }
+  return out;
+}
+
 export type BankTable = {
   period: string;
   rows: { bank: string; track: TrackKey | "all"; metric: "rate" | "share" | "irr"; value: number }[];
@@ -289,20 +307,114 @@ function bankTable(rows: PbiRow[]): BankTable {
   return { period: `${y}-${m}`, rows: out };
 }
 
+/* ------------------------------------- 5. TamInt010 — the per-bank table now */
+
+/**
+ * The Supervisor of Banks' "השוואת ריביות - הלוואות למטרת מגורים" workbook
+ * (https://www.boi.org.il/boi_files/Pikuah/TamInt010.xls): the average rate
+ * given on each track at each bank and for the whole system, the last 25
+ * months — the same numbers the Power BI comparison shows (its 10/2025 system
+ * prime 5.36 is this file's), but published through the current month, where
+ * the Power BI dataset stopped at 10/2025. Footnote: "The interest rate is the
+ * annual ADJUSTED rate, not the nominal interest rate" — so every figure is
+ * converted to the nominal rate the board and the loan contract quote.
+ * Bullet, balloon and foreign-currency loans are excluded by the BoI.
+ */
+const TAMINT_URL = "https://www.boi.org.il/boi_files/Pikuah/TamInt010.xls";
+const TAMINT_BANKS: Record<string, string> = {
+  "פועלים": "Hapoalim",
+  "לאומי": "Leumi",
+  "דיסקונט": "Discount",
+  "מזרחי": "Mizrahi Tefahot",
+  "בינלאומי": "Habeinleumi",
+  "מרכנתיל": "Mercantile",
+  "ירושלים": "Jerusalem",
+  "סך מערכת": "system",
+};
+const TAMINT_COLS: [RegExp, TrackKey | "all"][] = [
+  [/IRR/, "all"],
+  [/^קבועה לא צמודה/, "klz"],
+  // "שאינה פריים" ends in "פריים" too — it must be tested first.
+  [/שאינה פריים/, "mlz"],
+  [/-\s*פריים$/, "prime"],
+  [/^משתנה צמוד/, "mz"],
+  [/^קבועה צמוד/, "kz"],
+];
+
+export async function tamInt(): Promise<BankTable & { history: Record<string, Record<string, Partial<Record<TrackKey | "all", number>>>> }> {
+  const res = await fetch(TAMINT_URL, { headers: { "user-agent": "Mozilla/5.0" }, cache: "no-store", signal: AbortSignal.timeout(30_000) });
+  if (!res.ok) throw new Error(`TamInt010 ${res.status}`);
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const XLSX = await import("xlsx");
+  const wb = XLSX.read(new Uint8Array(await res.arrayBuffer()), { type: "array" });
+  const rows = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets["L01"], { header: 1, raw: true });
+  const nameRow = rows.findIndex((r) => (r ?? []).some((c) => c === "סך מערכת"));
+  const labelRow = rows.findIndex((r, i) => i > nameRow && (r ?? []).some((c) => typeof c === "string" && /IRR/.test(c)));
+  if (nameRow < 0 || labelRow < 0) throw new Error("TamInt010: layout changed");
+  // Bank name → its first column; the track columns follow under the label row.
+  const cols: { bank: string; track: TrackKey | "all"; col: number }[] = [];
+  const names = rows[nameRow] as unknown[];
+  const labels = rows[labelRow] as unknown[];
+  names.forEach((n, c) => {
+    const bank = typeof n === "string" ? TAMINT_BANKS[n.trim()] : undefined;
+    if (!bank) return;
+    for (let k = c; k < c + 6; k++) {
+      const hit = TAMINT_COLS.find(([re]) => re.test(String(labels[k] ?? "").trim()));
+      if (hit) cols.push({ bank, track: hit[1], col: k });
+    }
+  });
+  if (cols.filter((x) => x.bank === "system").length < 6) throw new Error("TamInt010: system columns not found");
+  const history: Record<string, Record<string, Partial<Record<TrackKey | "all", number>>>> = {};
+  for (const r of rows) {
+    const m = String((r ?? [])[0] ?? "");
+    if (!/^\d{4}-\d{2}$/.test(m)) continue;
+    for (const c of cols) {
+      const v = Number((r as unknown[])[c.col]);
+      if (Number.isFinite(v) && v > 0) ((history[m] ??= {})[c.bank] ??= {})[c.track] = v;
+    }
+  }
+  const period = Object.keys(history).filter((m) => history[m].system?.prime).sort().pop();
+  if (!period) throw new Error("TamInt010: no month with system rates");
+  const out: BankTable["rows"] = [];
+  for (const [bank, v] of Object.entries(history[period]))
+    for (const [track, value] of Object.entries(v)) out.push({ bank, track: track as TrackKey | "all", metric: track === "all" ? "irr" : "rate", value: value as number });
+  return { period, rows: out, history };
+}
+
+/** An effective (adjusted) annual rate → the nominal annual rate of a monthly-paid loan. */
+export const nominalOf = (effective: number) => (Math.pow(1 + effective / 100, 1 / 12) - 1) * 1200;
+
 /* ---------------------------------------------------------- assemble */
 
 export type MarketBuild = { snapshot: MarketSnapshot; banks: BankTable; level: Level };
 
+/**
+ * The snapshot. LEVEL and per-bank spreads come from TamInt010 (current month,
+ * converted to nominal); the term structure of the fixed tracks from the ZCM
+ * curve of the same month (a 30-year קל"צ is funded further out than a
+ * 10-year one); the all-purpose premium from BIR_MRTG_99 (the same flow states
+ * both segments, so their difference is like for like). If TamInt010 cannot be
+ * read, the Power BI comparison is the fallback (and its month says how old).
+ */
 export async function buildMarket(): Promise<MarketBuild> {
-  const [lv, br, zcm, pbiRows] = await Promise.all([level(), boiRates(), curves(), perBank()]);
-  const banks = bankTable(pbiRows);
+  const [lv, br, zcm] = await Promise.all([level(), boiRates(), curves()]);
+  let banks: BankTable;
+  let bankSource: { id: string; label: string; url: string };
+  try {
+    banks = await tamInt();
+    bankSource = { id: "boi_tamint", label: "בנק ישראל · השוואת ריביות לפי בנק (TamInt010)", url: TAMINT_URL };
+  } catch {
+    banks = bankTable(await perBank());
+    bankSource = { id: "boi_compare", label: "בנק ישראל · השוואת ריביות בהלוואות לדיור לפי בנק (Power BI)", url: PBI.page };
+  }
+  const fBank = zcm.get(banks.period) ?? zcm.get(Array.from(zcm.keys()).sort().pop()!);
   const fLevel = zcm.get(lv.period);
-  const fBank = zcm.get(banks.period);
-  if (!fLevel || !fBank) throw new Error(`ZCM missing ${!fLevel ? lv.period : banks.period}`);
+  if (!fBank || !fLevel) throw new Error(`ZCM missing ${!fBank ? banks.period : lv.period}`);
 
   const get = (bank: string, track: TrackKey | "all", metric: string) =>
     banks.rows.find((r) => r.bank === bank && r.track === track && r.metric === metric)?.value;
-  const sys = (t: TrackKey) => get("system", t, "rate") ?? NaN;
+  const sysEff = (t: TrackKey) => get("system", t, "rate") ?? NaN;
+  const sys = (t: TrackKey) => nominalOf(sysEff(t));
 
   const today = br.series[br.series.length - 1];
   const boiNow = today[1];
@@ -310,10 +422,11 @@ export async function buildMarket(): Promise<MarketBuild> {
   for (let i = br.series.length - 1; i >= 0 && br.series[i][1] === boiNow; i--) since = br.series[i][0];
   const primeThen = rateOn(br.series, banks.period) + 1.5;
 
-  const klzSpread = lv.klz - curveYield(fLevel, KLZ_REF_YEARS * 12, false);
-  const kzSpread = lv.kz - curveYield(fLevel, Math.round(lv.kzTerm * 12), true);
+  const klzSpread = sys("klz") - curveYield(fBank, KLZ_REF_YEARS * 12, false);
+  const kzSpread = sys("kz") - curveYield(fBank, Math.round(lv.kzTerm * 12), true);
   const primeMargin = sys("prime") - primeThen;
   const mlzMargin = sys("mlz") - bondAnchor(fBank, 0, 60, false);
+  const mzMargin = sys("mz") - bondAnchor(fBank, 0, 60, true);
 
   const premFixed = (lv.ap.klz - lv.klz + (lv.ap.kz - lv.kz)) / 2;
   const premVar = lv.ap.mzMargin - lv.mzMargin;
@@ -321,50 +434,47 @@ export async function buildMarket(): Promise<MarketBuild> {
   const bankDelta: MarketSnapshot["bankDelta"] = {};
   const bankIrr: MarketSnapshot["bankIrr"] = {};
   for (const r of banks.rows) {
-    if (r.bank === "system") {
-      if (r.metric === "irr") bankIrr.system = r.value;
-      continue;
-    }
     if (r.metric === "irr") {
       bankIrr[r.bank] = r.value;
       continue;
     }
-    if (r.metric !== "rate" || r.track === "all") continue;
-    (bankDelta[r.bank] ??= {})[r.track] = r.value - sys(r.track);
+    if (r.bank === "system" || r.metric !== "rate" || r.track === "all") continue;
+    (bankDelta[r.bank] ??= {})[r.track] = nominalOf(r.value) - sys(r.track);
   }
 
   const [ly, lm] = lv.period.split("-");
   const [by, bm] = banks.period.split("-");
   const snapshot: MarketSnapshot = {
     builtAt: new Date().toISOString(),
+    version: 2,
     sources: [
+      { ...bankSource, period: `${bm}/${by}` },
       {
         id: "boi_bir_mrtg",
-        label: "בנק ישראל · ריביות על הלוואות לדיור חדשות (BIR_MRTG_99)",
+        label: "בנק ישראל · ריביות על הלוואות לדיור חדשות (BIR_MRTG_99) — פער כל מטרה",
         period: `${lm}/${ly}`,
         url: BIR_URL,
       },
-      { id: "boi_compare", label: "בנק ישראל · השוואת ריביות בהלוואות לדיור לפי בנק", period: `${bm}/${by}`, url: PBI.page },
-      { id: "boi_zcm", label: "בנק ישראל · עקומי אפס (ZCM)", period: `${lm}/${ly}`, url: ZCM_URL },
+      { id: "boi_zcm", label: "בנק ישראל · עקומי אפס (ZCM)", period: fBank.asOf, url: ZCM_URL },
       { id: "boi_rate", label: "בנק ישראל · ריבית בנק ישראל", period: since, url: BR_URL },
     ],
     boi: { rate: boiNow, prime: boiNow + 1.5, since },
-    levelPeriod: lv.period,
+    levelPeriod: banks.period,
     bankPeriod: banks.period,
     housing: {
       klzSpread,
       kzSpread,
       primeMargin,
       mlzMargin,
-      mzMargin: lv.mzMargin,
+      mzMargin,
       avg: {
-        klz: lv.klz,
-        kz: lv.kz,
+        klz: sys("klz"),
+        kz: sys("kz"),
         kzTermYears: lv.kzTerm,
         klzRefTermYears: KLZ_REF_YEARS,
         prime: sys("prime"),
         mlz: sys("mlz"),
-        mz: lv.mzBench + lv.mzMargin,
+        mz: sys("mz"),
       },
     },
     allPurposePremium: { prime: premVar, klz: premFixed, kz: premFixed, mlz: premVar, mz: premVar },

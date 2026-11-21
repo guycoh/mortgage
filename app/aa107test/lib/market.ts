@@ -1,8 +1,13 @@
 // What a bank would charge for a NEW loan today — by track, term, bank and
 // purpose — built only from data the Bank of Israel publishes.
 //
-// THREE SOURCES, EACH FOR WHAT IT IS BEST AT (all fetched by lib/market-boi.ts,
-// stored in `mortgage_market_rates`, snapshotted in market-snapshot.json):
+// SOURCES, EACH FOR WHAT IT IS BEST AT (all fetched by lib/market-boi.ts,
+// stored in `mortgage_market_rates`, snapshotted in market-snapshot.json).
+// Since version 2 the LEVEL of every track and each bank's distance from the
+// system come from the Supervisor's TamInt010 workbook (current month, the
+// same series the Power BI shows — which stopped at 10/2025), converted from
+// the BoI's effective ("adjusted") rate to the nominal rate a loan quotes.
+// The original three, still used for what they alone give:
 //
 //   1. SDMX flow BIR_MRTG_99 — "Interest rates and business volume, housing
 //      loans", new business, whole banking system, monthly. The LEVEL: the
@@ -60,6 +65,13 @@ export type BankId = (typeof BANKS)[number]["id"];
 export type MarketSnapshot = {
   /** When the numbers were assembled (ISO). */
   builtAt: string;
+  /**
+   * 2 = every rate NOMINAL, level and per-bank spreads from TamInt010 (see
+   * market-boi). Absent = the first build, which subtracted a nominal prime
+   * from the BoI's effective (adjusted) averages — off by ~0.1pp; the engine
+   * says so when it is handed one.
+   */
+  version?: number;
   /** Where each number came from, for the UI's provenance line. */
   sources: { id: string; label: string; period: string; url: string }[];
   /** Bank of Israel policy rate now, and the prime it sets (rate + 1.5). */

@@ -78,7 +78,9 @@ export async function GET(req: Request) {
   if (!force && memory && Date.now() - memory.at < 6 * 3600_000) return NextResponse.json({ snapshot: memory.snapshot, origin: memory.origin, stale: false });
 
   const saved = await stored();
-  if (!force && saved && Date.now() - Date.parse(saved.builtAt) < FRESH_MS) {
+  // A stored snapshot from before version 2 (effective − nominal prime margins,
+  // per-bank table stuck at 10/2025) is never "fresh", whatever its age.
+  if (!force && saved && (saved.snapshot.version ?? 1) >= 2 && Date.now() - Date.parse(saved.builtAt) < FRESH_MS) {
     memory = { at: Date.now(), snapshot: saved.snapshot, origin: "db" };
     return NextResponse.json({ snapshot: saved.snapshot, origin: "db", stale: false });
   }
@@ -90,9 +92,12 @@ export async function GET(req: Request) {
     return NextResponse.json({ snapshot: built.snapshot, origin: "live", stale: false });
   } catch (e) {
     const reason = e instanceof Error ? e.message : String(e);
-    const snapshot = saved?.snapshot ?? (fallback as unknown as MarketSnapshot);
+    // The newer of the stored and the bundled snapshot, and never a pre-v2 one over a v2.
+    const bundled = fallback as unknown as MarketSnapshot;
+    const snapshot =
+      saved?.snapshot && (saved.snapshot.version ?? 1) >= (bundled.version ?? 1) && saved.snapshot.builtAt >= bundled.builtAt ? saved.snapshot : bundled;
     // A failure is remembered briefly so the BoI is not hammered per click.
-    memory = { at: Date.now() - 6 * 3600_000 + 600_000, snapshot, origin: saved ? "db-stale" : "bundled" };
+    memory = { at: Date.now() - 6 * 3600_000 + 600_000, snapshot, origin: snapshot === bundled ? "bundled" : "db-stale" };
     return NextResponse.json({ snapshot, origin: memory.origin, stale: true, reason });
   }
 }
