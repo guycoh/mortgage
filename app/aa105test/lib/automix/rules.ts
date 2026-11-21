@@ -85,6 +85,15 @@ export const MIN_YEARS: Record<"prime" | "klz" | "kz" | "mlz" | "mz", number> = 
  *   years     12 months
  *   cost      max(₪10,000, 2% of today's remaining cost)
  */
+/**
+ * The engine's own practice, not law: a refinance whose fees and costs come back
+ * only after ten years is not one an advisor files on a cost goal (savings,
+ * balanced, stable). Most mortgages are refinanced or repaid on a sale well
+ * before their term; a recovery that long rarely arrives. Audit 2026-11-21:
+ * r06 "stable" paid a ₪61,744 fee to recover it in 138 months.
+ */
+export const BREAK_EVEN_MAX = 120;
+
 export const MATERIAL = {
   monthly: (today: number) => Math.max(150, 0.03 * today),
   months: 12,

@@ -249,6 +249,16 @@ export type Proposal = {
    */
   structure?: "bank" | "firstLien" | "secondLien";
   structureWhy?: string;
+  /**
+   * Always set when `structure` is "bank": "internal" = the mortgage stays at its
+   * bank and the new money is that bank's (its rates, or the client's own lower
+   * record there, or the system plus the client's premium); "move" = the whole
+   * mortgage moves to another bank (the system average, or the bank the advisor
+   * picked). Absent on non-bank structures.
+   */
+  refinance?: "internal" | "move";
+  /** The bank whose prices this proposal's new money carries ("system" = the average of the banks). */
+  priceBank?: BankId;
 
   /** The complete proposal mix, ready for the board: kept rows + new tranches. */
   rows: ImportedLoan[];
@@ -336,6 +346,7 @@ export type AutoMixResult = {
   /** The market the new money was priced on — shown as provenance. */
   pricing: {
     asOf: string;
+    /** The bank whose prices `rows` show: the picked bank, else the bank that holds the mortgage (an internal refinance), else "system". */
     bank: BankId;
     /** The tier the new money was priced at, and — when it was read from the document — why. */
     tier: PricingTier;
@@ -364,7 +375,8 @@ export type AutoMixResult = {
     items: { id: string; label: string; balance: number; kind: "past-due" | "outside" | "enforcement" | "called"; rowId: string | null }[];
     /** Arrears on kept rows, brought current from the new money. */
     cures: { rowId: string; overdue: number }[];
-    reference: { monthly: number; totalPaid: number; months: number };
+    /** `pv`: the reference's forecast present value at the board's discount rate (the savings/balanced PV cap). */
+    reference: { monthly: number; totalPaid: number; months: number; pv?: number };
     /** The budget the budget goals were held to. */
     budget: number;
     /** "profile": profile.budget; "reference": the reference's own payment (the default). */

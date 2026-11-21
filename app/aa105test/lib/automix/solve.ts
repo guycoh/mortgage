@@ -64,6 +64,8 @@ export type SolverDebt = {
   paid: Vec;
   /** Every future payment on the board's typed read-out, ₪. */
   typedPaid: number;
+  /** Present value of the forecast payments at the board's discount rate (ע.נ.נ), ₪. */
+  pv?: number;
   /** סה״כ ריבית on the typed read-out, ₪ — the figure the sheet's cost column shows. */
   typedInterest: number;
   /** Highest monthly payment, per economy, ₪. */
@@ -88,6 +90,8 @@ export type Column = {
   paid: Vec;
   typedPaid: number;
   typedInterest: number;
+  /** Per ₪1: present value of the forecast payments at the board's discount rate. */
+  pv?: number;
   peak: Vec;
   /** Per ₪1, at the guard's sample months — [economy][sample]. */
   early: number[][];
@@ -118,6 +122,12 @@ export type Spec = {
   floor?: number | null;
   /** Caps on everything still to be paid: under the forecast, and on the typed read-out, ₪. */
   paidCap?: number | null;
+  /**
+   * Cap on the present value of every forecast payment, at the board's discount
+   * rate (savings, balanced): a saving that is only payments moved earlier, and
+   * costs more once discounted, is not one (the proposal's PV gate).
+   */
+  pvCap?: number | null;
   typedPaidCap?: number | null;
   /** Cap on the typed read-out's סה״כ ריבית, ₪. */
   typedInterestCap?: number | null;
@@ -142,6 +152,13 @@ export type Spec = {
   ptiCap: number | null;
   /** LTV: property value, the housing cap, the all-purpose total cap. */
   ltv: { value: number; housing: number; withAp: number } | null;
+  /**
+   * Credit the property secures that no decision touches — a mortgage row past
+   * its term, which stays on the board as it is. It counts in every limit on
+   * the property (LTV, the fixed and CPI shares of all its credit) exactly as
+   * the proposal's checks count it.
+   */
+  secured?: { balance: number; fixed: number; linked: number };
   /** Today's fixed share of the property's credit (for 329 §9). */
   fixedToday: number;
   /** Today's CPI-linked share of it — the mix after the move may not be more linked than max(⅓, this). */
@@ -180,20 +197,44 @@ const FIXED: Record<TrackKey, boolean> = { prime: false, klz: true, kz: true, ml
 const LINKED: Record<TrackKey, boolean> = { prime: false, klz: false, kz: true, mlz: false, mz: true };
 
 /** Solver telemetry — how many MILPs a build ran and how long they took (the check script prints it). */
-export const STATS = { solves: 0, ms: 0, cacheHits: 0, slow: [] as { ms: number; status: string; bins: number; cols: number }[] };
+export const STATS = { solves: 0, ms: 0, cacheHits: 0, slow: [] as { ms: number; status: string; bins: number; cols: number; spec?: string }[] };
 
 /** One MILP over the given columns. */
-export function solveOnce(debts: SolverDebt[], cols: Column[], s: Spec, relaxed = false, oneTerm = false): Plan {
+/**
+ * The debts in an order that depends on what they ARE, never on where they sit
+ * on the board: the model's variable order steers branch and bound, and a
+ * node-capped search that followed the board's order gave a different answer
+ * when the same rows were listed in reverse (corpus: r02 with a profile).
+ */
+const ORDER_KEY = (d: SolverDebt) => [d.group, d.segment, -Math.round(d.balance), Math.round(d.paid[0]), d.months, d.fixed ? 1 : 0, d.linked ? 1 : 0, d.lender];
+export function canonical(debts: SolverDebt[]): SolverDebt[] {
+  return [...debts].sort((a, b) => {
+    const x = ORDER_KEY(a);
+    const y = ORDER_KEY(b);
+    for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) return x[i] < y[i] ? -1 : 1;
+    return 0;
+  });
+}
+
+export function solveOnce(debtsIn: SolverDebt[], cols: Column[], s: Spec, relaxed = false, oneTerm = false, cap = NODE_CAP): Plan {
+  const debts = canonical(debtsIn);
   const t0 = typeof performance !== "undefined" ? performance.now() : Date.now();
   let out: Plan | null = null;
   try {
-    out = solveOnceInner(debts, cols, s, relaxed, oneTerm);
+    out = solveOnceInner(debts, cols, s, relaxed, oneTerm, cap);
     return out;
   } finally {
     const ms = (typeof performance !== "undefined" ? performance.now() : Date.now()) - t0;
     STATS.solves++;
     STATS.ms += ms;
-    if (ms > 50) STATS.slow.push({ ms: Math.round(ms), status: out?.status ?? "?", bins: debts.length, cols: cols.length });
+    if (ms > 50)
+      STATS.slow.push({
+        ms: Math.round(ms),
+        status: out?.status ?? "?",
+        bins: debts.length,
+        cols: cols.length,
+        spec: `w${s.wMonthly}/${s.wCost} l${s.lambda} b${s.budget ?? "-"} f${s.finish ?? "-"} fl${s.floor ?? "-"} pk${s.peakCap ?? "-"} km${s.keepMortgage ? 1 : 0} sc${s.shareCap ? 1 : 0}${s.typedCostCap != null ? ` tc${Math.round(s.typedCostCap)}` : ""}${s.paidCap != null ? ` pc${Math.round(s.paidCap)}` : ""}${s.fixZ ? " fixZ" : ""}${relaxed ? " LP" : ""}${oneTerm ? " 1T" : ""}`,
+      });
   }
 }
 
@@ -205,8 +246,12 @@ export function solveOnce(debts: SolverDebt[], cols: Column[], s: Spec, relaxed 
  * force.
  */
 export const NODE_CAP = 1500;
+/** Slack on the whole-property share rows, ₪ (see fix_all). */
+export const SHARE_SLACK = 100;
+/** The opening solve's cap (solveTerms): enough for a normal file, short of proving a hard one has no point. */
+export const FIRST_CAP = 500;
 
-function solveOnceInner(debts: SolverDebt[], colsIn: Column[], s: Spec, relaxed: boolean, oneTerm: boolean): Plan {
+function solveOnceInner(debts: SolverDebt[], colsIn: Column[], s: Spec, relaxed: boolean, oneTerm: boolean, cap: number): Plan {
   // A deadline binds new money too: no column may end after it.
   const cols = s.finish === null ? colsIn : colsIn.filter((c) => c.years * 12 <= s.finish!);
   const C = new Map<string, { min?: number; max?: number; equal?: number }>();
@@ -232,8 +277,8 @@ function solveOnceInner(debts: SolverDebt[], colsIn: Column[], s: Spec, relaxed:
   const keptPaid = stressK.map((k) => sum(debts.map((d) => d.paid[k])));
   const keptMonthly = sum(debts.map((d) => d.monthly));
   const keptEarly = stressK.map((k) => EARLY.map((_, i) => sum(debts.map((d) => d.early[k][i]))));
-  const mortgageBal = sum(debts.filter((d) => d.group === "mortgage").map((d) => d.balance));
-  const mortgageFixed = sum(debts.filter((d) => d.group === "mortgage" && d.fixed).map((d) => d.balance));
+  const mortgageBal = sum(debts.filter((d) => d.group === "mortgage").map((d) => d.balance)) + (s.secured?.balance ?? 0);
+  const mortgageFixed = sum(debts.filter((d) => d.group === "mortgage" && d.fixed).map((d) => d.balance)) + (s.secured?.fixed ?? 0);
   const mortgageMonthly = sum(debts.filter((d) => d.group === "mortgage").map((d) => d.monthly));
 
   const needH = movable.some((d) => d.segment === "housing");
@@ -257,6 +302,7 @@ function solveOnceInner(debts: SolverDebt[], colsIn: Column[], s: Spec, relaxed:
   if (s.floor != null) C.set("floor", { min: s.floor - keptMonthly });
   const keptTyped = sum(debts.map((d) => d.typedPaid));
   if (s.paidCap != null) C.set("paid0", { max: (s.paidCap - keptPaid[0]) / U });
+  if (s.pvCap != null) C.set("pv0", { max: (s.pvCap - sum(debts.map((d) => d.pv ?? 0))) / U });
   if (s.typedPaidCap != null) C.set("tpaid", { max: (s.typedPaidCap - keptTyped) / U });
   const keptInterest = sum(debts.map((d) => d.typedInterest));
   if (s.typedInterestCap != null) C.set("tint", { max: (s.typedInterestCap - keptInterest) / U });
@@ -271,12 +317,18 @@ function solveOnceInner(debts: SolverDebt[], colsIn: Column[], s: Spec, relaxed:
   }
   // 329 Q&A 5.1 / §9 on everything the property secures afterwards — bank law only.
   const phi = Math.min(FIXED_MIN, s.fixedToday);
-  if (bankLaw) C.set("fix_all", { min: -(mortgageFixed - phi * mortgageBal) / U });
+  // Both whole-property rows are tight AT ZERO when nothing moves (phi or psi
+  // equals today's share), a degenerate corner where yalps' simplex cycles and
+  // branch and bound silently drops the node — enough of them and a feasible
+  // problem reads "infeasible" (r01 savings, r02 at +0.05pp). ₪100 of slack
+  // (SHARE_SLACK) breaks the tie; rowsOf re-tests the shares on the rounded
+  // amounts, and ₪100 is under a thousandth of a point of any real mortgage.
+  if (bankLaw) C.set("fix_all", { min: -(mortgageFixed - phi * mortgageBal) / U - SHARE_SLACK / U });
   C.set("link_h", { max: 0 });
   // Practice on the whole secured mix: the move may not leave it more CPI-linked than max(⅓, today).
   const psi = Math.max(LINKED_MAX, s.linkedToday);
-  const mortgageLinked = sum(debts.filter((d) => d.group === "mortgage" && d.linked).map((d) => d.balance));
-  C.set("link_all", { max: -(mortgageLinked - psi * mortgageBal) / U });
+  const mortgageLinked = sum(debts.filter((d) => d.group === "mortgage" && d.linked).map((d) => d.balance)) + (s.secured?.linked ?? 0);
+  C.set("link_all", { max: -(mortgageLinked - psi * mortgageBal) / U + SHARE_SLACK / U });
   if (s.ltv) {
     // 329 §9: a refinance may not create a breach or enlarge one — so the cap is
     // the rule or today's balance, whichever is higher (a household already over
@@ -298,6 +350,7 @@ function solveOnceInner(debts: SolverDebt[], colsIn: Column[], s: Spec, relaxed:
     if (s.budget !== null) add(v, "budget", c.monthly * U);
     if (s.floor != null) add(v, "floor", c.monthly * U);
     if (s.paidCap != null) add(v, "paid0", c.paid[0]);
+    if (s.pvCap != null) add(v, "pv0", c.pv ?? 0);
     if (s.typedPaidCap != null) add(v, "tpaid", c.typedPaid);
     if (s.typedInterestCap != null) add(v, "tint", c.typedInterest);
     if (s.typedCostCap != null) add(v, "tcost", c.typedPaid - 1);
@@ -412,6 +465,7 @@ function solveOnceInner(debts: SolverDebt[], colsIn: Column[], s: Spec, relaxed:
     if (s.budget !== null) put("budget", -d.monthly);
     if (s.floor != null) put("floor", -d.monthly);
     if (s.paidCap != null) put("paid0", -d.paid[0] / U);
+    if (s.pvCap != null) put("pv0", -(d.pv ?? 0) / U);
     if (s.typedPaidCap != null) put("tpaid", -d.typedPaid / U);
     if (s.typedInterestCap != null) put("tint", -d.typedInterest / U);
     if (s.typedCostCap != null) put("tcost", -(d.typedPaid - d.balance) / U);
@@ -432,7 +486,10 @@ function solveOnceInner(debts: SolverDebt[], colsIn: Column[], s: Spec, relaxed:
     }
     if (d.group === "mortgage") {
       if (bankLaw) put("fix_all", -((d.fixed ? 1 : 0) - phi) * (d.balance / U));
-      put("link_all", ((d.linked ? 1 : 0) - psi) * (d.balance / U));
+      // Refinanced, the debt's own linked share leaves the kept side — the same
+      // sign as fix_all above (it was added, which counted a refinanced linked
+      // debt twice and an unlinked one as negative).
+      put("link_all", -((d.linked ? 1 : 0) - psi) * (d.balance / U));
       if (s.ltv) {
         // Refinanced, its balance leaves the kept side (and returns as x).
         put("ltv_h", -d.balance / U);
@@ -486,7 +543,7 @@ function solveOnceInner(debts: SolverDebt[], colsIn: Column[], s: Spec, relaxed:
       add(b, `ub:${b}`, 1);
     }
   const model: Model = { direction: "minimize", objective: "obj", constraints: C, variables: V, binaries: relaxed ? [] : binList };
-  const sol = solve(model, { tolerance: 1e-7, maxIterations: NODE_CAP, checkCycles: true });
+  const sol = solve(model, { tolerance: 1e-7, maxIterations: cap, checkCycles: true });
   const incumbent = sol.status === "timedout" && Number.isFinite(sol.result);
   if (sol.status !== "optimal" && !incumbent)
     return { ok: false, status: sol.status, refinance: [], amounts: {}, objective: NaN, setupHousing: 0, setupAp: 0 };
@@ -539,7 +596,8 @@ export function termsOf(plan: Plan, cols: Column[]): Record<string, number> {
   return out;
 }
 
-export function solveTerms(debts: SolverDebt[], cols: Column[], s: Spec, seeds: Seed[] = [], start?: Plan): Plan {
+export function solveTerms(debtsIn: SolverDebt[], cols: Column[], s: Spec, seeds: Seed[] = [], start?: Plan): Plan {
+  const debts = canonical(debtsIn);
   // 1) The first solve on every other year of each track's grid (and its
   //    longest term) — the neighbourhood step below refines on the full grid.
   const grid = new Map<string, number[]>();
@@ -553,13 +611,18 @@ export function solveTerms(debts: SolverDebt[], cols: Column[], s: Spec, seeds: 
     const hi = Math.max(...ys);
     return ys.length <= 8 || (c.years - lo) % 2 === 0 || c.years === hi;
   });
-  let first = start?.ok ? start : solveOnce(debts, coarse, s);
-  if (!first.ok && coarse.length < cols.length) first = solveOnce(debts, cols, s);
+  // The first solve runs on a third of the node cap: when it has found its
+  // point by then it is kept (and improved below); when not, the cheap starts
+  // below are tried before any solve is given the full cap.
+  let first = start?.ok ? start : solveOnce(debts, coarse, s, false, false, FIRST_CAP);
+  // When the coarse MILP finds nothing, the cheap starts come first (the LP's
+  // rounding, then the mix as it is) and the full-grid MILP last: its branch
+  // and bound can spend the whole node cap without an integer point (r01
+  // savings, 1.5s) where a held start is found in milliseconds.
   if (!first.ok) {
     const lp = solveOnce(debts, coarse, s, true);
-    if (!lp.ok) return first;
-    const fr = lp.zFrac ?? {};
-    for (const cut of [0.5, 0.25, 0.75, 0.05]) {
+    const fr = lp.ok ? lp.zFrac ?? {} : {};
+    for (const cut of lp.ok ? [0.5, 0.25, 0.75, 0.05] : []) {
       const fixZ = Object.keys(fr).filter((id) => fr[id] >= cut);
       const p = solveOnce(debts, coarse, { ...s, fixZ });
       if (p.ok) {
@@ -567,6 +630,16 @@ export function solveTerms(debts: SolverDebt[], cols: Column[], s: Spec, seeds: 
         break;
       }
     }
+    // Last, the mix as it is (only what must move moves): when it keeps every
+    // rule it is an answer, and the search below improves on it. Without this a
+    // branch and bound that hit its node cap with no incumbent read as "no mix
+    // exists", and which way it fell depended on the order of the debts.
+    if (!first.ok) {
+      const keep = solveOnce(debts, coarse, { ...s, fixZ: [] });
+      if (keep.ok) first = keep;
+    }
+    if (!first.ok) first = solveOnce(debts, coarse, s);
+    if (!first.ok && coarse.length < cols.length) first = solveOnce(debts, cols, s);
     if (!first.ok) return first;
   }
   const byKey = new Map(cols.map((c) => [c.key, c]));
@@ -597,11 +670,16 @@ export function solveTerms(debts: SolverDebt[], cols: Column[], s: Spec, seeds: 
   };
   /**
    * The neighbourhood: for a track in use, its terms ±3 grid positions; for a
-   * track not in use, a spread of its grid (every fifth position, both ends) —
-   * so a track can enter the mix. Solved exactly with one binary per term.
+   * track not in use, a spread of its grid (every fifth position, both ends)
+   * AND the terms around the mix's own (every term in use, ±3) — so a track can
+   * enter the mix where it fits beside the others (r07: a 5-year prime beside an
+   * 8-year קל"צ, which the spread 4, 9, 14… never offered). Solved exactly with
+   * one binary per term.
    */
   const neighbourhood = (p: Plan) => {
     const used = termsIn(p);
+    const mixYears = new Set<number>();
+    for (const ys of Array.from(used.values())) for (const y of Array.from(ys)) for (let k = -3; k <= 3; k++) mixYears.add(y + k);
     const keep = new Set<string>();
     for (const f of families) {
       const ys = yearsOf.get(f)!;
@@ -610,6 +688,7 @@ export function solveTerms(debts: SolverDebt[], cols: Column[], s: Spec, seeds: 
       else {
         for (let i = 0; i < ys.length; i += 5) pickIdx.add(i);
         pickIdx.add(ys.length - 1);
+        ys.forEach((y, i) => mixYears.has(y) && pickIdx.add(i));
       }
       for (const i of Array.from(pickIdx)) if (i >= 0 && i < ys.length) keep.add(`${f}|${ys[i]}`);
     }
@@ -622,8 +701,11 @@ export function solveTerms(debts: SolverDebt[], cols: Column[], s: Spec, seeds: 
   };
 
   // 2) the neighbourhood of the first answer, decisions held, one term per track
-  let best = solveOnce(debts, neighbourhood(first), held(first.refinance), false, true);
-  if (!best.ok) best = solveOnce(debts, neighbourhood(first), s, false, true);
+  // Refinement solves (one binary per term) run on the opening cap: they start
+  // from an answer, and the full cap on a wide neighbourhood cost 0.6–1.7s each
+  // for nothing better (corpus Z174, 5 debts, 5.5s).
+  let best = solveOnce(debts, neighbourhood(first), held(first.refinance), false, true, FIRST_CAP);
+  if (!best.ok) best = solveOnce(debts, neighbourhood(first), s, false, true, FIRST_CAP);
   if (start?.ok && single(start) && better(start, best)) best = start;
   if (!best.ok) return { ...first, ok: false, status: "terms" };
   // Other goals' answers as starting points: B&B is node-capped, so a good
@@ -648,7 +730,7 @@ export function solveTerms(debts: SolverDebt[], cols: Column[], s: Spec, seeds: 
       }
     }
     // 4) every term move in the neighbourhood at once, decisions held
-    const nb = solveOnce(debts, neighbourhood(best), held(best.refinance), false, true);
+    const nb = solveOnce(debts, neighbourhood(best), held(best.refinance), false, true, FIRST_CAP);
     if (better(nb, best) && single(nb)) {
       best = nb;
       changed = true;

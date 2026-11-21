@@ -206,6 +206,12 @@ export type TierInfo = {
   blocked: string | null;
   evidence: TierEvidence[];
   /**
+   * The client's own record in one figure: the median excess over the market of
+   * the day, and whether it covers enough of the mortgage to count (two tranches
+   * or half the balance). null when nothing could be compared.
+   */
+  record: { median: number; strong: boolean } | null;
+  /**
    * The non-bank risk grade the condition puts the client in (see LADDER):
    * A clean · B bank refusal, a non-bank mortgage today or debts past due ·
    * C arrears or enforcement · D insolvency. Bank tiers carry it too, for the
@@ -268,7 +274,15 @@ export function resolveTier(rows: ImportedLoan[], analysis: Analysis | null | un
   const arrearsNow = flags.has("arrears-now");
   const enforced = flags.has("execution") || (analysis?.legal.executionOpen.length ?? 0) > 0;
   const nonbankMortgage = rows.some((r) => r.group === "mortgage" && !r.is_guarantor && lenderOf(r.source_bank).kind === "nonbank");
-  const grade: Grade = insolvency ? "D" : arrearsNow || enforced ? "C" : nonbankMortgage || opts.pastDue ? "B" : "A";
+  // History a bank's underwriter reads (BDI keeps three years): non-payment
+  // records the bureau reports, and enforcement files closed since. Neither is
+  // a refusal on its own; both cost the client the clean grade.
+  const nonpayBureau = (analysis?.flags ?? []).some((f) => f.id === "nonpayment" && (f as { severity?: string }).severity === "critical");
+  const closedFiles = flags.has("execution-closed");
+  const grade: Grade = insolvency ? "D" : arrearsNow || enforced ? "C" : nonbankMortgage || opts.pastDue || nonpayBureau || closedFiles ? "B" : "A";
+  const mortgageBal0 = rows.filter((r) => r.group === "mortgage" && !r.is_guarantor).reduce((a, r) => a + (Number(r.amount) || 0), 0);
+  const evidenceBal0 = evidence.reduce((a, e) => a + (Number(rows.find((r) => r.id === e.id)?.amount) || 0), 0);
+  const record = evidence.length && Number.isFinite(med) ? { median: med, strong: evidence.length >= 2 || (mortgageBal0 > 0 && evidenceBal0 / mortgageBal0 >= 0.5) } : null;
   const base = (tier: PricingTier, why: string, blocked: string | null = null, short = why): TierInfo => ({
     grade,
     tier,
@@ -280,6 +294,7 @@ export function resolveTier(rows: ImportedLoan[], analysis: Analysis | null | un
     openingFee: tier === "nonbank" ? NONBANK.openingFee : 0,
     blocked,
     evidence,
+    record,
   });
 
   const blocked =
@@ -307,6 +322,15 @@ export function resolveTier(rows: ImportedLoan[], analysis: Analysis | null | un
       null,
       "בדוח חובות שמועד פירעונם חלף, ובנק לא ממחזר לפני שהם מוסדרים."
     );
+  if (nonpayBureau && !(record?.strong && record.median >= PREMIUM_EVIDENCE)) {
+    const t = base(
+      "bankPremium",
+      `בדוח רשומות אי עמידה בפירעון שמועברות ללשכת נתוני האשראי, ובנק יתמחר את הלקוח בתוספת סיכון של ${premiumFromRecord.toFixed(2)} נק׳ (הערכה: אין תעריף מפורסם, ומסלולי הלקוח עצמם לא מראים תוספת גדולה יותר). יש לברר כל רשומה ואם הוסדרה.`,
+      null,
+      "בדוח אי עמידה בפירעון שמדווחת ללשכה, ובנק יתמחר בתוספת סיכון (הערכה)."
+    );
+    return t;
+  }
   // One tranche is an anecdote: the record counts when it covers two tranches
   // or half the mortgage.
   const mortgageBal = rows.filter((r) => r.group === "mortgage" && !r.is_guarantor).reduce((a, r) => a + (Number(r.amount) || 0), 0);

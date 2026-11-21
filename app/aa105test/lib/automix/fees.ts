@@ -69,6 +69,55 @@ export function averageRate(linked: boolean, months: number, day: string): { rat
   return null;
 }
 
+/**
+ * What a NEW fixed-rate housing loan of `months` costs today: the BoI's average
+ * rate on the loans banks made in the newest report month, by bucket of term
+ * (the same tables the fees use: mashfix.xls unlinked, pribmash.xls CPI-linked),
+ * converted from effective annual to nominal, and interpolated linearly between
+ * bucket midpoints (flat before the first and after the last). One spread on a
+ * zero curve calibrated at ~20 years priced 4–10-year fixed money 0.4–0.8 points
+ * below what banks actually lent at (audit 2026-11-21: 4-year קל"צ 3.87 vs 4.50).
+ */
+export function newFixedRate(linked: boolean, months: number): { rate: number; report: string | null } {
+  const t = linked ? T.linked : T.unlinked;
+  const row = t.rows[0];
+  const mids: number[] = [];
+  let lo = 0;
+  for (const e of edgesOf(t)) {
+    const hi = Number.isFinite(e) ? e : 360;
+    mids.push((lo + hi) / 2);
+    lo = hi;
+  }
+  // The newest three monthly tables, averaged: one month's buckets jump (the
+  // linked 10–15y bucket read 3.59, 3.19 and 3.25 in Aug, Sep and Oct 2026).
+  const recent = t.rows.slice(0, 3).filter((r) => r.rates.length === row.rates.length);
+  const eff = row.rates.map((_, i) => recent.reduce((a, r) => a + r.rates[i], 0) / recent.length);
+  // Then a curve that never falls with the term (pool adjacent violators): a
+  // shorter fixed loan is not dearer than a longer one of the same kind; where a
+  // bucket of few loans says otherwise, it is pooled with its neighbour.
+  const blocks: { v: number; n: number }[] = [];
+  for (const v of eff) {
+    blocks.push({ v, n: 1 });
+    while (blocks.length > 1 && blocks[blocks.length - 2].v > blocks[blocks.length - 1].v) {
+      const b = blocks.pop()!;
+      const a = blocks.pop()!;
+      blocks.push({ v: (a.v * a.n + b.v * b.n) / (a.n + b.n), n: a.n + b.n });
+    }
+  }
+  const fitted = blocks.flatMap((b) => Array(b.n).fill(b.v) as number[]);
+  const nominal = fitted.map((e) => 1200 * (Math.pow(1 + e / 100, 1 / 12) - 1));
+  let rate = nominal[nominal.length - 1];
+  if (months <= mids[0]) rate = nominal[0];
+  else
+    for (let i = 1; i < mids.length; i++)
+      if (months <= mids[i]) {
+        const w = (months - mids[i - 1]) / (mids[i] - mids[i - 1]);
+        rate = nominal[i - 1] + w * (nominal[i] - nominal[i - 1]);
+        break;
+      }
+  return { rate, report: row.report };
+}
+
 /** The newest table row — the A every fee today is computed with. */
 export const feeTableAsOf = () => ({ unlinked: T.unlinked.rows[0].effective, linked: T.linked.rows[0].effective });
 
