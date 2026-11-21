@@ -16,7 +16,7 @@
 // Framework-free: no React, no `window`, so it can also be built headlessly.
 
 import type { Workbook, Worksheet } from "exceljs";
-import { asEcon, priceLoan, type Assume } from "./price";
+import { asEcon, priceLoan, todayPayment, type Assume } from "./price";
 import { schedules } from "@/app/data/amortization_schedules";
 import {
   FAMILY,
@@ -216,7 +216,7 @@ const CI = {
  * bank's number on it.
  */
 function monthlyOf(x: Priced): number {
-  return reportedMonthly(x.l) ?? x.res.monthlyPayment;
+  return reportedMonthly(x.l) ?? todayPayment(x.res);
 }
 
 /** The figure a totalled column carries on one row, before rounding. */

@@ -233,6 +233,23 @@ export type ImportedLoan = Loan & {
    */
   fee_folded?: number;
 
+  /**
+   * The tranche's projected all-in rate as the LENDER printed it (הריבית הכוללת
+   * החזויה, directive 451) — what the bank itself computes the tranche will
+   * cost, on its own true margin. Session-only: read once, on import, to settle
+   * `built_in_margin` (lib/builtin), and kept so a copy of the row carries it.
+   */
+  source_forecast_rate?: number;
+  /**
+   * תוספת מובנית: margin the lender folded into the anchor it prints, so the
+   * letter's עוגן + תוספת understate what the bank charges over the market by
+   * this much (Mizrahi-Tefahot's pre-2023 bond-anchored tracks — its "תוספת
+   * מיכונית"; SmartNPV adds the same figure). The grid keeps the letter's two
+   * numbers; the engine resets on תוספת + this. Session-only, settled on import:
+   * after a reload the engine estimates it from the BoI history instead.
+   */
+  built_in_margin?: number;
+
   /* --- עדכון עוגנים. Session fields: the save route writes an explicit column
      whitelist, so none of these need a migration and none of them survive a
      reload — which is right. A refreshed anchor is a simulation of what the
@@ -332,16 +349,23 @@ export function masterTotals(rows: ImportedLoan[]) {
  * reload, like a master with a fee to fold in.
  *
  * `fee_folded` is the receipt — see the field's note.
+ *
+ * The document's printed monthly charge does not travel either. It is a fact
+ * about the debt the client carries (the master shows it, see boardMonthly);
+ * the copy is a mortgage being priced, and is priced like any proposal — at its
+ * own rate, in today's money — as SmartNPV prices its שכפול משכנתה נוכחית.
  */
 export function foldMasterRow(l: ImportedLoan, withFees: boolean, mixId: string): ImportedLoan {
   const fee = withFees ? feeOf(l) : 0;
   // `amount` IS principal + indexation — the balance the rail already states —
   // so it is taken as it stands rather than re-derived from the two parts.
   const balance = Math.round(money(l.amount));
-  const { indexation: _i, prepayment_fee: _f, fee_folded: _ff, ...rest } = l;
+  const { indexation: _i, prepayment_fee: _f, fee_folded: _ff, source_monthly: _m, source_monthly_basis: _b, ...rest } = l;
   void _i;
   void _f;
   void _ff;
+  void _m;
+  void _b;
   return {
     ...rest,
     id: crypto.randomUUID(),

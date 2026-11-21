@@ -48,7 +48,73 @@ export type Forecast = {
   nominal: number[];
   /** Expected CPI, annual %, months 1…360. */
   inflation: number[];
+  /**
+   * What the market's anchors WERE, month by month (see AnchorHistory). Not part
+   * of the forecast itself: it rides along so the engine can read an anchor a
+   * bank fixed years ago against the market of that day rather than today's.
+   * Absent on a pasted curve or when the BoI is unreachable, and every reader
+   * falls back to today's curve, which is what the engine did before it existed.
+   */
+  history?: AnchorHistory;
 };
+
+/**
+ * The Bank of Israel's zero-coupon government yields, monthly averages (SDMX
+ * flow BOI.STATISTICS/ZCM): the market anchor for a reset window of any length
+ * in any past month, nominal for a לא צמודה track and CPI-linked for a צמודה one.
+ */
+export type AnchorHistory = {
+  /** First month the rows describe, "2011-01". */
+  from: string;
+  /** The maturities each row holds, in years, ascending. */
+  years: number[];
+  /** [month][maturity] annual-compounded zero yield %, null where unpublished. */
+  real: (number | null)[][];
+  nominal: (number | null)[][];
+};
+
+const monthIndex = (from: string, ym: string) => {
+  const [fy, fm] = from.split("-").map(Number);
+  const [y, m] = ym.split("-").map(Number);
+  return (y - fy) * 12 + (m - fm);
+};
+
+/** One month's zero yield at `years`, interpolated between published maturities. */
+function zeroAt(h: AnchorHistory, ym: string, years: number, real: boolean): number | null {
+  const row = (real ? h.real : h.nominal)[monthIndex(h.from, ym)];
+  if (!row) return null;
+  const pts = h.years.map((y, i) => [y, row[i]] as const).filter((p): p is readonly [number, number] => p[1] !== null);
+  if (!pts.length) return null;
+  if (years <= pts[0][0]) return pts[0][1];
+  if (years >= pts[pts.length - 1][0]) return pts[pts.length - 1][1];
+  for (let i = 1; i < pts.length; i++) {
+    const [y1, v1] = pts[i];
+    const [y0, v0] = pts[i - 1];
+    if (years <= y1) return v0 + ((v1 - v0) * (years - y0)) / (y1 - y0);
+  }
+  return null;
+}
+
+/**
+ * The market anchor for a `months`-long window as it stood when a bank fixed a
+ * rate in `ym` ("2023-05"): the zero yield of that maturity, averaged over that
+ * month and the one before — a reset is priced on an anchor published in the
+ * days before it, which a monthly average straddles. Null when the history does
+ * not reach that month.
+ */
+export function marketAnchorAt(f: Forecast, ym: string, months: number, real: boolean): number | null {
+  const h = f.history;
+  if (!h) return null;
+  const [y, m] = ym.split("-").map(Number);
+  const prev = new Date(y, m - 2, 1);
+  const prevYm = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, "0")}`;
+  const years = Math.max(1, Math.round(months)) / 12;
+  const a = zeroAt(h, ym, years, real);
+  const b = zeroAt(h, prevYm, years, real);
+  if (a === null && b === null) return null;
+  if (a === null || b === null) return a ?? b;
+  return (a + b) / 2;
+}
 
 /* ------------------------------------------------------------- reading it */
 
@@ -187,6 +253,42 @@ export function fitForecast(
   const inflation = months.map((m) => nsForward(inflNS, tOf(m)));
   const nominal = real.map((r, i) => ((1 + r / 100) * (1 + inflation[i] / 100) - 1) * 100);
   return { nominal, inflation };
+}
+
+/**
+ * AnchorHistory from the BoI's ZCM CSV (columns SERIES_CODE, TIME_PERIOD,
+ * OBS_VALUE; series ZC_TSB_Z{N,R}D_{yy}Y_MA). Months run from the first one
+ * at or after `from` to the newest one that has any value. Null when the text
+ * holds none of the series.
+ */
+export function historyFromZcm(csv: string, from = "2011-01", years = [1, 2, 3, 4, 5, 7, 10]): AnchorHistory | null {
+  const lines = csv.trim().split(/\r?\n/);
+  const head = (lines[0] ?? "").split(",");
+  const iCode = head.indexOf("SERIES_CODE");
+  const iTime = head.indexOf("TIME_PERIOD");
+  const iVal = head.indexOf("OBS_VALUE");
+  if (iCode < 0 || iTime < 0 || iVal < 0) return null;
+  const col = new Map(years.map((y, i) => [String(y).padStart(2, "0"), i]));
+  const real: (number | null)[][] = [];
+  const nominal: (number | null)[][] = [];
+  let last = -1;
+  for (const l of lines.slice(1)) {
+    const c = l.split(",");
+    const m = c[iCode]?.match(/^ZC_TSB_Z([NR])D_(\d\d)Y_MA$/);
+    if (!m) continue;
+    const j = col.get(m[2]);
+    const v = Number(c[iVal]);
+    if (j === undefined || !Number.isFinite(v) || !/^\d{4}-\d{2}$/.test(c[iTime] ?? "")) continue;
+    const k = monthIndex(from, c[iTime]);
+    if (k < 0) continue;
+    const t = m[1] === "R" ? real : nominal;
+    for (const arr of [real, nominal]) while (arr.length <= k) arr.push(years.map(() => null));
+    // Four places: a hundredth of a basis point, and half the payload.
+    t[k][j] = Math.round(v * 1e4) / 1e4;
+    last = Math.max(last, k);
+  }
+  if (last < 0) return null;
+  return { from, years, real: real.slice(0, last + 1), nominal: nominal.slice(0, last + 1) };
 }
 
 /* ------------------------------------------------------- the paste-in path */

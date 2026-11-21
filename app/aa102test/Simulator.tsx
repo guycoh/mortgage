@@ -37,7 +37,8 @@ import {
 } from "@phosphor-icons/react";
 import type { LoanPath } from "@/app/data/hooks/useLoanPaths";
 import { paths as STATIC_PATHS } from "@/app/data/paths";
-import { priceLoan, type Econ } from "./lib/price";
+import { priceLoan, todayPayment, type Econ } from "./lib/price";
+import { settleBuiltIns } from "./lib/builtin";
 import ForecastDialog, { SAVED_FORECASTS_ENABLED, type ForecastState } from "./components/ForecastDialog";
 import ShareOfferDialog from "./components/ShareOfferDialog";
 import Bay from "./components/Bay";
@@ -807,7 +808,7 @@ export default function Simulator({
       amount += Math.round(Number(l.amount) || 0);
       // Rounded per row so the rail's החזר חודשי is the same figure as the
       // ledger's סה״כ and the export's grand total — see the note in Ledger.
-      monthly += Math.round(boardMonthly(l, r.monthlyPayment));
+      monthly += Math.round(boardMonthly(l, todayPayment(r)));
       interest += r.totalInterest;
     }
     // החזר לשקל — the mix's quality in one figure, and the only cell here that
@@ -1127,7 +1128,10 @@ export default function Simulator({
       setMixes((prev) => {
         const next = (prev ?? []).map((m) => {
           if (m.id !== activeMixId) return m;
-          const incoming = summary.loans.map((l) => ({ ...l, mix_id: activeMixId }));
+          // A letter that hides margin inside its printed anchor (Mizrahi's
+          // pre-2023 bond tracks) is settled here, against the bank's own
+          // projection of each tranche — see lib/builtin.
+          const incoming = settleBuiltIns(summary.loans, activeForecast).map((l) => ({ ...l, mix_id: activeMixId }));
           if (first) {
             landed = incoming;
             return { ...m, mix_name: nameFor(m, summary, true, reports.map((r) => r.clientName)), loans: incoming };
@@ -1166,7 +1170,7 @@ export default function Simulator({
       setTimeout(() => setFlash(false), 1600);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [activeMixId, reports, mixes]
+    [activeMixId, reports, mixes, activeForecast]
   );
 
   /** Start over: drop the reports and give the mix its blank rows back. */

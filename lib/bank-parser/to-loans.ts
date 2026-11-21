@@ -188,6 +188,10 @@ function toRow(t: BankTranche, mixId: string, st: BankStatement): ImportedLoan {
     anchor: anchorRateOf(t),
     anchor_margin: t.margin ?? null,
     anchor_interval: t.resetMonths ?? null,
+    // The bank's own projection of the tranche (הריבית הכוללת החזויה). It is
+    // computed on the margin the bank really charges, which on some letters is
+    // not the one printed beside the anchor — lib/builtin settles the gap.
+    source_forecast_rate: t.forecastRate ?? undefined,
     // Derived from the interval, never stated independently. The board edits the
     // number; this text column exists for other pages, and two fields describing
     // one fact must not be able to contradict each other.

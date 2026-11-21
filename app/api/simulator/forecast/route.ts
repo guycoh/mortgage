@@ -16,7 +16,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
-import { fitForecast, HORIZON, parseVectors, type Forecast, type ZeroPoint } from "@/app/aa102test/lib/forecast";
+import {
+  fitForecast,
+  historyFromZcm,
+  HORIZON,
+  parseVectors,
+  type AnchorHistory,
+  type Forecast,
+  type ZeroPoint,
+} from "@/app/aa102test/lib/forecast";
 import { ADMIN_COOKIE, verifyAdminCookie } from "@/app/simulator/lib/admin-auth";
 
 export const dynamic = "force-dynamic";
@@ -76,6 +84,29 @@ async function fromBoi(): Promise<Forecast | null> {
   return value;
 }
 
+/**
+ * The market's anchors as they WERE — every month since 2011 — so the engine can
+ * judge an anchor a bank fixed years ago against the market of that day (see
+ * marginOf in lib/price). Fetched apart from the fit: it is large, changes once a
+ * month, and a failure here must cost only this, never the curves.
+ */
+const HISTORY_URL =
+  "https://edge.boi.org.il/FusionEdgeServer/sdmx/v2/data/dataflow/BOI.STATISTICS/ZCM/1.0/?startPeriod=2011-01&format=csv";
+let historyCache: { at: number; value: AnchorHistory | null } | null = null;
+
+async function boiHistory(): Promise<AnchorHistory | null> {
+  if (historyCache && Date.now() - historyCache.at < 12 * 3600_000) return historyCache.value;
+  let value: AnchorHistory | null = null;
+  try {
+    const res = await fetch(HISTORY_URL, { cache: "no-store", signal: AbortSignal.timeout(15_000) });
+    if (res.ok) value = historyFromZcm(await res.text());
+  } catch {
+    value = null;
+  }
+  historyCache = { at: value ? Date.now() : Date.now() - 12 * 3600_000 + 300_000, value };
+  return value;
+}
+
 function db() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -108,7 +139,13 @@ async function readSaved(): Promise<Forecast[]> {
 }
 
 export async function GET() {
-  const [boi, saved] = await Promise.all([fromBoi(), readSaved()]);
+  const [fit, savedRaw, history] = await Promise.all([fromBoi(), readSaved(), boiHistory()]);
+  // The history is the market's past, not a forecast, so every curve carries
+  // the same one — a pasted SmartNPV curve judges an old anchor exactly as the
+  // BoI rebuild does.
+  const withHistory = (f: Forecast): Forecast => (history ? { ...f, history } : f);
+  const boi = fit ? withHistory(fit) : null;
+  const saved = savedRaw.map(withHistory);
   return NextResponse.json({ forecast: boi, boi, saved }, { headers: { "Cache-Control": "private, max-age=300" } });
 }
 

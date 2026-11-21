@@ -26,7 +26,7 @@ import {
 } from "@/app/private/crm/leads/simulators/components/calculate/loanCalculators";
 import type { CombinedRow, MixFullTotals } from "@/app/private/crm/leads/simulators/components/calculate/mixScheduleCalculators";
 import { freqMonths } from "@/lib/rate-frequency";
-import { bondAnchor, indexFactor, nominalAt, type Forecast } from "./forecast";
+import { bondAnchor, indexFactor, marketAnchorAt, nominalAt, type Forecast } from "./forecast";
 import { parseDate, startOfToday } from "./dates";
 
 /** The board's economic assumptions. `forecast: null` is the flat mode. */
@@ -69,6 +69,8 @@ type Extra = Loan & {
   source_start_date?: string;
   next_reset?: string | null;
   reset_fresh?: boolean;
+  anchor_asof?: string;
+  built_in_margin?: number;
 };
 
 /** Months between rate resets on a bond track. 60 when nothing says — the market's default. */
@@ -108,13 +110,85 @@ export function firstResetOf(l: Extra, V: number, today = startOfToday()): numbe
 }
 
 /**
- * How far a typed anchor may sit from the curve's own anchor and still be read
+ * How far a typed anchor may sit from the market's own anchor and still be read
  * as that anchor. SmartNPV's board typed 1.76% against a curve 1.78% — the same
  * thing, a day apart. Mizrahi's letter prints 3.46% for a CPI-linked 5-year
- * anchor the curve puts at 1.78% — whatever that is, it is not the BoI curve,
+ * anchor the market put at 1.73% — whatever that is, it is not the BoI curve,
  * and adding the curve's future to it would price a different mortgage.
  */
 const ANCHOR_TOLERANCE = 0.5;
+
+/**
+ * The calendar month the row's current rate was fixed in ("2023-05"), or null
+ * when it is being fixed now — a new track, a re-tracked row, a debt whose
+ * calendar the document did not give. One reset interval before the next one.
+ */
+export function lastResetYm(l: Extra, V: number, today = startOfToday()): string | null {
+  if (l.reset_fresh) return null;
+  const ym = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  const thisMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+  // The rate a document prints was fixed one interval before the change it
+  // announces — even when that change has since passed: a letter dated before
+  // its own reset still shows the old period's anchor and rate.
+  const next = l.next_reset ? parseDate(l.next_reset) : null;
+  if (next) {
+    const at = new Date(next.getFullYear(), next.getMonth() - V, 1);
+    return at < thisMonth ? ym(at) : null;
+  }
+  const s = firstResetOf(l, V, today);
+  if (s >= V) return null;
+  return ym(new Date(today.getFullYear(), today.getMonth() + s - V, 1));
+}
+
+/**
+ * The anchor the row's current rate was set against: the market's, in the month
+ * the bank last fixed it (BoI zero yields, see marketAnchorAt), or today's curve
+ * for a rate being fixed now or when the history does not reach back that far.
+ */
+function referenceAnchor(l: Extra, f: Forecast, V: number, real: boolean): number {
+  // A refreshed anchor (עדכון עוגנים) is today's value by definition, whatever
+  // the row's own calendar says about when the bank last fixed it.
+  const ym = l.anchor_asof ? null : lastResetYm(l, V);
+  const then = ym ? marketAnchorAt(f, ym, V, real) : null;
+  return then ?? bondAnchor(f, 0, V, real);
+}
+
+/**
+ * A bond track's anchor, read against the market of the day it was fixed.
+ *
+ * `builtIn` is what the lender folded into the anchor it prints: Mizrahi-Tefahot
+ * moved part of every pre-2023 borrower's margin into its "עוגן אג"ח" when the
+ * מקורות anchor was retired in 2011 (its "תוספת מיכונית"), so its letter shows,
+ * say, anchor 1.76 + margin 1.00 on a rate set when the market anchor was 1.13
+ * — the margin the bank actually charges over the market is 1.63. SmartNPV
+ * names the same thing and resets on the full margin. Zero when the printed
+ * anchor is the market's (within ANCHOR_TOLERANCE) or below it.
+ */
+export function anchorReading(l: Loan, f: Forecast): { market: number; builtIn: number; margin: number } | null {
+  const x = l as Extra;
+  const track = trackOf(Number(x.path_id));
+  if (track !== "bond_nominal" && track !== "bond_real") return null;
+  const V = intervalOf(x);
+  const rate = Number(x.rate) || 0;
+  const typed = Number(x.anchor);
+  const hasTyped = x.anchor !== null && x.anchor !== undefined && Number.isFinite(typed) && typed !== 0;
+  // Settled on import against the letter's own projection (lib/builtin): the
+  // exact figure, where the history below can only estimate it.
+  const settled = Number(x.built_in_margin);
+  if (hasTyped && x.built_in_margin !== undefined && Number.isFinite(settled))
+    return { market: typed - settled, builtIn: settled, margin: rate - typed + settled };
+  const market = referenceAnchor(x, f, V, track === "bond_real");
+  // ABOVE the market by more than noise: margin the lender folded into the
+  // anchor, so the spread the bank charges is measured from the market.
+  if (hasTyped && typed - market > ANCHOR_TOLERANCE) return { market, builtIn: typed - market, margin: rate - market };
+  // At the market, or BELOW it: the printed margin stands. Lenders hide margin
+  // inside an anchor, never the reverse — an anchor well under the market of
+  // the month we date it to is an older reading (a credit report's origination
+  // anchor, a letter printed before its reset), and the contractual margin
+  // beside it is still the one thing about the row that does not move.
+  if (hasTyped) return { market, builtIn: 0, margin: rate - typed };
+  return { market, builtIn: 0, margin: rate - market };
+}
 
 /**
  * The spread over the anchor the row keeps for life.
@@ -122,11 +196,19 @@ const ANCHOR_TOLERANCE = 0.5;
  * PRIME: the stated margin (a prime margin is printed on every letter and means
  * one thing), else whatever puts month 1 at the typed rate.
  *
- * BOND TRACKS: TODAY'S SPREAD over the curve, so the rate moves by exactly as
- * much as the curve says the anchor will (owner's rule, 2026-10-10). The typed
- * anchor measures it when it agrees with the curve (see ANCHOR_TOLERANCE);
- * otherwise the curve's own anchor for the coming window does. Either way
- * month 1 is the rate the advisor typed.
+ * BOND TRACKS: the spread the rate was SET at, kept for life, so every reset is
+ * the window's forward anchor + that spread (owner's rule, 2026-10-10: the bank's
+ * margin does not move, the anchor does). It is read against the market anchor
+ * of the month the rate was fixed (see anchorReading): a printed anchor at or
+ * below that market keeps its printed margin; one well ABOVE it carries margin
+ * the lender folded in, and the spread is measured from the market instead. A
+ * rate being fixed now is read against today's curve. Either way month 1 is the
+ * rate the advisor typed.
+ *
+ * Until 2026-11 the yardstick was always TODAY's curve. Right for a rate set
+ * lately; wrong for one set years ago — a 2021 CPI-linked track at −1.08 + 3.05
+ * was priced on a 0.07 margin, and a 2013 Mizrahi track whose 1.76 anchor hides
+ * 0.7 of margin happened to sit near today's 1.9 and lost the 0.7.
  */
 function marginOf(l: Extra, f: Forecast, track: Track, V: number): number {
   const rate = Number(l.rate) || 0;
@@ -135,11 +217,7 @@ function marginOf(l: Extra, f: Forecast, track: Track, V: number): number {
     if (l.anchor_margin !== null && l.anchor_margin !== undefined && Number.isFinite(stated)) return stated;
     return rate - (nominalAt(f, 1) + PRIME_SPREAD);
   }
-  const curve = bondAnchor(f, 0, V, track === "bond_real");
-  const typed = Number(l.anchor);
-  if (l.anchor !== null && l.anchor !== undefined && Number.isFinite(typed) && typed !== 0 && Math.abs(typed - curve) <= ANCHOR_TOLERANCE)
-    return rate - typed;
-  return rate - curve;
+  return anchorReading(l, f)!.margin;
 }
 
 /** The annual rate for every month of the row's life. */
@@ -273,6 +351,17 @@ function forecastSchedule(l: Extra, f: Forecast): PricedLoan {
     index,
   };
 }
+
+/**
+ * Month 1's payment in TODAY's money: the schedule's first payment without the
+ * month of CPI the engine has already grown it by on a צמוד row.
+ *
+ * It is the figure a bank prints as the monthly charge and the one SmartNPV
+ * quotes as החזר חודשי / החזר ראשון (2,594 on a ₪342,881 ק"צ at 5.6% where
+ * the schedule's month 1 reads 2,598). The schedule itself keeps the CPI —
+ * that month IS paid indexed, and every total is summed from it.
+ */
+export const todayPayment = (res: PricedLoan, payment: number = res.monthlyPayment) => payment / (res.index[0] || 1);
 
 /** Price one row under the board's assumptions. */
 export function priceLoan(loan: Loan, assume: Assume): PricedLoan {

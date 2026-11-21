@@ -35,7 +35,7 @@ import {
 } from "@phosphor-icons/react";
 import { schedules } from "@/app/data/amortization_schedules";
 import type { LoanPath } from "@/app/data/hooks/useLoanPaths";
-import { priceLoan, type Assume } from "../lib/price";
+import { priceLoan, todayPayment, type Assume } from "../lib/price";
 import Select from "./Select";
 import DateField from "./DateField";
 import { BankIcon } from "./bankIcons";
@@ -547,6 +547,14 @@ export default function Ledger({
     if (loan.anchor_margin !== null && Number.isFinite(Number(loan.anchor_margin)))
       parts.push(`תוספת ${signed(Number(loan.anchor_margin))}`);
     parts.push(`סה"כ ${(Number(loan.rate) || 0).toFixed(2)}%`);
+    // The letter's anchor hides part of the margin (lib/builtin). The cells keep
+    // the letter's two numbers, so the reason the forecast resets higher than
+    // עוגן + תוספת has to be said where those numbers are read.
+    const builtIn = Number(loan.built_in_margin);
+    if (loan.built_in_margin !== undefined && builtIn > 0 && loan.anchor_margin !== null && Number.isFinite(Number(loan.anchor_margin)))
+      parts.push(
+        `העוגן במכתב כולל תוספת מובנית של ${builtIn.toFixed(2)}%, ולכן התוספת בפועל היא ${(Number(loan.anchor_margin) + builtIn).toFixed(2)}% ובכל עדכון הריבית תהיה העוגן החדש ועוד תוספת זו`
+      );
     // Where a refreshed anchor came from and how old it is. Both are the point of
     // the button: the value is only worth anything if you can see its date, and an
     // unverified source has to say so rather than borrow the credibility of one
@@ -600,7 +608,7 @@ export default function Ledger({
     const of = (rows: ImportedLoan[]) => ({
       rows,
       amount: rows.reduce((s, l) => s + Math.round(Number(l.amount) || 0), 0),
-      monthly: rows.reduce((s, l) => s + Math.round(boardMonthly(l, priceLoan(l, annualInflation).monthlyPayment)), 0),
+      monthly: rows.reduce((s, l) => s + Math.round(boardMonthly(l, todayPayment(priceLoan(l, annualInflation)))), 0),
       // The master's two extra sums. `amount` above is already principal +
       // indexation, so the balance is not re-added; these are the parts the
       // master's own columns foot — how much of it is linkage, and what leaving
@@ -1258,7 +1266,7 @@ export default function Ledger({
                       // החזר חודשי: the document's own charge while the row is
                       // the debt it described — see boardMonthly. The engine's
                       // figure (next month's) is one hover away, not gone.
-                      const pay = boardMonthly(loan, res.monthlyPayment);
+                      const pay = boardMonthly(loan, todayPayment(res));
                       const payFromDoc = months > 0 && reportedMonthly(loan) !== null;
                       // A guarantee is no share of the mix, because it is not in
                       // the mix — the column says so rather than quoting a

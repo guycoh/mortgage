@@ -39,7 +39,7 @@ export type MixFigures = {
   cost: number;
   perShekel: number;
   firstTyped: number;
-  /** Month 1 as the grid shows it, forecast pricing — what atPayment(1) quotes. */
+  /** Month 1 as the grid shows it — what atPayment(1) quotes. The same figure as firstTyped. */
   firstShown: number;
   peak: number;
   peakYear: number;
@@ -71,7 +71,6 @@ export function mixFigures(rows: ImportedLoan[], assume: Assume, discountRate: n
   const live = priced(rows);
   if (!live.length) return null;
   const all = live.map((l) => priceLoan(l, assume));
-  const typed = live.map((l) => priceLoan(l, asEcon(assume).inflation));
   const months = all.reduce((m, r) => Math.max(m, r.schedule.length), 0);
   const payments = Array.from({ length: months }, (_, i) => all.reduce((s, r) => s + (r.schedule[i]?.payment ?? 0), 0));
   const balances = Array.from({ length: months }, (_, i) => all.reduce((s, r) => s + (r.schedule[i]?.closingBalance ?? 0), 0));
@@ -115,8 +114,8 @@ export function mixFigures(rows: ImportedLoan[], assume: Assume, discountRate: n
     totalPaid,
     cost: totalPaid - principal,
     perShekel: principal ? totalPaid / principal : 0,
-    firstTyped: live.reduce((s, l, i) => s + (typed[i].schedule[0] ? monthOnePay(l, typed[i].schedule[0].payment) : 0), 0),
-    firstShown: live.reduce((s, l, i) => s + (all[i].schedule[0] ? monthOnePay(l, all[i].schedule[0].payment) : 0), 0),
+    firstTyped: live.reduce((s, l) => s + monthOnePay(l, assume), 0),
+    firstShown: live.reduce((s, l) => s + monthOnePay(l, assume), 0),
     peak,
     peakYear: Math.ceil(peakAt / 12),
     irr: annualIRR(principal, payments),
