@@ -58,7 +58,7 @@ export function instalmentCredit(x: {
   if (x.overdue > 0) return { ok: false, reason: "בפיגור — אין לוח תשלומים מדווח" };
   if (!(x.payment > 0)) return { ok: false, reason: "לא דווח חיוב חודשי" };
   if (x.payment >= x.balance * 0.5 || x.months <= 2)
-    return { ok: false, reason: "חיוב שוטף — החיוב החודשי קרוב ליתרה כולה" };
+    return { ok: false, reason: "רוב היתרה נפרעת בחודש הקרוב — חיוב שוטף" };
   if (x.rate <= 0) return { ok: false, reason: "היתרה בריבית אפס" };
   return { ok: true, reason: `תשלומים בריבית — כ־${x.months} חודשים לסיום` };
 }

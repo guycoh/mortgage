@@ -154,7 +154,7 @@ const COLS: Col[] = [
   // the figure the credit report itself prints as ריבית מתואמת.
   { header: 'שת"פ\nתשואה פנימית', width: 15, fmt: "pct" },
   { header: "ע.נ.נ (₪)\nערך נוכחי נקי", width: 17, fmt: "money" },
-  { header: "הערות", width: 30 },
+  { header: "הערות", width: 36 },
 ];
 
 const SPAN = COLS.length;
@@ -608,7 +608,7 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
       // instalments at interest (lib/cards#instalmentCredit) — say so, or the
       // reader is left guessing why one facility is a loan and another is not.
       l.group === "loan" && /מסגרת|כרטיס/.test(l.source_type ?? "")
-        ? "מסגרת אשראי שנפרסה לתשלומים — נספרת כהלוואה"
+        ? "מסגרת אשראי שנכללה בתמהיל כהלוואה"
         : "",
       res.isIndexed ? "צמוד מדד" : "",
       // Say which rows are NOT the document. Silence on a reproduction reads as
@@ -811,7 +811,7 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
       cell.font = { name: FONT, size: 9, bold: true, color: { argb: C.ink2 } };
       cell.alignment = { horizontal: alignOf(b.ci), vertical: "middle", wrapText: true };
     }
-    ws.getRow(r).height = 22;
+    ws.getRow(r).height = 26;
     r += 1;
   };
 
@@ -903,8 +903,8 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
       { ci: 4, header: "מסגרת (₪)", fmt: "money" },
       { ci: CI.amount, header: "יתרה מנוצלת (₪)", fmt: "money" },
       { ci: CI.rate, header: "ריבית", fmt: "pct" },
-      { ci: CI.anchor, header: "ניצול המסגרת", fmt: "pct" },
-      { ci: CI.monthly, header: "חיוב חודשי בדוח (₪)", fmt: "money" },
+      { ci: CI.anchor, header: "שיעור ניצול", fmt: "pct" },
+      { ci: CI.monthly, header: "תשלום חודשי בדוח (₪)", fmt: "money" },
       { ci: NOTE, header: "הערות" },
     ];
     writeSubHead(cols, C.facility);
@@ -915,11 +915,9 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
       const notes = [
         l.role === "guarantor" ? "ערב — אינו נכלל בסיכום" : "",
         l.category === "overdraft"
-          ? "מינוס בחשבון — ללא לוח תשלומים"
+          ? "מינוס בחשבון — ללא לוח סילוקין"
           : l.category === "card"
-            ? l.knownPayment > 0
-              ? "החיוב החודשי הוא חיוב שוטף, לא החזר הלוואה"
-              : "מסגרת מתחדשת — ללא לוח תשלומים"
+            ? "מסגרת מתחדשת — ללא לוח סילוקין"
             : "",
         over ? "חריגה מהמסגרת" : "",
         l.overdue > 0 ? `בפיגור ${money0(l.overdue)}` : "",
@@ -950,7 +948,7 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
     const L = colLetter(CI.amount + 1);
     const S = colLetter(CI.standing + 1);
     const facRow = writeBlockTotal(
-      'סה"כ מינוס ומסגרות',
+      'סה"כ מינוס ומסגרות מנוצלות',
       [
         {
           ci: CI.amount,
@@ -979,7 +977,7 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
       tot.value = { formula: `${L}${grandRow}+${L}${facRow}`, result: totalAmount + facilityAmount };
       tot.numFmt = MONEY;
       const n = cellAt(r, NOTE + 1);
-      n.value = "יתרות בלבד — אין להן החזר חודשי קבוע";
+      n.value = "למינוס ולמסגרות אין החזר חודשי קבוע";
       n.font = { name: FONT, size: 9, color: { argb: C.white } };
       n.alignment = { horizontal: "right", vertical: "middle" };
       ws.getRow(r).height = 24;
@@ -1021,30 +1019,32 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
   // The board's card list, every line of it, ticked or not — the record of
   // which card debts the advisor counted as loans and which were left out.
   if (cards.length) {
-    writeBand(`כרטיסי אשראי   (${cards.length})`, C.loan, C.loanWash);
+    writeBand(`כרטיסי אשראי ומסגרות   (${cards.length})`, C.loan, C.loanWash);
     const cols: BCol[] = [
       { ci: 0, header: "סוג" },
       { ci: CI.standing, header: "בתמהיל" },
-      { ci: 2, header: "גוף מימון" },
+      { ci: 2, header: "מקור / גורם מדווח" },
       { ci: 3, header: "הצעת המערכת" },
       { ci: 4, header: "מסגרת (₪)", fmt: "money" },
       { ci: CI.amount, header: "יתרה (₪)", fmt: "money" },
       { ci: CI.rate, header: "ריבית", fmt: "pct" },
-      { ci: COLS.findIndex((c) => c.header === "חודשים"), header: "חודשים", fmt: "int" },
-      { ci: CI.monthly, header: "חיוב חודשי (₪)", fmt: "money" },
-      { ci: NOTE, header: "הערה" },
+      { ci: COLS.findIndex((c) => c.header === "חודשים"), header: "חודשים לסיום", fmt: "int" },
+      { ci: CI.monthly, header: "תשלום חודשי בדוח (₪)", fmt: "money" },
+      { ci: NOTE, header: "הערות" },
     ];
     writeSubHead(cols, C.loan);
     const first = r;
     let inMix = 0;
+    let inFacilities = 0;
     cards.forEach((it, i) => {
       const l = it.loan;
       const on = cardOn.has(it.ref);
       if (on) inMix += Math.round(l.balance);
+      // the same test openFacilities applies, so the two figures name where each shekel already sits
+      else if (it.kind === "facility" && l.role !== "guarantor" && l.balance > 0) inFacilities += Math.round(l.balance);
       const notes = [
         l.overdue > 0 ? `בפיגור ${money0(l.overdue)}` : "",
         it.reason,
-        !on && it.kind === "facility" && l.role !== "guarantor" ? "נספרת במסגרות המנוצלות" : "",
         multiDoc && it.clientName ? it.clientName : "",
       ]
         .filter(Boolean)
@@ -1052,10 +1052,10 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
       writeLine(
         cols,
         [
-          it.kind === "loan" ? "הלוואה" : "מסגרת",
+          it.kind === "loan" ? "הלוואה" : "מסגרת אשראי",
           on ? "✓ כלול" : "לא כלול",
           lenderOf(l.source).full || "—",
-          it.kind === "loan" ? "הלוואה" : it.suggested ? "כהלוואה" : "חיוב שוטף",
+          it.suggested ? "לכלול כהלוואה" : "לא לכלול",
           l.limit > 0 ? Math.round(l.limit) : null,
           Math.round(l.balance),
           rateOf(l),
@@ -1074,7 +1074,7 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
     const A = colLetter(CI.amount + 1);
     const M = colLetter(CI.monthly + 1);
     writeBlockTotal(
-      'סה"כ כרטיסי אשראי',
+      'סה"כ ברשימה — לסקירה בלבד',
       [
         {
           ci: CI.amount,
@@ -1088,7 +1088,9 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
           },
         },
       ],
-      `מזה בתמהיל: ${money0(inMix)}`,
+      [inMix ? `${money0(inMix)} בתמהיל` : "", inFacilities ? `${money0(inFacilities)} במינוס ומסגרות` : ""]
+        .filter(Boolean)
+        .reduce((acc, part) => (acc ? `${acc} ו־${part}` : `מתוכן ${part}`), ""),
       C.loan,
       C.loanWash
     );
