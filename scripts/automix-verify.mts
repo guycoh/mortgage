@@ -225,13 +225,24 @@ export function verifier(market: MarketSnapshot, forecast: Forecast | null) {
       // 4. kept rows are the board's own copy of the master row
       const kept = p.rows.filter((l) => l.source_type !== "תמהיל אוטומטי");
       for (const mv of p.moves.filter((m) => m.action === "keep")) {
-        const want = foldMasterRow(masterById.get(mv.id)!, false, "x");
+        // The board's copy of the master row, still carrying the payment the document prints (a kept debt is not re-priced).
+        const src = masterById.get(mv.id)!;
+        const want = { ...foldMasterRow(src, false, "x"), ...(src.source_monthly != null ? { source_monthly: src.source_monthly, source_monthly_basis: src.source_monthly_basis } : {}) };
         const strip = (l: ImportedLoan) => JSON.stringify({ ...l, id: 0, mix_id: 0 });
         check(kept.some((l) => strip(l) === strip(want)), `${tag(p.goal)}: kept row ${mv.label} is not foldMasterRow(master)`);
       }
       // 5. guarantees travel, never counted
       const guar = input.master.filter((l) => l.is_guarantor).length;
       check(p.rows.filter((l) => l.is_guarantor).length === guar, `${tag(p.goal)}: guarantees ${p.rows.filter((l) => l.is_guarantor).length} ≠ ${guar}`);
+      // 6a. the solver budgets with the payment the board will show: a goal may never
+      // come out "no-gain" because its own read-out runs over the budget it held
+      // (that is the model and the read-out disagreeing, not a result).
+      // (Only where the goal's solve holds the budget and the budget is reachable at all: the
+      // lowest payment any mix reaches, the payment goal's, is within it. Consolidation, and a
+      // budget below every mix, honestly read "over the budget".)
+      const floor = r.proposals.find((x) => x.goal === "payment" && x.status !== "unavailable")?.metrics.monthly ?? Infinity;
+      if (["years", "savings", "stable", "balanced"].includes(p.goal) && floor <= budget + 0.5)
+        check(!(p.note ?? "").includes("חורג מהמסגרת"), `${tag(p.goal)}: read-out over the budget the solver held: ${p.note}`);
       // 6. budget-holding goals hold it
       if (BUDGET_GOALS.includes(p.goal) && p.status !== "no-gain") check(p.metrics.monthly <= budget + 0.5, `${tag(p.goal)}: ${p.metrics.monthly} over budget ${budget}`);
       // 7. no "ok" proposal is worse than today on its own goal — or, with debt due

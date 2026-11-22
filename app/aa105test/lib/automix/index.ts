@@ -753,18 +753,36 @@ type Ctx = {
   variant: Variant;
 };
 
+/**
+ * A debt the client KEEPS, as a row of the proposal: the board's own copy of the
+ * master row, plus the payment the document prints. foldMasterRow drops that
+ * figure on purpose (fa2638b: a duplicated mortgage is a mortgage being priced,
+ * as SmartNPV prices its שכפול), but a kept debt is not re-priced: it goes on
+ * exactly as today, so its החזר is the printed one — and it is the figure the
+ * solver budgets with (debtsOf prices the master row). Without it the read-out
+ * of a kept row moved (r06: a loan printed at ₪665 read ₪971) and nine budget
+ * goals on the real reports went over budget by ₪7 to ₪126.
+ */
+export function keptRow(l: ImportedLoan, id: string): ImportedLoan {
+  return {
+    ...foldMasterRow(l, false, MIX_ID),
+    ...(l.source_monthly != null ? { source_monthly: l.source_monthly, source_monthly_basis: l.source_monthly_basis } : {}),
+    id,
+  };
+}
+
 /** Plan → board rows, the money balanced per segment to the shekel. */
 function rowsOf(ctx: Ctx, plan: Plan): { rows: ImportedLoan[]; tranches: NewTranche[] } {
   const rows: ImportedLoan[] = [];
   let n = 0;
   const refi = new Set(plan.refinance);
-  for (const d of ctx.debts) if (!refi.has(d.id)) rows.push({ ...foldMasterRow(d.row, false, MIX_ID), id: `keep-${++n}` });
+  for (const d of ctx.debts) if (!refi.has(d.id)) rows.push(keptRow(d.row, `keep-${++n}`));
   // Owed rows the engine could not use (no term) stay on the board as they are.
   for (const l of owedOnly(ctx.input.master))
-    if (!ctx.debts.some((d) => d.id === l.id) && (Number(l.amount) || 0) > 0) rows.push({ ...foldMasterRow(l, false, MIX_ID), id: `keep-${++n}` });
+    if (!ctx.debts.some((d) => d.id === l.id) && (Number(l.amount) || 0) > 0) rows.push(keptRow(l, `keep-${++n}`));
   // Guarantees travel with the mix, as the board's own copy of the master does:
   // shown in their section, never in a total (owedOnly).
-  for (const l of ctx.input.master) if (l.is_guarantor) rows.push({ ...foldMasterRow(l, false, MIX_ID), id: `keep-${++n}` });
+  for (const l of ctx.input.master) if (l.is_guarantor) rows.push(keptRow(l, `keep-${++n}`));
   const tranches: NewTranche[] = [];
   const byKey = new Map(ctx.cols.map((c) => [c.key, c]));
   for (const seg of ["housing", "allPurpose"] as Segment[]) {
