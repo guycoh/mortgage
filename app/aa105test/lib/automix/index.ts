@@ -48,7 +48,7 @@ import type {
 } from "./types";
 import { ECONOMIES, scheduleIn, typedRow, pvOf } from "./econ";
 import { prepaymentFee, setCpiMonthly, feeTableAsOf, newFixedRate, OPERATIONAL_FEE } from "./fees";
-import { resolveTier, primeOn, NONBANK, NONBANK_LTV, LADDER, isAllPurpose, type TierInfo } from "./tiers";
+import { resolveTier, primeOn, NONBANK, NONBANK_LTV, LADDER, isAllPurpose, EVENT_SHARE, PREMIUM_EVIDENCE, type TierInfo } from "./tiers";
 import { conditionOf, type Condition, type DueDebt } from "./condition";
 import {
   AP_TERM_MAX_YEARS,
@@ -1968,6 +1968,19 @@ function caveatsOf(ctx: Ctx, goal: GoalId, book: Book, refi: Set<string>, fPaidD
   const moved = ctx.debts.filter((d) => refi.has(d.id));
   const tier = ctx.pricing.tier;
   if (tier.tier !== "bank") out.push(`תמחור ${tier.tier === "nonbank" ? "של גוף חוץ־בנקאי" : `של בנק בתוספת סיכון של ${tier.premium.toFixed(2)} נק׳`}. ${tier.why} יש לאמת מול המלווה.`);
+  else if (tier.smaller) {
+    // The tier was read for the whole refinance. A mix that borrows much less is
+    // the size of the loans the client paid a premium on: say so, with the figure.
+    const lent = sum(Object.values(solved.plan.amounts ?? {}));
+    const alike = tier.smaller.events.filter((e) => e.orig >= EVENT_SHARE * lent);
+    if (lent > 0 && alike.length) {
+      const lvl = alike.reduce((a, e) => a + e.excess * Math.max(1, e.orig), 0) / alike.reduce((a, e) => a + Math.max(1, e.orig), 0);
+      if (lvl >= PREMIUM_EVIDENCE)
+        out.push(
+          `הכסף החדש בתמהיל הזה ${nis(lent)}, והלוואות המשכנתא של הלקוח בגודל כזה נלקחו ${lvl.toFixed(2)} נק׳ מעל ממוצע הבנקים. התמהיל תומחר בתנאי השוק, ובנק עשוי לתמחר הלוואה בגודל הזה ביוקר יותר. יש לאמת מול המלווה.`
+        );
+    }
+  }
   if (moved.some((d) => d.feeEstimated && d.group === "mortgage" && d.fee > 0))
     out.push("עמלות הפירעון חושבו לפי צו הבנקאות וטבלאות בנק ישראל ואינן מחייבות. יש לבקש מכתב יתרה לסילוק מכל בנק.");
   if (moved.some((d) => d.group === "loan" && d.feeEstimated)) out.push("עמלת פירעון מוקדם על הלוואות צרכניות בריבית קבועה לא חושבה. יש לבקש מכתב יתרה.");
@@ -2169,6 +2182,14 @@ function findingsOf(ctx: Ctx, analysis: AutoMixInput["analysis"]): Finding[] {
   const noRate = ctx.debts.filter((d) => !d.due && !(d.rate > 0));
   if (noRate.length)
     out.push({ id: "no-rate", severity: "info", title: noRate.length === 1 ? "חוב בלי ריבית מדווחת" : `${noRate.length} חובות בלי ריבית מדווחת`, detail: "נשארים בתמהיל כמות שהם עד שתתקבל הריבית.", rows: noRate.map((d) => d.id) });
+  if (ctx.pricing.tier.tier === "bank" && ctx.pricing.tier.smaller)
+    out.push({
+      id: "tier-small",
+      severity: "info",
+      title: `הלוואות קטנות נלקחו ${ctx.pricing.tier.smaller.level.toFixed(2)} נק׳ מעל השוק`,
+      detail: ctx.pricing.tier.short,
+      rows: ctx.pricing.tier.smaller.events.flatMap((e) => e.ids),
+    });
   if (ctx.pricing.tier.tier !== "bank")
     out.push({
       id: "tier",
@@ -2624,7 +2645,10 @@ function prepare(
         d.cure = 0;
       }
   const today = bookOf(input.master, input, f);
-  const tier = resolveTier(input.master, input.analysis, profile, { override, pastDue: cond.due.length > 0 });
+  // The record is read for a loan the size of the new money: what this
+  // structure may refinance (every debt that is not locked in place).
+  const newMoney = sum(debts.filter((d) => !d.lock).map((d) => d.balance));
+  const tier = resolveTier(input.master, input.analysis, profile, { override, pastDue: cond.due.length > 0, size: newMoney });
   if (!debts.length)
     return {
       fail: "אין בתמהיל הנוכחי חובות עם סכום ותקופה, ואין ממה לבנות.",
@@ -2663,13 +2687,12 @@ function prepare(
   let priceBasis: Ctx["priceBasis"] = target ? "picked" : "system";
   if (!target && variant === "bank" && incumbent && tier.tier === "bank") {
     priceBasis = "incumbent";
-    // The record is followed only DOWN. It compares each tranche with the
-    // month's all-term average, so long fixed tranches sit above it by their term
-    // alone (+0.3 to +0.4 on r01, r02, r06): under PREMIUM_EVIDENCE it reads as
-    // market pricing, and following it up would price the term twice (the fixed
-    // curve already carries it) and tie new money to today's rows (r06 savings
-    // flipped under a 0.05-point shift). Above the threshold it is bankPremium.
-    const rec = tier.record?.strong ? Math.max(0, tier.record.median) : null;
+    // The record is followed only DOWN. Under PREMIUM_EVIDENCE it reads as
+    // market pricing (the record is noisy: ±0.3 between a client's loans of one
+    // bank is common), and following it up would tie new money to today's rows
+    // (r06 savings flipped under a 0.05-point shift). Above the threshold it is
+    // bankPremium. It is read for a loan the size of the new money (tiers.ts).
+    const rec = tier.record?.strong ? Math.max(0, tier.record.level) : null;
     for (const t of TRACKS) {
       const own = input.market.bankDelta[incumbent]?.[t] ?? 0;
       priceExtra[t] = rec !== null && rec < own ? rec : own;

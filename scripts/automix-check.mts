@@ -17,7 +17,8 @@ import { household, FIXTURE_SETS } from "./automix-fixtures.mts";
 import { buildAutoMix, DEFAULT_PROFILE, __test, type AutoMixInput, type AutoMixResult, type ClientProfile, type GoalId, type Proposal } from "../app/aa105test/lib/automix";
 import { ECONOMIES, scheduleIn } from "../app/aa105test/lib/automix/econ";
 import { MIN_TRANCHE, FIXED_MIN, LINKED_MAX, TRACK_SHARE_MAX, LTV_MAX, PTI_MAX } from "../app/aa105test/lib/automix/rules";
-import { NONBANK_LTV } from "../app/aa105test/lib/automix/tiers";
+import { NONBANK_LTV, resolveTier, loanEvents, pricingRecord, EVENT_SHARE } from "../app/aa105test/lib/automix/tiers";
+import { averageRateIn } from "../app/aa105test/lib/automix/fees";
 import { EARLY } from "../app/aa105test/lib/automix/solve";
 import { priceLoan } from "../app/aa102test/lib/price";
 import { boardMonthly, foldMasterRow, owedOnly, type ImportedLoan } from "../app/aa102test/lib/credit";
@@ -442,6 +443,87 @@ for (const c of bad) {
     );
   }
   for (const [ok, what] of c.expect?.(res[1], res[0]) ?? []) check(ok, `${c.name}: ${what}`);
+}
+
+/* ================================================================ T. the pricing record */
+
+section("T. the pricing record (tiers.ts) — loan events, size, term");
+{
+  const MZ = 'בנק מזרחי טפחות בע"מ';
+  const LM = 'בנק לאומי לישראל בע"מ';
+  const nominal = (e: number) => (Math.pow(1 + e / 100, 1 / 12) - 1) * 1200;
+  // a fixed unlinked track priced exactly at the BoI average for its month and term, plus `over` points
+  const klz = (over: number, start: string, end: string, orig: number, bank = MZ, extra: Partial<ImportedLoan> = {}) => {
+    const [d, m, y] = start.split("/").map(Number);
+    const [ey, em] = end.split("-").map(Number);
+    const term = (ey - y) * 12 + (em - m);
+    const avg = averageRateIn(false, term, `${y}-${String(m).padStart(2, "0")}`);
+    if (avg === null) throw new Error(`no BoI table for ${start}`);
+    void d;
+    return row({ path_id: 2, amount: orig * 0.9, source_orig_amount: orig, rate: Math.round((nominal(avg) + over) * 1000) / 1000, months: 200, source_start_date: start, loan_end_date: end, end_date: end, source_bank: bank, purpose: "housing", ...extra });
+  };
+  const P = { ...DEFAULT_PROFILE } as ClientProfile;
+  const tierOf = (rows: ImportedLoan[], size?: number) => resolveTier(rows, null, P, { size });
+
+  // events: same lender within 45 days is one decision; 60 days or another lender is another
+  const a = [klz(0, "01/03/2024", "2044-03", 200_000), klz(0, "25/03/2024", "2044-03", 100_000)];
+  check(loanEvents(a, pricingRecord(a)).length === 1, "record: two tracks of one lender 24 days apart are one loan event");
+  const b = [klz(0, "01/03/2024", "2044-03", 200_000), klz(0, "15/05/2024", "2044-05", 100_000)];
+  check(loanEvents(b, pricingRecord(b)).length === 2, "record: 75 days apart are two loan events");
+  const c = [klz(0, "01/03/2024", "2044-03", 200_000), klz(0, "01/03/2024", "2044-03", 100_000, LM)];
+  check(loanEvents(c, pricingRecord(c)).length === 2, "record: two lenders on one day are two loan events");
+  const ev1 = loanEvents(a, pricingRecord(a))[0];
+  check(Math.abs(ev1.orig - 300_000) < 1, "record: an event's size is the sum of its tracks' original amounts");
+
+  // term for term: a track at the BoI average of its month and term reads as zero
+  const t0 = pricingRecord([klz(0, "15/06/2023", "2048-06", 400_000)]);
+  check(t0.length === 1 && Math.abs(t0[0].excess) < 0.02, `record: a track at its month-and-term average reads 0 (read ${t0[0]?.excess})`);
+
+  // a large loan at market, a small one dear (this client's shape): bank, with a warning, never a premium
+  const mixed = [klz(-0.2, "13/03/2024", "2043-03", 463_000), klz(2.6, "21/01/2026", "2041-02", 150_000)];
+  const tm = tierOf(mixed, 672_000);
+  check(tm.tier === "bank" && tm.premium === 0, `record: a large loan at market outweighs a small dear one (got ${tm.tier} ${tm.premium})`);
+  check(!!tm.smaller && tm.smaller.level >= 2.5, "record: the dear small loan is kept as a warning");
+  // the same client borrowing a small sum: the small loan speaks for it
+  const ts = tierOf(mixed, 120_000);
+  check(ts.record !== null && ts.record.level > tm.record!.level, "record: for small new money the small dear loan weighs more");
+
+  // a large loan priced high: premium, clamped to [0.5, 2.5]
+  const dear = tierOf([klz(2.7, "17/07/2023", "2046-08", 322_000)], 300_000);
+  check(dear.tier === "bankPremium" && dear.premium === 2.5, `record: one large dear loan prices a premium, clamped at 2.5 (got ${dear.tier} ${dear.premium})`);
+  const mild = tierOf([klz(0.9, "17/07/2023", "2046-08", 322_000)], 300_000);
+  check(mild.tier === "bankPremium" && Math.abs(mild.premium - 0.9) < 0.03, `record: a 0.9 record prices 0.9 (got ${mild.premium})`);
+  const under = tierOf([klz(0.6, "17/07/2023", "2046-08", 322_000)], 300_000);
+  check(under.tier === "bank", "record: under 0.75 is market pricing");
+
+  // only small dear loans, large new money: market with a warning (the back-test's verdict)
+  const smalls = [klz(2.4, "15/07/2022", "2052-08", 27_000), klz(2.1, "21/04/2024", "2054-05", 80_000), klz(3.0, "15/04/2025", "2055-04", 31_000)];
+  const tsm = tierOf(smalls, 1_000_000);
+  check(tsm.tier === "bank" && !!tsm.smaller && tsm.record === null, "record: small dear loans alone do not price a large refinance");
+
+  // no cliff at the cut: an event just under it weighs nearly as much as one just over it
+  const cut = EVENT_SHARE * 1_200_000;
+  const over = tierOf([klz(0.9, "15/03/2018", "2048-03", 550_000), klz(-0.8, "29/04/2019", "2049-04", cut + 1_000)], 1_200_000).record!.level;
+  const below = tierOf([klz(0.9, "15/03/2018", "2048-03", 550_000), klz(-0.8, "29/04/2019", "2049-04", cut - 1_000)], 1_200_000).record!.level;
+  check(Math.abs(over - below) < 0.05, `record: no cliff at the cut (${over} vs ${below})`);
+
+  // what is not evidence: eligibility loans, undated rows, guarantees, consumer loans
+  const none = tierOf([
+    klz(3, "13/03/2024", "2043-03", 400_000, MZ, { source_eligibility: true }),
+    klz(3, "13/03/2024", "2043-03", 400_000, MZ, { source_start_date: undefined }),
+    klz(3, "13/03/2024", "2043-03", 400_000, MZ, { is_guarantor: true }),
+    klz(3, "13/03/2024", "2043-03", 400_000, MZ, { group: "loan" }),
+  ]);
+  check(none.events.length === 0 && none.tier === "bank" && none.record === null, "record: eligibility, undated, guaranteed and consumer rows are not evidence");
+
+  // the order of the rows changes nothing
+  const fwd = tierOf([...mixed, ...smalls], 672_000);
+  const rev = tierOf([...mixed, ...smalls].reverse(), 672_000);
+  check(fwd.tier === rev.tier && fwd.record?.level === rev.record?.level && fwd.smaller?.level === rev.smaller?.level, "record: row order changes nothing");
+
+  // a tier set in the profile wins
+  check(resolveTier(smalls, null, { ...P, tier: "bank" } as ClientProfile, { size: 50_000 }).tier === "bank", "record: a tier set in the profile wins over the record");
+  console.log(`  events, size, term, cut and evidence rules checked`);
 }
 
 /* ================================================================ E. determinism */

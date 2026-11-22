@@ -70,6 +70,27 @@ export function averageRate(linked: boolean, months: number, day: string): { rat
 }
 
 /**
+ * What banks lent fixed-rate housing money at in month `ym` (YYYY-MM) for an
+ * original term of `months`: the BoI average-rate table whose REPORT month is
+ * `ym` (the loans made that month), effective annual %. A table up to two
+ * months older stands in when that month's is missing; null beyond that.
+ * Used to read a client's own record term for term (tiers.ts pricingRecord):
+ * the all-term monthly average sits 0.3 to 0.4 points under a 25-year loan.
+ */
+export function averageRateIn(linked: boolean, months: number, ym: string): number | null {
+  const tables = linked ? [T.linked, T.linkedOld] : [T.unlinked, T.unlinkedOld];
+  const back = (a: string) => (Number(ym.slice(0, 4)) - Number(a.slice(0, 4))) * 12 + (Number(ym.slice(5, 7)) - Number(a.slice(5, 7)));
+  for (const t of tables) {
+    const row = t.rows.find((r) => r.report && r.report.slice(0, 7) <= ym);
+    if (!row || !row.report || back(row.report) > 2) continue;
+    const edges = edgesOf(t);
+    const i = edges.findIndex((e) => months <= e);
+    return row.rates[i < 0 ? row.rates.length - 1 : i];
+  }
+  return null;
+}
+
+/**
  * What a NEW fixed-rate housing loan of `months` costs today: the BoI's average
  * rate on the loans banks made in the newest report month, by bucket of term
  * (the same tables the fees use: mashfix.xls unlinked, pribmash.xls CPI-linked),

@@ -6,12 +6,15 @@
 // engine first decides WHO would lend, and prices every new shekel there:
 //
 //   bank         market terms — the BoI system average (or the chosen bank).
-//   bankPremium  a bank, at the premium THIS client was actually charged: the
-//                median distance of their own mortgage tranches from what the
-//                market gave in the month each was taken (BoI TamInt010 /
+//   bankPremium  a bank, at the premium THIS client was actually charged on a
+//                loan of the new money's size: the amount-weighted distance of
+//                their own mortgage loans of at least a third of that size from
+//                what the market lent in the month each was taken, for the same
+//                term on fixed tracks (BoI average-rate tables; TamInt010 /
 //                Power BI per-track system rates; BIR_MRTG_99 before 2016),
 //                clamped to [0.5, 2.5] pp. Evidence from the document, not a
-//                rate card.
+//                rate card. Smaller loans priced high are a warning only
+//                (EVENT_SHARE says why).
 //   nonbank      a non-bank property-backed lender (see NONBANK).
 //
 // The evidence and the resolved tier are stated (pricing.tierWhy) and repeated
@@ -24,6 +27,7 @@ import { parseDate } from "@/app/aa102test/lib/dates";
 import type { ImportedLoan } from "@/app/aa102test/lib/credit";
 import type { ClientProfile, PricingTier } from "./types";
 import history from "./history.json";
+import { averageRateIn } from "./fees";
 
 /** BoI effective ("adjusted") annual → nominal annual, monthly payments. */
 const nominalOf = (eff: number) => (Math.pow(1 + eff / 100, 1 / 12) - 1) * 1200;
@@ -188,7 +192,25 @@ function marketThen(track: TrackKey, month: string, allPurpose: boolean): { rate
 
 const TRACK_OF: Record<number, TrackKey> = { 1: "prime", 2: "klz", 3: "kz", 4: "mlz", 5: "mz" };
 
-export type TierEvidence = { id: string; track: TrackKey; month: string; excess: number; allPurpose: boolean };
+export type TierEvidence = {
+  id: string;
+  track: TrackKey;
+  month: string;
+  /** Points over what the market lent at that month (fixed housing tracks: for the same original term). */
+  excess: number;
+  allPurpose: boolean;
+  /** The loan event the track belongs to (lender + opening within EVENT_DAYS), see loanEvents. */
+  event: string;
+  /** Original amount of the track, ₪ (the balance when the document prints none). */
+  orig: number;
+};
+
+/**
+ * One borrowing decision: the tracks a lender opened together. The record is
+ * read per decision, not per track: three tracks of one loan are one price the
+ * bank set, not three pieces of evidence.
+ */
+export type LoanEvent = { key: string; lender: string; month: string; orig: number; excess: number; ids: string[] };
 
 export type TierInfo = {
   tier: PricingTier;
@@ -206,11 +228,20 @@ export type TierInfo = {
   blocked: string | null;
   evidence: TierEvidence[];
   /**
-   * The client's own record in one figure: the median excess over the market of
-   * the day, and whether it covers enough of the mortgage to count (two tranches
-   * or half the balance). null when nothing could be compared.
+   * The client's own record in one figure, for a loan the size of the new money:
+   * the amount-weighted excess of the loan events at least half that size
+   * (`level`). `strong` when such an event exists. null when nothing of that
+   * size could be compared.
    */
-  record: { median: number; strong: boolean } | null;
+  record: { level: number; strong: boolean; size: number; events: LoanEvent[] } | null;
+  /**
+   * Smaller loans the client took above the market (amount-weighted excess ≥
+   * PREMIUM_EVIDENCE) that the record above leaves out because they are under
+   * half the new money. Not a price: a warning to ask the bank. null when none.
+   */
+  smaller: { level: number; largest: number; events: LoanEvent[] } | null;
+  /** Every loan event read, newest first (the record and `smaller` are cut from it). */
+  events: LoanEvent[];
   /**
    * The non-bank risk grade the condition puts the client in (see LADDER):
    * A clean · B bank refusal, a non-bank mortgage today or debts past due ·
@@ -223,17 +254,53 @@ export type TierInfo = {
 export type Grade = "A" | "B" | "C" | "D";
 
 /** What in the client's condition the tier reads beyond the analysis flags (from condition.ts). */
-export type TierOptions = { override?: boolean; pastDue?: boolean };
+export type TierOptions = {
+  override?: boolean;
+  pastDue?: boolean;
+  /**
+   * The new money the record is read for, ₪: what the refinance would lend
+   * (every debt the engine may move). Defaults to the owed balance of the board.
+   */
+  size?: number;
+};
+
+/** Tracks a lender opened this many days apart belong to one borrowing decision (staged disbursements). */
+export const EVENT_DAYS = 45;
+/**
+ * A loan event speaks for the new money when it is at least this share of it.
+ * Banks price small loans dearer: in the corpus (8 credit reports with their
+ * closed loans, 46 bank letters; 78 loan events of 44 clients, eligibility
+ * loans left out, 2026-11-22) loans under ₪50k sat 2.53 points over the market
+ * of their month and term, loans of ₪300k and more 0.09 (4 of 39 at 0.75 or
+ * more). Walk-forward, each loan event priced from the same client's earlier
+ * ones as this tier would have priced it (34 cases), the premium added was off
+ * from what the bank charged by 0.351 points on average with this record,
+ * against 0.448 for the median of every track (the rule before 2026-11-22),
+ * 0.406 with half instead of a third, and 0.819 with no record at all; on
+ * loans of ₪250k and more, 0.117 against 0.176. Letting smaller loans fade in
+ * (resolveTier) scores the same and removes the cliff at the line. A record of small loans alone
+ * did worse when carried to a large one even after shrinking it by the size
+ * effect (it priced the one client whose large refinance was at market at a
+ * premium), so it is shown as a warning, not a price.
+ */
+export const EVENT_SHARE = 1 / 3;
+
+const nis = (x: number) => `₪${Math.round(Math.abs(x)).toLocaleString("en-US")}`;
+const monthsApart = (a: Date, b: Date) => (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth()) + (b.getDate() - a.getDate()) / 30;
 
 /**
  * The client's own pricing record: for every mortgage-secured row whose
  * opening date, track and rate are known, how far its margin (prime) or its
- * rate (fixed) sat from the system average of that month. Variable bond
- * tracks are left out — their printed margin is over each bank's own anchor
- * definition, which the BoI tables do not state.
+ * rate (fixed) sat from what the market lent at that month. Fixed housing
+ * tracks are read against the BoI average for loans of the SAME original term
+ * that month (fees.ts averageRateIn); the all-term monthly average stands in
+ * where those tables do not reach. Variable bond tracks are left out: their
+ * printed margin is over each bank's own anchor definition, which the BoI
+ * tables do not state.
  */
 export function pricingRecord(rows: ImportedLoan[]): TierEvidence[] {
   const out: TierEvidence[] = [];
+  const events = eventKeys(rows);
   for (const r of rows) {
     if (r.is_guarantor || r.group !== "mortgage" || r.source_eligibility) continue;
     const track = TRACK_OF[Number(r.path_id)];
@@ -242,31 +309,109 @@ export function pricingRecord(rows: ImportedLoan[]): TierEvidence[] {
     const month = monthOf(start);
     const ap = isAllPurpose(r);
     const m = marketThen(track, month, ap);
-    if (!m) continue;
     let excess: number | null = null;
     const margin = r.anchor_margin !== null && r.anchor_margin !== undefined ? Number(r.anchor_margin) : null;
     if (track === "prime") {
+      if (!m) continue;
       if (ap) {
         // The rate the loan was given at: prime on that day plus its margin.
         const p = primeOn(iso(start));
         if (margin !== null && Number.isFinite(margin) && p !== null && m.rate !== undefined) excess = p + margin - m.rate;
       } else if (margin !== null && Number.isFinite(margin) && m.primeMargin !== undefined) excess = margin - m.primeMargin;
-    } else if (m.rate !== undefined) excess = Number(r.rate) - m.rate;
-    if (excess !== null) out.push({ id: r.id, track, month, excess: Math.round(excess * 100) / 100, allPurpose: ap });
+    } else {
+      const term = termOf(r, start);
+      const sameTerm = !ap && term !== null ? averageRateIn(track === "kz", term, month) : null;
+      if (sameTerm !== null) excess = Number(r.rate) - nominalOf(sameTerm);
+      else if (m?.rate !== undefined) excess = Number(r.rate) - m.rate;
+    }
+    if (excess !== null) out.push({ id: r.id, track, month, excess: Math.round(excess * 100) / 100, allPurpose: ap, event: events.get(r.id) ?? r.id, orig: origOf(r) });
   }
   return out;
 }
 
-const median = (xs: number[]) => {
-  const s = [...xs].sort((a, b) => a - b);
-  const n = s.length;
-  return n ? (n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2) : NaN;
+/** Original term in months: the planned end less the opening date; else what is left plus what has run. */
+function termOf(r: ImportedLoan, start: Date): number | null {
+  const endRaw = r.loan_end_date ?? r.end_date;
+  const end = endRaw ? parseDate(String(endRaw)) : null;
+  if (end && end > start) return Math.round(monthsApart(start, end));
+  const left = Number(r.months);
+  return left > 0 ? Math.round(left + Math.max(0, monthsApart(start, new Date()))) : null;
+}
+
+const origOf = (r: ImportedLoan) => {
+  const o = Number(r.source_orig_amount);
+  return o > 0 ? o : Math.max(0, Number(r.amount) || 0);
 };
+
+/** Each mortgage row's loan event: same lender, opened within EVENT_DAYS of the event's previous track. */
+function eventKeys(rows: ImportedLoan[]): Map<string, string> {
+  const dated = rows
+    .filter((r) => !r.is_guarantor && r.group === "mortgage" && !r.source_eligibility && r.source_start_date)
+    .map((r) => ({ r, at: parseDate(r.source_start_date!) }))
+    .filter((x): x is { r: ImportedLoan; at: Date } => !!x.at)
+    .sort((a, b) => +a.at - +b.at || String(a.r.id).localeCompare(String(b.r.id)));
+  const open: { key: string; lender: string; last: Date }[] = [];
+  const out = new Map<string, string>();
+  for (const { r, at } of dated) {
+    const lender = String(r.source_bank ?? "").trim();
+    const e = open.find((g) => g.lender === lender && +at - +g.last <= EVENT_DAYS * 864e5);
+    if (e) {
+      e.last = at;
+      out.set(r.id, e.key);
+    } else {
+      const key = `${lender}|${iso(at)}`;
+      open.push({ key, lender, last: at });
+      out.set(r.id, key);
+    }
+  }
+  return out;
+}
+
+/** The loan events, newest first: size from every track of the event, excess from its comparable tracks (by amount). */
+export function loanEvents(rows: ImportedLoan[], evidence: TierEvidence[]): LoanEvent[] {
+  const keys = eventKeys(rows);
+  const by = new Map<string, LoanEvent & { w: number; x: number }>();
+  for (const r of rows) {
+    const key = keys.get(r.id);
+    if (!key) continue;
+    const e = by.get(key) ?? { key, lender: key.split("|")[0], month: key.split("|")[1].slice(0, 7), orig: 0, excess: NaN, ids: [], w: 0, x: 0 };
+    e.orig += origOf(r);
+    e.ids.push(r.id);
+    by.set(key, e);
+  }
+  for (const ev of evidence) {
+    const e = by.get(ev.event);
+    if (!e) continue;
+    const w = ev.orig > 0 ? ev.orig : 1;
+    e.w += w;
+    e.x += w * ev.excess;
+  }
+  return Array.from(by.values())
+    .filter((e) => e.w > 0)
+    .map(({ w, x, ...e }) => ({ ...e, excess: Math.round((x / w) * 100) / 100 }))
+    .sort((a, b) => b.month.localeCompare(a.month) || b.orig - a.orig);
+}
+
+const wmean = (es: LoanEvent[]) => es.reduce((a, e) => a + e.excess * Math.max(1, e.orig), 0) / es.reduce((a, e) => a + Math.max(1, e.orig), 0);
 
 export function resolveTier(rows: ImportedLoan[], analysis: Analysis | null | undefined, profile: ClientProfile, opts: TierOptions = {}): TierInfo {
   const evidence = pricingRecord(rows);
-  const med = median(evidence.map((e) => e.excess));
-  const premiumFromRecord = Number.isFinite(med) ? Math.min(PREMIUM_CLAMP[1], Math.max(PREMIUM_CLAMP[0], med)) : PREMIUM_CLAMP[0];
+  const events = loanEvents(rows, evidence);
+  const owed = rows.filter((r) => !r.is_guarantor).reduce((a, r) => a + Math.max(0, Number(r.amount) || 0), 0);
+  const size = opts.size && opts.size > 0 ? opts.size : owed;
+  const cut = EVENT_SHARE * size;
+  const band = events.filter((e) => e.orig >= cut);
+  const below = events.filter((e) => e.orig < cut);
+  // Once a loan of that size exists, smaller ones still count, fading with the
+  // square of their share of the cut: no cliff at the line (a ₪403k loan next
+  // to a ₪461k cut weighs three quarters of its amount, a ₪150k one a fifth).
+  const fade = (e: LoanEvent) => Math.max(1, e.orig) * Math.min(1, (e.orig / cut) ** 2);
+  const level = band.length ? Math.round((events.reduce((a, e) => a + e.excess * fade(e), 0) / events.reduce((a, e) => a + fade(e), 0)) * 100) / 100 : NaN;
+  const record = band.length ? { level, strong: true, size, events: band } : null;
+  // (strong: an event of a third of the new money or more is itself a borrowing decision of that size.)
+  const belowLevel = below.length ? Math.round(wmean(below) * 100) / 100 : NaN;
+  const smaller = below.length && belowLevel >= PREMIUM_EVIDENCE ? { level: belowLevel, largest: Math.max(...below.map((e) => e.orig)), events: below } : null;
+  const premiumFromRecord = Number.isFinite(level) ? Math.min(PREMIUM_CLAMP[1], Math.max(PREMIUM_CLAMP[0], level)) : PREMIUM_CLAMP[0];
   const bankAll: TrackKey[] = ["prime", "klz", "kz", "mlz", "mz"];
   // Hard signals first: what no bank refinances.
   const flags = new Set((analysis?.flags ?? []).map((f) => f.id));
@@ -280,9 +425,6 @@ export function resolveTier(rows: ImportedLoan[], analysis: Analysis | null | un
   const nonpayBureau = (analysis?.flags ?? []).some((f) => f.id === "nonpayment" && (f as { severity?: string }).severity === "critical");
   const closedFiles = flags.has("execution-closed");
   const grade: Grade = insolvency ? "D" : arrearsNow || enforced ? "C" : nonbankMortgage || opts.pastDue || nonpayBureau || closedFiles ? "B" : "A";
-  const mortgageBal0 = rows.filter((r) => r.group === "mortgage" && !r.is_guarantor).reduce((a, r) => a + (Number(r.amount) || 0), 0);
-  const evidenceBal0 = evidence.reduce((a, e) => a + (Number(rows.find((r) => r.id === e.id)?.amount) || 0), 0);
-  const record = evidence.length && Number.isFinite(med) ? { median: med, strong: evidence.length >= 2 || (mortgageBal0 > 0 && evidenceBal0 / mortgageBal0 >= 0.5) } : null;
   const base = (tier: PricingTier, why: string, blocked: string | null = null, short = why): TierInfo => ({
     grade,
     tier,
@@ -295,6 +437,8 @@ export function resolveTier(rows: ImportedLoan[], analysis: Analysis | null | un
     blocked,
     evidence,
     record,
+    smaller,
+    events,
   });
 
   const blocked =
@@ -322,31 +466,43 @@ export function resolveTier(rows: ImportedLoan[], analysis: Analysis | null | un
       null,
       "בדוח חובות שמועד פירעונם חלף, ובנק לא ממחזר לפני שהם מוסדרים."
     );
-  if (nonpayBureau && !(record?.strong && record.median >= PREMIUM_EVIDENCE)) {
+  if (nonpayBureau && !(record && record.level >= PREMIUM_EVIDENCE)) {
     const t = base(
       "bankPremium",
-      `בדוח רשומות אי עמידה בפירעון שמועברות ללשכת נתוני האשראי, ובנק יתמחר את הלקוח בתוספת סיכון של ${premiumFromRecord.toFixed(2)} נק׳ (הערכה: אין תעריף מפורסם, ומסלולי הלקוח עצמם לא מראים תוספת גדולה יותר). יש לברר כל רשומה ואם הוסדרה.`,
+      `בדוח רשומות אי עמידה בפירעון שמועברות ללשכת נתוני האשראי, ובנק יתמחר את הלקוח בתוספת סיכון של ${premiumFromRecord.toFixed(2)} נק׳ (הערכה: אין תעריף מפורסם, והלוואות הלקוח עצמו לא מראות תוספת גדולה יותר). יש לברר כל רשומה ואם הוסדרה.`,
       null,
       "בדוח אי עמידה בפירעון שמדווחת ללשכה, ובנק יתמחר בתוספת סיכון (הערכה)."
     );
     return t;
   }
-  // One tranche is an anecdote: the record counts when it covers two tranches
-  // or half the mortgage.
-  const mortgageBal = rows.filter((r) => r.group === "mortgage" && !r.is_guarantor).reduce((a, r) => a + (Number(r.amount) || 0), 0);
-  const evidenceBal = evidence.reduce((a, e) => a + (Number(rows.find((r) => r.id === e.id)?.amount) || 0), 0);
-  const strong = evidence.length >= 2 || (mortgageBal > 0 && evidenceBal / mortgageBal >= 0.5);
   const rel = (x: number) => (Math.abs(x) < 0.005 ? "בדיוק בממוצע הבנקים" : `${Math.abs(x).toFixed(2)} נק׳ ${x > 0 ? "מעל ממוצע הבנקים" : "מתחת לממוצע הבנקים"}`);
-  const same = evidence.some((e) => e.allPurpose) ? "באותו חודש ובאותה מטרה, דיור או כל מטרה" : "באותו חודש";
-  if (evidence.length && med >= PREMIUM_EVIDENCE && strong)
+  const same = evidence.some((e) => e.allPurpose) ? "באותו חודש ובאותה מטרה, דיור או כל מטרה" : "באותו חודש ולאותה תקופה";
+  const loans = (n: number) => (n === 1 ? "הלוואה אחת" : `${n} הלוואות`);
+  const sizeWords = `בגודל דומה לכסף החדש (${nis(Math.round((EVENT_SHARE * size) / 1000) * 1000)} ומעלה)`;
+  const smallWords = smaller
+    ? ` הלוואות קטנות יותר, עד ${nis(smaller.largest)}, נלקחו ${rel(smaller.level)}, אבל בנק מתמחר הלוואה קטנה ביוקר לכל לווה, ולכן הן לא קובעות את מחיר המחזור. כדאי לשאול את הבנק.`
+    : "";
+  if (record && record.level >= PREMIUM_EVIDENCE)
     return base(
       "bankPremium",
-      `מסלולי המשכנתא של הלקוח נלקחו בחציון ${rel(med)} ${same} (${evidence.length} מסלולים), ולכן בנק יתמחר אותו בתוספת סיכון של ${premiumFromRecord.toFixed(2)} נק׳.`,
+      `הלוואות המשכנתא של הלקוח ${sizeWords} נלקחו ${rel(record.level)} ${same} (${loans(record.events.length)}), ולכן בנק יתמחר אותו בתוספת סיכון של ${premiumFromRecord.toFixed(2)} נק׳.`,
       null,
-      `המסלולים נלקחו בחציון ${rel(med)} ${same} (${evidence.length} מסלולים).`
+      `הלוואות בגודל הכסף החדש נלקחו ${rel(record.level)}.`
     );
-  if (evidence.length && med >= PREMIUM_EVIDENCE)
-    return base("bank", `רק מסלול משכנתא אחד ניתן להשוואה, ${rel(med)} ${same}, וזו עדות חלשה. התמחור לפי ממוצע הבנקים, ויש לאמת.`);
-  if (evidence.length) return base("bank", `מסלולי המשכנתא של הלקוח תומחרו בתנאי השוק ${same} (בחציון ${rel(med)}).`);
+  if (record)
+    return base(
+      "bank",
+      `הלוואות המשכנתא של הלקוח ${sizeWords} תומחרו בתנאי השוק ${same} (${rel(record.level)}, ${loans(record.events.length)}).${smallWords}`,
+      null,
+      smaller ? `הלוואות קטנות נלקחו ${rel(smaller.level)}, הגדולות בתנאי השוק.` : undefined
+    );
+  if (smaller)
+    return base(
+      "bank",
+      `אין ללקוח הלוואת משכנתא ${sizeWords} להשוואה, ולכן התמחור לפי ממוצע הבנקים.${smallWords}`,
+      null,
+      `הלוואות קטנות נלקחו ${rel(smaller.level)}, ואין הלוואה בגודל הכסף החדש להשוואה.`
+    );
+  if (events.length) return base("bank", `הלוואות המשכנתא של הלקוח תומחרו בתנאי השוק ${same} (${rel(wmean(events))}).`);
   return base("bank", "אין בדוח עדות לתמחור חריג, ולכן התמחור לפי ממוצע הבנקים.");
 }
