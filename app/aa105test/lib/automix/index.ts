@@ -47,7 +47,7 @@ import type {
   TrackShare,
 } from "./types";
 import { ECONOMIES, scheduleIn, typedRow, pvOf } from "./econ";
-import { prepaymentFee, setCpiMonthly, feeTableAsOf, newFixedRate, OPERATIONAL_FEE } from "./fees";
+import { prepaymentFee, setCpiMonthly, mergeFeeRows, feeTableAsOf, newFixedRate, OPERATIONAL_FEE } from "./fees";
 import { resolveTier, primeOn, NONBANK, NONBANK_LTV, LADDER, isAllPurpose, EVENT_SHARE, PREMIUM_EVIDENCE, type TierInfo } from "./tiers";
 import { conditionOf, type Condition, type DueDebt } from "./condition";
 import {
@@ -2844,6 +2844,7 @@ export function buildAutoMix(input: AutoMixInput): AutoMixResult {
   });
   if (!f) return fail("תחזית הריבית והמדד של בנק ישראל עדיין לא נטענה, ואי אפשר לתמחר כסף חדש.");
   setCpiMonthly((history.sources.cpi as { yoy: number | null }).yoy);
+  mergeFeeRows(input.market?.feeRows);
 
   const prep0 = prepare(input, f, skipped, "bank");
   if ("fail" in prep0) return fail(prep0.fail, prep0.today.metrics, blocksOf(prep0.parts, []));

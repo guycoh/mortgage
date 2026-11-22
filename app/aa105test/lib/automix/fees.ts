@@ -166,6 +166,31 @@ export function newFixedRate(linked: boolean, months: number): { rate: number; r
   return { rate, report: row.report };
 }
 
+/**
+ * Newer rows of the two bucketed tables, read live with the market snapshot
+ * (MarketSnapshot.feeRows), merged over the tables committed with the code. The
+ * committed file is as old as the last deploy; prime and the 5-year tracks in
+ * the same snapshot are always current, so a stale table would price fixed money
+ * in one month and variable money in another. A day already in the table and a
+ * row with another bucket count are left out, so the call is idempotent and a
+ * changed file layout cannot corrupt the tables.
+ */
+export function mergeFeeRows(extra: { unlinked?: Table["rows"]; linked?: Table["rows"] } | null | undefined) {
+  if (!extra) return;
+  for (const [t, rows] of [
+    [T.unlinked, extra.unlinked],
+    [T.linked, extra.linked],
+  ] as const) {
+    if (!rows?.length) continue;
+    const have = new Set(t.rows.map((r) => r.effective));
+    const width = t.edges.length;
+    const fresh = rows.filter((r) => /^\d{4}-\d{2}-\d{2}$/.test(r.effective) && !have.has(r.effective) && r.rates.length === width && r.rates.every((x) => Number.isFinite(x) && x > 0 && x < 30));
+    if (!fresh.length) continue;
+    t.rows.push(...fresh.map((r) => ({ effective: r.effective, report: r.report ?? null, rates: r.rates.slice() })));
+    t.rows.sort((a, b) => (a.effective < b.effective ? 1 : -1));
+  }
+}
+
 /** The newest table row — the A every fee today is computed with. */
 export const feeTableAsOf = () => ({ unlinked: T.unlinked.rows[0].effective, linked: T.linked.rows[0].effective });
 
