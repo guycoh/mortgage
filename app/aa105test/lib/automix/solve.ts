@@ -148,6 +148,11 @@ export type Spec = {
   shareCap: boolean;
   /** Mortgage tranches of one lender move together (moving to another bank). */
   moveWhole: boolean;
+  /**
+   * Locked debts this goal may repay anyway (קיצור שנים: a state-eligibility
+   * loan that alone holds the end date, and costs nothing to repay).
+   */
+  unlock?: string[];
   /** Payment cap from income (329 §5), on the housing-secured payment. */
   ptiCap: number | null;
   /** LTV: property value, the housing cap, the all-purpose total cap. */
@@ -266,7 +271,8 @@ function solveOnceInner(debts: SolverDebt[], colsIn: Column[], s: Spec, relaxed:
   const nE = cols[0]?.paid.length ?? debts[0]?.paid.length ?? 1;
   const stressK = Array.from({ length: nE }, (_, k) => k);
 
-  const movable = debts.filter((d) => d.forced || (!d.lock && (d.group === "mortgage" ? !s.keepMortgage : s.loansAllowed)));
+  const free = (d: SolverDebt) => !d.lock || !!s.unlock?.includes(d.id);
+  const movable = debts.filter((d) => d.forced || (free(d) && (d.group === "mortgage" ? !s.keepMortgage : s.loansAllowed)));
   const kept = (d: SolverDebt) => !movable.includes(d);
   const bankLaw = (s.law ?? "bank") === "bank";
   // Arrears to bring current on a debt that stays: needed only while it stays.
@@ -648,7 +654,7 @@ export function solveTerms(debtsIn: SolverDebt[], cols: Column[], s: Spec, seeds
   const yearsOf = new Map<string, number[]>();
   for (const f of families) yearsOf.set(f, Array.from(new Set(cols.filter((c) => famKey(c) === f).map((c) => c.years))).sort((x, y) => x - y));
   const held = (z: string[]) => ({ ...s, fixZ: z });
-  const movable = debts.filter((d) => !d.lock && (d.group === "mortgage" ? !s.keepMortgage : s.loansAllowed));
+  const movable = debts.filter((d) => (!d.lock || !!s.unlock?.includes(d.id)) && (d.group === "mortgage" ? !s.keepMortgage : s.loansAllowed));
   // Debts that move together: a lender's whole mortgage when moving banks.
   const groups: string[][] = [];
   const seen = new Set<string>();

@@ -2,7 +2,7 @@
 // (automix-check.mts) and the corpus/fuzz run (automix-corpus.mts).
 import { __test, type AutoMixInput, type AutoMixResult, type GoalId, type Proposal } from "../app/aa105test/lib/automix";
 import { ECONOMIES, scheduleIn } from "../app/aa105test/lib/automix/econ";
-import { MIN_TRANCHE, FIXED_MIN, LINKED_MAX, TRACK_SHARE_MAX, LTV_MAX, PTI_MAX, MATERIAL, AP_LTV, AP_LTV_RELIEF, AP_RELIEF_CAP } from "../app/aa105test/lib/automix/rules";
+import { MIN_TRANCHE, FIXED_MIN, LINKED_MAX, TRACK_SHARE_MAX, LTV_MAX, PTI_MAX, MATERIAL, AP_LTV, AP_LTV_RELIEF, AP_RELIEF_CAP, YEARS_STRETCH } from "../app/aa105test/lib/automix/rules";
 import { NONBANK_LTV } from "../app/aa105test/lib/automix/tiers";
 import { EARLY } from "../app/aa105test/lib/automix/solve";
 import { priceLoan, todayPayment } from "../app/aa102test/lib/price";
@@ -244,7 +244,21 @@ export function verifier(market: MarketSnapshot, forecast: Forecast | null) {
       if (["years", "savings", "stable", "balanced"].includes(p.goal) && floor <= budget + 0.5)
         check(!(p.note ?? "").includes("חורג מהמסגרת"), `${tag(p.goal)}: read-out over the budget the solver held: ${p.note}`);
       // 6. budget-holding goals hold it
-      if (BUDGET_GOALS.includes(p.goal) && p.status !== "no-gain") check(p.metrics.monthly <= budget + 0.5, `${tag(p.goal)}: ${p.metrics.monthly} over budget ${budget}`);
+      // קיצור שנים holds its own ceiling: today's payment (the budget) or, with no budget set,
+      // up to YEARS_STRETCH above the reference payment — never more.
+      const refPay = due?.reference.monthly ?? r.today.monthly;
+      const given = !!(input.profile.budget && input.profile.budget > 0);
+      const ceiling = p.goal === "years" ? p.budget ?? budget : budget;
+      if (p.goal === "years" && p.status !== "unavailable") {
+        check(p.budget !== undefined, `${tag(p.goal)}: no ceiling on the years proposal`);
+        check(given ? Math.abs((p.budget ?? 0) - budget) <= 0.5 : (p.budget ?? 0) <= Math.round(refPay * (1 + YEARS_STRETCH)) + 0.5 && (p.budget ?? 0) >= budget - 0.5, `${tag(p.goal)}: years ceiling ${p.budget} outside [${budget}, ${Math.round(refPay * (1 + YEARS_STRETCH))}]`);
+      }
+      if (BUDGET_GOALS.includes(p.goal) && p.status !== "no-gain") check(p.metrics.monthly <= ceiling + 0.5, `${tag(p.goal)}: ${p.metrics.monthly} over budget ${ceiling}`);
+      // A state-eligibility loan is repaid only by קיצור שנים and החזר חודשי נמוך (the goals that may lift
+      // its lock), unless it is due now (then every goal pays it off).
+      // (A non-bank first lien clears the property, eligibility loans included, by law of the lien.)
+      if (p.goal !== "years" && p.goal !== "payment" && p.structure !== "firstLien")
+        for (const mv of p.moves) if (mv.action !== "keep" && !mv.due && masterById.get(mv.id)?.source_eligibility) check(false, `${tag(p.goal)}: repays an eligibility loan (${mv.label})`);
       // 7. no "ok" proposal is worse than today on its own goal — or, with debt due
       // now, than the reference (today + the cheapest clearing of that debt).
       if (p.status === "ok") {
@@ -308,7 +322,9 @@ export function verifier(market: MarketSnapshot, forecast: Forecast | null) {
     // …and savings shows the lowest typed cost (interest + indexation) among the budget-holding goals whose mix obeys its rules
     // (savings' own rules include the PV cap: no more than today in present value at the board's discount rate).
     const refPv = due ? due.reference.pv : r.today.outlook?.pv;
-    const pvOk = (p: Proposal) => refPv === undefined || !p.metrics.outlook || p.metrics.outlook.pv <= refPv + 1;
+    // …and a mix that repays an eligibility loan is outside savings' rules (only years and payment may).
+    const zakFree = (p: Proposal) => p.structure === "firstLien" || !p.moves.some((m) => m.action !== "keep" && !m.due && masterById.get(m.id)?.source_eligibility);
+    const pvOk = (p: Proposal) => zakFree(p) && (refPv === undefined || !p.metrics.outlook || p.metrics.outlook.pv <= refPv + 1);
     const savD = by("savings");
     if (savD)
       for (const g of ["years", "balanced", "consolidate", "stable"] as GoalId[]) {
@@ -321,7 +337,9 @@ export function verifier(market: MarketSnapshot, forecast: Forecast | null) {
     if (years)
       for (const g of ["savings", "balanced", "consolidate", "stable"] as GoalId[]) {
         const p = by(g);
-        if (!p || (g === "stable" && !shareCapOk(p))) continue;
+        // Only against mixes within years' own rules: the track share cap (a non-bank savings may
+        // adopt stable's single-track mix, corpus Z150) and no eligibility loan repaid where years may not.
+        if (!p || !shareCapOk(p)) continue;
         check(years.metrics.months <= p.metrics.months + slack(years, p, "months"), `${name}: years ends at ${years.metrics.months} after ${g} ${p.metrics.months}`);
       }
     const sav = by("savings");

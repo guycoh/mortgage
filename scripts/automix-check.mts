@@ -88,7 +88,17 @@ const GOLDEN_SCOPE: Record<string, { drop: string[]; why: string }> = {
   "tier-nonbank": { drop: ["*"], why: "the non-bank model changed by design: ladder, second or first lien, Fair Credit law instead of 329, file fee" },
 };
 const market = snapshotJson as unknown as MarketSnapshot;
-const forecast = await latestCurve();
+// The BoI curve is fetched live; a network blip retries (twice, 3s apart) instead of failing the run.
+const forecast = await (async () => {
+  for (let k = 0; ; k++) {
+    try {
+      return await latestCurve();
+    } catch (e) {
+      if (k >= 2) throw e;
+      await new Promise((r) => setTimeout(r, 3000));
+    }
+  }
+})();
 const fmt = (x: number) => Math.round(x).toLocaleString("en-US");
 const V = verifier(market, forecast);
 const { check, failures, verify, verifyOverride, guardOk, shareCapOk, BUDGET_GOALS } = V;

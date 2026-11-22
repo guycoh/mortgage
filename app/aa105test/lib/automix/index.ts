@@ -67,6 +67,7 @@ import {
   TERM_MAX_YEARS,
   TRACK_SHARE_MAX,
   BREAK_EVEN_MAX,
+  YEARS_STRETCH,
 } from "./rules";
 import { solveTerms as solveTermsRaw, solveOnce, termsOf, STATS, EARLY, U, SHARE_SLACK, type Seed, type Column, type Plan, type Segment, type SolverDebt, type Spec } from "./solve";
 import history from "./history.json";
@@ -249,7 +250,7 @@ const LABEL: Record<GoalId, string> = {
 };
 const TAGLINE: Record<GoalId, string> = {
   payment: "ההחזר החודשי הנמוך ביותר שתמהיל תקין מגיע אליו, והמחיר שלו לאורך השנים",
-  years: "אותו החזר חודשי לכל היותר, והחוב כולו נגמר מוקדם ככל האפשר",
+  years: "החוב כולו נגמר מוקדם ככל האפשר, בהחזר של היום או עד 10% יותר כשזה מקצר בשנה לפחות",
   savings: "אותו החזר חודשי לכל היותר, והכי פחות כסף משולם בסך הכול",
   balanced: "הקלה בהחזר בלי לשלם יותר בסך הכול, בסיכון מתון",
   stable: "הכי פחות חשיפה לפריים ולמדד במסגרת ההחזר",
@@ -899,7 +900,7 @@ function breakEven(today: Book, prop: Book, switchCost: number): number | null {
   return hit === 1 ? 0 : hit;
 }
 
-function checksOf(ctx: Ctx, rows: ImportedLoan[], plan: Plan, metrics: MixMetrics, goal: GoalId): Check[] {
+function checksOf(ctx: Ctx, rows: ImportedLoan[], plan: Plan, metrics: MixMetrics, goal: GoalId, ceiling: number = ctx.budget): Check[] {
   const out: Check[] = [];
   const owed = owedOnly(rows);
   const fresh = owed.filter((r) => r.source_type === AUTOMIX_SOURCE);
@@ -959,7 +960,12 @@ function checksOf(ctx: Ctx, rows: ImportedLoan[], plan: Plan, metrics: MixMetric
     }
   }
   if (goal !== "payment")
-    out.push({ label: "החזר חודשי במסגרת", ok: metrics.monthly <= ctx.budget + 0.5, value: `${nis(metrics.monthly)} מתוך ${nis(ctx.budget)}`, rule: "המסגרת שנקבעה לתמהיל" });
+    out.push({
+      label: "החזר חודשי במסגרת",
+      ok: metrics.monthly <= ceiling + 0.5,
+      value: `${nis(metrics.monthly)} מתוך ${nis(ceiling)}`,
+      rule: ceiling > ctx.budget + 0.5 ? `המסגרת לקיצור שנים: ההחזר של היום ועוד עד ${Math.round(YEARS_STRETCH * 100)}%` : "המסגרת שנקבעה לתמהיל",
+    });
   const income = ctx.input.profile.income;
   if (income && income > 0) {
     const housing = sum(owed.filter((r) => r.group !== "loan" || r.source_type === AUTOMIX_SOURCE).map((r) => typedRow(r, ctx.input.inflation).monthly));
@@ -1042,7 +1048,8 @@ function specFor(ctx: Ctx, over: Partial<Spec>): Spec {
 
 /** The lowest payment under every guardrail — and, when it can be had, a payment that survives the bad economies. */
 function solvePayment(ctx: Ctx): Solved {
-  const s = specFor(ctx, { wMonthly: 1, wCost: 1e-3, lambda: 0, budget: null });
+  const unlock = eligibilityIds(ctx);
+  const s = specFor(ctx, { wMonthly: 1, wCost: 1e-3, lambda: 0, budget: null, ...(unlock.length ? { unlock } : {}) });
   // Soundness: for the next five years, in every economy, the payment should not rise above what is paid today.
   const gs = { ...s, peakCap: ctx.ref.monthly };
   // The unguarded optimum first: it is cheap, and when it already keeps the
@@ -1078,7 +1085,40 @@ function solveCost(ctx: Ctx, goal: GoalId, over: Partial<Spec> = {}): Plan {
   return solveTerms(ctx.debts, ctx.cols, costSpec(ctx, goal, over));
 }
 
+/**
+ * קיצור שנים. The earliest month the whole debt can end, at two ceilings: today's
+ * payment (ctx.budget) and — when the advisor set no budget — up to
+ * YEARS_STRETCH above it. The higher payment is taken only when it ends the
+ * debt at least MATERIAL.months sooner; otherwise the payment stays as today's.
+ * A state-eligibility loan is free to repay here (no fee, and its subsidy is
+ * the only thing lost): when it alone would hold the end date, it is repaid.
+ */
 function solveYears(ctx: Ctx): Solved {
+  const unlock = eligibilityIds(ctx);
+  const base = earliestFinish(ctx, ctx.budget, unlock);
+  const given = ctx.input.profile.budget && ctx.input.profile.budget > 0;
+  const ceiling = given ? ctx.budget : Math.round(ctx.ref.monthly * (1 + YEARS_STRETCH));
+  const stretched = ceiling > ctx.budget + 0.5 ? earliestFinish(ctx, ceiling, unlock) : null;
+  const useStretch = !!stretched?.ok && (!base.ok || base.T - stretched.T >= MATERIAL.months);
+  const pick = useStretch ? stretched! : base;
+  if (!pick.ok) return { plan: { ok: false, status: "infeasible", refinance: [], amounts: {}, objective: NaN, setupHousing: 0, setupAp: 0 } };
+  const sv = yearsAtFrom(ctx, pick.T, pick.seed, pick.budget, unlock);
+  return {
+    ...sv,
+    meta: {
+      ...(sv.meta ?? {}),
+      budget: pick.budget,
+      // What the other ceiling reaches, for the reason: today's payment's end when
+      // the stretch is taken; the stretch's end when it was not worth a year.
+      ...(stretched?.ok ? { ...(base.ok ? { atToday: base.T } : {}), atStretch: stretched.T, stretchBudget: ceiling, stretched: useStretch ? 1 : 0 } : {}),
+    },
+  };
+}
+
+type Finish = { ok: true; T: number; budget: number; seed?: { plan: Plan; spec: Spec } } | { ok: false; T: number; budget: number };
+
+/** The earliest feasible finish month within `budget` (binary search over whole years and the debts' own ends). */
+function earliestFinish(ctx: Ctx, budget: number, unlock: string[]): Finish {
   // Candidate finish months: whole years for new money, and every kept debt's own end.
   const cands = new Set<number>();
   for (let y = 1; y <= ctx.maxYears; y++) cands.add(y * 12);
@@ -1087,7 +1127,7 @@ function solveYears(ctx: Ctx): Solved {
   const todayEnd = Math.max(0, ...ctx.debts.map((d) => d.months));
   const found = new Map<number, { plan: Plan; spec: Spec }>();
   const feasible = (T: number) => {
-    const spec = specFor(ctx, { wMonthly: 1, wCost: 1e-3, lambda: 0, budget: ctx.base.budget, finish: T });
+    const spec = specFor(ctx, { wMonthly: 1, wCost: 1e-3, lambda: 0, budget, finish: T, ...(unlock.length ? { unlock } : {}) });
     const p = solveTerms(ctx.debts, ctx.cols.filter((c) => c.years * 12 <= T), spec);
     if (p.ok) found.set(T, { plan: p, spec });
     return p.ok;
@@ -1099,8 +1139,9 @@ function solveYears(ctx: Ctx): Solved {
     // Clearing debt due now can make today's end date unreachable within the budget: the goal is then the
     // earliest finish that is reachable at all (it will not read "ok" unless it is earlier than today's).
     const later = sorted.slice(hi + 1).findIndex((T) => feasible(T));
-    if (later < 0 || !ctx.ref.due) return { plan: { ok: false, status: "infeasible", refinance: [], amounts: {}, objective: NaN, setupHousing: 0, setupAp: 0 } };
-    return yearsAtFrom(ctx, sorted[hi + 1 + later], found.get(sorted[hi + 1 + later]));
+    if (later < 0 || !ctx.ref.due) return { ok: false, T: Infinity, budget };
+    const T = sorted[hi + 1 + later];
+    return { ok: true, T, budget, seed: found.get(T) };
   }
   while (lo < hi) {
     const mid = (lo + hi) >> 1;
@@ -1108,7 +1149,7 @@ function solveYears(ctx: Ctx): Solved {
     else lo = mid + 1;
   }
   const T = sorted[hi];
-  return yearsAtFrom(ctx, T, found.get(T));
+  return { ok: true, T, budget, seed: found.get(T) };
 }
 
 /**
@@ -1117,18 +1158,49 @@ function solveYears(ctx: Ctx): Solved {
  * as infeasible (yalps drops cycled nodes), and a goal that HAS an answer must
  * not read "unavailable" (corpus Z39: a larger budget made years unavailable).
  */
-function yearsAtFrom(ctx: Ctx, T: number, seed?: { plan: Plan; spec: Spec }): Solved {
-  const at = yearsAt(ctx, T);
+function yearsAtFrom(ctx: Ctx, T: number, seed?: { plan: Plan; spec: Spec }, budget: number = ctx.base.budget ?? ctx.budget, unlock: string[] = []): Solved {
+  // At the earliest end T, the payment stays within a material margin of the
+  // LOWEST payment that reaches T (the search's own answer), and within that band
+  // the cheapest, risk-weighted mix wins. Cheapest-within-the-ceiling filled the
+  // ceiling with all-fixed money: dearer in the forecast (r01: ₪21k, r02: ₪68k),
+  // a higher payment, and a mix that drifted with the ceiling (r02 at −0.05pp).
+  // The band is anchored on the lowest payment, so it does not move with it.
+  const low = seed?.plan.ok ? shown(ctx, seed.plan).monthly : null;
+  const band = low !== null ? Math.min(budget, Math.ceil(low + Math.max(low * YEARS_BAND, YEARS_BAND_MIN))) : budget;
+  const at = yearsAt(ctx, T, seed?.plan.ok ? seed.plan : undefined, band, unlock);
   if (at.plan.ok || !seed) return at;
-  const again = yearsAt(ctx, T, seed.plan);
+  const again = yearsAt(ctx, T, seed.plan, budget, unlock);
   if (again.plan.ok) return again;
   return { plan: seed.plan, meta: { finish: T }, spec: seed.spec, cols: ctx.cols.filter((c) => c.years * 12 <= T) };
 }
 
+/**
+ * For a years goal that cannot shorten by a year: the debt that holds today's
+ * end, and the lowest payment that would end everything a year sooner (one
+ * solve, no ceiling). r06: a ₪797k interest-only balloon holds the end, and no
+ * +10% reaches a year.
+ */
+function yearsWhatItTakes(ctx: Ctx, refMonths: number, ceiling: number): string {
+  const T = refMonths - MATERIAL.months;
+  if (!(T > 0)) return "";
+  const last = [...ctx.debts].filter((d) => !d.forced).sort((a, b) => b.months - a.months || b.balance - a.balance)[0];
+  const unlock = eligibilityIds(ctx);
+  const spec = specFor(ctx, { wMonthly: 1, wCost: 1e-3, lambda: 0, budget: null, finish: T, ...(unlock.length ? { unlock } : {}) });
+  const p = solveTerms(ctx.debts, ctx.cols.filter((c) => c.years * 12 <= T), spec);
+  const holder = last ? ` את המועד קובע ${last.label} של ${nis(last.balance)}${last.interestOnly ? " בריבית בלבד" : ""}, שנגמר בעוד ${yrs(last.months)}.` : "";
+  if (!p.ok) return holder;
+  const need = shown(ctx, p).monthly;
+  return `${holder} קיצור של שנה, ל-${yrs(T)}, מחייב החזר של ${nis(need)} בחודש${need > ceiling + 0.5 ? `, מעל התקרה של ${nis(ceiling)}` : ""}.`;
+}
+
+/** קיצור שנים's band over the lowest payment that reaches the earliest end (see yearsAtFrom). */
+const YEARS_BAND = 0.01;
+const YEARS_BAND_MIN = 100;
+
 /** The cheapest (λ = 0.35) mix within budget whose last payment is by month T. */
-function yearsAt(ctx: Ctx, T: number, start?: Plan): Solved {
+function yearsAt(ctx: Ctx, T: number, start?: Plan, budget: number = ctx.base.budget ?? ctx.budget, unlock: string[] = []): Solved {
   const cols = ctx.cols.filter((c) => c.years * 12 <= T);
-  const spec = specFor(ctx, { wMonthly: 0, wCost: 1, lambda: LAMBDA.years, budget: ctx.base.budget, finish: T });
+  const spec = specFor(ctx, { wMonthly: 0, wCost: 1, lambda: LAMBDA.years, budget, finish: T, ...(unlock.length ? { unlock } : {}) });
   const plan = start ? solveTermsRaw(ctx.debts, cols, spec, POOL, start) : solveTerms(ctx.debts, cols, spec);
   return { plan, meta: { finish: T }, spec, cols };
 }
@@ -1159,6 +1231,29 @@ function solveBalanced(ctx: Ctx, payMin: number): Solved {
 function reliefBudget(ctx: Ctx): number {
   const given = ctx.input.profile.budget;
   return given && given > ctx.ref.monthly ? ctx.ref.monthly + (ctx.ref.due > 0 ? 3 : 0) : ctx.budget;
+}
+
+/** The monthly ceiling a goal was held to: years its own (today's, or up to YEARS_STRETCH more), the relief goals the relief budget, the rest the budget. */
+function ceilingOf(ctx: Ctx, goal: GoalId, solved?: Solved): number {
+  if (goal === "years" && typeof solved?.meta?.budget === "number") return solved.meta.budget;
+  if (goal === "balanced" || goal === "consolidate") return reliefBudget(ctx);
+  return ctx.budget;
+}
+
+/** Does a plan repay a debt that is locked for every goal but the one that unlocked it (קיצור שנים, an eligibility loan)? */
+function lockedIn(ctx: Ctx, plan: Plan, allowed: string[] = []): boolean {
+  return plan.refinance.some((id) => !!ctx.debts.find((d) => d.id === id)?.lock && !allowed.includes(id));
+}
+
+/**
+ * State-eligibility loans the two goals that measure payment and time may
+ * repay: no prepayment fee, only the subsidy is lost. קיצור שנים, when one alone
+ * holds the end date; החזר חודשי נמוך, when a short one carries a heavy payment
+ * (corpus Z566: kept, it held the lowest payment at ₪20,781 while repaying it
+ * reached ₪12,855). The cost goals keep them: subsidised money is cheap.
+ */
+function eligibilityIds(ctx: Ctx): string[] {
+  return ctx.debts.filter((d) => d.zak && !d.forced).map((d) => d.id);
 }
 
 function reliefSolve(ctx: Ctx, goal: "balanced" | "consolidate", payMin: number, reach: number, over: Partial<Spec>): Solved {
@@ -1281,7 +1376,7 @@ function enforceDisplayOrder(ctx: Ctx, solvedBy: Map<GoalId, Solved>) {
   if (pay?.plan.ok) {
     let best = shown(ctx, pay.plan).monthly;
     for (const [g, sv] of Array.from(solvedBy.entries())) {
-      if (g === "payment" || !sv.plan.ok) continue;
+      if (g === "payment" || !sv.plan.ok || lockedIn(ctx, sv.plan, eligibilityIds(ctx))) continue;
       const m = shown(ctx, sv.plan).monthly;
       if (m < best) {
         // A goal with tighter rules reached a lower payment: the payment goal takes that mix.
@@ -1302,7 +1397,7 @@ function enforceDisplayOrder(ctx: Ctx, solvedBy: Map<GoalId, Solved>) {
       for (const g of BUDGET_GOALS) {
         if (g === "savings") continue;
         const sv = solvedBy.get(g);
-        if (!sv?.plan.ok) continue;
+        if (!sv?.plan.ok || lockedIn(ctx, sv.plan)) continue;
         const c = shown(ctx, sv.plan).totalCost;
         if (c < own - 0.5 && (!rival || c < rival.cost) && fits(ctx, sv.plan, sav)) rival = { g, plan: sv.plan, cost: c };
       }
@@ -1454,7 +1549,7 @@ function proposalOf(ctx: Ctx, goal: GoalId, solved: Solved): Proposal {
       const pin = ctx.debts.filter((d) => d.lock && d.months >= m.months - 1).sort((a, b) => b.months - a.months)[0];
       note = pin
         ? `החוב נגמר בעוד ${yrs(m.months)} בגלל ${pin.label} של ${nis(pin.balance)} שנשאר (${pin.lock}).`
-        : `הקיצור הוא ${Math.max(0, R.months - m.months)} חודשים, פחות משנה, ולא מצדיק מחזור.`;
+        : `הקיצור הוא ${Math.max(0, R.months - m.months)} חודשים, פחות משנה, ולא מצדיק מחזור.${yearsWhatItTakes(ctx, R.months, ceilingOf(ctx, goal, solved))}`;
     }
   } else if (goal === "savings") {
     if (!costGain) {
@@ -1514,9 +1609,10 @@ function proposalOf(ctx: Ctx, goal: GoalId, solved: Solved): Proposal {
   if (status === "no-gain" && R.due > 0 && goal !== "payment" && goal !== "consolidate" && !(ctx.input.profile.budget && ctx.input.profile.budget > 0))
     note = `${note ?? ""} המסגרת היא ${nis(ctx.budget)}, ${ctx.budget - R.monthly > 0.5 ? `כמעט בדיוק ההחזר הנמוך ביותר שמסלק את החוב העומד לפירעון (${nis(R.monthly)})` : "ההחזר הנמוך ביותר שמסלק את החוב העומד לפירעון"}, ובה אין מקום ל${goal === "years" ? "קיצור" : goal === "savings" ? "חיסכון" : goal === "stable" ? "יציבות" : "שיפור"}. תקציב חודשי גבוה יותר שהלקוח יכול לשאת יפתח את היעד הזה.`.trim();
   // A budget-holding goal must hold it on the board's own read-out.
-  if (status === "ok" && goal !== "payment" && m.monthly > ctx.budget + 0.5) {
+  const held = ceilingOf(ctx, goal, solved);
+  if (status === "ok" && goal !== "payment" && m.monthly > held + 0.5) {
     status = "no-gain";
-    note = `ההחזר ${nis(m.monthly)} חורג מהמסגרת ${nis(ctx.budget)}`;
+    note = `ההחזר ${nis(m.monthly)} חורג מהמסגרת ${nis(held)}`;
   }
 
   const reasons = reasonsOf(ctx, goal, book, tranches, refi, fPaidDelta, worstDelta, be, fees + setup, solved);
@@ -1530,7 +1626,7 @@ function proposalOf(ctx: Ctx, goal: GoalId, solved: Solved): Proposal {
     reasons.splice(i, 1);
   }
   const caveats = caveatsOf(ctx, goal, book, refi, fPaidDelta, delta, solved);
-  const checks = checksOf(ctx, rows, used, m, goal);
+  const checks = checksOf(ctx, rows, used, m, goal, held);
   if (status === "ok" && checks.some((c) => !c.ok)) {
     status = "unavailable";
     note = `נכשלה בדיקה: ${checks.filter((c) => !c.ok).map((c) => c.label).join(", ")}`;
@@ -1541,6 +1637,7 @@ function proposalOf(ctx: Ctx, goal: GoalId, solved: Solved): Proposal {
     tagline: TAGLINE[goal],
     status,
     note,
+    ...(goal !== "payment" ? { budget: Math.round(held) } : {}),
     structure: isBankVariant(ctx.variant) ? "bank" : ctx.variant,
     ...(structureWhy ? { structureWhy } : {}),
     // Always set on a bank structure: "move" when the whole mortgage goes to another
@@ -1701,6 +1798,12 @@ function moveDetail(ctx: Ctx, d: Debt, todayRate: number, goal: GoalId): string[
       "היום לא משולם עליו דבר",
       d.rate > 0 ? `הריבית בדוח ${d.rate.toFixed(2)}%` : "",
     ];
+  if (d.zak)
+    return [
+      `הלוואת זכאות בריבית מסובסדת של ${d.rate.toFixed(2)}%, נפרעת והסבסוד אובד`,
+      feeWords(d),
+      goal === "years" ? `היום היא נגמרת בעוד ${yrs(d.months)}, וכל עוד היא נשארת החוב לא נגמר לפני כן` : `ההחזר עליה היום ${nis(d.monthly)} בחודש, עד ${yrs(d.months)}`,
+    ];
   const out: string[] = [rateWords(todayRate, marketRateFor(ctx, d)), feeWords(d)];
   if (d.interestOnly) out.push("המסלול עובר מריבית בלבד לפירעון קרן חודשי");
   if (d.group === "mortgage" && d.segment === "allPurpose") out.push("מטרתו כל מטרה, ולכן הוא ממוחזר ככסף לכל מטרה");
@@ -1783,6 +1886,45 @@ function reasonsOf(ctx: Ctx, goal: GoalId, book: Book, tranches: NewTranche[], r
     );
   if (goal === "balanced" && typeof solved.meta?.phi === "number" && solved.meta.phi > 0 && typeof solved.meta.payMin === "number")
     out.push(`זו ההקלה הגדולה ביותר שאינה מייקרת את סך התשלומים, ${Math.round(Number(solved.meta.phi) * 100)}% מהדרך מ-${nis(reliefBudget(ctx))} אל ההחזר הנמוך האפשרי, ${nis(Number(solved.meta.payMin))}.`);
+  // Repaying a state-eligibility loan gives up its subsidy: say what it is worth.
+  // The value of a below-market loan = its balance less the present value of its
+  // remaining payments (forecast) at what new money of the same track and term
+  // costs this client (nominal: a CPI-linked rate plus the typed inflation). An
+  // estimate. Summing the payments instead overstated it (r04: ₪257k vs ₪91k).
+  const zakMoved = moved.filter((d) => d.zak && !d.forced);
+  if (zakMoved.length) {
+    const extra = sum(
+      zakMoved.map((d) => {
+        const track = TRACK_OF[Number(d.row.path_id)];
+        if (!track || !ctx.pricing.tier.tracks.includes(track)) return 0;
+        const y = Math.max(MIN_YEARS[track], Math.min(ctx.maxYears, Math.round(d.months / 12)));
+        const r = ctx.pricing.rate(track, y, "housing").rate + (isLinkedPath(Number(d.row.path_id)) ? ctx.input.inflation : 0);
+        const pay = d.priced.pay[0] ?? [];
+        return Math.max(0, d.balance - pvOf(pay.map((x, i) => (i === 0 ? d.priced.typedMonthly : x)), r));
+      })
+    );
+    const bal = sum(zakMoved.map((d) => d.balance));
+    const last = Math.max(...zakMoved.map((d) => d.months));
+    out.splice(
+      Math.min(1, out.length),
+      0,
+      `${zakMoved.length === 1 ? "הלוואת הזכאות" : `${zakMoved.length} הלוואות הזכאות`}, ${nis(bal)}, ${zakMoved.length === 1 ? "נפרעת" : "נפרעות"}, ${goal === "years" ? `כי בלעדיהן החוב לא נגמר לפני ${yrs(last)}` : "כי ההחזר עליהן כבד"}. ${extra >= 1000 ? `הסבסוד שאובד שווה כ-${nis(extra)} בערך נוכחי, בריבית שכסף חדש מאותו סוג עולה ללקוח (הערכה).` : "הסבסוד שאובד זניח."}`
+    );
+  }
+  if (goal === "years" && typeof solved.meta?.atStretch === "number" && typeof solved.meta?.stretchBudget === "number") {
+    const B0 = ctx.budget;
+    const B1 = solved.meta.stretchBudget;
+    const T0 = typeof solved.meta.atToday === "number" ? solved.meta.atToday : null;
+    const T1 = solved.meta.atStretch;
+    if (solved.meta.stretched)
+      out.push(
+        T0 !== null
+          ? `במסגרת של היום, ${nis(B0)}, החוב היה נגמר בעוד ${yrs(T0)}. תקרה גבוהה ב-${nis(B1 - B0)} בחודש (עד ${Math.round(YEARS_STRETCH * 100)}% יותר) מקצרת אותו ל-${yrs(T1)}.`
+          : `במסגרת של היום, ${nis(B0)}, אין תמהיל שמקצר את החוב. בתקרה של ${nis(B1)} (עד ${Math.round(YEARS_STRETCH * 100)}% יותר) הוא נגמר בעוד ${yrs(T1)}.`
+      );
+    else if (T0 !== null && T0 > T1)
+      out.push(`תקרה גבוהה עד ${Math.round(YEARS_STRETCH * 100)}%, ${nis(B1)}, הייתה מקצרת רק ב-${T0 - T1} חודשים, פחות משנה, ולכן ההחזר נשאר במסגרת של היום, ${nis(B0)}.`);
+  }
   if (goal === "payment" && typeof solved.meta?.adopted === "string") out.push(`זה התמהיל של יעד "${LABEL[solved.meta.adopted as GoalId]}", שמגיע להחזר הנמוך ביותר מכל היעדים, ${nis(book.metrics.monthly)} בחודש.`);
   // Debt due now: today's החזר חודשי leaves it out, and every "versus today" figure says so.
   if (ctx.ref.due > 0) out.unshift(dueSentence(ctx));
@@ -2268,22 +2410,31 @@ function runGoals(ctx: Ctx, consolidateOk: boolean, wanted: Set<GoalId>): Run {
     const p2 = solveTermsRaw(ctx.debts, sv.cols, sv.spec, POOL, sv.plan);
     if (p2.ok && p2.objective < sv.plan.objective - 1e-6) solvedBy.set(goal, { ...sv, plan: p2 });
   }
-  const yrs0 = solvedBy.get("years");
-  if (yrs0?.plan.ok && typeof yrs0.meta?.finish === "number") {
-    const finishOf = (p: Plan) => Math.max(0, ...ctx.debts.filter((d) => !p.refinance.includes(d.id)).map((d) => d.months), ...Object.keys(p.amounts).map((k) => Number(k.split("|")[2]) * 12));
-    let T = yrs0.meta.finish;
-    for (const [g, sv] of Array.from(solvedBy.entries())) {
-      if (g === "years" || g === "payment" || !sv.plan.ok || !sv.spec || !sv.spec.shareCap) continue;
-      const f = finishOf(sv.plan);
-      if (f < T) {
-        const at = yearsAt(ctx, f, sv.plan);
-        if (at.plan.ok) {
-          solvedBy.set("years", tag(at));
+  // "years" also takes the earliest finish any budget-holding answer reached, when
+  // that answer obeys its rules — after the polish AND after the display order
+  // (savings can reach an earlier end there: corpus Z150, 48 months vs 60).
+  const yearsFromOthers = () => {
+    const yrs0 = solvedBy.get("years");
+    if (yrs0?.plan.ok && typeof yrs0.meta?.finish === "number") {
+      const finishOf = (p: Plan) => Math.max(0, ...ctx.debts.filter((d) => !p.refinance.includes(d.id)).map((d) => d.months), ...Object.keys(p.amounts).map((k) => Number(k.split("|")[2]) * 12));
+      let T = yrs0.meta.finish;
+      for (const [g, sv] of Array.from(solvedBy.entries())) {
+        if (g === "years" || g === "payment" || !sv.plan.ok || !sv.spec || !sv.spec.shareCap) continue;
+        const f = finishOf(sv.plan);
+        if (f < T) {
+          const ceiling = typeof yrs0.meta.budget === "number" ? yrs0.meta.budget : ctx.base.budget ?? ctx.budget;
+          const at = yearsAt(ctx, f, sv.plan, ceiling, eligibilityIds(ctx));
+          // The re-solve can read infeasible (yalps drops cycled nodes): the other
+          // goal's mix itself ends at f within a lower ceiling, so it stands in.
+          const use = at.plan.ok ? at : { ...sv, meta: { finish: f } };
+          const stretchedNow = !!yrs0.meta.stretched;
+          solvedBy.set("years", tag({ ...use, meta: { ...yrs0.meta, finish: f, ...(stretchedNow ? { atStretch: f } : typeof yrs0.meta.atStretch === "number" ? { atToday: f } : {}) } }));
           T = f;
         }
       }
     }
-  }
+  };
+  yearsFromOthers();
   // THE SHEET'S OWN ORDERING. The sheet's headline columns are the typed
   // read-out. Optimising on the forecast can leave "חיסכון מקסימלי" showing a
   // higher cost than another goal, which the board would contradict — so on the
@@ -2294,6 +2445,7 @@ function runGoals(ctx: Ctx, consolidateOk: boolean, wanted: Set<GoalId>): Run {
   // cap on the displayed figure; if that has no solution the other mix itself
   // is adopted (and the two fold with sameAs).
   enforceDisplayOrder(ctx, solvedBy);
+  yearsFromOthers();
   for (const [g, sv] of Array.from(solvedBy.entries())) solvedBy.set(g, tag(sv));
   return { ctx, solvedBy, unavailableConsolidate };
 }
@@ -2400,7 +2552,7 @@ function adoptAcross(ctx: Ctx, solvedBy: Map<GoalId, Solved>) {
   if (pay?.plan.ok)
     for (const [g, sv] of Array.from(solvedBy.entries())) {
       const cur = solvedBy.get("payment")!;
-      if (g === "payment" || !sv.plan.ok || sv.ctx === cur.ctx) continue;
+      if (g === "payment" || !sv.plan.ok || sv.ctx === cur.ctx || lockedIn(sv.ctx ?? ctx, sv.plan, eligibilityIds(sv.ctx ?? ctx))) continue;
       if (view(sv).monthly < view(cur).monthly - (homeward(sv) ? 0.5 : mMonthly)) solvedBy.set("payment", { ...sv, meta: { ...(sv.meta ?? {}), guard: 0, adopted: g } });
     }
   const yrs = solvedBy.get("years");
@@ -2414,7 +2566,7 @@ function adoptAcross(ctx: Ctx, solvedBy: Map<GoalId, Solved>) {
   if (sav?.plan.ok)
     for (const g of BUDGET_GOALS) {
       const sv = solvedBy.get(g);
-      if (g === "savings" || !sv || !holds(sv) || sv.ctx === solvedBy.get("savings")!.ctx) continue;
+      if (g === "savings" || !sv || !holds(sv) || sv.ctx === solvedBy.get("savings")!.ctx || lockedIn(sv.ctx ?? ctx, sv.plan)) continue;
       if (view(sv).totalCost < view(solvedBy.get("savings")!).totalCost - (homeward(sv) ? 1 : mCost)) solvedBy.set("savings", { ...sv, meta: { ...(sv.meta ?? {}), adopted: g } });
     }
 }

@@ -43,7 +43,17 @@ const DUMP = argAfter("--dump");
 const FAILS = argAfter("--fails");
 if (DUMP) fs.mkdirSync(DUMP, { recursive: true });
 const market = snapshotJson as unknown as MarketSnapshot;
-const forecast = await latestCurve();
+// The BoI curve is fetched live; a network blip retries (twice, 3s apart) instead of failing the run.
+const forecast = await (async () => {
+  for (let k = 0; ; k++) {
+    try {
+      return await latestCurve();
+    } catch (e) {
+      if (k >= 2) throw e;
+      await new Promise((r) => setTimeout(r, 3000));
+    }
+  }
+})();
 const V = verifier(market, forecast);
 const { check, failures, verify, verifyOverride, lint } = V;
 const fmt = (x: number) => Math.round(x).toLocaleString("en-US");
@@ -121,7 +131,8 @@ function run(name: string, input: AutoMixInput, opts: { ok?: boolean; laws?: boo
 function budgetLaw(name: string, input: AutoMixInput, r: AutoMixResult) {
   if (!r.ok || input.profile.budget) return;
   const base = r.dueNow?.budget ?? r.today.monthly;
-  const wide = buildAutoMix({ ...input, profile: { ...input.profile, budget: Math.round(base + 1500) } });
+  // Above every default ceiling, קיצור שנים's (today's payment + YEARS_STRETCH) included.
+  const wide = buildAutoMix({ ...input, profile: { ...input.profile, budget: Math.round(base * 1.1 + 1500) } });
   for (const g of BUDGET_GOALS) {
     const a = r.proposals.find((p) => p.goal === g);
     const b = wide.proposals.find((p) => p.goal === g);

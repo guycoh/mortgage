@@ -259,6 +259,12 @@ export type Proposal = {
   refinance?: "internal" | "move";
   /** The bank whose prices this proposal's new money carries ("system" = the average of the banks). */
   priceBank?: BankId;
+  /**
+   * The monthly ceiling this goal was held to (every goal but payment): the
+   * budget; for קיצור שנים up to 10% above today's payment when no budget was
+   * set and the higher payment ends the debt at least a year sooner.
+   */
+  budget?: number;
 
   /** The complete proposal mix, ready for the board: kept rows + new tranches. */
   rows: ImportedLoan[];

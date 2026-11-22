@@ -94,6 +94,14 @@ export const MIN_YEARS: Record<"prime" | "klz" | "kz" | "mlz" | "mz", number> = 
  */
 export const BREAK_EVEN_MAX = 120;
 
+/**
+ * קיצור שנים may raise the monthly payment up to this share above today's when
+ * the advisor has not set a budget (the owner's call, 2026-11-22) — and only
+ * when the higher payment ends the debt at least MATERIAL.months sooner than
+ * today's payment can. A budget the advisor sets is the ceiling as given.
+ */
+export const YEARS_STRETCH = 0.1;
+
 export const MATERIAL = {
   monthly: (today: number) => Math.max(150, 0.03 * today),
   months: 12,
