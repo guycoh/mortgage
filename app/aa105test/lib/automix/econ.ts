@@ -58,6 +58,28 @@ export const ECONOMIES: Economy[] = [
   { id: "cpiDown", label: `אינפלציה נמוכה מהצפוי (${pp(S.cpiDown)} נק׳)`, dRate: S.cpiDown, dCpi: S.cpiDown },
 ];
 
+/**
+ * Back-test and calibration only (AutoMixInput.tuning): the five economies for
+ * other shock sizes and for a correction to the base path, which is added to
+ * every economy. With neither it IS ECONOMIES, the same array.
+ */
+export function economiesOf(
+  shocks?: { rateUp: number; rateDown: number; cpiUp: number; cpiDown: number },
+  shift?: { rate: number; cpi: number }
+): Economy[] {
+  if (!shocks && !shift) return ECONOMIES;
+  const s = shocks ?? S;
+  const r = shift?.rate ?? 0;
+  const c = shift?.cpi ?? 0;
+  return [
+    { id: "base", label: ECONOMIES[0].label, dRate: r, dCpi: c },
+    { id: "rateUp", label: `ריבית גבוהה מהצפוי (${pp(s.rateUp)} נק׳)`, dRate: s.rateUp + r, dCpi: c },
+    { id: "rateDown", label: `ריבית נמוכה מהצפוי (${pp(s.rateDown)} נק׳)`, dRate: s.rateDown + r, dCpi: c },
+    { id: "cpiUp", label: `אינפלציה גבוהה מהצפוי (${pp(s.cpiUp)} נק׳)`, dRate: s.cpiUp + r, dCpi: s.cpiUp + c },
+    { id: "cpiDown", label: `אינפלציה נמוכה מהצפוי (${pp(s.cpiDown)} נק׳)`, dRate: s.cpiDown + r, dCpi: s.cpiDown + c },
+  ];
+}
+
 /** The BoI rate cannot go below its historical floor (0.1%, 2015–2022). */
 const NOMINAL_FLOOR = 0.1;
 
@@ -177,7 +199,8 @@ export function pathsIn(l: ImportedLoan, f: Forecast, e: Economy): { rates: numb
       factors.push(Math.pow(1 + pi / 100, 1 / 12));
     }
   }
-  if (e.id === "base" || path === 2 || path === 3) return { rates: base, factors };
+  // (A base economy carries a shift only under a back-test's baseShift.)
+  if ((e.id === "base" && !e.dRate && !e.dCpi) || path === 2 || path === 3) return { rates: base, factors };
   // The nominal shock actually felt at month m, after the floor.
   const dNom = (m: number) => Math.max(NOMINAL_FLOOR, nominalAt(f, m) + e.dRate * ramp(m)) - nominalAt(f, m);
   if (path === 1) return { rates: base.map((r, i) => (i === 0 ? r : r + dNom(i + 1))), factors };

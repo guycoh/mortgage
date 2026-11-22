@@ -46,7 +46,7 @@ import type {
   StressRow,
   TrackShare,
 } from "./types";
-import { ECONOMIES, scheduleIn, typedRow, pvOf } from "./econ";
+import { ECONOMIES, economiesOf, scheduleIn, typedRow, pvOf, type Economy } from "./econ";
 import { prepaymentFee, setCpiMonthly, feeTableAsOf, newFixedRate, OPERATIONAL_FEE } from "./fees";
 import { resolveTier, primeOn, NONBANK, NONBANK_LTV, LADDER, isAllPurpose, EVENT_SHARE, PREMIUM_EVIDENCE, type TierInfo } from "./tiers";
 import { conditionOf, type Condition, type DueDebt } from "./condition";
@@ -239,6 +239,14 @@ export const AGE_AT_END = 80;
  *   objective of the worst case alone made yalps cycle).
  */
 const LAMBDA: Record<GoalId, number> = { payment: 0, years: 0.35, savings: 0.25, balanced: 0.5, stable: 0.95, consolidate: 0.25 };
+/** A goal's λ: LAMBDA, unless a back-test's `tuning` sets it (types.ts Tuning). */
+const lambdaOf = (ctx: Ctx, goal: GoalId) => ctx.input.tuning?.lambda?.[goal] ?? LAMBDA[goal];
+
+/**
+ * The economies every row is priced in: ECONOMIES, the same array, except
+ * while buildAutoMix runs an input with `tuning` shocks or a base shift.
+ */
+let ECON: Economy[] = ECONOMIES;
 
 const LABEL: Record<GoalId, string> = {
   payment: "החזר חודשי נמוך",
@@ -315,7 +323,7 @@ function priceRow(l: ImportedLoan, inflation: number, f: Forecast, discountRate?
   const t = typedRow(l, inflation);
   const pay: number[][] = [];
   const bal: number[][] = [];
-  for (const e of ECONOMIES) {
+  for (const e of ECON) {
     const s = scheduleIn(l, f, e);
     pay.push(s.pay);
     bal.push(s.bal);
@@ -369,9 +377,9 @@ function bookOf(rows: ImportedLoan[], input: AutoMixInput, f: Forecast): Book {
   let months = 0;
   const typedPay: number[] = [];
   const typedRegular: number[] = [];
-  const regular = ECONOMIES.map(() => [] as number[]);
-  const pay = ECONOMIES.map(() => [] as number[]);
-  const bal = ECONOMIES.map(() => [] as number[]);
+  const regular = ECON.map(() => [] as number[]);
+  const pay = ECON.map(() => [] as number[]);
+  const bal = ECON.map(() => [] as number[]);
   const byTrack = new Map<TrackKey, number>();
   const outlookPay: number[] = [];
   let outlookPaid = 0;
@@ -592,7 +600,7 @@ type Debt = SolverDebt & {
 
 /** A debt due now, as a debt the solver must clear: nothing paid on it today, nothing priced. */
 function dueDebtOf(d: DueDebt, row: ImportedLoan | null): Debt {
-  const zeros = ECONOMIES.map(() => 0);
+  const zeros = ECON.map(() => 0);
   const placeholder = row ?? ({ id: d.id, mix_id: MIX_ID, path_id: 2, amount: d.balance, rate: 0, months: 0, amortization_schedule_id: 1, grace_type_id: 1, grace_months: 0, group: "loan" } as ImportedLoan);
   return {
     id: d.id,
@@ -609,7 +617,7 @@ function dueDebtOf(d: DueDebt, row: ImportedLoan | null): Debt {
     typedPaid: 0,
     typedInterest: 0,
     peak: zeros,
-    early: ECONOMIES.map(() => EARLY.map(() => 0)),
+    early: ECON.map(() => EARLY.map(() => 0)),
     lock: null,
     forced: true,
     row: placeholder,
@@ -621,7 +629,7 @@ function dueDebtOf(d: DueDebt, row: ImportedLoan | null): Debt {
     feeEstimated: false,
     feeBasis: "חוב לפירעון מיידי",
     cpiAveraging: 0,
-    priced: { typedMonthly: 0, typedInterest: 0, typedPaid: 0, typedPay: [], pay: ECONOMIES.map(() => []), bal: ECONOMIES.map(() => []), paid: zeros, pv: 0, peak: zeros, early: ECONOMIES.map(() => EARLY.map(() => 0)) },
+    priced: { typedMonthly: 0, typedInterest: 0, typedPaid: 0, typedPay: [], pay: ECON.map(() => []), bal: ECON.map(() => []), paid: zeros, pv: 0, peak: zeros, early: ECON.map(() => EARLY.map(() => 0)) },
     due: d,
   };
 }
@@ -1000,7 +1008,7 @@ function checksOf(ctx: Ctx, rows: ImportedLoan[], plan: Plan, metrics: MixMetric
 }
 
 function stressOf(today: Book, prop: Book): StressRow[] {
-  return ECONOMIES.map((e, k) => ({
+  return ECON.map((e, k) => ({
     id: e.id,
     label: e.label,
     peakMonthly: Math.round(Math.max(0, ...prop.regular[k])),
@@ -1069,7 +1077,7 @@ function solvePayment(ctx: Ctx): Solved {
 }
 
 function costSpec(ctx: Ctx, goal: GoalId, over: Partial<Spec> = {}): Spec {
-  return specFor(ctx, { wMonthly: 0, wCost: 1, lambda: LAMBDA[goal], budget: ctx.base.budget, ...pvCapOf(ctx, goal), ...over });
+  return specFor(ctx, { wMonthly: 0, wCost: 1, lambda: lambdaOf(ctx, goal), budget: ctx.base.budget, ...pvCapOf(ctx, goal), ...over });
 }
 /**
  * Savings and balanced may not cost more than the reference in present value
@@ -1078,7 +1086,11 @@ function costSpec(ctx: Ctx, goal: GoalId, over: Partial<Spec> = {}): Spec {
  */
 function pvCapOf(ctx: Ctx, goal: GoalId): Partial<Spec> {
   if ((goal !== "savings" && goal !== "balanced") || !ctx.input.forecastOn) return {};
-  const pv = ctx.ref.pv ?? (ctx.ref.book ?? ctx.today).metrics.outlook?.pv;
+  // A back-test's base shift moves the solver's present values off the board's
+  // forecast (the debts and columns are priced in the shifted base economy), so
+  // the cap is today's present value in that same economy.
+  const shifted = ctx.input.tuning?.baseShift && !ctx.ref.book ? sum(ctx.debts.map((d) => d.pv ?? 0)) : null;
+  const pv = shifted ?? ctx.ref.pv ?? (ctx.ref.book ?? ctx.today).metrics.outlook?.pv;
   return typeof pv === "number" ? { pvCap: pv } : {};
 }
 function solveCost(ctx: Ctx, goal: GoalId, over: Partial<Spec> = {}): Plan {
@@ -1200,7 +1212,7 @@ const YEARS_BAND_MIN = 100;
 /** The cheapest (λ = 0.35) mix within budget whose last payment is by month T. */
 function yearsAt(ctx: Ctx, T: number, start?: Plan, budget: number = ctx.base.budget ?? ctx.budget, unlock: string[] = []): Solved {
   const cols = ctx.cols.filter((c) => c.years * 12 <= T);
-  const spec = specFor(ctx, { wMonthly: 0, wCost: 1, lambda: LAMBDA.years, budget, finish: T, ...(unlock.length ? { unlock } : {}) });
+  const spec = specFor(ctx, { wMonthly: 0, wCost: 1, lambda: lambdaOf(ctx, "years"), budget, finish: T, ...(unlock.length ? { unlock } : {}) });
   const plan = start ? solveTermsRaw(ctx.debts, cols, spec, POOL, start) : solveTerms(ctx.debts, cols, spec);
   return { plan, meta: { finish: T }, spec, cols };
 }
@@ -1297,7 +1309,7 @@ function solveConsolidate(ctx: Ctx): Solved {
   if (neutral.plan.ok && neutral.plan.refinance.length && ctx.ref.monthly - shown(ctx, neutral.plan).monthly >= MATERIAL.monthly(ctx.ref.monthly)) return neutral;
   const B = reliefBudget(ctx);
   const cap = Math.floor(B - 0.5 * (B - payMin));
-  const spec = { ...s, wMonthly: 0, wCost: 1, lambda: LAMBDA.consolidate, budget: cap };
+  const spec = { ...s, wMonthly: 0, wCost: 1, lambda: lambdaOf(ctx, "consolidate"), budget: cap };
   const plan = solveTerms(ctx.debts, ctx.cols, spec);
   return plan.ok ? { plan, meta: { phi: 0.5, costs: 1, payMin, cap }, spec, cols: ctx.cols } : { plan: min };
 }
@@ -2825,6 +2837,18 @@ function prepare(
 }
 
 export function buildAutoMix(input: AutoMixInput): AutoMixResult {
+  const t = input.tuning;
+  if (!t?.shocks && !t?.baseShift) return buildIn(input);
+  // A back-test's economies (types.ts Tuning), for this build only.
+  ECON = economiesOf(t.shocks, t.baseShift);
+  try {
+    return buildIn(input);
+  } finally {
+    ECON = ECONOMIES;
+  }
+}
+
+function buildIn(input: AutoMixInput): AutoMixResult {
   const t0 = now();
   const skipped: AutoMixResult["skipped"] = [];
   const f = input.forecast;

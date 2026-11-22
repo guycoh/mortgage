@@ -116,6 +116,29 @@ export type AutoMixInput = {
    * cannot see them and says so.
    */
   analysis?: Analysis | null;
+  /**
+   * Back-test and calibration only (scripts/automix-backtest.mts); the sheet
+   * never sets it. Absent, every output is byte-identical to the engine without
+   * the field (scripts/automix-check.mts holds that with its golden copies).
+   */
+  tuning?: Tuning;
+};
+
+/**
+ * What a walk-forward back-test may vary, nothing else:
+ *   lambda     per goal, the share of cost that is the worst economy (index.ts LAMBDA);
+ *   shocks     the four stress economies' sizes, pp (econ.ts; default history.json shocks);
+ *   baseShift  a correction to the forecast's own path, pp, added to EVERY economy
+ *              (the base included) wherever a rate or CPI can move — prime from
+ *              month 2, bond tracks at their resets, CPI-linked indexation —
+ *              phased in over twelve months like the shocks. New money is still
+ *              priced on the curve as it stands, and the board's own figures
+ *              (`outlook`, the typed read-out) do not move.
+ */
+export type Tuning = {
+  lambda?: Partial<Record<GoalId, number>>;
+  shocks?: { rateUp: number; rateDown: number; cpiUp: number; cpiDown: number };
+  baseShift?: { rate: number; cpi: number };
 };
 
 /* ----------------------------------------------------------------- output */
