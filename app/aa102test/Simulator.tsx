@@ -1196,6 +1196,15 @@ export default function Simulator({
         annualInflation: typed,
         annualDiscount,
         clients: reports.map((r) => ({ name: r.clientName, id: r.clientId, reportDate: r.reportDate })),
+        // The מינוס, drawn facilities and the card list come from the report
+        // itself — the same docs and the same master refs the card list reads.
+        reportDebts: {
+          docs: reports
+            .filter((r) => r.report)
+            .map((r) => ({ report: r.report!, clientName: r.clientName, key: docKey(r) })),
+          onMaster: [...cardsOnBoard],
+          isMaster: isPrimaryMix,
+        },
       });
     } catch {
       flash4s({ kind: "err", text: "ייצוא האקסל נכשל" });

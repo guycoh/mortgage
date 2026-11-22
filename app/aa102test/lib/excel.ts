@@ -16,7 +16,7 @@
 // Framework-free: no React, no `window`, so it can also be built headlessly.
 
 import type { Workbook, Worksheet } from "exceljs";
-import { asEcon, priceLoan, todayPayment, type Assume } from "./price";
+import { priceLoan, todayPayment, type Assume } from "./price";
 import { schedules } from "@/app/data/amortization_schedules";
 import {
   FAMILY,
@@ -29,6 +29,8 @@ import {
 } from "./credit";
 import { lenderOf } from "./lenders";
 import { rowYield } from "./yield";
+import { cardItems, type CardDoc, type CardItem } from "./cards";
+import { extractLoans, type ExtractedLoan } from "@/lib/credit-parser/loan-mapping";
 
 /* ------------------------------------------------------------------ palette */
 
@@ -56,6 +58,11 @@ const C = {
   // family of the client's own debt.
   surety: "FF4E5A70",
   suretyWash: "FFF1F3F7",
+
+  // מינוס and drawn facilities: real debt with no schedule. Raspberry, not
+  // amber (the alarm) and not the loan orange (they are not loan rows).
+  facility: "FFA8325A",
+  facilityWash: "FFFBF0F4",
 } as const;
 
 const TRACK_ARGB: Record<number, string> = {
@@ -90,6 +97,19 @@ export interface ExcelInput {
   annualDiscount?: number;
   /** Names and IDs from the imported reports, in import order. */
   clients: { name: string; id: string; reportDate?: string }[];
+  /**
+   * The credit reports behind the board, for what the mix itself does not
+   * carry: the מינוס (עו"ש), drawn credit facilities that are not loan rows,
+   * and the card list under the charts. Absent on a board reloaded from the
+   * server — the report is not stored, so there is nothing to read.
+   */
+  reportDebts?: {
+    docs: CardDoc[];
+    /** `source_refs` of the master's rows — what the board already counts. */
+    onMaster: string[];
+    /** Exporting the master — the client's position today. */
+    isMaster: boolean;
+  };
 }
 
 type Col = {
@@ -101,7 +121,7 @@ type Col = {
 };
 
 const COLS: Col[] = [
-  { header: "סוג", width: 11 },
+  { header: "סוג", width: 13.5 },
   // WHOSE DEBT THIS IS. A guarantee is not a smaller loan, it is somebody
   // else's loan — so it gets a column of its own rather than a word buried in
   // הערות, where it could be sorted away from the row it qualifies.
@@ -125,19 +145,21 @@ const COLS: Col[] = [
   // read as report figures, and a reader who multiplies the monthly by the term
   // will not land on them exactly (the bank strikes its instalment on its own
   // billing cycle). "(תחזית)" is what stops that from looking like an error.
-  { header: 'סה"כ ריבית (₪) · תחזית', width: 17, fmt: "money", total: true },
-  { header: "עלות כוללת (₪) · תחזית", width: 17, fmt: "money", total: true },
+  { header: 'סה"כ ריבית (₪)\nתחזית', width: 17, fmt: "money", total: true },
+  { header: "עלות כוללת (₪)\nתחזית", width: 17, fmt: "money", total: true },
   // Both are this engine's readings, not the document's — same class as the
   // two "תחזית" columns above, and labelled in the same breath. שת"פ is an
   // annual EFFECTIVE rate, which is why it does not equal the nominal ריבית
   // column: a row quoted 4.40% nominal returns 4.49% effective, and that is
   // the figure the credit report itself prints as ריבית מתואמת.
-  { header: 'שת"פ · תשואה פנימית', width: 15, fmt: "pct" },
-  { header: "ע.נ.נ (₪) · ערך נוכחי נקי", width: 17, fmt: "money" },
-  { header: "הערות", width: 16 },
+  { header: 'שת"פ\nתשואה פנימית', width: 15, fmt: "pct" },
+  { header: "ע.נ.נ (₪)\nערך נוכחי נקי", width: 17, fmt: "money" },
+  { header: "הערות", width: 30 },
 ];
 
 const SPAN = COLS.length;
+/** The colour strip in column A — see buildSheet. */
+const EDGE = 1;
 
 /* ----------------------------------------------------------------- helpers */
 
@@ -246,6 +268,49 @@ function columnTotal(rows: Priced[], colIndex: number): number {
 
 // The split that governs this sheet lives in ./credit — see isSurety there.
 
+/* --------------------------------------------- what the mix does not carry */
+
+type Facility = { l: ExtractedLoan; clientName: string };
+
+const facilityKind = (l: ExtractedLoan) =>
+  l.category === "overdraft" ? 'עו"ש (מינוס)' : l.category === "card" ? "מסגרת אשראי" : "התחייבות אחרת";
+
+/**
+ * Open debt the report lists and the mix does not carry as a row: the מינוס,
+ * a drawn credit facility the board left as a monthly bill, anything else
+ * revolving. It has no schedule, so it cannot be a priced row — but it is
+ * owed all the same, and a sheet that leaves it out understates the client.
+ *
+ * "Not a row" is read off the master's `source_refs`, the same test the card
+ * list uses: tick a facility in as a loan and it leaves this block.
+ */
+function openFacilities(rd: NonNullable<ExcelInput["reportDebts"]>): Facility[] {
+  const onMaster = new Set(rd.onMaster);
+  // A joint account is listed on both spouses' reports. Matched across
+  // documents only, on what does not drift, so two look-alike accounts inside
+  // one report stay two.
+  const seen = new Map<string, string>();
+  const out: Facility[] = [];
+  for (const d of rd.docs) {
+    for (const l of extractLoans(d.report)) {
+      if (l.balance <= 0 || l.category === "mortgage" || l.category === "loan") continue;
+      if (onMaster.has(`${d.key}#${l.uid}`)) continue;
+      const id = [lenderOf(l.source).full, l.type, l.limit, l.startDate].join("|");
+      const from = seen.get(id);
+      if (from !== undefined && from !== d.key) continue;
+      seen.set(id, d.key);
+      out.push({ l, clientName: d.clientName });
+    }
+  }
+  const rank = (l: ExtractedLoan) => (l.category === "overdraft" ? 0 : l.category === "card" ? 1 : 2);
+  return out.sort(
+    (a, b) =>
+      Number(a.l.role === "guarantor") - Number(b.l.role === "guarantor") ||
+      rank(a.l) - rank(b.l) ||
+      b.l.balance - a.l.balance
+  );
+}
+
 /* -------------------------------------------------------------------- sheet */
 
 function buildSheet(wb: Workbook, input: ExcelInput): void {
@@ -262,7 +327,19 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
       margins: { left: 0.4, right: 0.4, top: 0.5, bottom: 0.5, header: 0.3, footer: 0.3 },
     },
   });
-  COLS.forEach((c, i) => (ws.getColumn(i + 1).width = c.width));
+  // Column A is the edge: a narrow strip that carries each block's colour, so
+  // the line that marks a block is a column of its own and never runs through
+  // text. (A border on the label column could not do it: on an RTL sheet Excel
+  // draws a "right" border between A and B, across any label spilling out of A,
+  // and a "left" one flush against the row headers, where it disappears.)
+  // Every column index below is the logical one; cellAt/merge add the strip.
+  ws.getColumn(1).width = 1.1;
+  COLS.forEach((c, i) => (ws.getColumn(i + 1 + EDGE).width = c.width));
+  const cellAt = (row: number, col: number) => ws.getCell(row, col + EDGE);
+  const merge = (r1: number, c1: number, r2: number, c2: number) => ws.mergeCells(r1, c1 + EDGE, r2, c2 + EDGE);
+  const edge = (row: number, argb: string) => {
+    ws.getCell(row, 1).fill = solid(argb);
+  };
 
   /* ------------------------------------------------------------ figures --- */
   // Priced once, split once, above every row that prints — the masthead quotes
@@ -284,6 +361,16 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
   const suretyAmount = columnTotal(sureties, CI.amount);
   const suretyMonthly = columnTotal(sureties, CI.monthly);
 
+  // From the report, beside the mix: the מינוס and drawn facilities, and the
+  // card list exactly as the board shows it.
+  const rd = input.reportDebts;
+  const facilities = rd ? openFacilities(rd) : [];
+  const ownFacilities = facilities.filter((f) => f.l.role !== "guarantor");
+  const facilityAmount = ownFacilities.reduce((s, f) => s + Math.round(f.l.balance), 0);
+  const cards: CardItem[] = rd ? cardItems(rd.docs) : [];
+  const cardOn = new Set(rd?.onMaster ?? []);
+  const multiDoc = (rd?.docs.length ?? 0) > 1;
+
   // החזר לשקל, through the one definition in ./credit — the sheet, the board's
   // rail and the comparison table all print this under the same name, so they
   // cannot be allowed to divide by different denominators. Note it is NOT
@@ -300,43 +387,39 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
   /* --------------------------------------------------------- masthead --- */
 
   // a 4px rule of the brand colour, the sheet's version of the page's rail
-  ws.mergeCells(r, 1, r, SPAN);
+  merge(r, 1, r, SPAN);
   ws.getRow(r).height = 4;
-  ws.getCell(r, 1).fill = solid(C.primary);
+  cellAt(r, 1).fill = solid(C.primary);
+  edge(r, C.primary);
   r += 1;
 
   // Title on the right, who this is on the left — one row instead of two.
   const half = Math.ceil(SPAN / 2);
-  ws.mergeCells(r, 1, r, half);
-  const title = ws.getCell(r, 1);
+  merge(r, 1, r, half);
+  const title = cellAt(r, 1);
   title.value = "סימולטור תמהילים";
   title.font = { name: FONT, size: 16, bold: true, color: { argb: C.ink } };
   title.alignment = { horizontal: "right", vertical: "middle" };
 
-  ws.mergeCells(r, half + 1, r, SPAN);
-  const sub = ws.getCell(r, half + 1);
-  const who = clients.map((c) => (c.id ? `${c.name} (${c.id})` : c.name)).filter(Boolean).join("  ·  ");
-  sub.value = [input.mixName, who].filter(Boolean).join("   ·   ");
+  merge(r, half + 1, r, SPAN);
+  const sub = cellAt(r, half + 1);
+  const who = clients.map((c) => (c.id ? `${c.name} (${c.id})` : c.name)).filter(Boolean).join("     ");
+  sub.value = [input.mixName, who].filter(Boolean).join("     ");
   sub.font = { name: FONT, size: 10.5, color: { argb: C.ink3 } };
   sub.alignment = { horizontal: "left", vertical: "middle" };
   ws.getRow(r).height = 24;
   r += 1;
 
-  ws.mergeCells(r, 1, r, SPAN);
-  const stamp = ws.getCell(r, 1);
+  merge(r, 1, r, SPAN);
+  const stamp = cellAt(r, 1);
   const d = new Date();
   const dd = `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
   // A board of nothing but guarantees has no cost per shekel — the client is not
   // paying any of them. 0.00 would be a figure where there is no figure.
-  // The assumption every figure below was priced on, said once.
-  const econ = asEcon(annualInflation);
-  stamp.value = [
-    `הופק ב-${dd}`,
-    econ.forecast ? `תחזית ריבית ואינפלציה: ${econ.forecast.label}` : `אינפלציה שנתית בהנחה: ${econ.inflation}%`,
-    totalAmount ? `החזר לשקל: ${perShekel.toFixed(2)}` : "",
-  ]
+  // No inflation assumption here, by the owner's call (2026-11-22).
+  stamp.value = [`הופק ב-${dd}`, totalAmount ? `החזר לשקל: ${perShekel.toFixed(2)}` : ""]
     .filter(Boolean)
-    .join("   ·   ");
+    .join("     ");
   stamp.font = { name: FONT, size: 9, color: { argb: C.ink3 } };
   stamp.alignment = { horizontal: "right", vertical: "middle" };
   ws.getRow(r).height = 14;
@@ -361,23 +444,23 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
     const c1 = 1 + i * KPI_W;
     const c2 = i === kpis.length - 1 ? SPAN : c1 + KPI_W - 1;
 
-    ws.mergeCells(kpiStart, c1, kpiStart, c2);
-    const lab = ws.getCell(kpiStart, c1);
+    merge(kpiStart, c1, kpiStart, c2);
+    const lab = cellAt(kpiStart, c1);
     lab.value = k[0];
     lab.font = { name: FONT, size: 9, bold: true, color: { argb: C.ink3 } };
     lab.alignment = { horizontal: "right", vertical: "middle" };
 
-    ws.mergeCells(kpiStart + 1, c1, kpiStart + 1, c2);
-    const val = ws.getCell(kpiStart + 1, c1);
+    merge(kpiStart + 1, c1, kpiStart + 1, c2);
+    const val = cellAt(kpiStart + 1, c1);
     val.value = Math.round(k[1]);
     val.numFmt = MONEY;
     val.font = { name: FONT, size: 15, bold: true, color: { argb: i === 1 ? C.primary : C.ink } };
     val.alignment = { horizontal: "right", vertical: "middle" };
 
     for (let c = c1; c <= c2; c += 1) {
-      ws.getCell(kpiStart, c).fill = solid(C.band);
-      ws.getCell(kpiStart + 1, c).fill = solid(C.band);
-      ws.getCell(kpiStart + 1, c).border = { bottom: thin(C.line2) };
+      cellAt(kpiStart, c).fill = solid(C.band);
+      cellAt(kpiStart + 1, c).fill = solid(C.band);
+      cellAt(kpiStart + 1, c).border = { bottom: thin(C.line2) };
     }
   });
   ws.getRow(kpiStart).height = 14;
@@ -388,8 +471,8 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
   // 40 rows down where the guarantees are actually listed. A headline number
   // with a silent exclusion is the same defect as one with a silent inclusion.
   if (sureties.length) {
-    ws.mergeCells(r, 1, r, SPAN);
-    const aside = ws.getCell(r, 1);
+    merge(r, 1, r, SPAN);
+    const aside = cellAt(r, 1);
     aside.value =
       `בנוסף: ${sureties.length} ${sureties.length === 1 ? "התחייבות" : "התחייבויות"} בערבות ` +
       `בסך ${Math.round(suretyAmount).toLocaleString("en-US")} ₪ ` +
@@ -398,6 +481,24 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
     aside.font = { name: FONT, size: 9, bold: true, color: { argb: C.surety } };
     aside.alignment = { horizontal: "right", vertical: "middle" };
     aside.fill = solid(C.suretyWash);
+    ws.getRow(r).height = 15;
+    r += 1;
+  }
+  if (ownFacilities.length) {
+    merge(r, 1, r, SPAN);
+    const aside = cellAt(r, 1);
+    const kinds = [
+      ownFacilities.some((f) => f.l.category === "overdraft") ? 'מינוס בעו"ש' : "",
+      ownFacilities.some((f) => f.l.category !== "overdraft") ? "מסגרות אשראי מנוצלות" : "",
+    ]
+      .filter(Boolean)
+      .join(" ו");
+    aside.value =
+      `בנוסף: ${kinds} בסך ${facilityAmount.toLocaleString("en-US")} ₪ — ` +
+      `חוב פתוח של הלקוח ללא לוח תשלומים, ואינו נכלל בסיכומים שלמעלה. מפורט מתחת לסיכום התמהיל.`;
+    aside.font = { name: FONT, size: 9, bold: true, color: { argb: C.facility } };
+    aside.alignment = { horizontal: "right", vertical: "middle" };
+    aside.fill = solid(C.facilityWash);
     ws.getRow(r).height = 15;
     r += 1;
   }
@@ -422,15 +523,19 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
     .filter((t) => t.amount > 0);
 
   if (tracks.length) {
-    const head = ws.getCell(r, 1);
+    const head = cellAt(r, 1);
     head.value = "הרכב לפי מסלול";
     head.font = { name: FONT, size: 11, bold: true, color: { argb: C.ink } };
     head.alignment = { horizontal: "right" };
     r += 1;
 
+    // The track name gets two columns ("משתנה לא צמודה" does not fit in one);
+    // the figures follow in the next four.
+    const colOf = (i: number) => (i === 0 ? 1 : i + 2);
     const cHead = ["מסלול", "שורות", "יתרה (₪)", "% מהתמהיל", "החזר חודשי (₪)"];
+    merge(r, 1, r, 2);
     cHead.forEach((h, i) => {
-      const cell = ws.getCell(r, i + 1);
+      const cell = cellAt(r, colOf(i));
       cell.value = h;
       cell.font = { name: FONT, size: 9, bold: true, color: { argb: C.ink2 } };
       cell.alignment = { horizontal: i === 0 ? "right" : "center", vertical: "middle" };
@@ -447,8 +552,9 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
         totalAmount ? t.amount / totalAmount : 0,
         Math.round(t.monthly),
       ];
+      merge(r, 1, r, 2);
       cells.forEach((v, i) => {
-        const cell = ws.getCell(r, i + 1);
+        const cell = cellAt(r, colOf(i));
         cell.value = v as string | number;
         cell.font = { name: FONT, size: 10, color: { argb: C.ink2 }, bold: i === 0 };
         cell.alignment = { horizontal: i === 0 ? "right" : "center", vertical: "middle" };
@@ -456,8 +562,8 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
         if (i === 3) cell.numFmt = "0%";
         cell.border = { bottom: thin(C.line) };
       });
-      // the track's colour, as a swatch on the leading edge
-      ws.getCell(r, 1).border = { bottom: thin(C.line), right: { style: "thick", color: { argb: TRACK_ARGB[t.id] } } };
+      // the track's colour, as a swatch on the edge
+      edge(r, TRACK_ARGB[t.id]);
       r += 1;
     }
     ws.getRow(r).height = 6;
@@ -468,13 +574,13 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
 
   const headRow = r;
   COLS.forEach((c, i) => {
-    const cell = ws.getCell(headRow, i + 1);
+    const cell = cellAt(headRow, i + 1);
     cell.value = c.header;
     cell.font = { name: FONT, size: 9.5, bold: true, color: { argb: C.white } };
     cell.fill = solid(C.ink);
     cell.alignment = { horizontal: alignOf(i), vertical: "middle", wrapText: true };
   });
-  ws.getRow(headRow).height = 24;
+  ws.getRow(headRow).height = 28;
   r += 1;
 
   const famOf = (l: ImportedLoan): DebtGroup => (l.group === "loan" ? "loan" : "mortgage");
@@ -497,6 +603,13 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
     const reported = reportedMonthly(l);
     const notes = [
       l.is_shared ? "מופיע בשני הדוחות" : "",
+      // A card facility on the loan side. The report files it as מסגרת אשראי
+      // מתחדשת; the board counts it as a loan because it is being repaid in
+      // instalments at interest (lib/cards#instalmentCredit) — say so, or the
+      // reader is left guessing why one facility is a loan and another is not.
+      l.group === "loan" && /מסגרת|כרטיס/.test(l.source_type ?? "")
+        ? "מסגרת אשראי שנפרסה לתשלומים — נספרת כהלוואה"
+        : "",
       res.isIndexed ? "צמוד מדד" : "",
       // Say which rows are NOT the document. Silence on a reproduction reads as
       // "this came from the report", so the exceptions are the ones that speak:
@@ -512,14 +625,14 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
       // for something the bank printed. The yearly figure is the one the client
       // will recognise from their account.
       freq
-        ? `תשלום ${freq} · כ-₪${Math.round(res.monthlyPayment * 12).toLocaleString("he-IL")} לשנה · ההחזר החודשי כאן הוא שקילות חודשית, לא סכום שהבנק דיווח`
+        ? `תשלום ${freq}, כ-₪${Math.round(res.monthlyPayment * 12).toLocaleString("he-IL")} לשנה; ההחזר החודשי כאן הוא שקילות חודשית, לא סכום שהבנק דיווח`
         : "",
       idx > 0 ? `מזה הצמדת קרן ₪${idx.toLocaleString("he-IL")}` : "",
       fee > 0 ? `הפרשי היוון ₪${fee.toLocaleString("he-IL")}` : "",
       folded > 0 ? `כולל הפרשי היוון ₪${folded.toLocaleString("he-IL")}` : "",
     ]
       .filter(Boolean)
-      .join(" · ");
+      .join("; ");
 
     const values: (string | number | Date | null)[] = [
       FAMILY[g].label,
@@ -551,7 +664,7 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
     ];
 
     values.forEach((v, ci) => {
-      const cell = ws.getCell(r, ci + 1);
+      const cell = cellAt(r, ci + 1);
       cell.value = v as string | number | Date | null;
       cell.font = {
         name: FONT,
@@ -569,22 +682,22 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
       if (i % 2 === 1) cell.fill = solid(C.band);
     });
     // the spine, in the family's colour
-    ws.getCell(r, 1).border = { bottom: thin(C.line), right: { style: "medium", color: { argb: accent } } };
+    edge(r, accent);
     // a high rate is the one thing the sheet flags, same rule as the screen
     const rate = Number(l.rate) || 0;
     const hot = g === "loan" ? rate >= 10 : rate >= 6.5;
-    if (hot) ws.getCell(r, CI.rate + 1).font = { name: FONT, size: 10, bold: true, color: { argb: C.amber } };
+    if (hot) cellAt(r, CI.rate + 1).font = { name: FONT, size: 10, bold: true, color: { argb: C.amber } };
     r += 1;
   };
 
   /** A band naming the block below it, painted across the grid. */
   const writeBand = (label: string, accent: string, wash: string): void => {
-    const band = ws.getCell(r, 1);
+    const band = cellAt(r, 1);
     band.value = label;
     band.font = { name: FONT, size: 10.5, bold: true, color: { argb: accent } };
     band.alignment = { horizontal: "right", vertical: "middle" };
-    for (let c = 1; c <= SPAN; c += 1) ws.getCell(r, c).fill = solid(wash);
-    ws.getCell(r, 1).border = { right: { style: "medium", color: { argb: accent } } };
+    for (let c = 1; c <= SPAN; c += 1) cellAt(r, c).fill = solid(wash);
+    edge(r, accent);
     ws.getRow(r).height = 19;
     r += 1;
   };
@@ -602,7 +715,7 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
     wash: string
   ): void => {
     COLS.forEach((c, ci) => {
-      const cell = ws.getCell(r, ci + 1);
+      const cell = cellAt(r, ci + 1);
       if (ci === 0) cell.value = label;
       else if (c.total)
         cell.value = {
@@ -645,13 +758,20 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
 
   /* ---------------------------------------------------- grand total ----- */
 
+  // On the master, the מינוס and drawn facilities close the client's position
+  // under a second total; the loans' own total then steps down a shade so the
+  // sheet still has exactly one bottom line.
+  const closesWithFacilities = !!rd?.isMaster && ownFacilities.length > 0 && dataRanges.length > 0;
+  let grandRow = 0;
+
   if (dataRanges.length) {
+    grandRow = r;
     COLS.forEach((c, ci) => {
-      const cell = ws.getCell(r, ci + 1);
+      const cell = cellAt(r, ci + 1);
       // Named, not just "סה\"כ התמהיל": with a guarantee block underneath, the
       // total has to say WHOSE debt it adds up, or the reader supplies the
       // wrong answer from the rows nearest to it.
-      if (ci === 0) cell.value = 'סה"כ התחייבויות הלקוח';
+      if (ci === 0) cell.value = closesWithFacilities ? 'סה"כ הלוואות ומשכנתאות' : 'סה"כ התחייבויות הלקוח';
       else if (c.total) {
         const L = colLetter(ci + 1);
         // the raw rows of each family, never the subtotal rows between them —
@@ -662,12 +782,211 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
       cell.font = { name: FONT, size: 11.5, bold: true, color: { argb: C.white } };
       cell.alignment = { horizontal: ci === 0 ? "right" : "center", vertical: "middle" };
       if (c.fmt === "money") cell.numFmt = MONEY;
-      cell.fill = solid(C.ink);
+      cell.fill = solid(closesWithFacilities ? C.ink2 : C.ink);
     });
     ws.getRow(r).height = 24;
     r += 1;
     ws.getRow(r).height = 6;
     r += 1;
+  }
+
+  /* ------------------------------------------- report-only mini tables -- */
+  // Laid on the SAME column grid as the detail table, each figure under the
+  // column that means the same thing — יתרה under יתרה, ריבית under ריבית — so
+  // the eye can run one column from the mix down through these blocks.
+
+  type BCol = { ci: number; header: string; fmt?: Col["fmt"] };
+  const NOTE = SPAN - 1;
+
+  const writeSubHead = (cols: BCol[], accent: string): void => {
+    edge(r, accent); // the strip runs unbroken from the band into the rows
+    for (let c = 1; c <= SPAN; c += 1) {
+      const cell = cellAt(r, c);
+      cell.fill = solid(C.band);
+      cell.border = { bottom: thin(C.line2) };
+    }
+    for (const b of cols) {
+      const cell = cellAt(r, b.ci + 1);
+      cell.value = b.header;
+      cell.font = { name: FONT, size: 9, bold: true, color: { argb: C.ink2 } };
+      cell.alignment = { horizontal: alignOf(b.ci), vertical: "middle", wrapText: true };
+    }
+    ws.getRow(r).height = 22;
+    r += 1;
+  };
+
+  const writeLine = (
+    cols: BCol[],
+    values: (string | number | null)[],
+    i: number,
+    accent: string,
+    hot: Set<number> = new Set()
+  ): void => {
+    for (let c = 1; c <= SPAN; c += 1) {
+      const cell = cellAt(r, c);
+      cell.border = { bottom: thin(C.line) };
+      if (i % 2 === 1) cell.fill = solid(C.band);
+    }
+    cols.forEach((b, k) => {
+      const cell = cellAt(r, b.ci + 1);
+      cell.value = values[k];
+      const strong = b.ci === 0 || b.ci === CI.amount;
+      cell.font = {
+        name: FONT,
+        size: 10,
+        bold: strong || hot.has(b.ci),
+        color: { argb: hot.has(b.ci) ? C.amber : b.ci === 0 ? accent : C.ink2 },
+      };
+      cell.alignment = { horizontal: b.fmt ? "center" : "right", vertical: "middle" };
+      if (b.fmt === "money" || b.fmt === "int") cell.numFmt = MONEY;
+      if (b.fmt === "pct") cell.numFmt = PCT;
+    });
+    edge(r, accent);
+    r += 1;
+  };
+
+  /** A closing row in the block's wash: label, then figures at chosen columns. */
+  const writeBlockTotal = (
+    label: string,
+    figures: { ci: number; value: number | { formula: string; result: number } }[],
+    note: string,
+    accent: string,
+    wash: string
+  ): number => {
+    const at = r;
+    for (let c = 1; c <= SPAN; c += 1) {
+      const cell = cellAt(r, c);
+      cell.fill = solid(wash);
+      cell.border = { top: thin(accent), bottom: thin(C.line2) };
+      cell.font = { name: FONT, size: 10.5, bold: true, color: { argb: C.ink } };
+      cell.alignment = { horizontal: "center", vertical: "middle" };
+    }
+    const lab = cellAt(r, 1);
+    lab.value = label;
+    lab.font = { name: FONT, size: 10.5, bold: true, color: { argb: accent } };
+    lab.alignment = { horizontal: "right", vertical: "middle" };
+    for (const f of figures) {
+      const cell = cellAt(r, f.ci + 1);
+      cell.value = f.value;
+      cell.numFmt = MONEY;
+    }
+    if (note) {
+      const n = cellAt(r, NOTE + 1);
+      n.value = note;
+      n.font = { name: FONT, size: 9, bold: false, color: { argb: C.ink3 } };
+      n.alignment = { horizontal: "right", vertical: "middle" };
+    }
+    ws.getRow(r).height = 20;
+    r += 1;
+    ws.getRow(r).height = 6;
+    r += 1;
+    return at;
+  };
+
+
+  const money0 = (n: number) => `₪${Math.round(n).toLocaleString("en-US")}`;
+  const rateOf = (l: ExtractedLoan) => (l.interest !== "" && Number.isFinite(Number(l.interest)) ? Number(l.interest) / 100 : null);
+
+  /* ------------------------------------------- מינוס ומסגרות מנוצלות --- */
+
+  if (facilities.length) {
+    writeBand(
+      `מינוס ומסגרות אשראי מנוצלות   (${facilities.length})` + (rd?.isMaster ? "" : "     מתוך דוח ריכוז הנתונים"),
+      C.facility,
+      C.facilityWash
+    );
+    const cols: BCol[] = [
+      { ci: 0, header: "סוג" },
+      { ci: CI.standing, header: "מעמד הלקוח" },
+      { ci: 2, header: "מקור / גורם מדווח" },
+      { ci: 3, header: "סוג עסקה בדוח" },
+      { ci: 4, header: "מסגרת (₪)", fmt: "money" },
+      { ci: CI.amount, header: "יתרה מנוצלת (₪)", fmt: "money" },
+      { ci: CI.rate, header: "ריבית", fmt: "pct" },
+      { ci: CI.anchor, header: "ניצול המסגרת", fmt: "pct" },
+      { ci: CI.monthly, header: "חיוב חודשי בדוח (₪)", fmt: "money" },
+      { ci: NOTE, header: "הערות" },
+    ];
+    writeSubHead(cols, C.facility);
+    const first = r;
+    facilities.forEach(({ l, clientName }, i) => {
+      const use = l.limit > 0 ? l.balance / l.limit : null;
+      const over = use !== null && use > 1;
+      const notes = [
+        l.role === "guarantor" ? "ערב — אינו נכלל בסיכום" : "",
+        l.category === "overdraft"
+          ? "מינוס בחשבון — ללא לוח תשלומים"
+          : l.category === "card"
+            ? l.knownPayment > 0
+              ? "החיוב החודשי הוא חיוב שוטף, לא החזר הלוואה"
+              : "מסגרת מתחדשת — ללא לוח תשלומים"
+            : "",
+        over ? "חריגה מהמסגרת" : "",
+        l.overdue > 0 ? `בפיגור ${money0(l.overdue)}` : "",
+        multiDoc && clientName ? clientName : "",
+      ]
+        .filter(Boolean)
+        .join("; ");
+      writeLine(
+        cols,
+        [
+          facilityKind(l),
+          l.role === "guarantor" ? "ערב" : "חייב",
+          lenderOf(l.source).full || "—",
+          l.type || "—",
+          l.limit > 0 ? Math.round(l.limit) : null,
+          Math.round(l.balance),
+          rateOf(l),
+          use,
+          l.knownPayment > 0 ? Math.round(l.knownPayment) : null,
+          notes || null,
+        ],
+        i,
+        C.facility,
+        over ? new Set([CI.anchor]) : undefined
+      );
+    });
+    const last = r - 1;
+    const L = colLetter(CI.amount + 1);
+    const S = colLetter(CI.standing + 1);
+    const facRow = writeBlockTotal(
+      'סה"כ מינוס ומסגרות',
+      [
+        {
+          ci: CI.amount,
+          // SUMIF on מעמד, so a guaranteed account can sit in the list without
+          // being added to what the client owes.
+          value: { formula: `SUMIF(${S}${first}:${S}${last},"חייב",${L}${first}:${L}${last})`, result: facilityAmount },
+        },
+      ],
+      "",
+      C.facility,
+      C.facilityWash
+    );
+
+    // The client's whole position: what the mix schedules plus what sits open.
+    if (closesWithFacilities && grandRow) {
+      for (let c = 1; c <= SPAN; c += 1) {
+        const cell = cellAt(r, c);
+        cell.fill = solid(C.ink);
+        cell.font = { name: FONT, size: 11.5, bold: true, color: { argb: C.white } };
+        cell.alignment = { horizontal: "center", vertical: "middle" };
+      }
+      const lab = cellAt(r, 1);
+      lab.value = 'סה"כ התחייבויות הלקוח — כולל מינוס ומסגרות';
+      lab.alignment = { horizontal: "right", vertical: "middle" };
+      const tot = cellAt(r, CI.amount + 1);
+      tot.value = { formula: `${L}${grandRow}+${L}${facRow}`, result: totalAmount + facilityAmount };
+      tot.numFmt = MONEY;
+      const n = cellAt(r, NOTE + 1);
+      n.value = "יתרות בלבד — אין להן החזר חודשי קבוע";
+      n.font = { name: FONT, size: 9, color: { argb: C.white } };
+      n.alignment = { horizontal: "right", vertical: "middle" };
+      ws.getRow(r).height = 24;
+      r += 1;
+      ws.getRow(r).height = 6;
+      r += 1;
+    }
   }
 
   /* ------------------------------------------------------ guarantees ---- */
@@ -683,8 +1002,8 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
     sureties.forEach((x, i) => writeRow(x, i, C.surety));
     writeSubtotal('סה"כ בערבות — אינו נכלל בסיכום', sureties, first, r - 1, C.surety, C.suretyWash);
 
-    ws.mergeCells(r, 1, r, SPAN);
-    const note = ws.getCell(r, 1);
+    merge(r, 1, r, SPAN);
+    const note = cellAt(r, 1);
     note.value =
       "התחייבויות שהלקוח ערב להן ואינו הלווה בהן. הן מופיעות בדוח ריכוז הנתונים תחת " +
       '"עסקאות בהן הלקוח ערב", ואינן חלק מההחזר החודשי שלו — אך הן חשיפה קיימת לכל דבר ' +
@@ -693,13 +1012,93 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
     note.alignment = { horizontal: "right", vertical: "middle", wrapText: true };
     ws.getRow(r).height = 14;
     r += 1;
+    ws.getRow(r).height = 8;
+    r += 1;
+  }
+
+  /* ---------------------------------------------------- כרטיסי אשראי ---- */
+
+  // The board's card list, every line of it, ticked or not — the record of
+  // which card debts the advisor counted as loans and which were left out.
+  if (cards.length) {
+    writeBand(`כרטיסי אשראי   (${cards.length})`, C.loan, C.loanWash);
+    const cols: BCol[] = [
+      { ci: 0, header: "סוג" },
+      { ci: CI.standing, header: "בתמהיל" },
+      { ci: 2, header: "גוף מימון" },
+      { ci: 3, header: "הצעת המערכת" },
+      { ci: 4, header: "מסגרת (₪)", fmt: "money" },
+      { ci: CI.amount, header: "יתרה (₪)", fmt: "money" },
+      { ci: CI.rate, header: "ריבית", fmt: "pct" },
+      { ci: COLS.findIndex((c) => c.header === "חודשים"), header: "חודשים", fmt: "int" },
+      { ci: CI.monthly, header: "חיוב חודשי (₪)", fmt: "money" },
+      { ci: NOTE, header: "הערה" },
+    ];
+    writeSubHead(cols, C.loan);
+    const first = r;
+    let inMix = 0;
+    cards.forEach((it, i) => {
+      const l = it.loan;
+      const on = cardOn.has(it.ref);
+      if (on) inMix += Math.round(l.balance);
+      const notes = [
+        l.overdue > 0 ? `בפיגור ${money0(l.overdue)}` : "",
+        it.reason,
+        !on && it.kind === "facility" && l.role !== "guarantor" ? "נספרת במסגרות המנוצלות" : "",
+        multiDoc && it.clientName ? it.clientName : "",
+      ]
+        .filter(Boolean)
+        .join("; ");
+      writeLine(
+        cols,
+        [
+          it.kind === "loan" ? "הלוואה" : "מסגרת",
+          on ? "✓ כלול" : "לא כלול",
+          lenderOf(l.source).full || "—",
+          it.kind === "loan" ? "הלוואה" : it.suggested ? "כהלוואה" : "חיוב שוטף",
+          l.limit > 0 ? Math.round(l.limit) : null,
+          Math.round(l.balance),
+          rateOf(l),
+          Number(l.months) || null,
+          l.knownPayment > 0 ? Math.round(l.knownPayment) : null,
+          notes || null,
+        ],
+        i,
+        C.loan
+      );
+      // the tick carries the colour, as it does on the board
+      const tick = cellAt(r - 1, CI.standing + 1);
+      tick.font = { name: FONT, size: 10, bold: on, color: { argb: on ? C.loan : C.ink3 } };
+    });
+    const last = r - 1;
+    const A = colLetter(CI.amount + 1);
+    const M = colLetter(CI.monthly + 1);
+    writeBlockTotal(
+      'סה"כ כרטיסי אשראי',
+      [
+        {
+          ci: CI.amount,
+          value: { formula: `SUM(${A}${first}:${A}${last})`, result: cards.reduce((s, c) => s + Math.round(c.loan.balance), 0) },
+        },
+        {
+          ci: CI.monthly,
+          value: {
+            formula: `SUM(${M}${first}:${M}${last})`,
+            result: cards.reduce((s, c) => s + (c.loan.knownPayment > 0 ? Math.round(c.loan.knownPayment) : 0), 0),
+          },
+        },
+      ],
+      `מזה בתמהיל: ${money0(inMix)}`,
+      C.loan,
+      C.loanWash
+    );
   }
 }
 
-/** 1 → A, 27 → AA. */
+/** Logical column → sheet letter, past the edge strip: 1 → B. */
 function colLetter(n: number): string {
   let s = "";
-  let x = n;
+  let x = n + EDGE;
   while (x > 0) {
     const m = (x - 1) % 26;
     s = String.fromCharCode(65 + m) + s;
@@ -731,7 +1130,7 @@ export async function buildMixWorkbook(input: ExcelInput): Promise<Workbook> {
   wb.lastModifiedBy = "סימולטור תמהילים";
   wb.created = new Date();
   wb.modified = new Date();
-  wb.title = `תמהיל · ${input.mixName}`;
+  wb.title = `תמהיל ${input.mixName}`;
   wb.subject = input.clients.map((c) => c.name).filter(Boolean).join(" + ") || "תמהיל משכנתא";
 
   buildSheet(wb, input);
