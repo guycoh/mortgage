@@ -13,7 +13,8 @@
 // 01/03/2013, a single rate before. CPI-linked: today's buckets (RESULT sheet)
 // and the pre-2011 buckets (RESULT_OLD) — kept with their own bucket edges.
 // The rates are EFFECTIVE annual rates (the files ship an effective→nominal
-// converter); fees.ts converts them to a monthly rate as (1+A)^(1/12) − 1.
+// converter); fees.ts states them the way the banks' letters do (2 decimals,
+// monthly-compounded nominal at 2 decimals) and divides by 12.
 import { createRequire } from "node:module";
 import { writeFileSync } from "node:fs";
 
@@ -76,6 +77,27 @@ unlinkedOld.rows.sort((a, b) => (a.effective < b.effective ? 1 : -1));
 const linked = table(rowsOf(cpi, "RESULT"), [60, 120, 180, 240, 300, Infinity], 1, 6, 7, 8);
 // CPI-linked before 08/2011: [avg, >20, 17–20, 15–17, 12–15, 5–12, ≤5, effective, report]
 const linkedOld = table(rowsOf(cpi, "RESULT_OLD"), [60, 144, 180, 204, 240, Infinity], 1, 6, 7, 8);
+
+// Both files are published together, so one report month takes effect on one
+// day in both. Where they disagree and one date is out of order (later than the
+// NEXT report's), it is a typo and the other file's date stands: mashfix dates
+// report 31/08/2026 to 31/10/2026, after report 30/09/2026 took effect on
+// 19/10/2026; pribmash dates it 15/09/2026, and the A printed on letters of
+// 04/10/2026 and 18/10/2026 is that report's.
+function repair(t: FeeTable, twin: FeeTable, name: string) {
+  const byReport = [...t.rows].sort((a, b) => ((a.report ?? "") < (b.report ?? "") ? -1 : 1));
+  byReport.forEach((r, i) => {
+    const next = byReport[i + 1];
+    if (!next || r.effective <= next.effective) return;
+    const other = twin.rows.find((x) => x.report === r.report);
+    if (!other || other.effective > next.effective) return console.warn(`${name}: report ${r.report} effective ${r.effective} is out of order and has no usable twin`);
+    console.log(`${name}: report ${r.report} effective ${r.effective} → ${other.effective} (twin file)`);
+    r.effective = other.effective;
+  });
+  t.rows.sort((a, b) => (a.effective < b.effective ? 1 : -1));
+}
+repair(unlinked, linked, "unlinked");
+repair(linked, unlinked, "linked");
 
 const out = {
   builtAt: new Date().toISOString(),
