@@ -2509,9 +2509,12 @@ function windowRise(ctx: Ctx, plan: Plan, rows: NonNullable<Spec["lifeAt"]>): nu
  * peak of the summed payments, by cutting planes (lifeRowAt) at each answer's
  * worst month per economy. Each round is one MILP, the debts free, one term per
  * track, on קל"צ at every term and the start's own tracks (where the steadiest
- * cheap mixes are; the whole grid ran each round to its node cap). null when no
+ * cheap mixes are; the whole grid ran each round to its node cap), on
+ * COST_AT_EXCESS_NODES nodes, two rounds (r02 typical: 3.2 s on the opening cap
+ * and three rounds, 0.3 s so, the same answers on r02 and r01+r02). null when no
  * round answers within the rows.
  */
+const COST_AT_EXCESS_NODES = 100;
 function solveCostAtExcess(ctx: Ctx, over: Partial<Spec>, start: Plan, excess: number): Solved | null {
   const share = MATERIAL.monthly(1e9) / 1e9;
   const floor = MATERIAL.monthly(0);
@@ -2537,9 +2540,9 @@ function solveCostAtExcess(ctx: Ctx, over: Partial<Spec>, start: Plan, excess: n
   worst(ctx.today);
   worst(bookOf(rowsOf(ctx, start).rows, ctx.input, ctx.f));
   let out: Solved | null = null;
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < 2; i++) {
     const s = stableSpec(ctx, { ...over, ...cap, lifeAt: rows.slice() });
-    const p = solveOnce(ctx.debts, cols, s, false, true, FIRST_CAP);
+    const p = solveOnce(ctx.debts, cols, s, false, true, COST_AT_EXCESS_NODES);
     if (!p.ok) break;
     const book = bookOf(rowsOf(ctx, p).rows, ctx.input, ctx.f);
     const m1 = book.metrics.monthly;
