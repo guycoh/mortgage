@@ -1469,23 +1469,28 @@ function solveYears(ctx: Ctx): Solved {
     const pick = useStretch ? stretched! : base;
     return { base, stretched, useStretch, pick, g: useStretch ? g1! : g0 };
   };
+  // Materiality before the tier: the strongest guard tier with a MATERIAL
+  // shortening wins (absolute, then relative, then none with its caveat); only
+  // when no tier has one does the strongest guarded answer stand, and it reads
+  // no-gain. (L14: 9 months under the absolute guard, 21 under the relative one;
+  // L18: 6 and 18.)
+  let first: ReturnType<typeof at> | null = null;
+  let chosen: ReturnType<typeof at> | null = null;
   for (let lvl = 0; lvl < levels; lvl++) {
-    let { base, stretched, useStretch, pick, g } = at(lvl);
-    if (!pick.ok) continue;
-    // The guard is the default, but not at the price of the offer: when the
-    // guarded shortening is under MATERIAL.months and the unguarded tier ends
-    // materially sooner (still at no more paid than the reference: yearsCaps),
-    // that one is offered, with no guard said and the guarded end in its reason
-    // (L14: 9 months under the guard, 45 without; L18: 6 and 30).
-    let guardedAt: number | undefined;
-    if (g.kind !== 0 && ctx.ref.months - pick.T < MATERIAL.months && lvl < levels - 1) {
-      const free = at(levels - 1);
-      if (free.pick.ok && ctx.ref.months - free.pick.T >= MATERIAL.months) {
-        guardedAt = pick.T;
-        ({ base, stretched, useStretch, pick, g } = free);
-      }
+    const r = at(lvl);
+    if (!r.pick.ok) continue;
+    first ??= r;
+    if (ctx.ref.months - r.pick.T >= MATERIAL.months) {
+      chosen = r;
+      break;
     }
-    if (!pick.ok) continue;
+  }
+  const use = chosen ?? first;
+  if (use) {
+    const { base, stretched, useStretch, pick, g } = use;
+    if (!pick.ok) return { plan: { ok: false, status: "infeasible", refinance: [], amounts: {}, objective: NaN, setupHousing: 0, setupAp: 0 } };
+    // The guarded end the caveat quotes when the shortening is offered without the guard.
+    const guardedAt = chosen && chosen.g.kind === 0 && first && first !== chosen && first.g.kind !== 0 && first.pick.ok ? first.pick.T : undefined;
     const sv = yearsAtFrom(ctx, pick.T, pick.seed?.(), pick.budget, unlock, g);
     return {
       ...sv,
