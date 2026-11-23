@@ -1456,7 +1456,7 @@ function solveYears(ctx: Ctx): Solved {
   // in when today's own mix breaks the absolute one; no guard when neither holds.
   const tiersAt = (c: number): Guard[] => [...guardTiers(ctx, c), { kind: 0, caps: ECON.map(() => c) }];
   const levels = Math.max(tiersAt(ctx.budget).length, ceiling > ctx.budget + 0.5 ? tiersAt(ceiling).length : 0);
-  for (let lvl = 0; lvl < levels; lvl++) {
+  const at = (lvl: number) => {
     const gAt = (c: number) => {
       const t = tiersAt(c);
       return t[Math.min(lvl, t.length - 1)];
@@ -1467,8 +1467,25 @@ function solveYears(ctx: Ctx): Solved {
     const stretched = g1 ? earliestFinish(ctx, ceiling, unlock, g1) : null;
     const useStretch = !!stretched?.ok && (!base.ok || base.T - stretched.T >= MATERIAL.months);
     const pick = useStretch ? stretched! : base;
+    return { base, stretched, useStretch, pick, g: useStretch ? g1! : g0 };
+  };
+  for (let lvl = 0; lvl < levels; lvl++) {
+    let { base, stretched, useStretch, pick, g } = at(lvl);
     if (!pick.ok) continue;
-    const g = useStretch ? g1! : g0;
+    // The guard is the default, but not at the price of the offer: when the
+    // guarded shortening is under MATERIAL.months and the unguarded tier ends
+    // materially sooner (still at no more paid than the reference: yearsCaps),
+    // that one is offered, with no guard said and the guarded end in its reason
+    // (L14: 9 months under the guard, 45 without; L18: 6 and 30).
+    let guardedAt: number | undefined;
+    if (g.kind !== 0 && ctx.ref.months - pick.T < MATERIAL.months && lvl < levels - 1) {
+      const free = at(levels - 1);
+      if (free.pick.ok && ctx.ref.months - free.pick.T >= MATERIAL.months) {
+        guardedAt = pick.T;
+        ({ base, stretched, useStretch, pick, g } = free);
+      }
+    }
+    if (!pick.ok) continue;
     const sv = yearsAtFrom(ctx, pick.T, pick.seed?.(), pick.budget, unlock, g);
     return {
       ...sv,
@@ -1480,6 +1497,7 @@ function solveYears(ctx: Ctx): Solved {
         // What the other ceiling reaches, for the reason: today's payment's end when
         // the stretch is taken; the stretch's end when it was not worth a year.
         ...(stretched?.ok ? { ...(base.ok ? { atToday: base.T } : {}), atStretch: stretched.T, stretchBudget: ceiling, stretched: useStretch ? 1 : 0 } : {}),
+        ...(guardedAt !== undefined ? { guardedAt } : {}),
       },
     };
   }
@@ -1987,7 +2005,82 @@ function riseOf(ctx: Ctx, plan: Plan, cols: Column[]): number {
  * peak of 1.13 times month one on average and 1.35 at worst, beaten on its own
  * promise by all-קל"צ in 431 of 636 builds.
  */
-function solveStable(ctx: Ctx, extra: Partial<Spec> = {}): Solved {
+function solveStable(ctx: Ctx, extra: Partial<Spec> = {}, others: Plan[] = []): Solved {
+  const least = solveLeastRise(ctx, extra);
+  if (!least.plan.ok) return least;
+  return stableAtMargin(ctx, least, others, extra);
+}
+
+/**
+ * Stability bought at the margin, not against today. The candidates are the
+ * least-rise mix and every other goal's answer of this structure, re-solved
+ * under stability's rules (the same debts, tracks and terms, the amounts for
+ * its own risk-weighted cost). From the cheapest in the forecast, a steadier
+ * candidate is taken only when its extra forecast cost is at most STABLE_PRICE
+ * of the payments it removes in the worst economy relative to THAT candidate,
+ * beyond what its own lower month one removes (the other's path scaled to its
+ * month one), and steadier means a lower worst-economy peak over month one: a
+ * variable track stretched to 30 years lowers every payment in shekels and
+ * protects nothing. Round 6 to wave 2 bought the last shekels of rise at any
+ * price the test against today allowed: L44 forecast saving ₪328,296 →
+ * ₪119,292 with ₪416k of 30-year prime; L16 a saving of ₪68,356 → ₪32,798 more
+ * than today at 360 months.
+ */
+function stableAtMargin(ctx: Ctx, least: Solved, others: Plan[], extra: Partial<Spec>): Solved {
+  const s0 = costSpec(ctx, "stable", { shareCap: false, ...extra });
+  type C = { sv: Solved; book: Book; paid: number; m1: number; ratio: number };
+  const of = (sv: Solved): C => {
+    const book = bookOf(rowsOf(ctx, sv.plan).rows, ctx.input, ctx.f);
+    const m1 = book.metrics.monthly;
+    return { sv, book, paid: book.paid[0], m1, ratio: Math.max(...lifePeak(book, m1)) / Math.max(1, m1) - 1 };
+  };
+  const cands: C[] = [of(least)];
+  const seen = new Set([canonicalKey(least.plan)]);
+  for (const p of others) {
+    const r = restart(ctx, p, s0, ctx.cols);
+    if (!r || seen.has(canonicalKey(r))) continue;
+    seen.add(canonicalKey(r));
+    cands.push(of({ plan: r, spec: { ...s0, riseCap: riseOf(ctx, r, ctx.cols) }, cols: ctx.cols }));
+  }
+  cands.sort((a, b) => a.paid - b.paid);
+  const base = cands[0];
+  let cur = base;
+  for (const b of cands.slice(1)) {
+    if (b.ratio < cur.ratio - 1e-4 && b.paid - cur.paid <= STABLE_PRICE * removedBy(cur.book, cur.m1, b.book, b.m1)) cur = b;
+  }
+  if (cur === base) return { ...cur.sv, meta: { ...(least.meta ?? {}), ...(cur.sv.meta ?? {}) } };
+  return {
+    ...cur.sv,
+    meta: {
+      ...(least.meta ?? {}),
+      ...(cur.sv.meta ?? {}),
+      marginCost: cur.paid - base.paid,
+      marginRemoved: removedBy(base.book, base.m1, cur.book, cur.m1),
+      marginPeakFrom: Math.max(...lifePeak(base.book, base.m1)),
+      marginPeakTo: Math.max(...lifePeak(cur.book, cur.m1)),
+    },
+  };
+}
+/** A plan's identity: its debt decisions and its tranches. */
+const canonicalKey = (p: Plan) => `${p.refinance.slice().sort().join(",")}|${Object.keys(p.amounts).sort().join(",")}`;
+/**
+ * The payments mix B removes in A's worst economy (the economy of A's highest
+ * life peak) beyond what B's own month one removes: A's path scaled to B's
+ * month one, month by month, less B's, where positive.
+ */
+function removedBy(a: Book, aM1: number, b: Book, bM1: number): number {
+  const peaks = lifePeak(a, aM1);
+  const k = peaks.reduce((best, x, i) => (x > peaks[best] ? i : best), 0);
+  const s = bM1 / Math.max(1, aM1);
+  const pa = a.regular[k];
+  const pb = b.regular[k];
+  let sum = 0;
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) sum += Math.max(0, (pa[i] ?? 0) * s - (pb[i] ?? 0));
+  return sum;
+}
+
+/** The least-rise mix within the budget, then the cheapest within STABLE_BAND of that rise (the candidate stableAtMargin starts from). */
+function solveLeastRise(ctx: Ctx, extra: Partial<Spec> = {}): Solved {
   const s1 = costSpec(ctx, "stable", { shareCap: false, wCost: 1e-4, wRise: 1, ...extra });
   let p1 = solveTerms(ctx.debts, ctx.cols, s1);
   if (!p1.ok) {
@@ -3505,6 +3598,13 @@ function reasonsOf(ctx: Ctx, goal: GoalId, book: Book, tranches: NewTranche[], r
   if (goal === "stable") {
     const s = stabilityOf(R.book ?? ctx.today, R.monthly, book, m.monthly);
     out.push(`בתרחיש הלחץ הקשה ביותר ההחזר הגבוה ביותר לאורך כל התקופה הוא ${nis(s.next)}, מול ${nis(s.now)} בתמהיל של ${R.book ? "היום ונשיאת החוב שעומד לפירעון" : "היום"}.`);
+    // What the steadiness costs at the margin: against the cheapest mix under the same rules, not against today.
+    const mc = solved.meta?.marginCost;
+    if (typeof mc === "number" && mc >= 1 && typeof solved.meta?.marginRemoved === "number" && typeof solved.meta?.marginPeakFrom === "number")
+      out.push(`היציבות עולה ${nis(mc)} יותר בתחזית מהתמהיל הזול ביותר באותם כללים, שבו ההחזר הגבוה בתרחיש הלחץ מגיע ל-${nis(solved.meta.marginPeakFrom)}. התוספת היא פחות מרבע מהתשלומים שהיא חוסכת בתרחיש הזה, ${nis(solved.meta.marginRemoved)}.`);
+    // The cheapest mix under the rules still costing more than today: its price is against today, and said so (L27).
+    else if (book.paid[0] - R.paid > MATERIAL.neutral(R.paid) && book.paid[0] - R.paid <= STABLE_PRICE * s.protection)
+      out.push(`היציבות עולה ${nis(book.paid[0] - R.paid)} יותר מהיום בתחזית, פחות מרבע מהתשלומים שהיא חוסכת בתרחיש הזה מול התמהיל של היום, ${nis(s.protection)}.`);
   }
   const g = guardLine(ctx, goal, solved, book);
   if (g) out.push(g);
@@ -3744,7 +3844,11 @@ function caveatsOf(ctx: Ctx, goal: GoalId, book: Book, refi: Set<string>, fPaidD
   // Which five-year guard the rows hold (Proposal.guard): none is said here, and the
   // relative one by מאוזן and קיצור שנים (the payment goal says it in its reasons).
   const guard = guardOf(ctx, goal, solved, book);
-  if (guard?.kind === "none")
+  if (guard?.kind === "none" && goal === "years" && typeof solved.meta?.guardedAt === "number")
+    out.push(
+      `בתרחיש לחץ ההחזר עלול לעלות בחמש השנים הקרובות עד ${nis(Math.max(...peak5Of(book)))}, מעל התקרה של ${nis(guard.caps[0])}. תמהיל שנשאר מתחת לתקרה גם בתרחיש הלחץ מקצר רק ${ctx.ref.months - solved.meta.guardedAt} חודשים, פחות משנה, ולכן זה הקיצור שמוצע.`
+    );
+  else if (guard?.kind === "none")
     out.push(
       goal === "years"
         ? `בתרחיש לחץ ההחזר עלול לעלות בחמש השנים הקרובות מעל התקרה של ${nis(guard.caps[0])}, ואין תמהיל שמונע זאת ומקצר את החוב.`
@@ -4153,7 +4257,8 @@ function runGoals(ctx: Ctx, consolidateOk: boolean, wanted: Set<GoalId>): Run {
     if (goal === "payment") return solvedPayment;
     if (goal === "years") return solveYears(ctx);
     if (goal === "balanced") return solveBalanced(ctx, extra, fromGuard);
-    if (goal === "stable") return solveStable(ctx, extra);
+    // The other goals of this structure are stability's candidates at the margin.
+    if (goal === "stable") return solveStable(ctx, extra, Array.from(solvedBy.entries()).filter(([g, sv]) => g !== "stable" && sv.plan.ok).map(([, sv]) => sv.plan));
     const spec = costSpec(ctx, goal, extra);
     return { plan: solveTerms(ctx.debts, ctx.cols, spec), spec, cols: ctx.cols };
   };
@@ -4967,4 +5072,125 @@ function dueNowOf(ctx: Ctx): AutoMixResult["dueNow"] {
 }
 
 /** Exposed for the check script. */
-export const __test = { STATS, SLIVER_STATS, GATE_STATS, DISPLAY_STATS, PAYMENT_STAGE, ALIGN_STATS, runGoals, sliversOf, sliverTest, SLIVER_REASON, unsliver, solveBalanced, frontierPoint, solveGuarded, variantsFor, referenceOf, applyReference, prepare, solveTermsRaw, specFor, LAMBDA, bookOf, rowsOf, priceRow, debtsOf, columnsFor, pricingFor, trancheRow, SETUP_HOUSING, SETUP_AP_ALONE, isIndexedPath };
+/* ------------------------------------------------------------ the regress proof */
+
+/** A goal's mix as another build states it: the debts it moves and its tranches (scripts/automix-regress.mts). */
+export type RegressMix = { structure?: Variant; refinance: string[]; tranches: { track: string; segment: string; years: number; amount: number }[] };
+/** A mix re-priced by today's engine for one goal: its measures, its status by today's gates, or the rule it breaks. */
+export type RegressOutcome = {
+  ok: boolean;
+  /** The rule of the goal the mix breaks today (null when it obeys every one). */
+  rule: string | null;
+  status?: Proposal["status"];
+  gate?: string | null;
+  monthly?: number;
+  months?: number;
+  /** Forecast total paid, and in every economy (ECONOMIES order). */
+  paid?: number[];
+  /** Highest payment over the life in each economy (balloons out), month one included. */
+  peak?: number[];
+  /** Highest payment over months 1–60 in each economy. */
+  peak5?: number[];
+  /** The regular payments month by month in each economy (balloons out). */
+  regular?: number[][];
+  /** The tranche count (each opened track rounds the read-out by up to ₪0.5). */
+  tranches?: number;
+  reference?: { monthly: number; paid: number; months: number; todayCost: number; neutral: number; material: { monthly: number; cost: number; months: number } };
+};
+
+/**
+ * Today's engine on another build's mix for one goal: the same structure, the
+ * same debts moved, the same tracks and terms, the amounts re-solved under the
+ * goal's rules today (money must still balance at today's fees and costs), then
+ * priced as the board prices it and judged by today's gates. When the rules
+ * cannot be met the first rule whose removal lets the mix stand is named.
+ */
+function regressOf(input: AutoMixInput, goal: GoalId, mix: RegressMix, guardCaps?: number[] | null, ceiling?: number, lifted = false): RegressOutcome {
+  const f = input.forecast;
+  if (!f) return { ok: false, rule: "forecast" };
+  setCpiMonthly((history.sources.cpi as { yoy: number | null }).yoy);
+  mergeFeeRows(input.market?.feeRows);
+  const p0 = prepare(input, f, [], "bank");
+  if ("fail" in p0) return { ok: false, rule: "no build" };
+  const shared = referenceOf(p0.ctx);
+  const variant = mix.structure ?? "bank";
+  const p = variant === "bank" ? p0 : prepare(input, f, [], variant);
+  if ("fail" in p) return { ok: false, rule: `structure ${variant}` };
+  const ctx = p.ctx;
+  applyReference(ctx, shared);
+  const ids = new Set(ctx.debts.map((d) => d.id));
+  const unknown = mix.refinance.filter((id) => !ids.has(id));
+  if (unknown.length) return { ok: false, rule: `debts ${unknown.length} not in today's book` };
+  const keys = mix.tranches.map((x) => `${x.track}|${x.segment}|${x.years}`);
+  const cols = ctx.cols.filter((c) => keys.includes(c.key));
+  const missing = keys.filter((k) => !cols.some((c) => c.key === k));
+  if (missing.length) return { ok: false, rule: `no such term today (${missing.join(", ")})` };
+  const unlock = eligibilityIds(ctx);
+  const caps = guardCaps && guardCaps.length ? (guardCaps.every((x) => x === guardCaps[0]) ? guardCaps[0] : guardCaps) : null;
+  const finish = Math.max(0, ...ctx.debts.filter((d) => !mix.refinance.includes(d.id)).map((d) => d.months), ...mix.tranches.map((x) => x.years * 12));
+  const lam = lambdaOf(ctx, goal);
+  const B = reliefBudget(ctx);
+  // The goal's rules today, and the objective its amounts are re-solved for.
+  const spec: Spec =
+    goal === "payment"
+      ? specFor(ctx, { wMonthly: 1, wCost: 1e-3, lambda: 0, budget: null, hold: undefined, peakCap: caps, ...(unlock.length ? { unlock } : {}) })
+      : goal === "years"
+        ? specFor(ctx, { wMonthly: 1, wCost: 1e-3, lambda: 0, budget: ceiling ?? ctx.budget, finish, peakCap: caps, ...yearsCaps(ctx), ...(unlock.length ? { unlock } : {}) })
+        : goal === "balanced"
+          ? specFor(ctx, { wMonthly: 0, wCost: 1, lambda: lam, budget: Math.min(ctx.base.budget ?? B, B), peakCap: caps, typedPaidCap: ctx.ref.typedPaid, ...pvCapOf(ctx, "balanced") })
+          : goal === "stable"
+            ? costSpec(ctx, "stable", { shareCap: false })
+            : goal === "consolidate"
+              ? specFor(ctx, { keepMortgage: true, loansAllowed: true, shareCap: false, hold: undefined })
+              : costSpec(ctx, goal);
+  // Today's answer moved the cheap debts (CHEAP_KEEP lifted on its own measure): the old mix may too.
+  if (lifted) spec.hold = undefined;
+  const fix: Spec = { ...spec, fixZ: mix.refinance };
+  const plan = solveOnce(ctx.debts, cols, fix, false, true);
+  const reference = { monthly: ctx.ref.monthly, paid: ctx.ref.paid, months: ctx.ref.months, todayCost: todayCostOf(ctx), neutral: MATERIAL.neutral(ctx.ref.paid), material: { monthly: MATERIAL.monthly(ctx.ref.monthly), cost: MATERIAL.cost(todayCostOf(ctx)), months: MATERIAL.months } };
+  // The figures of a mix, priced and judged under a spec.
+  const measure = (p: Plan, s: Spec) => {
+    const { rows } = rowsOf(ctx, p);
+    const book = bookOf(rows, ctx.input, ctx.f);
+    const v = quickJudge(ctx, goal, { plan: p, spec: s, cols });
+    return {
+      status: v.status,
+      gate: v.gate,
+      monthly: book.metrics.monthly,
+      months: book.metrics.months,
+      paid: book.paid,
+      peak: ECON.map((_, k) => Math.max(book.metrics.monthly, ...book.regular[k])),
+      peak5: ECON.map((_, k) => Math.max(book.metrics.monthly, ...book.regular[k].slice(1, 60))),
+      regular: book.regular,
+      tranches: Object.keys(p.amounts).length,
+      reference,
+    };
+  };
+  if (!plan.ok) {
+    // The rule it breaks, and the mix's figures with that rule set aside (the figure the verdict quotes).
+    const held = (spec.hold ?? []).filter((id) => mix.refinance.includes(id));
+    if (held.length) {
+      const free = solveOnce(ctx.debts, cols, { ...fix, hold: undefined }, false, true);
+      return { ok: false, rule: `CHEAP_KEEP (${held.length} debt${held.length > 1 ? "s" : ""} ${held.map((id) => (ctx.cheapBy.get(id) ?? 0).toFixed(2)).join("/")} pp under new money)`, ...(free.ok ? measure(free, { ...fix, hold: undefined }) : { reference }) };
+    }
+    const relax: [string, Partial<Spec>][] = [
+      ["the budget", { budget: null }],
+      ["the five-year guard", { peakCap: null }],
+      ["the track share cap", { shareCap: false }],
+      ["the present-value cap", { pvCap: undefined }],
+      ["no more paid than the reference", { paidCap: undefined, typedPaidCap: undefined }],
+      ["the payment-to-income cap", { ptiCap: null }],
+      ["the loan-to-value cap", { ltv: null }],
+      ["the fixed and linked shares", { fixedToday: 0, linkedToday: 1 }],
+    ];
+    for (const [name, over] of relax) {
+      const s = { ...fix, ...over };
+      const p = solveOnce(ctx.debts, cols, s, false, true);
+      if (p.ok) return { ok: false, rule: name, ...measure(p, s) };
+    }
+    return { ok: false, rule: "the funding or the tranche rules (no single rule)", reference };
+  }
+  return { ok: true, rule: null, ...measure(plan, fix) };
+}
+
+export const __test = { regressOf, STATS, SLIVER_STATS, GATE_STATS, DISPLAY_STATS, PAYMENT_STAGE, ALIGN_STATS, runGoals, sliversOf, sliverTest, SLIVER_REASON, unsliver, solveBalanced, frontierPoint, solveGuarded, variantsFor, referenceOf, applyReference, prepare, solveTermsRaw, specFor, LAMBDA, bookOf, rowsOf, priceRow, debtsOf, columnsFor, pricingFor, trancheRow, SETUP_HOUSING, SETUP_AP_ALONE, isIndexedPath };
