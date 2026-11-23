@@ -130,12 +130,13 @@ function verdict(goal: GoalId, o: Outcome, n: Outcome): { v: string; why: string
   // stable: the promise (index.ts solveStable). In every economy the true life
   // peak at most the mix's own month one plus MATERIAL.monthly of it; among mixes
   // that keep it the cheaper risk-weighted one is better; where neither keeps it,
-  // the smaller excess over it, summed over the economies.
+  // the smaller excess over it in the worst economy (what the proposal states:
+  // its real worst peak), then the cheaper.
   const over = (x: Outcome) => x.peak!.map((p) => Math.max(0, p - x.monthly! - Math.max(150, 0.03 * x.monthly!)));
   const keeps = (x: Outcome) => Math.max(...over(x)) <= 0.5;
-  const total = (x: Outcome) => over(x).reduce((a, b) => a + b, 0);
+  const total = (x: Outcome) => Math.max(...over(x));
   const dCost = riskCost(n, "stable") - riskCost(o, "stable");
-  const why = `peak/month one ${ratio(o).toFixed(3)} → ${ratio(n).toFixed(3)}, excess over the promise ${fmt(total(o))} → ${fmt(total(n))}, risk-weighted cost ${sgn(dCost)} (new − old)`;
+  const why = `peak/month one ${ratio(o).toFixed(3)} → ${ratio(n).toFixed(3)}, worst excess over the promise ${fmt(total(o))} → ${fmt(total(n))}, risk-weighted cost ${sgn(dCost)} (new − old)`;
   if (!keeps(o) && keeps(n)) return { v: "new better", why: `the old mix breaks the peak promise (ratio ${ratio(o).toFixed(3)}); ${why}` };
   if (keeps(o) && !keeps(n)) return { v: "OLD MIX BETTER", why: `the old mix keeps the peak promise and today's does not; ${why}` };
   if (keeps(o) && keeps(n)) return { v: dCost > R.material.cost ? "OLD MIX BETTER" : dCost < -R.neutral ? "new better" : "same", why };
@@ -184,8 +185,14 @@ for (const c of await cases()) {
         if (!ro.ok) {
           v = "old mix breaks";
           // The figure: what the old mix gives with that one rule set aside.
+          // Over the budget: by how much, at the lowest month one the old mix reaches today (within ₪0.5 a track it is not over).
+          // (The read-out's own tolerance, as the gates and the audit read the budget: month one at most budget + ₪0.5.)
+          const within = !!ro.budget && ro.budget.least <= ro.budget.cap + 0.5;
+          const over = ro.budget ? ` over by ${fmt(ro.budget.least - ro.budget.cap)} (its lowest month one ${fmt(ro.budget.least)} against ${fmt(ro.budget.cap)})${within ? " WITHIN ROUNDING" : ""};` : "";
           const fig = ro.monthly === undefined ? "" : ro.rule === "the five-year guard" ? `its five-year peak ${fmt(Math.max(...ro.peak5!))} over the cap ${fmt(Math.max(...(caps ?? [0])))}; set aside: ${show(ro)}` : rn?.ok ? `set aside: ${verdict(goal, ro, rn).v.toLowerCase()} (${verdict(goal, ro, rn).why})` : `set aside: ${show(ro)}`;
-          line = `${head}${`old mix breaks ${ro.rule}`.padEnd(26)} ${fig}`;
+          line = `${head}${`old mix breaks ${ro.rule}`.padEnd(26)}${over} ${fig}`;
+          // Over the budget by no more than the rounding a budget row allows, the old mix keeps the rule: judged as it is.
+          if (within && rn?.ok && verdict(goal, ro, rn).v === "OLD MIX BETTER") v = "OLD MIX BETTER";
         } else if (ro.status !== "ok") {
           v = "old mix breaks";
           line = `${head}${`old mix breaks ${ro.gate ? `the ${ro.gate} gate` : `its ${ro.status}`}`.padEnd(26)} old today: ${show(ro)}`;

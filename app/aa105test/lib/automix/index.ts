@@ -5784,6 +5784,12 @@ export type RegressOutcome = {
   ok: boolean;
   /** The rule of the goal the mix breaks today (null when it obeys every one). */
   rule: string | null;
+  /**
+   * When the rule is the budget: the budget, and the lowest month one the mix reaches today under every other
+   * rule (its debts, tracks and terms, the amounts re-solved for the payment), as the board reads it. The
+   * difference is by how much it is over; within the ₪0.5 a budget row allows per opened track it is not over.
+   */
+  budget?: { cap: number; least: number; tracks: number };
   status?: Proposal["status"];
   gate?: string | null;
   monthly?: number;
@@ -5842,7 +5848,7 @@ function regressOf(input: AutoMixInput, goal: GoalId, mix: RegressMix, guardCaps
         : goal === "balanced"
           ? specFor(ctx, { wMonthly: 0, wCost: 1, lambda: lam, budget: Math.min(ctx.base.budget ?? B, B), peakCap: caps, typedPaidCap: ctx.ref.typedPaid, ...pvCapOf(ctx, "balanced") })
           : goal === "stable"
-            ? costSpec(ctx, "stable", { shareCap: false })
+            ? stableSpec(ctx, { shareCap: false }, STABLE_SLACK)
             : goal === "consolidate"
               ? specFor(ctx, { keepMortgage: true, loansAllowed: true, shareCap: false, hold: undefined })
               : costSpec(ctx, goal);
@@ -5889,6 +5895,11 @@ function regressOf(input: AutoMixInput, goal: GoalId, mix: RegressMix, guardCaps
     for (const [name, over] of relax) {
       const s = { ...fix, ...over };
       const p = solveOnce(ctx.debts, cols, s, false, true);
+      if (p.ok && name === "the budget" && spec.budget != null) {
+        const low = solveOnce(ctx.debts, cols, { ...s, wMonthly: 1, wCost: 1e-3, lambda: 0 }, false, true);
+        const least = low.ok ? bookOf(rowsOf(ctx, low).rows, ctx.input, ctx.f).metrics.monthly : NaN;
+        return { ok: false, rule: name, ...measure(p, s), budget: { cap: spec.budget, least, tracks: Object.keys((low.ok ? low : p).amounts).length } };
+      }
       if (p.ok) return { ok: false, rule: name, ...measure(p, s) };
     }
     return { ok: false, rule: "the funding or the tranche rules (no single rule)", reference };
