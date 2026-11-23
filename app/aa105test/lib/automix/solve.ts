@@ -35,7 +35,7 @@ import { FIXED_MIN, LINKED_MAX, MAX_AP_TRANCHES, MAX_HOUSING_TRANCHES, MIN_TRANC
 
 export const U = 1000; // money variables in ₪ thousands — binaries next to millions are badly conditioned
 /** Per opened tranche, ₪ — the read-out's per-row rounding (see the budget row). */
-const ROUNDING = 0.6;
+export const ROUNDING = 0.6;
 
 export type Segment = "housing" | "allPurpose";
 
@@ -587,7 +587,8 @@ const better = (a: Plan, b: Plan) => a.ok && (!b.ok || a.objective < b.objective
  * held. 2) One term per track (amount-weighted), 3) a coordinate walk over each
  * track's term (±1…3 years) with the debt decisions held, 4) a one-flip walk
  * over the debt decisions with the terms held, 5) a free re-solve on the best
- * terms; 3–5 repeat while anything improves.
+ * terms; 3–5 repeat while anything improves, at most `rounds` times (a probe
+ * that only reads the shape of a frontier needs fewer than a final answer).
  */
 /** A starting point another goal reached: which debts moved and each track's term. */
 export type Seed = { refinance: string[]; terms: Record<string, number> };
@@ -602,7 +603,7 @@ export function termsOf(plan: Plan, cols: Column[]): Record<string, number> {
   return out;
 }
 
-export function solveTerms(debtsIn: SolverDebt[], cols: Column[], s: Spec, seeds: Seed[] = [], start?: Plan): Plan {
+export function solveTerms(debtsIn: SolverDebt[], cols: Column[], s: Spec, seeds: Seed[] = [], start?: Plan, rounds = 6): Plan {
   const debts = canonical(debtsIn);
   // 1) The first solve on every other year of each track's grid (and its
   //    longest term) — the neighbourhood step below refines on the full grid.
@@ -723,7 +724,7 @@ export function solveTerms(debtsIn: SolverDebt[], cols: Column[], s: Spec, seeds
     const p = solveOnce(debts, sc, held(seed.refinance.filter((id) => movable.some((d) => d.id === id))));
     if (better(p, best)) best = p;
   }
-  for (let outer = 0; outer < 6; outer++) {
+  for (let outer = 0; outer < rounds; outer++) {
     let changed = false;
     // 3) one group of debt decisions at a time, terms held
     for (const g of groups) {

@@ -80,12 +80,6 @@ export const MAX_AP_TRANCHES = 2;
 export const MIN_YEARS: Record<"prime" | "klz" | "kz" | "mlz" | "mz", number> = { prime: 4, klz: 4, kz: 5, mlz: 10, mz: 10 };
 
 /**
- * Materiality — below these a goal is "no-gain": shown, not offered.
- *   monthly   max(₪150, 3% of today's payment)
- *   years     12 months
- *   cost      max(₪10,000, 2% of today's remaining cost)
- */
-/**
  * The engine's own practice, not law: a refinance whose fees and costs come back
  * only after ten years is not one an advisor files on a cost goal (savings,
  * balanced, stable). Most mortgages are refinanced or repaid on a sale well
@@ -102,8 +96,60 @@ export const BREAK_EVEN_MAX = 120;
  */
 export const YEARS_STRETCH = 0.1;
 
+/**
+ * Materiality — below these a goal is "no-gain": shown, not offered.
+ *   monthly   max(₪150, 3% of today's payment)
+ *   years     12 months
+ *   cost      max(₪10,000, 2% of today's remaining cost)
+ *   neutral   max(₪500, 0.02% of everything still to be paid today): a
+ *             difference in total paid this small over the life of the loan is
+ *             not a cost. It is the residue of rounding every new tranche to
+ *             ₪1,000 (each thousand moved between two tracks moves the total by
+ *             their difference in cost per shekel, tens to hundreds of shekels).
+ *             Within it two mixes cost the same: no proposal is refused for it
+ *             and no sentence quotes it as a "תוספת" or a "חיסכון". Audit
+ *             2026-11-22: מאוזן refused over ₪116 (L01), ₪91 (L05), ₪131 (L36)
+ *             and ₪24 (L45) on reliefs of ₪223 to ₪926 a month, and איחוד הלוואות
+ *             said "תוספת של ₪3" (r01).
+ */
 export const MATERIAL = {
   monthly: (today: number) => Math.max(150, 0.03 * today),
   months: 12,
   cost: (todayCost: number) => Math.max(10_000, 0.02 * todayCost),
+  neutral: (todayPaid: number) => Math.max(500, 0.0002 * todayPaid),
+};
+
+/**
+ * One-off costs out of proportion to the debt: prepayment fees plus the new
+ * loan's setup above this share of the new money, and the engine does not
+ * offer the refinance (override off; with it the mix is built and the share is
+ * a caveat). The engine's own practice, not a law: a bank's housing file costs
+ * ₪3,108 to open (index.ts SETUP), 5% of ₪62,000, and the audit of 2026-11-22
+ * found payment goals spending a third of the debt on it. L39: a ₪9,830 debt
+ * with 45 months left became a ₪13,000 loan over 30 years with ₪3,048 of costs
+ * (total paid ₪11.8k → ₪30.4k); L40: ₪8,485 with 25 months left, ₪12,000 new
+ * money, costs 37% of the debt.
+ */
+export const REFI_COST_MAX = 0.05;
+
+/**
+ * A sliver: a new tranche under this share of its segment's new money. The
+ * LP's vertex solutions leave ₪50,000–65,000 tranches (MIN_TRANCHE or just
+ * above) beside tranches ten times larger, each with its own term (L18 payment:
+ * prime 625k + קל"צ 50k + ק"צ 289k + מ"צ 50k; r01 stable: מל"צ 52k beside קל"צ
+ * 968k; L44 stable: מל"צ 51k beside קל"צ 2,746k). No advisor files a ₪50k track on
+ * a ₪1M mortgage: it adds a line to the contract and a reset or an index
+ * exposure for a gain of a few shekels. One stays only when removing it costs
+ * the goal more than SLIVER_GIVE, or a rule needs it.
+ */
+export const SLIVER_SHARE = 0.1;
+/**
+ * What a goal may give up on its own objective to drop a sliver. Cost goals:
+ * 0.1% of the forecast total paid (₪2,000 on a ₪2M mortgage, a fifth of the
+ * materiality of a saving). The payment goal: max(₪10, 0.2% of today's payment)
+ * a month, the same order as the read-out's own rounding of several rows.
+ */
+export const SLIVER_GIVE = {
+  cost: (todayPaid: number) => 0.001 * todayPaid,
+  monthly: (today: number) => Math.max(10, 0.002 * today),
 };

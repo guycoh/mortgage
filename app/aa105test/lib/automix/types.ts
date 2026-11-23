@@ -30,7 +30,11 @@ export type GoalId =
   | "years"
   /** חיסכון מקסימלי — the monthly budget held, the least money paid overall. */
   | "savings"
-  /** מאוזן — some of the payment relief and some of the saving; the default recommendation. */
+  /**
+   * מאוזן — payment relief and total saving in equal measure (the same share of
+   * the most free relief and of the most saving the budget allows); the default
+   * recommendation.
+   */
   | "balanced"
   /** יציבות מרבית — the least exposure to prime and CPI the budget allows. */
   | "stable"
@@ -201,6 +205,12 @@ export type NewTranche = {
   years: number;
   rate: number;
   monthly: number;
+  /**
+   * Set on a tranche under a tenth of its segment's new money (rules.ts
+   * SLIVER_SHARE), saying why it stays: removing it costs the goal more than
+   * the engine gives up for one less track, or a rule needs it.
+   */
+  keptSmall?: string;
 };
 
 export type Check = {
@@ -274,6 +284,17 @@ export type Proposal = {
   metrics: MixMetrics;
   /** proposal − today. Negative monthly/months/totalPaid = better. */
   delta: { monthly: number; months: number; totalPaid: number; totalCost: number; totalInterest: number; pv: number };
+
+  /**
+   * מאוזן only: the two measures it balances, against the reference. `relief`
+   * = reference − this payment (₪ a month); `saving` = reference − this forecast
+   * total paid (₪). `reliefMax` = the most relief that pays no more in total;
+   * `savingMax` = the most forecast saving the budget allows; `t` = the smaller
+   * of the two shares (relief/reliefMax, saving/savingMax), the share of each the
+   * client gets at least. A maximum below materiality is not balanced against
+   * (`t` is then the other share).
+   */
+  balance?: { relief: number; reliefMax: number; saving: number; savingMax: number; t: number };
 
   /** What the switch itself costs, ₪ — all of it already inside `rows` when financed. */
   costs: {

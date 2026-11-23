@@ -24,7 +24,7 @@ import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 import { household, FIXTURE_SETS } from "./automix-fixtures.mts";
 import { verifier } from "./automix-verify.mts";
-import { buildAutoMix, DEFAULT_PROFILE, type AutoMixInput, type AutoMixResult, type ClientProfile, type GoalId } from "../app/aa105test/lib/automix";
+import { buildAutoMix, DEFAULT_PROFILE, __test, type AutoMixInput, type AutoMixResult, type ClientProfile, type GoalId } from "../app/aa105test/lib/automix";
 import { parseBankStatement, detectBank } from "../lib/bank-parser/index";
 import { bankStatementToLoans } from "../lib/bank-parser/to-loans";
 import { latestCurve } from "../app/aa107test/lib/market-boi";
@@ -156,6 +156,25 @@ function budgetLaw(name: string, input: AutoMixInput, r: AutoMixResult) {
   }
 }
 
+/**
+ * מאוזן's status does not flip on a 0.05-point change in the price of new money
+ * (profile.negotiated ±0.05), unless the proposal sits at a threshold the
+ * change genuinely crosses (verify nearThreshold). Audit W2: with the solve
+ * aimed exactly at its own gate, L02, L16, L18, L43 and L44 went ok → no-gain and
+ * L01, L21 the other way, and the recommendation moved with them.
+ */
+function negotiatedLaw(name: string, input: AutoMixInput, r: AutoMixResult) {
+  if (!r.ok) return;
+  const a = r.proposals.find((p) => p.goal === "balanced");
+  if (!a || a.status === "unavailable") return;
+  for (const dn of [0.05, -0.05]) {
+    const s = buildAutoMix({ ...input, profile: { ...input.profile, negotiated: (input.profile.negotiated || 0) + dn } });
+    const b = s.proposals.find((p) => p.goal === "balanced");
+    if (!b || b.status === a.status) continue;
+    check(V.nearThreshold(a, r) || V.nearThreshold(b, s), `${name}/balanced negotiated ${dn > 0 ? "+" : ""}${dn}: ${a.status} → ${b.status} away from every threshold (${b.note ?? a.note ?? ""})`);
+  }
+}
+
 /* ------------------------------------------------------------ the profile grid */
 
 const BANK_OF: [RegExp, BankId][] = [
@@ -235,7 +254,10 @@ if (!ONLY || ONLY === "letters") {
     for (const g of grid(master, base.today.monthly)) {
       const input = inputOf(master, g.over, g.profile);
       const r = run(`${id}/${g.tag}`, input, { laws: g.laws });
-      if (g.tag === "none" && r) budgetLaw(`${id}/${g.tag}`, input, r);
+      if (g.tag === "none" && r) {
+        budgetLaw(`${id}/${g.tag}`, input, r);
+        negotiatedLaw(`${id}/${g.tag}`, input, r);
+      }
       if (g.tag === "none" || g.tag === "typical") console.log(`  ${id} ${String(st.bank).padEnd(10)} ${String(master.length).padStart(2)} rows ${fmt(base.today.monthly).padStart(7)}/mo ${g.tag.padEnd(8)} ${r?.pricing.tier ?? ""} ${(r?.ms ?? 0).toFixed(0).padStart(4)}ms ${status(r)}`);
     }
   }
@@ -254,7 +276,10 @@ if (!ONLY || ONLY === "reports") {
     for (const g of grid(h.master, base.today.monthly)) {
       const input = inputOf(h.master, { analysis: h.analysis, ...g.over }, g.profile);
       const r = run(`${s.id}/${g.tag}`, input, { laws: g.laws });
-      if (g.tag === "none" && r) budgetLaw(`${s.id}/${g.tag}`, input, r);
+      if (g.tag === "none" && r) {
+        budgetLaw(`${s.id}/${g.tag}`, input, r);
+        negotiatedLaw(`${s.id}/${g.tag}`, input, r);
+      }
       if (g.tag === "typical" || g.tag === "tight") console.log(`  ${s.id.padEnd(8)} ${g.tag.padEnd(8)} ${r?.pricing.tier ?? ""} ${(r?.ms ?? 0).toFixed(0).padStart(4)}ms ${status(r)}`);
     }
   }
@@ -402,6 +427,12 @@ if (!ONLY || ONLY === "fuzz") {
   console.log(`  built ${tally.ok} · not ok ${tally.notOk} · threw ${tally.threw} · goals ok ${tally.okGoals} / no-gain ${tally.ngGoals} / unavailable ${tally.naGoals} · slowest ${worstMs.toFixed(0)}ms (${tally.slow} over 2s)`);
 }
 
+{
+  const t = V.tally;
+  console.log(`\n  slivers on the board: ${t.slivers} (${t.slivMarked} with a reason) · מאוזן with both measures: ${t.balanced}, t lowest ${t.tN ? t.tLow.toFixed(3) : "-"}, mean ${t.tN ? (t.tSum / t.tN).toFixed(3) : "-"}`);
+  const z = __test.SLIVER_STATS;
+  console.log(`  sliver pass: ${z.dropped} answers changed, at most ₪${fmt(z.cost)} (cost goals, risk-weighted) and ₪${fmt(z.monthly)} a month (payment) given up`);
+}
 console.log(`\n${V.passed()} checks passed, ${failures.length} failed`);
 const groups = new Map<string, string[]>();
 for (const f of failures) {
