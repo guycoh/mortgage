@@ -70,8 +70,15 @@ export const LINKED_MAX = 1 / 3;
  * One track's share of new housing money, except in the stability goal (which
  * may be all fixed). Tapers for small amounts so a mix too small to split into
  * two ₪50,000 tranches can still be one tranche:  track ≤ ⅔·N + ⅓·2·MIN.
+ * קל"צ is exempt in every goal (TRACK_SHARE_EXEMPT): the one track with neither
+ * a rate nor an index risk needs no diversification, and the Bank of Israel's own
+ * uniform basket 1, which every bank must quote, is 100% fixed unlinked
+ * (https://boi.org.il/information/bank-paymnts/financial-education/competition-in-mortgages/).
+ * Capping it let stable beat savings on payment, forecast, worst case and
+ * present value at once (audit S2: L05, L21, r01, r01+r02).
  */
 export const TRACK_SHARE_MAX = 2 / 3;
+export const TRACK_SHARE_EXEMPT: readonly string[] = ["klz"];
 /** Smallest tranche worth opening — practice (banks rarely open a track under ~₪50k). */
 export const MIN_TRANCHE = 50_000;
 export const MAX_HOUSING_TRANCHES = 4;
@@ -153,3 +160,72 @@ export const SLIVER_GIVE = {
   cost: (todayPaid: number) => 0.001 * todayPaid,
   monthly: (today: number) => Math.max(10, 0.002 * today),
 };
+
+/**
+ * A debt clearly cheaper than the money that would replace it stays by default:
+ * in every goal but the lowest payment and the consolidation, a debt whose own
+ * all-in rate under the forecast (indexation included) is at least this many
+ * points below the cheapest new money of its segment at its own remaining term
+ * is held. The default gives way when the goal has no answer with it, and in the
+ * cost goals and קיצור שנים when the answer without it is materially better on
+ * the goal's own measure (index.ts liftGain: MATERIAL.cost of its objective,
+ * MATERIAL.months sooner); מאוזן's anchors always hold it. No advisor stretches
+ * a track cheaper than its replacement for a share or a sliver of payment, and
+ * every advisor folds small cheap loans when the payment they free shortens the
+ * big tranches (r02: about ₪27k at 3.7–4.75% freeing about ₪600 a month, worth
+ * ₪61k–₪230k of forecast cost to its budget goals).
+ * Audit U1 and round 6's open question 1: L44 מאוזן moved a קל"צ at 3.03% with
+ * 14.8 years left into 26-year money at 4.74% (+₪208,066 on that debt) to reach
+ * its relief share; r02's budget goals folded three consumer loans at 3.73%,
+ * 4.41% and 4.75% with 31–33 months left into 16–17-year all-purpose money at
+ * 6.73% (+₪16,696 between them), each for about ₪200 of month-one payment.
+ */
+export const CHEAP_KEEP = 1;
+
+/**
+ * Savings' own objective comes first: the display repair (index.ts
+ * enforceDisplayOrder), which lets savings show the lowest typed cost of the
+ * budget goals, may replace savings' answer only when its objective (forecast
+ * and worst economy) worsens by no more than this share of the forecast total
+ * paid — the sliver pass's own allowance. Audit S1: on 18 letter builds and 2
+ * report builds the repair cost savings more than 0.3% of its own objective
+ * (L16/infl5: no-gain while a mix saving ₪98,627 passed every gate; r01
+ * budget-low ₪77,444 worse), and typing today's payment as the budget instead of
+ * leaving it empty changed savings (L01 ₪233,055 → ₪181,500).
+ */
+export const DISPLAY_GIVE = (todayPaid: number) => 0.001 * todayPaid;
+
+/**
+ * יציבות מרבית is measured in payment: the goal takes the mix whose payment can
+ * rise least over its whole life in the worst economy, and among the mixes within
+ * this band of that rise (₪ a month) the cheapest risk-weighted one. The band is
+ * small next to materiality (MATERIAL.monthly) and absorbs the rounding of the
+ * tranches. Back-test 2026-11-23: stability measured in worst-economy COST took
+ * 42–62% prime for 2016–2020 originations (prime stayed cheap under the rate
+ * shock), and the realised payment peaked at 1.13 times month one on average
+ * (1.35 worst); measured in payment, 1.05 and 1.23.
+ */
+export const STABLE_BAND = (today: number) => Math.max(20, 0.005 * today);
+/**
+ * Stability's price test: what the stable mix costs more in the forecast may not
+ * exceed this share of the payments it removes in the worst economy (month by
+ * month, the payment today's mix would make there above the stable mix's). The
+ * shocks are 10th/90th percentiles: a household lands in a bad tail about one
+ * time in five, so certainty priced above a quarter of what it protects is an
+ * expensive policy.
+ */
+export const STABLE_PRICE = 0.25;
+
+/**
+ * A mortgage tranche taken less than this many months ago, refinanced: the
+ * proposal names its age. Audit U6: L35 refinanced two tranches given six weeks
+ * before the letter, at the same bank, with ₪3,108 of costs.
+ */
+export const SEASONING_MONTHS = 12;
+
+/**
+ * Moved or kept rows below this balance, of one lender, track and decision,
+ * are summarised together in Proposal.moveGroups (audit P1: L44 מאוזן listed 14
+ * moved rows, some of ₪1,014 to ₪2,542, each with its own sentence).
+ */
+export const SMALL_MOVE = 20_000;
