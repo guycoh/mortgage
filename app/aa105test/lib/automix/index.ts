@@ -1288,11 +1288,23 @@ function quickJudge(ctx: Ctx, goal: GoalId, sv: Solved): Verdict {
  * and all-purpose debt saved about ₪125k in the forecast, broke even at month 84
  * and fit the budget, ₪7,952 of ₪8,048).
  */
-function gateRows(ctx: Ctx): Partial<Spec> {
+function gateRows(ctx: Ctx, goal: GoalId): Partial<Spec> {
+  const share = ctx.override ? {} : { costShareMax: REFI_COST_MAX };
+  // איחוד הלוואות answers to one gate only, the costs' share (judge): it is a
+  // relief goal, and its fallback says what the relief costs in total, so the
+  // break-even rows would refuse the very answers it is built to state.
+  if (goal === "consolidate") return share;
   const ref = ctx.ref.book ?? ctx.today;
-  return { ...(ctx.override ? {} : { costShareMax: REFI_COST_MAX }), ahead: { cap: aheadOf(ref.pay[0], ref.bal[0]) } };
+  return { ...share, ahead: { cap: aheadOf(ref.pay[0], ref.bal[0]) } };
 }
-const GATED_GOALS: GoalId[] = ["savings", "balanced", "stable"];
+/**
+ * The goals solved again with their gates as rows when their first answer fails
+ * one. Consolidation joined them (audit 3 M4: r02 under a typical profile was
+ * refused for costs of 5.62% of ₪54,270 while consolidations under 5% existed;
+ * with the share row it folds ₪84,081 into ₪87,129 over 10 years, costs 3.5%,
+ * ₪725 a month of relief).
+ */
+const GATED_GOALS: GoalId[] = ["savings", "balanced", "stable", "consolidate"];
 
 function specFor(ctx: Ctx, over: Partial<Spec>): Spec {
   return { ...ctx.base, ...over };
@@ -2133,16 +2145,20 @@ function paidOfPlan(ctx: Ctx, plan: Plan): { forecast: number; typed: number } {
  * איחוד הלוואות — the mortgage untouched; consumer debt folded into
  * all-purpose money. The most relief (up to ¾ of the way to the lowest
  * consolidated payment) that does not cost more overall; when every relief
- * costs more, half the way — and the proposal says what it costs.
+ * costs more, half the way — and the proposal says what it costs. `extra`:
+ * the gate rows (runGoals, GATED_GOALS), held in every solve of the goal, so
+ * "the lowest consolidated payment" and "half the way" are measured among the
+ * mixes that pass them.
  */
-function solveConsolidate(ctx: Ctx): Solved {
+function solveConsolidate(ctx: Ctx, extra: Partial<Spec> = {}): Solved {
   // (Consolidation folds consumer debt by design: CHEAP_KEEP does not hold it.)
-  const s = specFor(ctx, { keepMortgage: true, loansAllowed: true, shareCap: false, hold: undefined });
+  const over: Partial<Spec> = { keepMortgage: true, loansAllowed: true, shareCap: false, hold: undefined, ...extra };
+  const s = specFor(ctx, over);
   const minSpec = { ...s, wMonthly: 1, wCost: 1e-3, lambda: 0, budget: null };
   const min = solveTerms(ctx.debts, ctx.cols, minSpec);
   if (!min.ok) return { plan: min };
   const payMin = bookOf(rowsOf(ctx, min).rows, ctx.input, ctx.f).metrics.monthly;
-  const neutral = reliefSolve(ctx, "consolidate", payMin, 0.75, { keepMortgage: true, loansAllowed: true, shareCap: false, hold: undefined });
+  const neutral = reliefSolve(ctx, "consolidate", payMin, 0.75, over);
   // "Keep everything" satisfies "no more relief than costs nothing" — for consolidation that is not an answer:
   // when no material relief is free, take half the way and say what it costs.
   if (neutral.plan.ok && neutral.plan.refinance.length && ctx.ref.monthly - shown(ctx, neutral.plan).monthly >= MATERIAL.monthly(ctx.ref.monthly)) return neutral;
@@ -4261,7 +4277,7 @@ function runGoals(ctx: Ctx, consolidateOk: boolean, wanted: Set<GoalId>): Run {
   // On a first lien the whole mortgage moves, so "the mortgage untouched" is the second-lien structure's goal.
   const consolidateHere = !((ctx.variant === "firstLien" || ctx.variant === "bankMove") && ctx.debts.some((d) => d.group === "mortgage"));
   const solveGoal = (goal: GoalId, extra: Partial<Spec> = {}, fromGuard?: Guard["kind"]): Solved => {
-    if (goal === "consolidate") return solveConsolidate(ctx);
+    if (goal === "consolidate") return solveConsolidate(ctx, extra);
     if (goal === "payment") return solvedPayment;
     if (goal === "years") return solveYears(ctx);
     if (goal === "balanced") return solveBalanced(ctx, extra, fromGuard);
@@ -4380,7 +4396,7 @@ function runGoals(ctx: Ctx, consolidateOk: boolean, wanted: Set<GoalId>): Run {
     // Every gate at once, so the answer passes them all: the rows, savings' typed
     // read-out at most the reference's, and stability at a price its protection
     // allows, then at no extra cost in the forecast.
-    const rows = { ...gateRows(ctx), ...(g === "savings" ? { typedPaidCap: ctx.ref.typedPaid } : {}) };
+    const rows = { ...gateRows(ctx, g), ...(g === "savings" ? { typedPaidCap: ctx.ref.typedPaid } : {}) };
     const levels: Partial<Spec>[] =
       g === "stable" ? [rows, { ...rows, paidCap: ctx.ref.paid + STABLE_PRICE * (v.stable?.protection ?? 0) }, { ...rows, paidCap: ctx.ref.paid }] : [rows];
     for (const extra of levels) {
