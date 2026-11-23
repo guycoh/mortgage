@@ -132,6 +132,15 @@ export function verifier(market: MarketSnapshot, forecast: Forecast | null) {
   function waveLints(tag: string, input: AutoMixInput, r: AutoMixResult, p: Proposal) {
     const refMonthly = r.dueNow?.reference.monthly ?? r.today.monthly;
     const all = p.reasons.join(" ");
+    // Stability states its promise only when its rows keep it; above it, it says what it is instead (the steadiest within today's payment).
+    if (p.goal === "stable" && p.status === "ok" && p.stress.length) {
+      const excess = Math.max(...p.stress.map((s) => s.peakMonthly)) - p.metrics.monthly;
+      const allow = Math.max(150, 0.03 * p.metrics.monthly);
+      const promise = all.includes("גם בתרחיש הגרוע ההחזר לא עולה ביותר מ-");
+      const steadiest = all.includes("זה התמהיל היציב ביותר בתוך ההחזר של היום");
+      check(!(excess > allow + 2) || (steadiest && !promise), `${tag}: stable ${Math.round(excess)} above month one (promise ${Math.round(allow)}) and ${promise ? "states the promise" : "does not say it is the steadiest within today's payment"}`);
+      check(!(excess < allow - 2) || !steadiest, `${tag}: stable keeps its promise and says it cannot`);
+    }
     const promise = all.match(/בחמש השנים הקרובות, גם בתרחיש הלחץ הקשה ביותר, ההחזר לא עולה על (?:התקרה של )?₪([\d,]+)/);
     if (promise) check(guardOk(p.rows, input.inflation, Number(promise[1].replace(/,/g, "")), EVERY60), `${tag}: the guard sentence (₪${promise[1]}) breaks on some month 1–60`);
     if (p.goal === "payment" || p.goal === "balanced" || p.goal === "years") {

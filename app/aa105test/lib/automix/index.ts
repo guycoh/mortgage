@@ -2070,8 +2070,14 @@ function solveStable(ctx: Ctx, extra: Partial<Spec> = {}, others: Plan[] = []): 
   if (!pool.length) return least.plan.ok ? least : cands[0].sv;
   const minEx = Math.min(...pool.map((c) => c.total));
   const best = cheapest(pool.filter((c) => c.total <= minEx + STABLE_BAND(ctx.ref.monthly)));
-  return { ...best.sv, meta: { ...(least.meta ?? {}), ...(best.sv.meta ?? {}), stablePromise: 0 } };
+  // The price of the full promise: the lowest month one of a mix that keeps it with no budget (L11: about ₪5,370 against ₪4,915).
+  const full = solveTerms(ctx.debts, ctx.cols, { ...sP, budget: null, wMonthly: 1, wCost: 1e-3, lambda: 0 });
+  const fullMonthly = full.ok ? bookOf(rowsOf(ctx, full).rows, ctx.input, ctx.f).metrics.monthly : null;
+  return { ...best.sv, meta: { ...(least.meta ?? {}), ...(best.sv.meta ?? {}), stablePromise: 0, ...(fullMonthly !== null ? { promiseMonthly: Math.round(fullMonthly) } : {}) } };
 }
+
+/** Does a mix keep stability's promise on its rows: in every economy the life peak at most month one plus MATERIAL.monthly of it? */
+const stableKept = (book: Book, monthly: number) => Math.max(...lifePeak(book, monthly)) - monthly <= MATERIAL.monthly(monthly) + 0.5;
 
 /** The least-rise mix within the budget, then the cheapest within STABLE_BAND of that rise (stability's fallback when no mix keeps its promise). */
 function solveLeastRise(ctx: Ctx, extra: Partial<Spec> = {}): Solved {
@@ -2461,7 +2467,8 @@ function proposalOf(ctx: Ctx, goal: GoalId, solved: Solved): Proposal {
   return {
     goal,
     label: LABEL[goal],
-    tagline: TAGLINE[goal],
+    // Stability that cannot keep its promise within the budget says what it is instead.
+    tagline: goal === "stable" && !stableKept(book, m.monthly) ? "התמהיל היציב ביותר בתוך ההחזר של היום" : TAGLINE[goal],
     status,
     note,
     ...(goal !== "payment" ? { budget: Math.round(held) } : {}),
@@ -3592,9 +3599,17 @@ function reasonsOf(ctx: Ctx, goal: GoalId, book: Book, tranches: NewTranche[], r
   if (goal === "stable") {
     const s = stabilityOf(R.book ?? ctx.today, R.monthly, book, m.monthly);
     out.push(`בתרחיש הלחץ הקשה ביותר ההחזר הגבוה ביותר לאורך כל התקופה הוא ${nis(s.next)}, מול ${nis(s.now)} בתמהיל של ${R.book ? "היום ונשיאת החוב שעומד לפירעון" : "היום"}.`);
-    // The promise, with its figure, on the rows as the board prices them.
-    const rise = Math.max(0, Math.max(...lifePeak(book, m.monthly)) - m.monthly);
-    out.push(`גם בתרחיש הגרוע ההחזר לא עולה ביותר מ-${nis(Math.ceil(rise))} מעל ההחזר הראשון, לאורך כל התקופה.${rise > MATERIAL.monthly(m.monthly) + 0.5 ? " החובות שנשארים והמסגרת לא מאפשרים עלייה קטנה מזו." : ""}`);
+    // The promise, with its figure, on the rows as the board prices them; where
+    // the budget does not allow it, what the mix is instead, first, and what the
+    // promise would cost (the budget the advisor can type).
+    const peak = Math.max(...lifePeak(book, m.monthly));
+    const rise = Math.max(0, peak - m.monthly);
+    if (stableKept(book, m.monthly)) out.push(`גם בתרחיש הגרוע ההחזר לא עולה ביותר מ-${nis(Math.ceil(rise))} מעל ההחזר הראשון, לאורך כל התקופה.`);
+    else {
+      const full = solved.meta?.promiseMonthly;
+      // One reason, first, so the price of the promise is never cut from the list.
+      out.unshift(`זה התמהיל היציב ביותר בתוך ההחזר של היום: בתרחיש הגרוע ההחזר מגיע עד ${nis(peak)}, ${nis(rise)} (${pct(rise / Math.max(1, m.monthly))}) מעל ההחזר הראשון, מול ${nis(s.now)} בתמהיל של היום.` + (typeof full === "number" ? " " + `תמהיל שההחזר בו לא עולה ביותר מ-${pct(MATERIAL.monthly(1e9) / 1e9)} מעל ההחזר הראשון גם בתרחיש הגרוע מתחיל ב-${nis(full)} בחודש, מול ${nis(R.monthly)} היום. מסגרת חודשית כזו תציג אותו.` : ""));
+    }
   }
   const g = guardLine(ctx, goal, solved, book);
   if (g) out.push(g);
@@ -3646,6 +3661,9 @@ function reasonsOf(ctx: Ctx, goal: GoalId, book: Book, tranches: NewTranche[], r
   // Debt due now: today's החזר חודשי leaves it out, and every "versus today" figure says so.
   if (ctx.ref.due > 0) out.unshift(dueSentence(ctx));
   if (lead) out.unshift(lead);
+  const steadiest = out.findIndex((x) => x.startsWith("זה התמהיל היציב ביותר בתוך ההחזר של היום"));
+  // Into the first reason, beside a cost lead the laws want there (the typed and forecast costs).
+  if (steadiest > 0) out[0] = `${out.splice(steadiest, 1)[0]} ${out[0]}`;
   return out.slice(0, 5);
 }
 
