@@ -222,8 +222,11 @@ export type DebtMove = {
   /**
    * Set when the debt is clearly cheaper than the new money that would replace
    * it (rules.ts CHEAP_KEEP): how many points its forecast all-in rate sits
-   * under the cheapest new money of its segment at its own term. Every goal but
-   * the lowest payment and the consolidation keeps such a debt.
+   * under the cheapest new money of its segment at its own term. Set on a debt
+   * the answer keeps under the rule. Every goal but the lowest payment and the
+   * consolidation holds such a debt by default; savings, stability and קיצור
+   * שנים move it when holding costs them materially, and the moved debt's `why`
+   * then says what holding would cost.
    */
   heldCheap?: number;
 };

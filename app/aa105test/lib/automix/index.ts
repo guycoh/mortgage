@@ -2099,7 +2099,9 @@ function shown(ctx: Ctx, plan: Plan) {
 
 /** Does a plan satisfy a goal's rules (its spec), whatever its objective? */
 function fits(ctx: Ctx, plan: Plan, sv: Solved): boolean {
-  if (!sv.spec || !plan.ok) return false;
+  // A mix that moves a debt this goal holds (CHEAP_KEEP) is outside its rules: fixZ cannot move a held debt, and the
+  // test would pass on a different mix (fuzz seed 11 Z436: savings adopted years' lifted mix at ₪1,209 over its ₪1,101).
+  if (!sv.spec || !plan.ok || movesHeld(plan, sv.spec)) return false;
   const keys = new Set(Object.keys(plan.amounts));
   const cols = (sv.cols ?? ctx.cols).filter((c) => keys.has(c.key));
   if (cols.length !== keys.size) return false;

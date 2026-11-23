@@ -564,6 +564,8 @@ export function verifier(market: MarketSnapshot, forecast: Forecast | null) {
       for (const g of ["years", "balanced", "consolidate", "stable"] as GoalId[]) {
         const p = by(g);
         if (!p || p.status !== "ok" || p.sameAs === "savings" || p.metrics.monthly > budget + 0.5 || !shareCapOk(p) || !pvOk(p)) continue;
+        // …and none of the debts savings holds as cheaper than new money (CHEAP_KEEP: another goal may lift it on its own measure).
+        if (p.moves.some((m) => m.action !== "keep" && savD.moves.some((x) => x.id === m.id && x.heldCheap !== undefined))) continue;
         if (savD.metrics.totalCost <= p.metrics.totalCost + 1 + slack(savD, p, "cost")) continue;
         check(savD.caveats.some((c) => c.includes(p.label)), `${name}: savings shows cost ${fmt(savD.metrics.totalCost)} > ${g} ${fmt(p.metrics.totalCost)} and no caveat names it`);
       }
@@ -603,7 +605,8 @@ export function verifier(market: MarketSnapshot, forecast: Forecast | null) {
       // (Within savings' rules: a stable mix the typed read-out contradicts is one savings may not offer, L11 at 0% inflation.)
       const st = by("stable");
       const stTyped = st ? (due ? st.metrics.totalPaid - due.reference.totalPaid : st.delta.totalPaid) : Infinity;
-      if (st && sav.status !== "unavailable" && st.status === "ok" && sav.status === "ok" && shareCapOk(st) && pvOk(st) && stTyped <= nt) {
+      const stLifts = !!st && st.moves.some((m) => m.action !== "keep" && sav.moves.some((x) => x.id === m.id && x.heldCheap !== undefined));
+      if (st && !stLifts && sav.status !== "unavailable" && st.status === "ok" && sav.status === "ok" && shareCapOk(st) && pvOk(st) && stTyped <= nt) {
         const w = (p: Proposal) => Math.max(...p.stress.map((x) => x.totalPaid));
         const pv = (p: Proposal) => p.metrics.outlook?.pv ?? p.metrics.pv;
         const m = 0.0015;
