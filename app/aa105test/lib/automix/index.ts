@@ -4625,8 +4625,95 @@ function beatsMaterially(goal: GoalId, x: Solved, incumbent: Solved, anchors?: A
           ? MATERIAL.months
           : costMargin / U;
   if (a[0] < b[0] - margin) return true;
+  // Inside the first measure's materiality the goal's whole score decides (secondaryWins).
+  if (secondaryWins(goal, x, incumbent)) return true;
   if (a[0] > b[0] - margin) return false;
   return better(a.slice(1), b.slice(1));
+}
+
+/**
+ * Another structure's answer re-solved at the incumbent's own level of the
+ * goal's first measure: the cheapest forecast at no higher payment (the payment
+ * goal), the most forecast saving at no less relief and then the cheapest
+ * risk-weighted mix within half a materiality of that saving (מאוזן, as the box
+ * does). Each structure's answer is its best at ITS level, so two structures were
+ * never compared where the client would choose between them: the move's own
+ * payment answer sat ₪23–60 a month lower, under materiality, and was judged on
+ * that alone; at the incumbent's payment it is ₪11k–39k cheaper (audit 3 F7).
+ */
+function atIncumbentLevel(goal: GoalId, x: Solved, inc: Solved): Solved | null {
+  const cx = x.ctx;
+  const ci = inc.ctx;
+  if (!cx || !ci || !x.plan.ok || !inc.plan.ok || !x.spec) return null;
+  const bi = bookOf(rowsOf(ci, inc.plan).rows, ci.input, ci.f);
+  // No higher payment than the incumbent's (the read-out's rounding of a shekel only).
+  const cap = bi.metrics.monthly + 0.5;
+  // (A seed is re-solved with its decisions held: in the move structure every movable mortgage is forced, so the
+  // incumbent's own refinance set cannot keep part of the lender's mortgage there.)
+  const seeds = [seedOf(inc.plan, ci.cols)];
+  // The sliver pass every goal's answer takes in runGoals (this re-solve comes after it): a tranche under a tenth of
+  // its segment is dropped or says why it stays (corpus L42 infl0: a ₪51,000 פריים of ₪663,026 with no reason).
+  const finish = (sv: Solved): Solved | null => (sv.plan.ok ? keepCheaper(cx, unsliver(cx, goal, sv)) : null);
+  if (goal === "payment") {
+    const spec: Spec = { ...x.spec, wMonthly: 0, wCost: 1, lambda: 0, budget: cap };
+    const start = restart(cx, x.plan, spec, cx.cols);
+    const p = solveGuarded(cx, spec, seeds, 2, start);
+    const q = swapRepair(cx, p.ok ? p : start ?? p, spec);
+    return finish({ ...x, plan: q, spec, cols: cx.cols, meta: { ...(x.meta ?? {}), matched: 1 } });
+  }
+  const rules: Partial<Spec> = { peakCap: x.spec.peakCap ?? null, typedPaidCap: cx.ref.typedPaid, ...pvCapOf(cx, "balanced") };
+  const s1 = specFor(cx, { wMonthly: 0, wCost: 1, lambda: 0, budget: Math.min(reliefBudget(cx), cap), ...rules });
+  const p1 = solveGuarded(cx, s1, [...seeds, ...basketSeeds(cx, x.plan)], undefined, restart(cx, x.plan, s1, cx.cols));
+  if (!p1.ok) return null;
+  const paid = bookOf(rowsOf(cx, p1).rows, cx.input, cx.f).paid[0];
+  const s2 = costSpec(cx, "balanced", { budget: s1.budget, paidCap: Math.min(paid + 0.5 * MATERIAL.cost(todayCostOf(cx)), cx.ref.paid), ...rules });
+  const start = restart(cx, p1, s2, cx.cols);
+  const p2 = solveGuarded(cx, s2, [], undefined, start);
+  const plan = p2.ok ? p2 : start;
+  // The structure's own frontier mode stays (its anchors say which sentence and which t apply); `matched` only marks the re-solve.
+  return plan ? finish({ ...x, plan, spec: s2, cols: cx.cols, meta: { ...(x.meta ?? {}), matched: 1 } }) : null;
+}
+
+/**
+ * The goal's whole score inside the primary's materiality: a structure no worse
+ * on the goal's first measure (no higher payment than the incumbent's, ₪0.5 of
+ * the read-out's rounding) that is materially better on what the goal measures
+ * next replaces the incumbent. The payment goal: the forecast total at that
+ * payment, by MATERIAL.cost. מאוזן: relief and forecast saving both no worse
+ * (the payment, the neutral residue), its own risk-weighted cost no worse, and
+ * one of the three materially better (the box itself minimises that cost).
+ * Savings: better on its own objective and on the typed cost, each by half its
+ * materiality (its first measure is its objective, so there is no "next").
+ * Before, only the first measure was compared, so moving the whole mortgage to
+ * another bank at the same payment and ₪11k–39k less in total was never taken
+ * (audit 3 F7: L36, L12, L42, L45). Both mixes are priced from their own rows,
+ * each in its own structure, against the one reference every structure shares.
+ */
+function secondaryWins(goal: GoalId, x: Solved, inc: Solved): boolean {
+  if (goal !== "payment" && goal !== "balanced" && goal !== "savings") return false;
+  const cx = x.ctx;
+  const ci = inc.ctx;
+  if (!cx || !ci || !x.plan.ok || !inc.plan.ok) return false;
+  const bx = bookOf(rowsOf(cx, x.plan).rows, cx.input, cx.f);
+  const bi = bookOf(rowsOf(ci, inc.plan).rows, ci.input, ci.f);
+  const R = ci.ref;
+  const band = 0.5;
+  const matC = MATERIAL.cost(Math.max(0, R.paid - sum(ci.debts.filter((d) => !d.due).map((d) => d.balance))));
+  if (goal === "payment") return bx.metrics.monthly <= bi.metrics.monthly + band && bx.paid[0] < bi.paid[0] - matC;
+  const neutral = MATERIAL.neutral(R.paid);
+  if (goal === "savings") {
+    // Savings' first measure IS its objective: inside its materiality, a structure better by half of it on that
+    // objective AND on the cost the sheet shows, within the budget, is better on everything the client sees
+    // (r01+r02 typical: the move ₪41,460 lower on the objective and ₪43,012 on the typed cost, against ₪48,016;
+    // a move for a few thousand shekels, L13 ₪4,654, stays out).
+    const ls = lambdaOf(ci, "savings");
+    const Js = (b: Book) => (1 - ls) * b.paid[0] + ls * Math.max(...b.paid);
+    return bx.metrics.monthly <= ci.budget + 0.5 && Js(bx) < Js(bi) - 0.5 * matC && bx.metrics.totalCost < bi.metrics.totalCost - 0.5 * matC;
+  }
+  const lam = lambdaOf(ci, "balanced");
+  const J = (b: Book) => (1 - lam) * b.paid[0] + lam * Math.max(...b.paid);
+  const noWorse = bx.metrics.monthly <= bi.metrics.monthly + band && bx.paid[0] <= bi.paid[0] + neutral && J(bx) <= J(bi) + neutral;
+  return noWorse && (bx.paid[0] < bi.paid[0] - matC || J(bx) < J(bi) - matC || bx.metrics.monthly < bi.metrics.monthly - MATERIAL.monthly(R.monthly));
 }
 function better(a: number[], b: number[]): boolean {
   for (let i = 0; i < Math.max(a.length, b.length); i++) {
@@ -5059,7 +5146,21 @@ function buildIn(input: AutoMixInput): AutoMixResult {
     // The second lien keeps the bank mortgage: it is the incumbent, and a first lien
     // must beat it MATERIALLY on the goal's own measure to replace it.
     const anchors = goal === "balanced" ? { R: Math.max(0, ...ok.map((x) => Number(x.meta?.reliefMax ?? 0))), S: Math.max(0, ...ok.map((x) => Number(x.meta?.savingMax ?? 0))) } : undefined;
-    const best = ok.reduce((b, x) => (beatsMaterially(goal, x, b, anchors) ? x : b), ok[0]);
+    let best = ok.reduce((b, x) => (beatsMaterially(goal, x, b, anchors) ? x : b), ok[0]);
+    // Within the first measure's materiality, the other structure re-solved at
+    // the incumbent's own level of it: the cheapest it can do at that payment
+    // (the payment goal), the most it saves at that relief (מאוזן). Each answer
+    // is its structure's best at ITS level, so the two were never compared where
+    // the client would choose between them (audit 3 F7).
+    if (goal === "payment" || goal === "balanced")
+      for (const x of ok) {
+        if (x.ctx === best.ctx) continue;
+        const m = atIncumbentLevel(goal, x, best);
+        if (m && secondaryWins(goal, m, best) && quickJudge(m.ctx!, goal, m).status === "ok") {
+          best = m;
+          break;
+        }
+      }
     const other = solvedOk.filter((x) => x !== best).reduce<Solved | null>((b, x) => (!b || better(score(goal, x, anchors), score(goal, b, anchors)) ? x : b), null);
     const missing = runs.length > 1 && !other ? runs.find((r) => r.ctx.variant !== best.ctx!.variant && r.solvedBy.has(goal)) : undefined;
     const floorPlan = missing?.solvedBy.get("payment");
