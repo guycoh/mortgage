@@ -4,6 +4,7 @@
 
 import { fitForecast, bondAnchor, type Forecast, type ZeroPoint } from "@/app/aa102test/lib/forecast";
 import { curveYield, type FeeRow, type MarketSnapshot, type TrackKey } from "./market";
+import { fetchBoi451 } from "@/app/aa102test/lib/boi451";
 
 const SDMX = "https://edge.boi.gov.il/FusionEdgeServer/ws/public/sdmxapi/rest/data/BOI.STATISTICS";
 const BIR_URL = `${SDMX},BIR_MRTG_99,1.0?lastNObservations=6`;
@@ -143,8 +144,14 @@ async function curves(): Promise<Map<string, Forecast>> {
   return out;
 }
 
-/** The newest monthly curve the BoI has published — what the board's forecast runs on. */
+/**
+ * The newest curve the BoI has published — what the board's forecast runs on:
+ * the directive-451 file (lib/boi451) when it can be read, else our fit of the
+ * newest complete ZCM month.
+ */
 export async function latestCurve(): Promise<Forecast> {
+  const official = await fetchBoi451();
+  if (official) return official;
   const all = await curves();
   const p = Array.from(all.keys()).sort().pop();
   if (!p) throw new Error("ZCM: no complete month");

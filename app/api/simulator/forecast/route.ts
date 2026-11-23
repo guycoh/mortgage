@@ -1,10 +1,12 @@
 // תחזית ריבית ואינפלציה — the curves the board prices variable and linked rows on.
 //
 // GET  → { forecast, boi, saved }
-//        `boi` is rebuilt from the Bank of Israel's published zero-coupon points
-//        (SDMX flow BOI.STATISTICS/ZCM, monthly averages) by lib/forecast's
-//        fitForecast — the same construction directive 451 prescribes and
-//        SmartNPV runs. It is the default (`forecast`).
+//        `boi` is the Bank of Israel's directive-451 forecast file (lib/boi451):
+//        BoI's own 360-month nominal curve and expected CPI, published on the
+//        15th and the 1st — the exact vectors SmartNPV shows as "תחזית בנק
+//        ישראל". When that file cannot be read, our fit of the monthly ZCM
+//        points (lib/forecast#fitForecast) stands in, then the bundled copy.
+//        It is the default (`forecast`).
 //        `saved` are exact vectors kept in `mortgage_forecasts` — SmartNPV's own
 //        curve, pasted vectors — newest first, one per label. The board offers
 //        them as alternatives; none of them replaces the default by itself.
@@ -32,6 +34,7 @@ import { ADMIN_COOKIE, verifyAdminCookie } from "@/app/simulator/lib/admin-auth"
 import boiLast from "./boi-last.json";
 import { BOI_SNAPSHOT } from "@/app/aa102test/lib/boi";
 import { snpvForecast } from "@/app/aa102test/lib/snpv-forecast";
+import { fetchBoi451 } from "@/app/aa102test/lib/boi451";
 
 export const dynamic = "force-dynamic";
 // Room for the SmartNPV probe calls (lib/snpv-forecast) on a cold start.
@@ -47,10 +50,10 @@ const code = (kind: "N" | "R", y: number) => `ZC_TSB_Z${kind}D_${String(y).padSt
 
 /** The newest BoI curves this build shipped with, for when the BoI cannot be reached. */
 function lastKnown(): Forecast | null {
-  const { asOf, nominal, inflation } = boiLast as { asOf: string; nominal: number[]; inflation: number[] };
+  const { asOf, nominal, inflation, label } = boiLast as { asOf: string; nominal: number[]; inflation: number[]; label?: string };
   if (!/^\d{4}-\d{2}$/.test(asOf) || nominal.length !== HORIZON || inflation.length !== HORIZON) return null;
   const [yy, mm] = asOf.split("-");
-  return { asOf, source: "boi", label: `בנק ישראל · ${mm}/${yy} (עותק שמור)`, nominal, inflation };
+  return { asOf, source: "boi", label: `${label ?? `בנק ישראל · ${mm}/${yy}`} (עותק שמור)`, nominal, inflation };
 }
 
 /** Six hours in memory — the BoI publishes twice a month. */
@@ -58,8 +61,12 @@ let boiCache: { at: number; value: Forecast | null } | null = null;
 
 async function fromBoi(): Promise<Forecast | null> {
   if (boiCache && Date.now() - boiCache.at < 6 * 3600_000) return boiCache.value;
-  let value: Forecast | null = null;
-  try {
+  // 1. The directive-451 file itself: BoI's own 360-month curves, the exact
+  //    vectors SmartNPV shows (lib/boi451).
+  let value: Forecast | null = await fetchBoi451();
+  // 2. Our fit of the monthly ZCM points — within ~0.2% of the file, and on a
+  //    different host (edge.boi.org.il), so one outage does not take both.
+  if (!value) try {
     const res = await fetch(BOI_URL, { cache: "no-store", signal: AbortSignal.timeout(12_000) });
     if (res.ok) {
       const lines = (await res.text()).trim().split(/\r?\n/);
