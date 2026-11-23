@@ -1,7 +1,7 @@
 // תמהיל אוטומטי — the invariants every proposal must hold, shared by the proof
 // (automix-check.mts) and the corpus/fuzz run (automix-corpus.mts).
 import { __test, type AutoMixInput, type AutoMixResult, type GoalId, type Proposal } from "../app/aa105test/lib/automix";
-import { ECONOMIES, scheduleIn } from "../app/aa105test/lib/automix/econ";
+import { ECONOMIES, scheduleIn, pvOf } from "../app/aa105test/lib/automix/econ";
 import { MIN_TRANCHE, FIXED_MIN, LINKED_MAX, TRACK_SHARE_MAX, TRACK_SHARE_EXEMPT, LTV_MAX, PTI_MAX, MATERIAL, AP_LTV, AP_LTV_RELIEF, AP_RELIEF_CAP, YEARS_STRETCH, REFI_COST_MAX, SLIVER_SHARE, BREAK_EVEN_MAX, SEASONING_MONTHS, SMALL_MOVE, STABLE_PRICE } from "../app/aa105test/lib/automix/rules";
 import { NONBANK_LTV } from "../app/aa105test/lib/automix/tiers";
 import { EARLY } from "../app/aa105test/lib/automix/solve";
@@ -682,5 +682,107 @@ export function verifier(market: MarketSnapshot, forecast: Forecast | null) {
     const forcedBank = o && (input.profile.tier === "bank" || input.profile.tier === "bankPremium") && r.blocks.some((b) => ["insolvency", "enforcement", "arrears", "past-due", "outside"].includes(b.id));
     if (forcedBank) for (const p of r.proposals) check((p.caveats[0] ?? "").includes("בנק מסרב"), `${name}/${p.goal}: forced bank tier without the refusal caveat first`);
   }
-  return { check, failures, passed: () => passed, verify, verifyOverride, lint, guardOk, shareCapOk, BUDGET_GOALS, tally, nearThreshold, wave };
+  /**
+   * No uniform basket beats מאוזן at its own relief (audit 3: on r04 the Bank of
+   * Israel's basket 1, all קל"צ at 21 years on the same debts, gave ₪115 a month
+   * more relief and ₪22,821 more saving than the offered מאוזן). The baskets — all
+   * קל"צ; ⅓ קל"צ ⅓ פריים ⅓ מ"צ; ½ קל"צ ½ פריים — are built on the answer's own debts
+   * and all-purpose money, its housing money split as the basket (₪1,000 tranches,
+   * קל"צ takes the remainder) at its weighted housing term and three years either
+   * side, at the engine's own quotes. A basket that keeps the answer's relief,
+   * its worst economy and every gate of the goal (the guard, the typed total and
+   * the present value against today, break-even, the property's fixed and CPI
+   * shares) may not save MATERIAL.cost more in the forecast.
+   */
+  function basketLaw(name: string, input: AutoMixInput, r: AutoMixResult) {
+    const p = r.proposals.find((x) => x.goal === "balanced" && x.status === "ok");
+    if (!p || r.dueNow || !forecast || !p.stress.length) return;
+    const AUTOMIX = "תמהיל אוטומטי";
+    const housing = p.tranches.filter((t) => t.segment === "housing");
+    const NH = housing.reduce((a, t) => a + t.amount, 0);
+    if (!(NH > 0)) return;
+    const avg = Math.round(housing.reduce((a, t) => a + t.amount * t.years, 0) / NH);
+    const variant = !p.structure || p.structure === "bank" ? (p.refinance === "move" ? "bankMove" : "bank") : p.structure;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const prep: any = (__test as any).prepare(input, forecast, [], variant);
+    if ("fail" in prep) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const cols: any[] = prep.ctx.cols;
+    const others = p.rows.filter((l) => !(l.source_type === AUTOMIX && l.group !== "loan"));
+    const owedOf = (rows: ImportedLoan[]) => owedOnly(rows).filter((l) => Number(l.months) > 0 && Number(l.amount) > 0);
+    const figures = (rows: ImportedLoan[]) => {
+      let monthly = 0;
+      let F = 0;
+      let typed = 0;
+      let pv = 0;
+      const paid = ECONOMIES.map(() => 0);
+      const pay0: number[] = [];
+      const bal0: number[] = [];
+      for (const l of owedOnly(rows)) monthly += Math.round(boardMonthly(l, todayPayment(priceLoan(l, typed0(input.inflation)))));
+      for (const l of owedOf(rows)) {
+        const t = priceLoan(l, typed0(input.inflation));
+        typed += t.totalPaid;
+        const fr = priceLoan(l, { inflation: input.inflation, forecast });
+        F += fr.totalPaid;
+        const first = Math.round(boardMonthly(l, todayPayment(t)));
+        pv += pvOf(fr.schedule.map((x, i) => (i === 0 ? first : x.payment)), input.discountRate);
+        ECONOMIES.forEach((e, k) => {
+          const sch = scheduleIn(l, forecast, e);
+          paid[k] += sch.pay.reduce((a, x) => a + x, 0);
+          if (k === 0) sch.pay.forEach((x, i) => ((pay0[i] = (pay0[i] ?? 0) + x), (bal0[i] = (bal0[i] ?? 0) + sch.bal[i])));
+        });
+      }
+      return { monthly, F, typed, pv, W: Math.max(...paid.slice(1)), pay0, bal0 };
+    };
+    const today = figures(input.master);
+    const answer = figures(p.rows);
+    const neutral = MATERIAL.neutral(p.stress[0].todayTotalPaid);
+    const matC = MATERIAL.cost(p.stress[0].todayTotalPaid - r.today.balance);
+    const beOk = (b: { pay0: number[]; bal0: number[] }) => {
+      let cum = 0;
+      let hit: number | null = null;
+      for (let m = 0; m < Math.max(today.pay0.length, b.pay0.length); m++) {
+        cum += (today.pay0[m] ?? 0) - (b.pay0[m] ?? 0);
+        const d = cum + (today.bal0[m] ?? 0) - (b.bal0[m] ?? 0);
+        if (d >= 0 && hit === null) hit = m + 1;
+        if (d < 0) hit = null;
+      }
+      return hit !== null && hit <= BREAK_EVEN_MAX;
+    };
+    const onProperty = (ls: ImportedLoan[]) => owedOnly(ls).filter((l) => l.group === "mortgage" || l.source_type === AUTOMIX);
+    const shares = (ls: ImportedLoan[]) => {
+      const all = ls.reduce((a, l) => a + Number(l.amount), 0);
+      return { fixed: all ? ls.filter((l) => Number(l.path_id) === 2 || Number(l.path_id) === 3).reduce((a, l) => a + Number(l.amount), 0) / all : 1, linked: all ? ls.filter((l) => Number(l.path_id) === 3 || Number(l.path_id) === 5).reduce((a, l) => a + Number(l.amount), 0) / all : 0 };
+    };
+    const now = shares(onProperty(input.master));
+    const caps = p.guard && p.guard.kind !== "none" ? p.guard.caps : null;
+    for (const y0 of [avg - 3, avg, avg + 3])
+      for (const parts of [[["klz", 1]], [["klz", 1 / 3], ["prime", 1 / 3], ["mz", 1 / 3]], [["klz", 0.5], ["prime", 0.5]]] as [string, number][][]) {
+        const tr = parts.map(([t, sh]) => ({ c: cols.find((c) => c.key === `${t}|housing|${Math.max(t === "mz" ? 10 : 4, Math.min(30, y0))}`), sh }));
+        if (tr.some((x) => !x.c)) continue;
+        let used = 0;
+        const rows = [...others];
+        tr.forEach((x, i) => {
+          const a = i === 0 ? 0 : Math.floor((x.sh * NH) / 1000) * 1000;
+          used += a;
+          if (i > 0) rows.push((__test as any).trancheRow(x.c.track, x.c.years, "housing", a, x.c.price, `basket-${i}`));
+        });
+        rows.push((__test as any).trancheRow(tr[0].c.track, tr[0].c.years, "housing", NH - used, tr[0].c.price, "basket-0"));
+        const b = figures(rows);
+        const sh = shares(onProperty(rows));
+        const legal =
+          b.monthly <= p.metrics.monthly + 0.5 &&
+          b.W <= answer.W + neutral &&
+          b.typed <= today.typed + neutral &&
+          b.pv <= today.pv + 1 &&
+          beOk(b) &&
+          sh.fixed >= Math.min(FIXED_MIN, now.fixed) - 0.005 &&
+          sh.linked <= Math.max(LINKED_MAX, now.linked) + 0.005 &&
+          (!caps || guardOk(rows, input.inflation, caps));
+        if (legal) check(!(b.F < answer.F - matC), `${name}: basket ${parts.map(([t]) => t).join("+")} at ${tr[0].c.years}y saves ${fmt(answer.F - b.F)} more than מאוזן at its relief (${b.monthly} vs ${p.metrics.monthly})`);
+      }
+  }
+  const typed0 = (inflation: number) => ({ inflation, forecast: null });
+
+  return { check, failures, passed: () => passed, verify, verifyOverride, lint, guardOk, shareCapOk, BUDGET_GOALS, tally, nearThreshold, wave, basketLaw };
 }

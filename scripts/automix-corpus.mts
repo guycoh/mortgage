@@ -55,7 +55,7 @@ const forecast = await (async () => {
   }
 })();
 const V = verifier(market, forecast);
-const { check, failures, verify, verifyOverride, lint } = V;
+const { check, failures, verify, verifyOverride, lint, basketLaw } = V;
 const fmt = (x: number) => Math.round(x).toLocaleString("en-US");
 const section = (s: string) => console.log(`\n### ${s}`);
 const BUDGET_GOALS: GoalId[] = ["years", "savings", "stable", "balanced", "consolidate"];
@@ -335,6 +335,7 @@ if (!ONLY || ONLY === "letters") {
         budgetEquivalenceLaw(`${id}/${g.tag}`, input, r);
       }
       if (g.tag === "own-bank") ownBankLaw(`${id}/own-bank`, none, r, bankOf(master));
+      if ((g.tag === "none" || g.tag === "typical") && r) basketLaw(`${id}/${g.tag}`, input, r);
       if (g.tag === "none" || g.tag === "typical") console.log(`  ${id} ${String(st.bank).padEnd(10)} ${String(master.length).padStart(2)} rows ${fmt(base.today.monthly).padStart(7)}/mo ${g.tag.padEnd(8)} ${r?.pricing.tier ?? ""} ${(r?.ms ?? 0).toFixed(0).padStart(4)}ms ${status(r)}`);
     }
   }
@@ -361,6 +362,7 @@ if (!ONLY || ONLY === "reports") {
         budgetEquivalenceLaw(`${s.id}/${g.tag}`, input, r);
       }
       if (g.tag === "own-bank") ownBankLaw(`${s.id}/own-bank`, none, r, bankOf(h.master));
+      if ((g.tag === "none" || g.tag === "typical") && r) basketLaw(`${s.id}/${g.tag}`, input, r);
       if (g.tag === "typical" || g.tag === "tight") console.log(`  ${s.id.padEnd(8)} ${g.tag.padEnd(8)} ${r?.pricing.tier ?? ""} ${(r?.ms ?? 0).toFixed(0).padStart(4)}ms ${status(r)}`);
     }
   }
