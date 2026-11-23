@@ -620,6 +620,13 @@ type World = {
   maxYears: number;
   apYears: number;
   age: number | null;
+  /**
+   * The bank all-purpose floor (rules.ts BANK_AP_MIN, or AP_GREEN.min for Mizrahi-Tefahot's own mortgage client
+   * refinanced there: the engine's Spec.apMin), as solve.ts holds it: all-purpose money lent at all is at least
+   * min(floor, MIN_TRANCHE). 0 for a non-bank lender, and where the segment carries money the mix must lend (a
+   * forced all-purpose debt, a כל מטרה mortgage row that moves with the whole mortgage, arrears to cure).
+   */
+  apFloor: number;
 };
 
 /** Every structure the engine itself would price (variantsFor), with its debts, its columns and its reference. */
@@ -716,6 +723,11 @@ function worldOf(id: string, profileName: string, input: AutoMixInput, res: Auto
     maxYears: ctx.maxYears,
     apYears: ctx.apYears,
     age: pr.age ?? null,
+    apFloor: (() => {
+      const apMin: number | null = ctx.base.apMin ?? null;
+      const exempt = debts.some((d: any) => (d.cure ?? 0) > 0) || debts.some((d: any) => d.segment === "allPurpose" && (!!d.forced || (!!ctx.base.moveWhole && d.group === "mortgage" && !d.lock)));
+      return apMin && !exempt ? Math.min(apMin, MIN_TRANCHE) : 0;
+    })(),
   };
 }
 
@@ -935,6 +947,7 @@ function failures(c: Cand, r: Rules, statusOk = true): string[] {
   const NH = sum(c.tr.filter((t) => w.unitByKey.get(t.key)!.seg === "housing").map((t) => t.amount));
   const NA = sum(c.tr.filter((t) => w.unitByKey.get(t.key)!.seg === "allPurpose").map((t) => t.amount));
   if (Math.abs(NH - c.base.NH) > 1 || Math.abs(NA - c.base.NA) > 1) out.push("money");
+  if (NA > 0 && w.apFloor && NA < w.apFloor - 0.5) out.push(`AP floor ${Math.round(NA)}<${w.apFloor}`);
   if (c.tr.length && m.propBal > 0 && w.today.propBal > 0) {
     const fx = m.propFixed / m.propBal;
     const lk = m.propLinked / m.propBal;
@@ -988,8 +1001,14 @@ function failures(c: Cand, r: Rules, statusOk = true): string[] {
 
 /* ---------------------------------------- the continuous part: one LP */
 
-type Obj = { kind: "monthly" } | { kind: "f" } | { kind: "J"; lam: number } | { kind: "peak" };
-type Extra = { monthlyMax?: number; fMax?: number; peakMax?: number };
+type Obj = { kind: "monthly" } | { kind: "f" } | { kind: "J"; lam: number } | { kind: "peak" } | { kind: "excess"; share: number; floor: number };
+/**
+ * jMax: the risk-weighted cost (1 − λ)·F + λ·max_k paid_k at most `cap` (a row per economy, the max needs none).
+ * promise: stability's promise on the true peak, against the mix's own month one: in every economy and month the
+ * summed payment at most (1 + share)·month one + floor + slack (slack 0: the promise kept; the engine takes share or
+ * floor by today's payment, solveStable, and the candidate is re-tested on MATERIAL.monthly exactly).
+ */
+type Extra = { monthlyMax?: number; fMax?: number; peakMax?: number; jMax?: { lam: number; cap: number }; promise?: { share: number; floor: number; slack: number } };
 
 /**
  * The best amounts over a set of columns for one refinance set: every linear rule a row, the
@@ -1005,9 +1024,11 @@ function solveAmounts(w: World, b: Base, r: Rules, colsIn: Unit[], obj: Obj, ex:
   const useA = b.NA > 0;
   const cols = colsIn.filter((u) => (u.seg === "housing" ? useH : useA) && (r.finish === null || u.years * 12 <= r.finish));
   if ((useH && !cols.some((u) => u.seg === "housing")) || (useA && !cols.some((u) => u.seg === "allPurpose"))) return null;
+  // The bank all-purpose floor: a set that lends less all-purpose money than it has no tranche a bank writes.
+  if (useA && w.apFloor && b.NA < w.apFloor - 0.5) return null;
   const nx = cols.length;
   const iT = nx;
-  const n = nx + (obj.kind === "J" || obj.kind === "peak" ? 1 : 0);
+  const n = nx + (obj.kind === "J" || obj.kind === "peak" || obj.kind === "excess" ? 1 : 0);
   const c = new Array(n).fill(0);
   const vec = (f: (u: Unit) => number) => {
     const a = new Array(n).fill(0);
@@ -1040,6 +1061,10 @@ function solveAmounts(w: World, b: Base, r: Rules, colsIn: Unit[], obj: Obj, ex:
   if (r.typedCap !== null) rows.push({ a: vec((u) => u.tp), hi: (r.typedCap - K.typedPaid) / U - 0.05 });
   if (r.paidCap !== null) rows.push({ a: vec((u) => u.paid[0]), hi: (r.paidCap - K.paid[0]) / U - 0.05 });
   if (ex.fMax !== undefined) rows.push({ a: vec((u) => u.paid[0]), hi: (ex.fMax - K.paid[0]) / U });
+  if (ex.jMax) {
+    const jl = ex.jMax.lam;
+    for (let k = 0; k < ECON_N; k++) rows.push({ a: vec((u) => (1 - jl) * u.paid[0] + jl * u.paid[k]), hi: (ex.jMax.cap - (1 - jl) * K.paid[0] - jl * K.paid[k]) / U });
+  }
   if (r.pvCap !== null) rows.push({ a: vec((u) => u.pv), hi: (r.pvCap - K.pv) / U - 0.002 });
   if (obj.kind === "monthly") cols.forEach((u, j) => (c[j] = u.m * U));
   else if (obj.kind === "f") cols.forEach((u, j) => (c[j] = u.paid[0]));
@@ -1051,8 +1076,12 @@ function solveAmounts(w: World, b: Base, r: Rules, colsIn: Unit[], obj: Obj, ex:
       a[iT] = -1;
       rows.push({ a, hi: -K.paid[k] / U });
     }
+  } else if (obj.kind === "excess") {
+    // The worst economy's true peak over the mix's own promise: P − (1 + share)·month one − floor.
+    c[iT] = 1;
+    cols.forEach((u, j) => (c[j] = -(1 + obj.share) * u.m * U));
   } else c[iT] = 1;
-  const lbScore = (o: number) => (obj.kind === "monthly" ? K.monthly + o : obj.kind === "f" ? K.paid[0] + U * o : obj.kind === "J" ? (1 - obj.lam) * K.paid[0] + U * o : o);
+  const lbScore = (o: number) => (obj.kind === "monthly" ? K.monthly + o : obj.kind === "f" ? K.paid[0] + U * o : obj.kind === "J" ? (1 - obj.lam) * K.paid[0] + U * o : obj.kind === "excess" ? o - (1 + obj.share) * K.monthly - obj.floor : o);
   const lb = new Array(n).fill(0);
   const ub = new Array(n).fill(Infinity);
   if (integer)
@@ -1067,7 +1096,12 @@ function solveAmounts(w: World, b: Base, r: Rules, colsIn: Unit[], obj: Obj, ex:
     hi: r.guard![k] - (mo === 1 ? K.monthly + 0.6 * open : K.reg[k][mo - 1]),
   });
   const beRow = (mo: number): LpRow => ({ a: vec((u) => u.cb0[mo - 1]), hi: (w.today.cb0[mo - 1] - K.cb0[mo - 1]) / U });
+  const pr = ex.promise;
   const peakRow = (k: number, mo: number): LpRow => {
+    if (pr) {
+      const a = vec((u) => ((u.reg[k][mo - 1] ?? 0) - (1 + pr.share) * u.m) * U);
+      return { a, hi: (1 + pr.share) * K.monthly + pr.floor + pr.slack - K.reg[k][mo - 1] };
+    }
     const a = vec((u) => (u.reg[k][mo - 1] ?? 0) * U);
     if (ex.peakMax === undefined) {
       a[iT] = -1;
@@ -1076,7 +1110,7 @@ function solveAmounts(w: World, b: Base, r: Rules, colsIn: Unit[], obj: Obj, ex:
     return { a, hi: ex.peakMax - K.reg[k][mo - 1] };
   };
   const wantBE = r.breakEven && b.fees + b.setup > 0;
-  const peakMode = obj.kind === "peak" || ex.peakMax !== undefined;
+  const peakMode = obj.kind === "peak" || obj.kind === "excess" || ex.peakMax !== undefined || !!pr;
   if (r.guard) for (let k = 1; k < ECON_N; k++) for (const mo of [1, 31, 60]) { rows.push(guardRow(k, mo)); cut.add(`g${k}_${mo}`); }
   if (wantBE) for (const mo of [120, 180, 240]) if (mo <= w.H) { rows.push(beRow(mo)); cut.add(`b${mo}`); }
   if (peakMode) for (let k = 0; k < ECON_N; k++) { rows.push(peakRow(k, 1)); cut.add(`p${k}_1`); }
@@ -1109,7 +1143,9 @@ function solveAmounts(w: World, b: Base, r: Rules, colsIn: Unit[], obj: Obj, ex:
         if (d < -0.01) viol.push({ key, v: -d, row: () => beRow(mo) });
       }
     if (peakMode) {
-      const P = ex.peakMax ?? x[iT];
+      let m1 = K.monthly;
+      for (const j of nz) m1 += cols[j].m * U * x[j];
+      const P = pr ? (1 + pr.share) * m1 + pr.floor + pr.slack : ex.peakMax ?? x[iT];
       for (let k = 0; k < ECON_N; k++)
         for (let mo = 1; mo <= w.H; mo++) {
           const key = `p${k}_${mo}`;
@@ -1711,25 +1747,63 @@ function auditGoal(ws: World[], goal: GoalId, rand: () => number): Line[] {
       const any = run.best;
       return [line("stable: any offer", any ? "MISS" : "NO-OFFER CONFIRMED", eng, any ? fig(any.cand) : null, any ? ePeak - lifePeak(any.cand.mix) : 0, matM, run, any?.cand)];
     }
-    let r1 = runAll(mk, { kind: "f" }, { peakMax: ePeak }, (c) => (lifePeak(c.mix) <= ePeak + 0.5 ? fOf(c.mix) : Infinity), { target: eF - matC, reach: true });
-    let r2 = runAll(mk, { kind: "peak" }, { fMax: eF }, (c) => (fOf(c.mix) <= eF + 1 ? lifePeak(c.mix) : Infinity), { target: ePeak - matM, reach: true });
-    // Stability may lift CHEAP_KEEP too (index.ts LIFT_GOALS): a lifted mix counts where it beats the best held one materially.
-    let liftNote: string | undefined;
-    if (ws.some((w) => w.hold.length)) {
-      const mkL = (w: World) => rulesFor(w, "stable", p, { lift: true });
-      const l1 = runAll(mkL, { kind: "f" }, { peakMax: ePeak }, (c) => (lifePeak(c.mix) <= ePeak + 0.5 ? fOf(c.mix) : Infinity), { target: Math.min(eF, r1.best?.score ?? Infinity) - matC, reach: true });
-      const l2 = runAll(mkL, { kind: "peak" }, { fMax: eF }, (c) => (fOf(c.mix) <= eF + 1 ? lifePeak(c.mix) : Infinity), { target: Math.min(ePeak, r2.best?.score ?? Infinity) - matM, reach: true });
-      if (l1.best && (!r1.best || l1.best.score < r1.best.score - matC)) { r1 = l1; liftNote = "lifted CHEAP_KEEP (beats the best held mix materially)"; }
-      if (l2.best && (!r2.best || l2.best.score < r2.best.score - matM)) { r2 = l2; liftNote = "lifted CHEAP_KEEP (beats the best held mix materially)"; }
+    // STABILITY AS DEFINED (index.ts solveStable, rules after 490c92d): the promise that in every economy the TRUE
+    // peak of the summed payments over the whole life stays within MATERIAL.monthly of the mix's OWN month one.
+    // Among mixes that keep it the cheaper risk-weighted one (λ 0.95) is better, by MATERIAL.cost; where none keeps
+    // it, the smaller worst-economy excess over the promise at no higher risk-weighted cost (by MATERIAL.monthly), or
+    // the lower cost at no higher excess. A mix that keeps the promise where the engine's does not beats it outright.
+    const lamS = 0.95;
+    const share = MATERIAL.monthly(1e9) / 1e9;
+    const floorM = MATERIAL.monthly(0);
+    const mode = share * R.monthly >= floorM ? { share, floor: 0 } : { share: 0, floor: floorM };
+    const excOf = (m: Mix) => lifePeak(m) - m.monthly - MATERIAL.monthly(m.monthly);
+    const keeps = (m: Mix) => excOf(m) <= 0.5;
+    const eJ = Jof(em!, lamS);
+    const eExc = excOf(em!);
+    const engS = { base: eJ, J: Math.round(eJ), peak: Math.round(ePeak), excess: Math.round(Math.max(0, eExc)), monthly: em!.monthly, forecast: Math.round(eF) };
+    const figS = (c: Cand) => ({ J: Math.round(Jof(c.mix, lamS)), peak: Math.round(lifePeak(c.mix)), excess: Math.round(Math.max(0, excOf(c.mix))), monthly: c.mix.monthly, forecast: Math.round(fOf(c.mix)) });
+    // A held search, and where CHEAP_KEEP holds a debt the lifted one, which counts only where it beats the best held
+    // mix by the same materiality (index.ts LIFT_GOALS).
+    const both = (obj: Obj, ex: Extra, score: (c: Cand) => number, o: SOpts, mat: number) => {
+      let run = runAll(mk, obj, ex, score, o);
+      let note: string | undefined;
+      if (ws.some((w) => w.hold.length)) {
+        const l = runAll((w) => rulesFor(w, "stable", p, { lift: true }), obj, ex, score, { ...o, target: Math.min(o.target, (run.best?.score ?? Infinity) - mat) });
+        if (l.best && (!run.best || l.best.score < run.best.score - mat)) {
+          run = l;
+          note = "lifted CHEAP_KEEP (beats the best held mix materially)";
+        }
+      }
+      return { run, note };
+    };
+    const Jscore = (c: Cand) => Jof(c.mix, lamS);
+    const out: Line[] = [];
+    if (keeps(em!)) {
+      const { run, note } = both({ kind: "J", lam: lamS }, { promise: { ...mode, slack: 0 } }, (c) => (keeps(c.mix) ? Jscore(c) : Infinity), { target: eJ - matC, reach: true }, matC);
+      const g = run.best ? eJ - run.best.score : 0;
+      out.push(line("stable: risk-weighted cost among mixes that keep the promise ₪", g > matC ? "BEATEN" : "CONFIRMED", engS, run.best ? figS(run.best.cand) : null, g, matC, run, run.best?.cand, note));
+    } else {
+      const k0 = both({ kind: "J", lam: lamS }, { promise: { ...mode, slack: 0 } }, (c) => (keeps(c.mix) ? Jscore(c) : Infinity), { target: Infinity, stopAtFirst: true }, matC);
+      out.push(line("stable: a mix that keeps the promise (the engine's does not)", k0.run.best ? "BEATEN" : "CONFIRMED", engS, k0.run.best ? figS(k0.run.best.cand) : null, k0.run.best ? eExc : 0, 0.5, k0.run, k0.run.best?.cand, k0.note));
+      const e1 = both({ kind: "excess", ...mode }, { jMax: { lam: lamS, cap: eJ } }, (c) => (Jscore(c) <= eJ + 1 ? excOf(c.mix) : Infinity), { target: eExc - matM, reach: true }, matM);
+      const g1 = e1.run.best ? eExc - e1.run.best.score : 0;
+      out.push(line("stable: worst excess over the promise at ≤ its risk-weighted cost ₪/mo", g1 > matM ? "BEATEN" : "CONFIRMED", { ...engS, base: Math.max(1, eExc) }, e1.run.best ? figS(e1.run.best.cand) : null, g1, matM, e1.run, e1.run.best?.cand, e1.note));
+      const c1 = both({ kind: "J", lam: lamS }, { promise: { ...mode, slack: eExc } }, (c) => (excOf(c.mix) <= eExc + 0.5 ? Jscore(c) : Infinity), { target: eJ - matC, reach: true }, matC);
+      const g2 = c1.run.best ? eJ - c1.run.best.score : 0;
+      out.push(line("stable: risk-weighted cost at ≤ its worst excess ₪", g2 > matC ? "BEATEN" : "CONFIRMED", engS, c1.run.best ? figS(c1.run.best.cand) : null, g2, matC, c1.run, c1.run.best?.cand, c1.note));
     }
+    // (info) The earlier two-way test, kept for comparison: forecast at no higher worst peak, worst peak at no higher forecast.
+    const { run: r1 } = both({ kind: "f" }, { peakMax: ePeak }, (c) => (lifePeak(c.mix) <= ePeak + 0.5 ? fOf(c.mix) : Infinity), { target: eF - matC, reach: true }, matC);
+    const { run: r2 } = both({ kind: "peak" }, { fMax: eF }, (c) => (fOf(c.mix) <= eF + 1 ? lifePeak(c.mix) : Infinity), { target: ePeak - matM, reach: true }, matM);
     const b1 = r1.best;
     const b2 = r2.best;
     const g1 = b1 ? eF - fOf(b1.cand.mix) : 0;
     const g2 = b2 ? ePeak - lifePeak(b2.cand.mix) : 0;
-    return [
-      line("stable: forecast at ≤ its worst peak ₪", g1 > matC ? "BEATEN" : "CONFIRMED", eng, b1 ? fig(b1.cand) : null, g1, matC, r1, b1?.cand, liftNote),
-      line("stable: worst peak at ≤ its forecast ₪/mo", g2 > matM ? "BEATEN" : "CONFIRMED", { ...eng, base: ePeak }, b2 ? fig(b2.cand) : null, g2, matM, r2, b2?.cand),
-    ];
+    out.push(
+      line("(info) stable: forecast at ≤ its worst peak ₪", g1 > matC ? "info: beaten" : "info: confirmed", eng, b1 ? fig(b1.cand) : null, g1, matC, r1, b1?.cand),
+      line("(info) stable: worst peak at ≤ its forecast ₪/mo", g2 > matM ? "info: beaten" : "info: confirmed", { ...eng, base: ePeak }, b2 ? fig(b2.cand) : null, g2, matM, r2, b2?.cand)
+    );
+    return out;
   }
   return [];
 }
@@ -2030,8 +2104,11 @@ for (const c of cases) {
 const byGoal = new Map<string, Line[]>();
 for (const l of outLines) byGoal.set(l.goal, [...(byGoal.get(l.goal) ?? []), l]);
 console.log("\nSUMMARY (measures per goal: confirmed / beaten / miss; the largest gap)");
-for (const [g, ls] of Array.from(byGoal.entries())) {
+for (const [g, all] of Array.from(byGoal.entries())) {
+  // (info) lines are a second, informational column: not counted as measures.
+  const ls = all.filter((l) => !l.measure.startsWith("(info)"));
+  const info = all.length - ls.length;
   const n = (v: RegExp) => ls.filter((l) => v.test(l.verdict)).length;
   const top = ls.filter((l) => /BEATEN|MISS|POWER:/.test(l.verdict)).sort((a, b) => b.gap - a.gap)[0];
-  console.log(`  ${pad(g, 11)} ${ls.length} measures: confirmed ${n(/CONFIRMED/)}, beaten ${n(/BEATEN/)}, miss ${n(/MISS/)}, power ${n(/POWER:/)}${top ? `; largest ${fmt(top.gap)} (${top.gapPct.toFixed(2)}%) ${top.id} ${top.profile} [${top.measure}]` : ""}`);
+  console.log(`  ${pad(g, 11)} ${ls.length} measures: confirmed ${n(/CONFIRMED/)}, beaten ${n(/BEATEN/)}, miss ${n(/MISS/)}, power ${n(/POWER:/)}${info ? ` (info: ${all.filter((l) => /^info: beaten/.test(l.verdict)).length} of ${info} beaten)` : ""}${top ? `; largest ${fmt(top.gap)} (${top.gapPct.toFixed(2)}%) ${top.id} ${top.profile} [${top.measure}]` : ""}`);
 }
