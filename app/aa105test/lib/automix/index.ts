@@ -1470,7 +1470,14 @@ function solvePayment(ctx: Ctx): Solved {
   const material = ctx.ref.monthly - MATERIAL.monthly(ctx.ref.monthly);
   const roof = low <= material ? material : ctx.ref.monthly - 1;
   const s2: Spec = { ...pick.spec, wMonthly: 0, wCost: 1, lambda: 0, budget: low + Math.min(SLIVER_GIVE.monthly(ctx.ref.monthly), Math.max(0, roof - low)) };
-  const p2 = solveGuarded(ctx, s2, POOL, 2, restart(ctx, pick.plan, s2, ctx.cols));
+  const p1 = solveGuarded(ctx, s2, POOL, 2, restart(ctx, pick.plan, s2, ctx.cols));
+  // Then one debt in and one out with the terms re-solved around the answer's:
+  // the term walk holds the decisions and the flips hold the terms, so a swap
+  // that only fits once a term moves is never seen (audit 3 F2 and the last OLD
+  // MIX BETTER line of the regress proof: r01+r02 typical, a 6% מ"צ of ₪48,642
+  // moved and a ₪22,675 מל"צ kept, the all-purpose term two years longer: the
+  // same payment, ₪89,330 cheaper in the forecast).
+  const p2 = swapRepair(ctx, p1.ok ? p1 : restart(ctx, pick.plan, s2, ctx.cols) ?? p1, s2);
   const cheaper = p2.ok && frontierPoint(ctx, p2, ctx.cols).saving > frontierPoint(ctx, pick.plan, ctx.cols).saving + 1;
   if (cheaper) {
     PAYMENT_STAGE.n++;
@@ -1479,6 +1486,60 @@ function solvePayment(ctx: Ctx): Solved {
   }
   return { plan: cheaper ? p2 : pick.plan, meta: { guard: pick.guard.kind, low }, spec: cheaper ? s2 : pick.spec, cols: ctx.cols, guard: pick.guard };
 }
+/**
+ * One debt in and one out of a plan at once (or one in alone), the terms
+ * re-solved around the plan's own (±SWAP_SPAN years, one term per track), the
+ * goal's spec unchanged: the best that improves its objective, polished by the
+ * usual local search. The debts tried in are the kept ones whose own forecast
+ * payments exceed what the plan's new money of their segment costs for their
+ * balance (the moves that save), at most SWAP_IN of them, largest saving first;
+ * every moved debt is tried out against each. Measured on r01+r02 under a typical
+ * profile (32 debts): 4 × 21 swaps, each a one-term MILP on a few columns with
+ * every decision fixed, 2 ms apiece.
+ */
+function swapRepair(ctx: Ctx, plan: Plan, spec: Spec): Plan {
+  if (!plan.ok) return plan;
+  const byKey = new Map(ctx.cols.map((c) => [c.key, c]));
+  const yearsOf = new Map<string, number>();
+  const perShekel = new Map<Segment, { paid: number; amount: number }>();
+  for (const [k, a] of Object.entries(plan.amounts)) {
+    const c = byKey.get(k);
+    if (!c) return plan;
+    yearsOf.set(`${c.track}|${c.segment}`, c.years);
+    const x = perShekel.get(c.segment) ?? { paid: 0, amount: 0 };
+    x.paid += c.paid[0] * a;
+    x.amount += a;
+    perShekel.set(c.segment, x);
+  }
+  const near = ctx.cols.filter((c) => {
+    const y = yearsOf.get(`${c.track}|${c.segment}`);
+    return y !== undefined && Math.abs(c.years - y) <= SWAP_SPAN;
+  });
+  const free = (d: Debt) => !d.forced && (!d.lock || !!spec.unlock?.includes(d.id)) && !spec.hold?.includes(d.id) && (d.group === "mortgage" ? !spec.keepMortgage && !spec.moveWhole : spec.loansAllowed) && perShekel.has(d.segment);
+  const moved = new Set(plan.refinance);
+  const saveIf = (d: Debt) => {
+    const x = perShekel.get(d.segment)!;
+    return d.paid[0] - (d.balance + d.fee) * (x.paid / x.amount);
+  };
+  const ins = ctx.debts.filter((d) => free(d) && !moved.has(d.id) && saveIf(d) > 0).sort((a, b) => saveIf(b) - saveIf(a)).slice(0, SWAP_IN);
+  const outs = ctx.debts.filter((d) => free(d) && moved.has(d.id));
+  let best = plan;
+  for (const x of ins)
+    for (const y of [null, ...outs]) {
+      const z = plan.refinance.filter((id) => id !== y?.id).concat(x.id);
+      const q = solveOnce(ctx.debts, near, { ...spec, fixZ: z }, false, true, FIRST_CAP);
+      if (q.ok && q.objective < best.objective - 1e-6 * Math.max(1, Math.abs(best.objective))) best = q;
+    }
+  if (best === plan) return plan;
+  SWAP_STATS.n++;
+  const polished = solveTermsRaw(ctx.debts, ctx.cols, spec, [], best, 2);
+  return polished.ok && polished.objective < best.objective ? polished : best;
+}
+const SWAP_SPAN = 3;
+const SWAP_IN = 4;
+/** How often the swap repair improved an answer across builds (the corpus prints it). */
+const SWAP_STATS = { n: 0 };
+
 /** What the payment goal's cost stage recovered across builds (the corpus prints it): answers changed, the most forecast saving, ₪. */
 const PAYMENT_STAGE = { n: 0, saved: 0 };
 
@@ -1982,8 +2043,16 @@ function solveBalanced(ctx: Ctx, extra: Partial<Spec> = {}, fromGuard?: Guard["k
   // the same answer).
   const box = (relief: number, saving: number, from: Plan[], mode: string, debts: SolverDebt[] = ctx.debts, cols: Column[] = ctx.cols): Solved => {
     const spec = costSpec(ctx, "balanced", { budget: Math.min(budget, M0 - relief + 0.01), paidCap: Math.min(P0 - saving + 0.5, P0), ...rules });
-    const p = solveGuarded(ctx, spec, [...POOL, ...from.map((x) => seedOf(x, ctx.cols))], undefined, from[0], debts, cols);
-    const plan = p.ok ? p : from[0];
+    // The starts re-priced under the box's own objective (restart). A probe is
+    // solved for the cheapest FORECAST (λ 0); carried in as it is, its objective
+    // is lower than any risk-weighted one, so the search below and the polish in
+    // runGoals kept it as unbeatable and the box never moved off the probe
+    // (audit 3 F1, F3, F4: r01 ₪44,024, r04 ₪45,045, r01+r02 typical ₪172,636 of
+    // saving left at the same relief).
+    const starts = from.map((x) => restart(ctx, x, spec, ctx.cols)).filter((x): x is Plan => !!x?.ok);
+    const p = solveGuarded(ctx, spec, [...POOL, ...from.map((x) => seedOf(x, ctx.cols))], undefined, starts[0] ?? from[0], debts, cols);
+    const bestStart = starts.reduce<Plan | undefined>((b, x) => (!b || x.objective < b.objective ? x : b), undefined);
+    const plan = p.ok && (!bestStart || p.objective <= bestStart.objective + 1e-9) ? p : bestStart ?? (p.ok ? p : from[0]);
     if (plan.ok) addToPool(plan, ctx.cols);
     return { plan, meta: { ...anchors, mode }, spec, cols: ctx.cols, guard };
   };
@@ -2054,8 +2123,60 @@ function solveBalanced(ctx: Ctx, extra: Partial<Spec> = {}, fromGuard?: Guard["k
     if (q.s >= q.f) a = q;
     else b = q;
   }
-  const t = tOf(best);
-  return box(t * R, t * S, [best.plan], "both", between, near);
+  // THE POINT, refined on the whole problem. The probes run between the anchors
+  // on two rounds; at the point they found, the most forecast saving at the same
+  // relief is searched again with every debt free, every term on the grid, and
+  // the other goals' answers and the Bank of Israel's uniform baskets as starts
+  // (audit 3: r01 ₪44,024 and r04 ₪45,045 more saving at the same relief lay
+  // outside the anchors' region, keeping a debt both anchors move or at terms
+  // more than three years off theirs; on r04 basket 1, all קל"צ at 21 years,
+  // gave more relief and more saving than the answer).
+  const refine = (q: Pt): Pt => {
+    const spec = cheapestAt(M0 - q.f * R);
+    const start = restart(ctx, q.plan, spec, ctx.cols);
+    const p = solveGuarded(ctx, spec, [...POOL, seedOf(q.plan, ctx.cols), ...basketSeeds(ctx, q.plan)], undefined, start, ctx.debts, ctx.cols);
+    const r = p.ok ? pt(p) : null;
+    return r && r.s > q.s && r.f >= q.f - 1e-9 ? r : q;
+  };
+  const point = refine(best);
+  const t = tOf(point);
+  // The box: the cheapest risk-weighted mix (λ 0.5) at the point's relief and,
+  // within half the materiality of a saving, its saving: never less relief or
+  // materially less saving than the point it improves, a better worst economy
+  // where one is to be had.
+  const give = 0.5 * MATERIAL.cost(todayCostOf(ctx));
+  return box(point.f * R, Math.max(t * S, point.s * S - give), [point.plan, best.plan], "both");
+}
+
+/**
+ * The Bank of Israel's three uniform baskets (all קל"צ; ⅓ קל"צ ⅓ פריים ⅓ מ"צ; ½ קל"צ
+ * ½ פריים) as search starts on a plan's own debts: the housing money on the
+ * basket's tracks at the plan's weighted term, three years either side and every
+ * five years, the all-purpose money on the plan's own terms. Each start is
+ * re-solved under the goal's spec (solve.ts seeds), so its amounts follow the
+ * rules, not the basket's thirds.
+ */
+function basketSeeds(ctx: Ctx, plan: Plan): Seed[] {
+  if (!plan.ok) return [];
+  const housing = Object.entries(plan.amounts).filter(([k]) => k.split("|")[1] === "housing");
+  const N = sum(housing.map(([, a]) => a));
+  if (!(N > 0)) return [];
+  const avg = Math.round(sum(housing.map(([k, a]) => a * Number(k.split("|")[2]))) / N);
+  const ap: Record<string, number> = {};
+  for (const [f, y] of Object.entries(termsOf(plan, ctx.cols))) if (f.endsWith("|allPurpose")) ap[f] = y;
+  const keys = new Set(ctx.cols.map((c) => c.key));
+  const years = Array.from(new Set([avg - 3, avg, avg + 3, 10, 15, 20, 25, 30])).filter((y) => y >= MIN_YEARS.prime && y <= ctx.maxYears);
+  const out: Seed[] = [];
+  for (const y of years)
+    for (const tracks of [["klz"], ["klz", "prime", "mz"], ["klz", "prime"]] as TrackKey[][]) {
+      const terms: Record<string, number> = { ...ap };
+      for (const tr of tracks) {
+        const yy = Math.max(MIN_YEARS[tr], y);
+        if (keys.has(`${tr}|housing|${yy}`)) terms[`${tr}|housing`] = yy;
+      }
+      out.push({ refinance: plan.refinance.slice().sort(), terms });
+    }
+  return out;
 }
 
 /**
@@ -3182,7 +3303,7 @@ function unsliver(ctx: Ctx, goal: GoalId, sv: Solved): Solved {
     const spec = sv.spec;
     const known = new Set(sliversOf(cur, cols).map((x) => `${x.track}|${x.segment}`));
     // In the canonical order (solve.ts): the first improving flip is taken, so the board's row order may not decide which.
-    const flippable = (canonical(ctx.debts) as Debt[]).filter((d) => !d.forced && (!d.lock || !!spec.unlock?.includes(d.id)) && !spec.hold?.includes(d.id) && (d.group === "mortgage" ? !spec.keepMortgage : spec.loansAllowed));
+    const flippable = (canonical(ctx.debts) as Debt[]).filter((d) => !d.forced && (!d.lock || !!spec.unlock?.includes(d.id)) && !spec.hold?.includes(d.id) && (d.group === "mortgage" ? !spec.keepMortgage : spec.loansAllowed) && flipsAlone(d, spec));
     for (const d of flippable) {
       const keys = new Set(Object.keys(cur.amounts));
       const z = cur.refinance.includes(d.id) ? cur.refinance.filter((id) => id !== d.id) : [...cur.refinance, d.id];
@@ -3259,6 +3380,16 @@ const KEEP_SLIVER = new WeakMap<Plan, string[]>();
  * weight on cost in the payment goal let it stand. A plan is never made worse,
  * a cap on the shown cost is held, and no sliver is added.
  */
+/**
+ * Whether a debt's decision may be flipped on its own. When the whole mortgage
+ * moves (the move structure, or a bank the advisor picked that does not hold it)
+ * a lender's mortgage rows go together, as in the solver (solve.ts moveWhole):
+ * keeping one of them alone leaves a lien behind the new bank's first lien. The
+ * sliver pass and keepCheaper flipped one at a time and did (check
+ * move-to-discount: מאוזן kept the 2.4% ק"צ and moved the bank's other three).
+ */
+const flipsAlone = (d: Debt, spec: Spec) => !(spec.moveWhole && d.group === "mortgage");
+
 function keepCheaper(ctx: Ctx, sv: Solved): Solved {
   if (!sv.plan.ok || !sv.spec) return sv;
   const spec = sv.spec;
@@ -3271,7 +3402,7 @@ function keepCheaper(ctx: Ctx, sv: Solved): Solved {
     const keys = new Set(Object.keys(cur.amounts));
     let changed = false;
     for (const d of canonical(ctx.debts) as Debt[]) {
-      if (!cur.refinance.includes(d.id) || d.forced || (flips.get(d.id)?.paid ?? 0) > -100) continue;
+      if (!cur.refinance.includes(d.id) || d.forced || !flipsAlone(d, spec) || (flips.get(d.id)?.paid ?? 0) > -100) continue;
       const p = solveOnce(ctx.debts, cols.filter((c) => keys.has(c.key)), { ...spec, fixZ: cur.refinance.filter((id) => id !== d.id) });
       // Better on the goal's objective, or no worse and cheaper in the forecast: the
       // payment goal weighs cost at 1/1000, too little for its search to see (Z426).
@@ -4702,8 +4833,95 @@ function beatsMaterially(goal: GoalId, x: Solved, incumbent: Solved, anchors?: A
           ? MATERIAL.months
           : costMargin / U;
   if (a[0] < b[0] - margin) return true;
+  // Inside the first measure's materiality the goal's whole score decides (secondaryWins).
+  if (secondaryWins(goal, x, incumbent)) return true;
   if (a[0] > b[0] - margin) return false;
   return better(a.slice(1), b.slice(1));
+}
+
+/**
+ * Another structure's answer re-solved at the incumbent's own level of the
+ * goal's first measure: the cheapest forecast at no higher payment (the payment
+ * goal), the most forecast saving at no less relief and then the cheapest
+ * risk-weighted mix within half a materiality of that saving (מאוזן, as the box
+ * does). Each structure's answer is its best at ITS level, so two structures were
+ * never compared where the client would choose between them: the move's own
+ * payment answer sat ₪23–60 a month lower, under materiality, and was judged on
+ * that alone; at the incumbent's payment it is ₪11k–39k cheaper (audit 3 F7).
+ */
+function atIncumbentLevel(goal: GoalId, x: Solved, inc: Solved): Solved | null {
+  const cx = x.ctx;
+  const ci = inc.ctx;
+  if (!cx || !ci || !x.plan.ok || !inc.plan.ok || !x.spec) return null;
+  const bi = bookOf(rowsOf(ci, inc.plan).rows, ci.input, ci.f);
+  // No higher payment than the incumbent's (the read-out's rounding of a shekel only).
+  const cap = bi.metrics.monthly + 0.5;
+  // (A seed is re-solved with its decisions held: in the move structure every movable mortgage is forced, so the
+  // incumbent's own refinance set cannot keep part of the lender's mortgage there.)
+  const seeds = [seedOf(inc.plan, ci.cols)];
+  // The sliver pass every goal's answer takes in runGoals (this re-solve comes after it): a tranche under a tenth of
+  // its segment is dropped or says why it stays (corpus L42 infl0: a ₪51,000 פריים of ₪663,026 with no reason).
+  const finish = (sv: Solved): Solved | null => (sv.plan.ok ? keepCheaper(cx, unsliver(cx, goal, sv)) : null);
+  if (goal === "payment") {
+    const spec: Spec = { ...x.spec, wMonthly: 0, wCost: 1, lambda: 0, budget: cap };
+    const start = restart(cx, x.plan, spec, cx.cols);
+    const p = solveGuarded(cx, spec, seeds, 2, start);
+    const q = swapRepair(cx, p.ok ? p : start ?? p, spec);
+    return finish({ ...x, plan: q, spec, cols: cx.cols, meta: { ...(x.meta ?? {}), matched: 1 } });
+  }
+  const rules: Partial<Spec> = { peakCap: x.spec.peakCap ?? null, typedPaidCap: cx.ref.typedPaid, ...pvCapOf(cx, "balanced") };
+  const s1 = specFor(cx, { wMonthly: 0, wCost: 1, lambda: 0, budget: Math.min(reliefBudget(cx), cap), ...rules });
+  const p1 = solveGuarded(cx, s1, [...seeds, ...basketSeeds(cx, x.plan)], undefined, restart(cx, x.plan, s1, cx.cols));
+  if (!p1.ok) return null;
+  const paid = bookOf(rowsOf(cx, p1).rows, cx.input, cx.f).paid[0];
+  const s2 = costSpec(cx, "balanced", { budget: s1.budget, paidCap: Math.min(paid + 0.5 * MATERIAL.cost(todayCostOf(cx)), cx.ref.paid), ...rules });
+  const start = restart(cx, p1, s2, cx.cols);
+  const p2 = solveGuarded(cx, s2, [], undefined, start);
+  const plan = p2.ok ? p2 : start;
+  // The structure's own frontier mode stays (its anchors say which sentence and which t apply); `matched` only marks the re-solve.
+  return plan ? finish({ ...x, plan, spec: s2, cols: cx.cols, meta: { ...(x.meta ?? {}), matched: 1 } }) : null;
+}
+
+/**
+ * The goal's whole score inside the primary's materiality: a structure no worse
+ * on the goal's first measure (no higher payment than the incumbent's, ₪0.5 of
+ * the read-out's rounding) that is materially better on what the goal measures
+ * next replaces the incumbent. The payment goal: the forecast total at that
+ * payment, by MATERIAL.cost. מאוזן: relief and forecast saving both no worse
+ * (the payment, the neutral residue), its own risk-weighted cost no worse, and
+ * one of the three materially better (the box itself minimises that cost).
+ * Savings: better on its own objective and on the typed cost, each by half its
+ * materiality (its first measure is its objective, so there is no "next").
+ * Before, only the first measure was compared, so moving the whole mortgage to
+ * another bank at the same payment and ₪11k–39k less in total was never taken
+ * (audit 3 F7: L36, L12, L42, L45). Both mixes are priced from their own rows,
+ * each in its own structure, against the one reference every structure shares.
+ */
+function secondaryWins(goal: GoalId, x: Solved, inc: Solved): boolean {
+  if (goal !== "payment" && goal !== "balanced" && goal !== "savings") return false;
+  const cx = x.ctx;
+  const ci = inc.ctx;
+  if (!cx || !ci || !x.plan.ok || !inc.plan.ok) return false;
+  const bx = bookOf(rowsOf(cx, x.plan).rows, cx.input, cx.f);
+  const bi = bookOf(rowsOf(ci, inc.plan).rows, ci.input, ci.f);
+  const R = ci.ref;
+  const band = 0.5;
+  const matC = MATERIAL.cost(Math.max(0, R.paid - sum(ci.debts.filter((d) => !d.due).map((d) => d.balance))));
+  if (goal === "payment") return bx.metrics.monthly <= bi.metrics.monthly + band && bx.paid[0] < bi.paid[0] - matC;
+  const neutral = MATERIAL.neutral(R.paid);
+  if (goal === "savings") {
+    // Savings' first measure IS its objective: inside its materiality, a structure better by half of it on that
+    // objective AND on the cost the sheet shows, within the budget, is better on everything the client sees
+    // (r01+r02 typical: the move ₪41,460 lower on the objective and ₪43,012 on the typed cost, against ₪48,016;
+    // a move for a few thousand shekels, L13 ₪4,654, stays out).
+    const ls = lambdaOf(ci, "savings");
+    const Js = (b: Book) => (1 - ls) * b.paid[0] + ls * Math.max(...b.paid);
+    return bx.metrics.monthly <= ci.budget + 0.5 && Js(bx) < Js(bi) - 0.5 * matC && bx.metrics.totalCost < bi.metrics.totalCost - 0.5 * matC;
+  }
+  const lam = lambdaOf(ci, "balanced");
+  const J = (b: Book) => (1 - lam) * b.paid[0] + lam * Math.max(...b.paid);
+  const noWorse = bx.metrics.monthly <= bi.metrics.monthly + band && bx.paid[0] <= bi.paid[0] + neutral && J(bx) <= J(bi) + neutral;
+  return noWorse && (bx.paid[0] < bi.paid[0] - matC || J(bx) < J(bi) - matC || bx.metrics.monthly < bi.metrics.monthly - MATERIAL.monthly(R.monthly));
 }
 function better(a: number[], b: number[]): boolean {
   for (let i = 0; i < Math.max(a.length, b.length); i++) {
@@ -5139,7 +5357,21 @@ function buildIn(input: AutoMixInput): AutoMixResult {
     // The second lien keeps the bank mortgage: it is the incumbent, and a first lien
     // must beat it MATERIALLY on the goal's own measure to replace it.
     const anchors = goal === "balanced" ? { R: Math.max(0, ...ok.map((x) => Number(x.meta?.reliefMax ?? 0))), S: Math.max(0, ...ok.map((x) => Number(x.meta?.savingMax ?? 0))) } : undefined;
-    const best = ok.reduce((b, x) => (beatsMaterially(goal, x, b, anchors) ? x : b), ok[0]);
+    let best = ok.reduce((b, x) => (beatsMaterially(goal, x, b, anchors) ? x : b), ok[0]);
+    // Within the first measure's materiality, the other structure re-solved at
+    // the incumbent's own level of it: the cheapest it can do at that payment
+    // (the payment goal), the most it saves at that relief (מאוזן). Each answer
+    // is its structure's best at ITS level, so the two were never compared where
+    // the client would choose between them (audit 3 F7).
+    if (goal === "payment" || goal === "balanced")
+      for (const x of ok) {
+        if (x.ctx === best.ctx) continue;
+        const m = atIncumbentLevel(goal, x, best);
+        if (m && secondaryWins(goal, m, best) && quickJudge(m.ctx!, goal, m).status === "ok") {
+          best = m;
+          break;
+        }
+      }
     const other = solvedOk.filter((x) => x !== best).reduce<Solved | null>((b, x) => (!b || better(score(goal, x, anchors), score(goal, b, anchors)) ? x : b), null);
     const missing = runs.length > 1 && !other ? runs.find((r) => r.ctx.variant !== best.ctx!.variant && r.solvedBy.has(goal)) : undefined;
     const floorPlan = missing?.solvedBy.get("payment");
@@ -5404,4 +5636,4 @@ function regressOf(input: AutoMixInput, goal: GoalId, mix: RegressMix, guardCaps
   return { ok: true, rule: null, ...measure(plan, fix) };
 }
 
-export const __test = { regressOf, STATS, SLIVER_STATS, GATE_STATS, DISPLAY_STATS, PAYMENT_STAGE, ALIGN_STATS, runGoals, sliversOf, sliverTest, SLIVER_REASON, unsliver, solveBalanced, frontierPoint, solveGuarded, variantsFor, referenceOf, applyReference, prepare, solveTermsRaw, specFor, LAMBDA, bookOf, rowsOf, priceRow, debtsOf, columnsFor, pricingFor, trancheRow, SETUP_HOUSING, SETUP_AP_ALONE, isIndexedPath };
+export const __test = { SWAP_STATS, regressOf, STATS, SLIVER_STATS, GATE_STATS, DISPLAY_STATS, PAYMENT_STAGE, ALIGN_STATS, runGoals, sliversOf, sliverTest, SLIVER_REASON, unsliver, solveBalanced, frontierPoint, solveGuarded, variantsFor, referenceOf, applyReference, prepare, solveTermsRaw, specFor, LAMBDA, bookOf, rowsOf, priceRow, debtsOf, columnsFor, pricingFor, trancheRow, SETUP_HOUSING, SETUP_AP_ALONE, isIndexedPath };

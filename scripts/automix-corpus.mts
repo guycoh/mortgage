@@ -55,7 +55,7 @@ const forecast = await (async () => {
   }
 })();
 const V = verifier(market, forecast);
-const { check, failures, verify, verifyOverride, lint } = V;
+const { check, failures, verify, verifyOverride, lint, basketLaw } = V;
 const fmt = (x: number) => Math.round(x).toLocaleString("en-US");
 const section = (s: string) => console.log(`\n### ${s}`);
 const BUDGET_GOALS: GoalId[] = ["years", "savings", "stable", "balanced", "consolidate"];
@@ -108,7 +108,10 @@ function run(name: string, input: AutoMixInput, opts: { ok?: boolean; laws?: boo
     return null;
   }
   sane(name, r);
-  check(r.ms < 3000, `${name}: ${r.ms.toFixed(0)}ms`);
+  // 4 s (3 s before audit 3's fixes): מאוזן's point is refined on the whole problem, which costs the largest
+  // household 0.3 s (r02 typical 2.6 → 3.0 s idle) and buys ₪25–30k of forecast saving at the same relief on r01
+  // and r01+r02 typical. The 3 s limit left 45 ms of room and failed under a second process.
+  check(r.ms < 4000, `${name}: ${r.ms.toFixed(0)}ms`);
   if (r.ok) verify(name, input, r, { ok: opts.ok ?? r.ok });
   else {
     lint(name, r);
@@ -332,6 +335,7 @@ if (!ONLY || ONLY === "letters") {
         budgetEquivalenceLaw(`${id}/${g.tag}`, input, r);
       }
       if (g.tag === "own-bank") ownBankLaw(`${id}/own-bank`, none, r, bankOf(master));
+      if ((g.tag === "none" || g.tag === "typical") && r) basketLaw(`${id}/${g.tag}`, input, r);
       if (g.tag === "none" || g.tag === "typical") console.log(`  ${id} ${String(st.bank).padEnd(10)} ${String(master.length).padStart(2)} rows ${fmt(base.today.monthly).padStart(7)}/mo ${g.tag.padEnd(8)} ${r?.pricing.tier ?? ""} ${(r?.ms ?? 0).toFixed(0).padStart(4)}ms ${status(r)}`);
     }
   }
@@ -358,6 +362,7 @@ if (!ONLY || ONLY === "reports") {
         budgetEquivalenceLaw(`${s.id}/${g.tag}`, input, r);
       }
       if (g.tag === "own-bank") ownBankLaw(`${s.id}/own-bank`, none, r, bankOf(h.master));
+      if ((g.tag === "none" || g.tag === "typical") && r) basketLaw(`${s.id}/${g.tag}`, input, r);
       if (g.tag === "typical" || g.tag === "tight") console.log(`  ${s.id.padEnd(8)} ${g.tag.padEnd(8)} ${r?.pricing.tier ?? ""} ${(r?.ms ?? 0).toFixed(0).padStart(4)}ms ${status(r)}`);
     }
   }
@@ -512,7 +517,7 @@ if (!ONLY || ONLY === "fuzz") {
   console.log(`  sliver pass: ${z.dropped} answers changed, at most ₪${fmt(z.cost)} (cost goals, risk-weighted) and ₪${fmt(z.monthly)} a month (payment) given up`);
   const w = V.wave;
   console.log(`  wave 2: gates refused / then passed in the search, by goal and gate: ${Object.entries(__test.GATE_STATS.by as Record<string, { refused: number; passed: number }>).sort().map(([k, x]) => `${k} ${x.refused}/${x.passed}`).join(", ") || "none"}`);
-  console.log(`  wave 2: gates held in the search ${__test.GATE_STATS.n} · savings kept over the display repair ${__test.DISPLAY_STATS.held} · payment cost stage ${__test.PAYMENT_STAGE.n} answers, at most ₪${fmt(__test.PAYMENT_STAGE.saved)} saved · terms aligned ${__test.ALIGN_STATS.n}`);
+  console.log(`  wave 2: gates held in the search ${__test.GATE_STATS.n} · savings kept over the display repair ${__test.DISPLAY_STATS.held} · payment cost stage ${__test.PAYMENT_STAGE.n} answers, at most ₪${fmt(__test.PAYMENT_STAGE.saved)} saved · payment swap repair ${__test.SWAP_STATS.n} · terms aligned ${__test.ALIGN_STATS.n}`);
   console.log(`  wave 2: relative guard ${w.guardRelative} · no guard ${w.guardNone} · debts held cheap ${w.heldCheap} · move groups ${w.moveGroups} · stale-prime words ${w.staleWords} · no recommendation with ok goals ${w.recNull} · budget equivalence ${EQUIV.n - EQUIV.differ}/${EQUIV.n} identical · years ends not compared across guard tiers ${LAW_SKIPS.guardTier} · budget objectives not compared where the lower ceiling lifted CHEAP_KEEP ${LAW_SKIPS.cheapLift}`);
 }
 console.log(`\n${V.passed()} checks passed, ${failures.length} failed`);
