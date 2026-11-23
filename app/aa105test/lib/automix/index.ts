@@ -2510,7 +2510,7 @@ function proposalOf(ctx: Ctx, goal: GoalId, solved: Solved): Proposal {
     if (fixed && fixed.plan !== used) {
       const r2 = rowsOf(ctx, fixed.plan);
       const b2 = bookOf(r2.rows, ctx.input, ctx.f);
-      if (goal === "payment" || b2.metrics.monthly <= ceilingOf(ctx, goal, solved) + 0.5) {
+      if (b2.metrics.monthly <= ceilingOf(ctx, goal, solved) + 0.5) {
         used = fixed.plan;
         usedSpec = fixed.spec;
         ({ rows, tranches } = r2);
