@@ -614,6 +614,7 @@ function columnsFor(pr: Pricing, input: AutoMixInput, f: Forecast, maxYears: num
           peak: p.peak.map((x) => x / PROBE),
           early: p.early.map((e) => e.map((x) => x / PROBE)),
           ahead: p.ahead.map((x) => x / PROBE),
+          pay60: p.pay.map((e) => e.slice(0, 60).map((x) => x / PROBE)),
           fRate: irrOf(p.pay[0], PROBE) ?? undefined,
           price,
         });
@@ -1351,6 +1352,68 @@ function earlyOk(ctx: Ctx, plan: Plan, cols: Column[], caps: number[]): boolean 
   );
 }
 
+/** A guard row at month m of economy k (solve.ts Spec.guardAt): every debt's own payment there (a balloon's lump excluded) and every column's per ₪1. */
+function guardRowAt(ctx: Ctx, k: number, m: number, cap: number): NonNullable<Spec["guardAt"]>[number] {
+  const debt: Record<string, number> = {};
+  for (const d of ctx.debts) debt[d.id] = m === lumpMonth(d.row) ? 0 : d.priced.pay[k]?.[m - 1] ?? 0;
+  const col: Record<string, number> = {};
+  for (const c of ctx.cols) col[c.key] = c.pay60?.[k]?.[m - 1] ?? 0;
+  return { cap, debt, col };
+}
+
+/** Do a plan's own rows, as the board prices them, hold the guard on every month 1–60? */
+const rowsHold = (ctx: Ctx, plan: Plan, g: Guard) => guardHolds(bookOf(rowsOf(ctx, plan).rows, ctx.input, ctx.f), g);
+/** What guard repairs did across builds (the corpus prints it): answers re-solved under a lower cap, and those that still could not hold. */
+const GUARD_REPAIR = { n: 0, failed: 0 };
+
+/**
+ * The five-year guard on a proposal's OWN rows. The solve holds it at the
+ * sample months (solve.ts EARLY) on the unrounded amounts, so the rows can
+ * break it between two samples or by the ₪1,000 rounding (audit 3 R4: L44
+ * קיצור שנים sat at the ₪19,192 ceiling at month 25 in the CPI shock, and a kept
+ * debt ending after month 27 let the payment climb to ₪19,220 before it fell).
+ * The goal's own problem is solved again with a guard row at each economy's
+ * worst month on the rows (solve.ts Spec.guardAt), at the cap less the
+ * rounding (₪1, then ₪3, ₪5), up to three times; `widen` is tried when that
+ * problem has no answer within the goal's own budget (קיצור שנים: its band
+ * around the lowest payment, then its ceiling). null when no mix of the goal's
+ * problem holds the guard on its rows.
+ */
+function holdGuard(ctx: Ctx, sv: Solved, g: Guard, widen?: Partial<Spec>): Solved | null {
+  if (!g.kind || !sv.spec || !sv.plan.ok) return null;
+  const cols = sv.cols ?? ctx.cols;
+  const rows = [...(sv.spec.guardAt ?? [])];
+  let plan = sv.plan;
+  let spec = sv.spec;
+  for (let i = 0; i <= 3; i++) {
+    const book = bookOf(rowsOf(ctx, plan).rows, ctx.input, ctx.f);
+    if (guardHolds(book, g)) {
+      if (plan !== sv.plan) GUARD_REPAIR.n++;
+      return plan === sv.plan ? sv : { ...sv, plan, spec };
+    }
+    if (i === 3 || book.metrics.monthly > Math.min(...g.caps) + 1) break;
+    ECON.forEach((_, k) => {
+      let worst = 0;
+      for (let m = 2; m <= 60; m++) if ((book.regular[k][m - 1] ?? 0) > g.caps[k] + 1 && (book.regular[k][m - 1] ?? 0) > (book.regular[k][worst - 1] ?? -Infinity)) worst = m;
+      if (worst) rows.push(guardRowAt(ctx, k, worst, g.caps[k] - 1 - 2 * i));
+    });
+    let next: Plan | null = null;
+    for (const over of [{}, ...(widen ? [widen] : [])]) {
+      const s = { ...sv.spec, ...over, guardAt: rows.slice() };
+      const p = solveGuarded(ctx, s, POOL, undefined, restart(ctx, plan, s, cols), ctx.debts, cols);
+      if (p.ok) {
+        next = p;
+        spec = s;
+        break;
+      }
+    }
+    if (!next) break;
+    plan = next;
+  }
+  GUARD_REPAIR.failed++;
+  return null;
+}
+
 /** A plan's typed month-one payment as the budget row reads it: kept debts, new money, and the read-out's rounding room per opened track. */
 function budgetRowOf(ctx: Ctx, plan: Plan, cols: Column[]): number {
   const byKey = new Map(cols.map((c) => [c.key, c]));
@@ -1478,24 +1541,64 @@ function solveYears(ctx: Ctx): Solved {
   // when no tier has one does the strongest guarded answer stand, and it reads
   // no-gain. (L14: 9 months under the absolute guard, 21 under the relative one;
   // L18: 6 and 18.)
-  let first: ReturnType<typeof at> | null = null;
-  let chosen: ReturnType<typeof at> | null = null;
+  type Tier = ReturnType<typeof at>;
+  // A tier's answer at its end, solved and read on its own rows: the guard it
+  // states holds on every month 1–60 (holdGuard lowers the caps until it does),
+  // or the answer does not hold it. Each tier is settled once.
+  // When the tier's earliest end cannot hold it, the next two ends (whole years
+  // and kept debts' own ends) are tried while the shortening stays material: the
+  // strongest tier with a material shortening still wins, a little later.
+  const settled = new Map<Tier, { sv: Solved; holds: boolean; T: number }>();
+  const settle = (r: Tier): { sv: Solved; holds: boolean; T: number } => {
+    const known = settled.get(r);
+    if (known) return known;
+    const at1 = (T: number, sv: Solved): { sv: Solved; holds: boolean; T: number } | null => {
+      if (!r.g.kind || !sv.plan.ok || rowsHold(ctx, sv.plan, r.g)) return { sv, holds: true, T };
+      const held = holdGuard(ctx, sv, r.g, { budget: r.pick.budget });
+      return held ? { sv: held, holds: true, T } : null;
+    };
+    const sv0 = yearsAtFrom(ctx, r.pick.T, r.pick.ok ? r.pick.seed?.() : undefined, r.pick.budget, unlock, r.g);
+    let out = at1(r.pick.T, sv0);
+    if (!out) {
+      const later = Array.from(new Set([...Array.from({ length: ctx.maxYears }, (_, i) => 12 * (i + 1)), ...ctx.debts.map((d) => d.months)]))
+        .filter((m) => m > r.pick.T && ctx.ref.months - m >= MATERIAL.months)
+        .sort((a, b) => a - b)
+        .slice(0, 2);
+      for (const T of later) {
+        const sv = yearsAtFrom(ctx, T, undefined, r.pick.budget, unlock, r.g);
+        if (sv.plan.ok && (out = at1(T, sv))) break;
+      }
+    }
+    const res = out ?? { sv: sv0, holds: false, T: r.pick.T };
+    settled.set(r, res);
+    return res;
+  };
+  let first: Tier | null = null;
+  let chosen: Tier | null = null;
   for (let lvl = 0; lvl < levels; lvl++) {
     const r = at(lvl);
     if (!r.pick.ok) continue;
     first ??= r;
-    if (ctx.ref.months - r.pick.T >= MATERIAL.months) {
+    // A tier whose material shortening cannot hold its guard on its rows is no
+    // answer at that tier: the next, weaker one is tried (audit 3 R4: L44).
+    if (ctx.ref.months - r.pick.T >= MATERIAL.months && settle(r).holds) {
       chosen = r;
       break;
     }
   }
   const use = chosen ?? first;
   if (use) {
-    const { base, stretched, useStretch, pick, g } = use;
+    const { base, stretched, useStretch, pick } = use;
     if (!pick.ok) return { plan: { ok: false, status: "infeasible", refinance: [], amounts: {}, objective: NaN, setupHousing: 0, setupAp: 0 } };
-    // The guarded end the caveat quotes when the shortening is offered without the guard.
-    const guardedAt = chosen && chosen.g.kind === 0 && first && first !== chosen && first.g.kind !== 0 && first.pick.ok ? first.pick.T : undefined;
-    const sv = yearsAtFrom(ctx, pick.T, pick.seed?.(), pick.budget, unlock, g);
+    const { sv, holds, T: end } = settle(use);
+    // An answer that cannot hold its tier's guard on its rows is stated as holding none.
+    const g: Guard = holds ? use.g : { kind: 0, caps: use.g.caps };
+    // The end of the ceiling taken is the settled one (a later end when the earliest could not hold the guard).
+    const ends = { atToday: base.ok ? (useStretch ? base.T : end) : undefined, atStretch: stretched?.ok ? (useStretch ? end : stretched.T) : undefined };
+    // The guarded end the caveat quotes when the shortening is offered without the
+    // guard: a guarded tier that reached only an immaterial shortening.
+    const guardedAt =
+      chosen && g.kind === 0 && first && first !== chosen && first.g.kind !== 0 && first.pick.ok && ctx.ref.months - first.pick.T < MATERIAL.months ? first.pick.T : undefined;
     return {
       ...sv,
       guard: g,
@@ -1505,7 +1608,7 @@ function solveYears(ctx: Ctx): Solved {
         guard: g.kind,
         // What the other ceiling reaches, for the reason: today's payment's end when
         // the stretch is taken; the stretch's end when it was not worth a year.
-        ...(stretched?.ok ? { ...(base.ok ? { atToday: base.T } : {}), atStretch: stretched.T, stretchBudget: ceiling, stretched: useStretch ? 1 : 0 } : {}),
+        ...(stretched?.ok ? { ...(ends.atToday !== undefined ? { atToday: ends.atToday } : {}), atStretch: ends.atStretch!, stretchBudget: ceiling, stretched: useStretch ? 1 : 0 } : {}),
         ...(guardedAt !== undefined ? { guardedAt } : {}),
       },
     };
@@ -2359,6 +2462,24 @@ function proposalOf(ctx: Ctx, goal: GoalId, solved: Solved): Proposal {
       const b2 = bookOf(r2.rows, ctx.input, ctx.f);
       if (b2.metrics.monthly <= ctx.budget + 0.5) {
         used = sv2.plan;
+        ({ rows, tranches } = r2);
+        book = b2;
+      }
+    }
+  }
+  // The five-year guard the solve held, on these rows (holdGuard): a mix that
+  // breaks it between the solver's sample months or by the rounding is solved
+  // again under a lower cap, within the goal's own ceiling; one that still
+  // cannot hold it is stated as holding none (guardOf).
+  const g5 = solved.guard;
+  if (g5?.kind && usedSpec && !guardHolds(book, g5)) {
+    const fixed = holdGuard(ctx, { ...solved, plan: used, spec: usedSpec }, g5);
+    if (fixed && fixed.plan !== used) {
+      const r2 = rowsOf(ctx, fixed.plan);
+      const b2 = bookOf(r2.rows, ctx.input, ctx.f);
+      if (goal === "payment" || b2.metrics.monthly <= ceilingOf(ctx, goal, solved) + 0.5) {
+        used = fixed.plan;
+        usedSpec = fixed.spec;
         ({ rows, tranches } = r2);
         book = b2;
       }
@@ -3704,19 +3825,18 @@ function reasonsOf(ctx: Ctx, goal: GoalId, book: Book, tranches: NewTranche[], r
 
 /**
  * The guard a proposal's own rows hold on every month 1–60 in every economy:
- * the absolute guard at the goal's cap, else the relative guard the solve held,
- * else none (Proposal.guard). Only what the rows hold is stated as a promise.
+ * the absolute guard at the goal's cap, else the relative guard (the one the
+ * solve held, or the goal's own at its cap), else none (Proposal.guard). Only
+ * what the rows hold is stated: an absolute or relative guard always holds,
+ * and a mix that breaks the guard its solve held reads "none", with that
+ * tier's caveat (audit 3 R4: L44 קיצור שנים read "absolute, does not hold").
  */
 function guardOf(ctx: Ctx, goal: GoalId, solved: Solved, book: Book): Proposal["guard"] {
   if (goal !== "payment" && goal !== "balanced" && goal !== "years") return undefined;
   const c = goal === "years" ? ceilingOf(ctx, goal, solved) : ctx.ref.monthly;
   const abs: Guard = { kind: 1, caps: ECON.map(() => c) };
   if (guardHolds(book, abs)) return { kind: "absolute", caps: abs.caps.map(Math.ceil), holds: true };
-  const imposed = solved.guard;
-  if (imposed?.kind === 2) return { kind: "relative", caps: imposed.caps.map(Math.ceil), holds: guardHolds(book, imposed) };
-  if (imposed?.kind === 1) return { kind: "absolute", caps: abs.caps.map(Math.ceil), holds: false };
-  // A mix adopted from another goal (the display order) is measured on its own rows.
-  const rel = guardTiers(ctx, c).find((x) => x.kind === 2);
+  const rel = solved.guard?.kind === 2 ? solved.guard : guardTiers(ctx, c).find((x) => x.kind === 2);
   if (rel && guardHolds(book, rel)) return { kind: "relative", caps: rel.caps.map(Math.ceil), holds: true };
   return { kind: "none", caps: abs.caps.map(Math.ceil), holds: false };
 }
@@ -4368,8 +4488,15 @@ function runGoals(ctx: Ctx, consolidateOk: boolean, wanted: Set<GoalId>): Run {
           // fuzz Z276 took stable's mix at ₪132k more on the typed read-out.)
           // The re-solve first, then the other goal's mix itself, each held to years' own rules: no more paid in total,
           // its guard, and the debts CHEAP_KEEP keeps (fuzz Z344: the re-solve failed the rows' cost test while the mix passed).
-          const okForYears = (c: Solved) => costsNoMore(ctx, c.plan) && !(yrs0.guard?.kind && !earlyOk(ctx, c.plan, c.cols ?? ctx.cols, yrs0.guard.caps)) && !movesHeld(c.plan, yrs0.spec);
-          const use = [at.plan.ok ? at : null, { ...sv, meta: { finish: f } } as Solved].find((c): c is Solved => !!c && okForYears(c));
+          // (The guard at the solver's samples, and on the mix's own rows on every month 1–60: audit 3 R4.)
+          const okRest = (c: Solved) => costsNoMore(ctx, c.plan) && !movesHeld(c.plan, yrs0.spec);
+          const okForYears = (c: Solved) => okRest(c) && !(yrs0.guard?.kind && !(earlyOk(ctx, c.plan, c.cols ?? ctx.cols, yrs0.guard.caps) && rowsHold(ctx, c.plan, yrs0.guard)));
+          let use = [at.plan.ok ? at : null, { ...sv, meta: { finish: f } } as Solved].find((c): c is Solved => !!c && okForYears(c));
+          // A re-solve that breaks the guard only on its rows is solved again under it there (holdGuard).
+          if (!use && at.plan.ok && yrs0.guard?.kind && okRest(at)) {
+            const fixed = holdGuard(ctx, at, yrs0.guard);
+            if (fixed && okRest(fixed)) use = fixed;
+          }
           if (!use) continue;
           const stretchedNow = !!yrs0.meta.stretched;
           solvedBy.set("years", tag({ ...use, guard: yrs0.guard, meta: { ...yrs0.meta, finish: f, ...(stretchedNow ? { atStretch: f } : typeof yrs0.meta.atStretch === "number" ? { atToday: f } : {}) } }));

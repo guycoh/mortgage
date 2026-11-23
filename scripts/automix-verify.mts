@@ -146,6 +146,9 @@ export function verifier(market: MarketSnapshot, forecast: Forecast | null) {
     if (p.goal === "payment" || p.goal === "balanced" || p.goal === "years") {
       const g = p.guard;
       check(!!g, `${tag}: no guard on the proposal`);
+      // An absolute or relative guard is stated only when the rows hold it on every month 1–60;
+      // a mix that breaks the guard its solve held reads "none" (audit 3 R4: L44 years, ₪19,220 against ₪19,192).
+      if (g && g.kind !== "none") check(g.holds, `${tag}: ${g.kind} guard stated and not held (${g.caps.join("/")})`);
       if (g) {
         if (g.kind === "relative") {
           wave.guardRelative++;

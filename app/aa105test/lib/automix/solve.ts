@@ -103,6 +103,8 @@ export type Column = {
   early: number[][];
   /** Per ₪1: the forecast position at each AHEAD month (paid through it plus the balance left). */
   ahead?: number[];
+  /** Per ₪1, every payment of the first 60 months, per economy — [economy][month − 1] (Spec.guardAt reads it). */
+  pay60?: number[][];
   /** The forecast's all-in annual rate of the column, % (the rate at which its forecast payments are worth ₪1). */
   fRate?: number;
 };
@@ -141,6 +143,13 @@ export type Spec = {
    * guard, today's own five-year peak in that economy (index.ts guardCaps).
    */
   peakCap: number | number[] | null;
+  /**
+   * The same guard at months outside the samples, one row each: the mix's
+   * payment in one economy and month at most `cap`, from each debt's own payment
+   * there (kept) and each column's per ₪1. Added where a proposal's own rows
+   * broke the guard between two samples (index.ts holdGuard).
+   */
+  guardAt?: { cap: number; debt: Record<string, number>; col: Record<string, number> }[] | null;
   /**
    * Weight on the rise: the worst economy's payment peak over the whole life
    * (bounded above by the sum of every row's own peak there) less the typed
@@ -399,6 +408,9 @@ function solveOnceInner(debts: SolverDebt[], colsIn: Column[], s: Spec, relaxed:
         pkRows.add(`pk${k}_${i}`);
         C.set(`pk${k}_${i}`, { max: capAt(k) - keptEarly[k][i] });
       });
+  // The guard at the months the samples missed (Spec.guardAt), every debt kept as the constant.
+  const guardAt = s.guardAt ?? [];
+  guardAt.forEach((g, j) => C.set(`ga${j}`, { max: g.cap - sum(debts.map((d) => g.debt[d.id] ?? 0)) }));
   // The break-even position test (index.ts gatesPass), at each AHEAD month.
   const aheadCap = s.ahead?.cap ?? null;
   if (aheadCap) aheadCap.forEach((cap, j) => C.set(`ah${j}`, { max: (cap - sum(debts.map((d) => d.ahead?.[j] ?? 0))) / U }));
@@ -474,6 +486,7 @@ function solveOnceInner(debts: SolverDebt[], colsIn: Column[], s: Spec, relaxed:
     if (s.ptiCap !== null) add(v, "pti", c.monthly * U);
     if (s.peakCap !== null) for (const k of stressK) EARLY.forEach((_, i) => pkRows.has(`pk${k}_${i}`) && add(v, `pk${k}_${i}`, c.early[k][i] * U));
     if (aheadCap) aheadCap.forEach((_, j) => add(v, `ah${j}`, c.ahead?.[j] ?? 0));
+    guardAt.forEach((g, j) => add(v, `ga${j}`, (g.col[c.key] ?? 0) * U));
     if (rise) {
       for (const k of stressK) add(v, `rp${k}`, -c.peak[k] * U);
       if (s.wRise) add(v, "obj", -s.wRise * c.monthly * U);
@@ -632,6 +645,7 @@ function solveOnceInner(debts: SolverDebt[], colsIn: Column[], s: Spec, relaxed:
     if (s.ptiCap !== null && d.group === "mortgage") put("pti", -d.monthly);
     if (s.peakCap !== null) for (const kk of stressK) EARLY.forEach((_, i) => pkRows.has(`pk${kk}_${i}`) && put(`pk${kk}_${i}`, -d.early[kk][i]));
     if (aheadCap) aheadCap.forEach((_, j) => put(`ah${j}`, -(d.ahead?.[j] ?? 0) / U));
+    guardAt.forEach((g, j) => put(`ga${j}`, -(g.debt[d.id] ?? 0)));
     if (rise) {
       for (const kk of stressK) put(`rp${kk}`, d.peak[kk]);
       if (s.wRise) {
