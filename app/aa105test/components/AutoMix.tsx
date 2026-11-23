@@ -14,7 +14,7 @@
 // The sheet computes nothing itself: every figure is the engine's
 // (lib/automix), which prices through the board's own priceLoan.
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, useReducedMotion } from "motion/react";
 import { CaretDown, Plus, Warning, X } from "@phosphor-icons/react";
@@ -28,7 +28,7 @@ import type { AbilityProfile } from "@/app/api/simulator/ability-profile/route";
 import { BANKS, TRACK_PATH, TRACK_SHORT, type BankId, type MarketSnapshot, type TrackKey } from "@/app/aa107test/lib/market";
 import fallback from "@/app/aa107test/lib/market-snapshot.json";
 import type { SolveReply, SolveRequest } from "./automix.worker";
-import { DEFAULT_PROFILE, type AutoMixInput, type AutoMixResult, type ClientProfile, type GoalId, type MixMetrics, type PricingTier, type Proposal } from "../lib/automix/types";
+import { DEFAULT_PROFILE, type AutoMixInput, type AutoMixResult, type ClientProfile, type DebtMove, type GoalId, type MixMetrics, type PricingTier, type Proposal } from "../lib/automix/types";
 import "../automix.css";
 
 type Props = {
@@ -128,6 +128,40 @@ function Delta({ v, kind }: { v: number; kind: "money" | "months" }) {
     </span>
   );
 }
+
+/**
+ * One line of "מה משתנה": a debt, or the small debts of one lender, track and
+ * decision that the engine folded together (Proposal.moveGroups). The sums and
+ * the sentence are the engine's; the members are the debts themselves.
+ */
+type Line = { key: string; label: string; members: DebtMove[]; balance: number; fee: number; why: string };
+function linesOf(p: Pick<Proposal, "moves" | "moveGroups"> | null, keep: boolean): Line[] {
+  if (!p) return [];
+  const mine = (a: DebtMove["action"]) => (a === "keep") === keep;
+  if (!p.moveGroups) return p.moves.filter((m) => mine(m.action)).map((m) => ({ key: m.id, label: m.label, members: [m], balance: m.balance, fee: m.fee, why: m.why }));
+  const byId = new Map(p.moves.map((m) => [m.id, m]));
+  return p.moveGroups
+    .filter((g) => mine(g.action))
+    .map((g) => ({ key: g.ids.join("+"), label: g.label, members: g.ids.map((id) => byId.get(id)).filter((m): m is DebtMove => !!m), balance: g.balance, fee: g.fee, why: g.why }))
+    .filter((l) => l.members.length > 0);
+}
+/** The rate of a line: one figure, or the span between its debts. */
+function Rates({ of, none = "—" }: { of: DebtMove[]; none?: string }) {
+  const rs = of.map((m) => m.rate).filter((r) => r > 0);
+  if (!rs.length) return <>{none}</>;
+  const lo = Math.min(...rs);
+  const hi = Math.max(...rs);
+  return <span dir="ltr">{lo === hi ? pct(lo) : `${lo.toFixed(2)}–${pct(hi)}`}</span>;
+}
+/** What is left on a line: one term, or the longest of its debts. */
+function left(of: DebtMove[]): string {
+  const ms = of.map((m) => m.months);
+  const hi = Math.max(...ms);
+  return Math.min(...ms) === hi ? span(hi) : `עד ${span(hi)}`;
+}
+
+/** Which mix opens when the engine recommends none: the order its own recommendation walks, the lowest payment last. */
+const OPEN_ORDER: GoalId[] = ["balanced", "savings", "stable", "years", "consolidate", "payment"];
 
 /** The mix's colour signature — share of balance per track. */
 function MixBar({ m }: { m: MixMetrics }) {
@@ -231,6 +265,8 @@ export default function AutoMix({ master, forecast, forecastOn, inflation, disco
   const [picked, setPicked] = useState<GoalId | null>(null);
   const [keptOpen, setKeptOpen] = useState(false);
   const [allOpen, setAllOpen] = useState(false);
+  /** The folded line whose debts are listed under it. */
+  const [openLine, setOpenLine] = useState<string | null>(null);
   const [findOpen, setFindOpen] = useState(false);
   const sheet = useRef<HTMLElement>(null);
 
@@ -371,8 +407,19 @@ export default function AutoMix({ master, forecast, forecastOn, inflation, disco
   // The open line: the advisor's pick while it still exists, else the recommendation.
   const current: Proposal | null = useMemo(() => {
     const byId = (id: GoalId | null) => usable.find((p) => p.goal === id) ?? null;
-    return byId(picked) ?? byId(result?.recommended ?? null) ?? usable[0] ?? null;
+    return byId(picked) ?? byId(result?.recommended ?? null) ?? OPEN_ORDER.map(byId).find(Boolean) ?? usable[0] ?? null;
   }, [usable, picked, result]);
+  /**
+   * Mixes are offered and the engine recommends none of them: each buys its goal
+   * at a price in the forecast, and the lowest payment is recommended only for a
+   * budget typed under today's. Said in one line, so a missing badge is not read
+   * as an oversight.
+   */
+  const unadvised = useMemo(() => {
+    if (!result?.ok || result.recommended || usable.length === 0) return null;
+    const dearer = (p: Proposal) => (p.stress[0] ? p.stress[0].totalPaid - p.stress[0].todayTotalPaid : 0) > 0;
+    return usable.every(dearer) ? "dearer" : "payment";
+  }, [result, usable]);
   /** Goals that reached the same mix as the line shown — named on that line. */
   const twins = (p: Proposal) => (result?.proposals ?? []).filter((q) => q.sameAs === p.goal).map((q) => q.label);
 
@@ -403,7 +450,7 @@ export default function AutoMix({ master, forecast, forecastOn, inflation, disco
   const keptAll = useMemo(() => {
     if (usable.length > 0) return [];
     const p = offered.find((q) => q.status === "no-gain" && q.moves.length > 0 && q.moves.every((m) => m.action === "keep"));
-    return p ? p.moves : [];
+    return linesOf(p ?? null, true);
   }, [usable, offered]);
 
   // DEBT DUE NOW. Today's החזר חודשי does not carry it, so a plain "versus
@@ -436,6 +483,9 @@ export default function AutoMix({ master, forecast, forecastOn, inflation, disco
   const leaving = moves.filter((m) => m.action !== "keep");
   const staying = moves.filter((m) => m.action === "keep");
   const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
+  /** The same debts as the sheet lists them: small ones of one lender and track on one line. */
+  const closing = useMemo(() => linesOf(current, false), [current]);
+  const kept = useMemo(() => linesOf(current, true), [current]);
   const charged = leaving.filter((m) => m.fee > 0);
   const allEstimated = charged.length > 0 && charged.every((m) => m.feeEstimated);
 
@@ -715,6 +765,7 @@ export default function AutoMix({ master, forecast, forecastOn, inflation, disco
                           setPicked(p.goal);
                           setKeptOpen(false);
                           setAllOpen(false);
+                          setOpenLine(null);
                         }}
                       >
                         <span className="am-radio" aria-hidden />
@@ -750,6 +801,13 @@ export default function AutoMix({ master, forecast, forecastOn, inflation, disco
                     );
                   })}
                 </div>
+                {unadvised && (
+                  <p className="am-unadvised">
+                    {unadvised === "dearer"
+                      ? `אין כאן תמהיל מומלץ: ${usable.length === 1 ? "התמהיל שמוצע עולה" : "כל תמהיל שמוצע עולה"} יותר ${reference ? "מקו ההשוואה" : "מהיום"} בסך התשלומים, לפי תחזית בנק ישראל.`
+                      : "אין כאן תמהיל מומלץ: ההחזר הנמוך מומלץ רק כשמסגרת ההחזר שהוקלדה נמוכה מההחזר של היום."}
+                  </p>
+                )}
               </section>
 
               {result.findings.length > 0 && (
@@ -897,28 +955,58 @@ export default function AutoMix({ master, forecast, forecastOn, inflation, disco
                           </tr>
                         </thead>
                         <tbody>
-                          {(allOpen ? leaving : leaving.slice(0, CLOSED_SHOWN)).map((m) => (
-                            <tr key={m.id} title={m.why}>
-                              <td>
-                                <span className="am-fam" data-f={m.group} />
-                                {m.label}
-                                {m.due && <span className="am-tag" data-tone="neg">לפירעון מיידי</span>}
-                              </td>
-                              <td>
-                                <Nis v={m.balance} />
-                              </td>
-                              <td className="am-n">{m.rate > 0 ? pct(m.rate) : "—"}</td>
-                              <td className="am-n">{span(m.months)}</td>
-                              <td>{m.fee > 0 ? <Nis v={m.fee} /> : "—"}{m.fee > 0 && m.feeEstimated && !allEstimated ? <sup>הערכה</sup> : null}</td>
-                            </tr>
-                          ))}
+                          {(allOpen ? closing : closing.slice(0, CLOSED_SHOWN)).map((l) => {
+                            const m = l.members[0];
+                            const many = l.members.length > 1;
+                            const open = many && openLine === l.key;
+                            const estimated = l.members.some((x) => x.fee > 0 && x.feeEstimated);
+                            return (
+                              <Fragment key={l.key}>
+                                <tr title={l.why}>
+                                  <td>
+                                    <span className="am-fam" data-f={m.group} />
+                                    {many ? (
+                                      <button type="button" className="am-fold" aria-expanded={open} onClick={() => setOpenLine(open ? null : l.key)}>
+                                        {l.label}
+                                        <span className="am-fold-n">{l.members.length} מסלולים</span>
+                                        <CaretDown size={11} weight="bold" />
+                                      </button>
+                                    ) : (
+                                      l.label
+                                    )}
+                                    {l.members.some((x) => x.due) && <span className="am-tag" data-tone="neg">לפירעון מיידי</span>}
+                                  </td>
+                                  <td>
+                                    <Nis v={l.balance} />
+                                  </td>
+                                  <td className="am-n">
+                                    <Rates of={l.members} />
+                                  </td>
+                                  <td className="am-n">{left(l.members)}</td>
+                                  <td>{l.fee > 0 ? <Nis v={l.fee} /> : "—"}{l.fee > 0 && estimated && !allEstimated ? <sup>הערכה</sup> : null}</td>
+                                </tr>
+                                {open &&
+                                  l.members.map((x) => (
+                                    <tr key={x.id} className="am-sub" title={x.why}>
+                                      <td>{x.label}</td>
+                                      <td>
+                                        <Nis v={x.balance} />
+                                      </td>
+                                      <td className="am-n">{x.rate > 0 ? pct(x.rate) : "—"}</td>
+                                      <td className="am-n">{span(x.months)}</td>
+                                      <td>{x.fee > 0 ? <Nis v={x.fee} /> : "—"}</td>
+                                    </tr>
+                                  ))}
+                              </Fragment>
+                            );
+                          })}
                         </tbody>
-                        {leaving.length > CLOSED_SHOWN && (
+                        {closing.length > CLOSED_SHOWN && (
                           <tfoot>
                             <tr>
                               <td>
                                 <button type="button" className="am-more" onClick={() => setAllOpen((v) => !v)}>
-                                  {allOpen ? "הצגת פחות" : `עוד ${leaving.length - CLOSED_SHOWN}`}
+                                  {allOpen ? "הצגת פחות" : `עוד ${closing.length - CLOSED_SHOWN}`}
                                 </button>
                               </td>
                               <td>
@@ -943,24 +1031,30 @@ export default function AutoMix({ master, forecast, forecastOn, inflation, disco
                         </button>
                         {keptOpen && (
                           <ul>
-                            {staying.map((m) => (
-                              <li key={m.id}>
-                                <span>
-                                  <span className="am-fam" data-f={m.group} />
-                                  {m.label}
-                                </span>
-                                <span className="am-n">{m.rate > 0 ? pct(m.rate) : ""}</span>
-                                <Nis v={m.balance} />
-                                <p>
-                                  {m.cure ? (
-                                    <>
-                                      פיגור של <Nis v={m.cure} /> מוסדר מהכסף החדש.{" "}
-                                    </>
-                                  ) : null}
-                                  <Rich text={m.why} />
-                                </p>
-                              </li>
-                            ))}
+                            {kept.map((l) => {
+                              const cure = sum(l.members.map((x) => x.cure ?? 0));
+                              return (
+                                <li key={l.key}>
+                                  <span>
+                                    <span className="am-fam" data-f={l.members[0].group} />
+                                    {l.label}
+                                    {l.members.length > 1 && <span className="am-fold-n">{l.members.length} מסלולים</span>}
+                                  </span>
+                                  <span className="am-n">
+                                    <Rates of={l.members} none="" />
+                                  </span>
+                                  <Nis v={l.balance} />
+                                  <p>
+                                    {cure > 0 ? (
+                                      <>
+                                        פיגור של <Nis v={cure} /> מוסדר מהכסף החדש.{" "}
+                                      </>
+                                    ) : null}
+                                    <Rich text={l.why} />
+                                  </p>
+                                </li>
+                              );
+                            })}
                           </ul>
                         )}
                       </div>
@@ -1042,16 +1136,19 @@ export default function AutoMix({ master, forecast, forecastOn, inflation, disco
                         <h3>למה כל חוב נשאר</h3>
                         <div className="am-kept am-kept-open">
                           <ul>
-                            {keptAll.map((m) => (
-                              <li key={m.id}>
+                            {keptAll.map((l) => (
+                              <li key={l.key}>
                                 <span>
-                                  <span className="am-fam" data-f={m.group} />
-                                  {m.label}
+                                  <span className="am-fam" data-f={l.members[0].group} />
+                                  {l.label}
+                                  {l.members.length > 1 && <span className="am-fold-n">{l.members.length} מסלולים</span>}
                                 </span>
-                                <span className="am-n">{m.rate > 0 ? pct(m.rate) : ""}</span>
-                                <Nis v={m.balance} />
+                                <span className="am-n">
+                                  <Rates of={l.members} none="" />
+                                </span>
+                                <Nis v={l.balance} />
                                 <p>
-                                  <Rich text={m.why} />
+                                  <Rich text={l.why} />
                                 </p>
                               </li>
                             ))}

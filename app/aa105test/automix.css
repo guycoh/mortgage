@@ -296,6 +296,8 @@ li[data-sev="medium"] > .am-sev { background: var(--warn-tint); color: var(--war
 .am-delta[data-tone="bad"] { color: var(--neg); }
 .am-delta[data-tone="flat"] { color: var(--lgr-3); font-weight: 500; }
 .am-none { grid-column: 3 / -1; font-size: 13px; line-height: 1.4; color: var(--lgr-2); text-wrap: pretty; }
+/* Mixes are offered and none is recommended: one quiet line under the list. */
+.am-unadvised { margin: 8px 0 0; padding: 0 12px; padding-inline-start: 48px; font-size: 13px; line-height: 1.45; color: var(--lgr-2); text-wrap: pretty; }
 .am-goal:disabled { min-height: 46px; }
 
 .am-bar { display: flex; gap: 2px; height: 10px; min-width: 0; border-radius: 3px; overflow: hidden; direction: rtl; }
@@ -358,6 +360,27 @@ li[data-sev="medium"] > .am-sev { background: var(--warn-tint); color: var(--war
 .am-detail-h > .am-tag { vertical-align: 3px; font-size: 11.5px; letter-spacing: 0; }
 .am-fam { display: inline-block; width: 8px; height: 8px; margin-inline-end: 8px; border-radius: 50%; background: var(--mortgage); }
 .am-fam[data-f="loan"] { background: var(--loan); }
+
+/* Small debts of one lender and track, folded by the engine into one line. In
+   the closing table the line is a button that lists them under it. */
+.am-fold {
+  display: inline-flex;
+  align-items: baseline;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.am-fold:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring-strong); }
+.am-fold > svg { align-self: center; margin-inline-start: 6px; color: var(--lgr-3); transition: rotate 180ms cubic-bezier(0.16, 1, 0.3, 1); rotate: 90deg; }
+.am-fold[aria-expanded="true"] > svg { rotate: 0deg; }
+.am-fold-n { margin-inline-start: 8px; font-size: 12px; font-weight: 500; color: var(--lgr-2); white-space: nowrap; }
+.am-table tr.am-sub td { padding-top: 4px; padding-bottom: 4px; font-size: 12.5px; color: var(--lgr-2); }
+.am-table tr.am-sub td:first-child { padding-inline-start: 16px; font-weight: 500; }
 
 .am-kept { margin-top: 8px; border: 1px solid var(--line); border-radius: var(--r-sm); }
 .am-kept-h {
@@ -571,5 +594,5 @@ li[data-sev="medium"] > .am-sev { background: var(--warn-tint); color: var(--war
 
 @media (prefers-reduced-motion: reduce) {
   .am-skel > span { animation: none; }
-  .am-kept-h > svg, .am-rates > summary > svg, .am-switch > span > i { transition: none; }
+  .am-kept-h > svg, .am-fold > svg, .am-rates > summary > svg, .am-switch > span > i { transition: none; }
 }
