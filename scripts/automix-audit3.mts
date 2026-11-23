@@ -800,7 +800,10 @@ function rulesFor(w: World, goal: GoalId, p: Proposal | undefined, opts: { lift?
   if (goal === "consolidate" && (w.variant === "bankMove" || w.variant === "firstLien") && w.debts.some((d) => d.group === "mortgage")) return null;
   // מאוזן follows savings on the cheap debts: free only where savings itself moved one (index.ts solveHolding).
   const sav = w.res.proposals.find((x) => x.goal === "savings");
-  const savingsLifted = !!sav && sav.moves.some((m) => m.action !== "keep" && w.hold.includes(m.id));
+  // (Per structure: the engine's מאוזן is free only where that structure's own savings answer lifted; the
+  // savings proposal shown is one structure's, so another structure is taken as held.)
+  const savStructure = sav ? (!sav.structure || sav.structure === "bank" ? (sav.refinance === "move" ? "bankMove" : "bank") : sav.structure) : null;
+  const savingsLifted = !!sav && savStructure === w.variant && sav.moves.some((m) => m.action !== "keep" && w.hold.includes(m.id));
   const hold = goal === "payment" || goal === "consolidate" ? [] : goal === "balanced" ? (savingsLifted || opts.lift ? [] : w.hold) : opts.lift ? [] : w.hold;
   const kind: GuardKind = opts.guardKind ?? (p?.guard?.kind as GuardKind | undefined) ?? "absolute";
   const ceiling = goal === "payment" ? null : goal === "years" ? opts.ceiling ?? p?.budget ?? w.budget : goal === "balanced" || goal === "consolidate" ? w.reliefBudget : w.budget;
@@ -942,9 +945,11 @@ function failures(c: Cand, r: Rules, statusOk = true): string[] {
   if (w.ltv && c.tr.length) {
     const V = w.ltv.value;
     if (w.bankLaw) {
-      if (m.housingBal > LTV_MAX[w.input.profile.propertyType] * V + 1) out.push("LTV");
-      if (NA > 0 && m.securedBal > Math.min(AP_LTV_RELIEF, AP_LTV + AP_RELIEF_CAP / V) * V + 1) out.push("AP LTV");
-    } else if (m.securedBal > (w.variant === "secondLien" ? NONBANK_LTV.combined : NONBANK_LTV.first) * V + 1) out.push("nonbank LTV");
+      // (₪0.5: the solver's own LTV rows are exact; the checks' 0.5% and the verifier's ₪1 are looser, and a
+      // candidate that needs them is not one the engine could reach: r01+r02 typical, ₪1 over.)
+      if (m.housingBal > Math.max(LTV_MAX[w.input.profile.propertyType] * V, w.today.housingBal) + 0.5) out.push("LTV");
+      if (NA > 0 && m.securedBal > Math.min(AP_LTV_RELIEF, AP_LTV + AP_RELIEF_CAP / V) * V + 0.5) out.push("AP LTV");
+    } else if (m.securedBal > (w.variant === "secondLien" ? NONBANK_LTV.combined : NONBANK_LTV.first) * V + 0.5) out.push("nonbank LTV");
   }
   if (r.ceiling !== null && m.monthly > r.ceiling + 0.5) out.push(`budget ${m.monthly}>${Math.round(r.ceiling)}`);
   if (r.guard && guardPeaks(m, r.guardMonths).some((p, k) => p > r.guard![k] + 1)) out.push("guard");
