@@ -2499,9 +2499,13 @@ function proposalOf(ctx: Ctx, goal: GoalId, solved: Solved): Proposal {
   // The five-year guard the solve held, on these rows (holdGuard): a mix that
   // breaks it between the solver's sample months or by the rounding is solved
   // again under a lower cap, within the goal's own ceiling; one that still
-  // cannot hold it is stated as holding none (guardOf).
+  // cannot hold it is stated as holding none (guardOf). Not the payment goal's,
+  // nor a mix adopted from another goal: the display order made them the lowest
+  // payment of all, and a re-solve here would undo it (corpus L43 budget-low:
+  // payment adopted מאוזן's ₪6,879 and its repair under payment's own problem
+  // came back at ₪6,994). Their guard is what their rows hold.
   const g5 = solved.guard;
-  if (g5?.kind && usedSpec && !guardHolds(book, g5)) {
+  if (g5?.kind && usedSpec && goal !== "payment" && solved.meta?.adopted === undefined && !guardHolds(book, g5)) {
     const fixed = holdGuard(ctx, { ...solved, plan: used, spec: usedSpec }, g5);
     if (fixed && fixed.plan !== used) {
       const r2 = rowsOf(ctx, fixed.plan);
