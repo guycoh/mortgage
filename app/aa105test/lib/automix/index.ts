@@ -615,6 +615,7 @@ function columnsFor(pr: Pricing, input: AutoMixInput, f: Forecast, maxYears: num
           early: p.early.map((e) => e.map((x) => x / PROBE)),
           ahead: p.ahead.map((x) => x / PROBE),
           pay60: p.pay.map((e) => e.slice(0, 60).map((x) => x / PROBE)),
+          payLife: p.pay.map((e) => e.map((x) => x / PROBE)),
           fRate: irrOf(p.pay[0], PROBE) ?? undefined,
           price,
         });
@@ -2272,8 +2273,67 @@ function riseOf(ctx: Ctx, plan: Plan, cols: Column[]): number {
  * prime; L16 +₪32,798 at 360 months); priced at the margin against the cheaper
  * candidate it went back to 30% prime and 1.12 (wave 3, not kept).
  */
+/**
+ * Stability's spec; `slack`, room in its budget row (Spec.budgetSlack). The board
+ * reads the budget as met at month one ≤ budget + ₪0.5 (the gates, proposalOf's
+ * repair); the solve's row keeps ROUNDING (₪0.6) a tranche of room for the
+ * read-out's rounding, so a mix the board reads AT the budget is out of its reach
+ * (regress: L05, all קל"צ over 16 years read ₪5,261 against ₪5,261, keeping the
+ * promise ₪11,391 cheaper). STABLE_SLACK lets a one-tranche mix sit up to ₪0.5
+ * over in the row; a candidate solved with it is kept only as its rows read
+ * within the budget + ₪0.5 (solveStableAt, budgetHeld).
+ */
+const STABLE_SLACK = 0.5 + ROUNDING;
+function stableSpec(ctx: Ctx, over: Partial<Spec>, slack = 0): Spec {
+  const s = costSpec(ctx, "stable", over);
+  return s.budget != null && slack > 0 ? { ...s, budgetSlack: slack } : s;
+}
+
+/**
+ * יציבות מרבית. Solved as the budget row has always read it, and again at the
+ * budget's edge (STABLE_SLACK) where the answer sits at the budget; the edge
+ * answer stands only where it is MATERIALLY better on stability's own measure
+ * (stableEdgeWins). Every other goal's search keeps the strict row, so a
+ * stability mix within ₪1 of the budget that is not materially better would show
+ * a lower cost than the saving goal can reach, and the sheet's own order would
+ * then move the saving goal off its own optimum (L13: ₪1,588 worse on its
+ * objective, for a stability mix ₪1,764 cheaper).
+ */
 function solveStable(ctx: Ctx, extra: Partial<Spec> = {}, others: Plan[] = []): Solved {
-  const s0 = costSpec(ctx, "stable", { shareCap: false, ...extra });
+  const strict = solveStableAt(ctx, extra, others, 0);
+  const cap = costSpec(ctx, "stable", extra).budget;
+  if (!strict.plan.ok || cap == null) return strict;
+  const at = bookOf(rowsOf(ctx, strict.plan).rows, ctx.input, ctx.f).metrics.monthly;
+  if (at < cap - 3) return strict;
+  const edge = solveStableAt(ctx, extra, others, STABLE_SLACK);
+  return edge.plan.ok && stableEdgeWins(ctx, edge, strict) ? edge : strict;
+}
+
+/** The edge answer against the strict one, on stability's own measure: the promise kept, then the risk-weighted cost; where neither keeps it, the worst excess and the cost (each by its materiality). */
+function stableEdgeWins(ctx: Ctx, edge: Solved, strict: Solved): boolean {
+  const lam = lambdaOf(ctx, "stable");
+  const fig = (sv: Solved) => {
+    const book = bookOf(rowsOf(ctx, sv.plan).rows, ctx.input, ctx.f);
+    const m1 = book.metrics.monthly;
+    const excess = Math.max(...lifePeak(book, m1)) - m1 - MATERIAL.monthly(m1);
+    return { m1, excess, J: (1 - lam) * book.paid[0] + lam * Math.max(...book.paid) };
+  };
+  const e = fig(edge);
+  const s = fig(strict);
+  const matC = MATERIAL.cost(todayCostOf(ctx));
+  const matM = MATERIAL.monthly(ctx.ref.monthly);
+  const neutral = MATERIAL.neutral(ctx.ref.paid);
+  const keepsE = e.excess <= 0.5;
+  const keepsS = s.excess <= 0.5;
+  if (keepsE !== keepsS) return keepsE;
+  if (keepsE) return e.J < s.J - matC;
+  // (Where neither keeps it: the selection's own band on the excess, STABLE_BAND, as solveStableAt ranks them.)
+  void matM;
+  return (e.excess < s.excess - STABLE_BAND(ctx.ref.monthly) && e.J <= s.J + neutral) || (e.J < s.J - matC && e.excess <= s.excess + 0.5);
+}
+
+function solveStableAt(ctx: Ctx, extra: Partial<Spec>, others: Plan[], slack: number): Solved {
+  const s0 = stableSpec(ctx, { shareCap: false, ...extra }, slack);
   // The promise in the solve: the bound on the peak (every row's own peak summed,
   // at least the true peak) at most month one plus MATERIAL.monthly of it, so a
   // mix the solve returns keeps the promise on its rows.
@@ -2281,9 +2341,23 @@ function solveStable(ctx: Ctx, extra: Partial<Spec> = {}, others: Plan[] = []): 
   const floor = MATERIAL.monthly(0);
   const promise: Partial<Spec> = share * ctx.ref.monthly >= floor ? { riseShare: share } : { riseCap: floor };
   const sP: Spec = { ...s0, ...promise };
-  // excess: over the promise in every economy, summed (a prime track that rises
-  // only in the rate shock counts even where the CPI shock is the worst).
+  // excess: over the promise in the worst economy (what the proposal states, its
+  // real worst peak against its own month one); total: summed over the economies.
   type Cand = { sv: Solved; cost: number; m1: number; peak: number; excess: number; total: number };
+  // Solved with the budget slack (stableSpec), a mix is kept as it is when its rows read within the budget + ₪0.5;
+  // else its amounts are re-solved under the strict row, its debts and tracks held (budgetHeld).
+  const cap = s0.budget;
+  const budgetHeld = (sv: Solved): Solved | null => {
+    if (!sv.plan.ok || cap == null || !slack) return sv;
+    if (bookOf(rowsOf(ctx, sv.plan).rows, ctx.input, ctx.f).metrics.monthly <= cap + 0.5) return sv;
+    const strict: Spec = { ...(sv.spec ?? s0), budgetSlack: 0 };
+    const r = restart(ctx, sv.plan, strict, sv.cols ?? ctx.cols);
+    return r ? { ...sv, plan: r, spec: strict } : null;
+  };
+  const add = (sv: Solved) => {
+    const f = budgetHeld(sv);
+    if (f?.plan.ok) cands.push(of(f));
+  };
   const of = (sv: Solved): Cand => {
     const book = bookOf(rowsOf(ctx, sv.plan).rows, ctx.input, ctx.f);
     const m1 = book.metrics.monthly;
@@ -2296,63 +2370,245 @@ function solveStable(ctx: Ctx, extra: Partial<Spec> = {}, others: Plan[] = []): 
   const fallsEnough = (c: Cand) => todayPeak - c.peak >= MATERIAL.monthly(ctx.ref.monthly);
   const cands: Cand[] = [];
   const sT: Spec = { ...sP, peakTop: todayPeak - MATERIAL.monthly(ctx.ref.monthly) };
+  // (At the budget's edge the solves leave the pool alone: it seeds every goal's polish, whose rows are strict.)
+  const solve = (s: Spec) => (slack ? solveTermsRaw(ctx.debts, ctx.cols, s, POOL) : solveTerms(ctx.debts, ctx.cols, s));
   for (const s of [sT, sP]) {
-    const p = solveTerms(ctx.debts, ctx.cols, s);
-    if (p.ok) cands.push(of({ plan: p, spec: s, cols: ctx.cols }));
+    const p = solve(s);
+    if (p.ok) add({ plan: p, spec: s, cols: ctx.cols });
   }
   // The other goals' answers, re-solved under stability's rules: on the TRUE
   // peak (the peak of the summed payments) one of them may keep the promise
   // cheaper than the bound lets the solve see.
   for (const p of others) {
     const r = restart(ctx, p, s0, ctx.cols);
-    if (r) cands.push(of({ plan: r, spec: { ...s0, riseCap: riseOf(ctx, r, ctx.cols) }, cols: ctx.cols }));
+    if (r) add({ plan: r, spec: { ...s0, riseCap: riseOf(ctx, r, ctx.cols) }, cols: ctx.cols });
   }
-  const kept = cands.filter((c) => c.excess <= 0.5 && Number.isFinite(c.cost));
   const cheapest = (xs: Cand[]) => xs.reduce((b, x) => (x.cost < b.cost - 1e-9 ? x : b), xs[0]);
-  if (kept.length) {
-    // The cheapest that keeps the promise AND lowers today's worst peak materially (L08: a 9-year קל"צ, ₪1,359 → ₪743), else the cheapest that keeps it.
+  // The cheapest that keeps the promise AND lowers today's worst peak materially (L08: a 9-year קל"צ, ₪1,359 → ₪743), else the cheapest that keeps it.
+  const keeping = (): Solved | null => {
+    const kept = cands.filter((c) => c.excess <= 0.5 && Number.isFinite(c.cost));
+    if (!kept.length) return null;
     const falls = kept.filter(fallsEnough);
     const best = cheapest(falls.length ? falls : kept);
-    // Held to the promise from here on (the polish keeps it on the bound).
-    const held = best.sv.spec === sP || best.sv.spec === sT ? best.sv.spec : { ...s0, riseCap: Math.max(best.sv.spec?.riseCap ?? 0, riseOf(ctx, best.sv.plan, ctx.cols)) };
+    // Held to the promise from here on (the polish keeps it on the bound, or on the rows it was solved on).
+    const held = best.sv.spec === sP || best.sv.spec === sT || best.sv.spec?.lifeAt ? best.sv.spec : { ...s0, riseCap: Math.max(best.sv.spec?.riseCap ?? 0, riseOf(ctx, best.sv.plan, ctx.cols)) };
     return { ...best.sv, spec: held, meta: { ...(best.sv.meta ?? {}), stablePromise: 1 } };
-  }
+  };
+  const first = keeping();
+  if (first) return first;
   // No mix keeps it (debts it must keep, the budget): the least excess over the
-  // promise, then the cheapest within STABLE_BAND of that excess.
-  const least = solveLeastRise(ctx, extra);
-  if (least.plan.ok) cands.push(of(least));
+  // promise in the worst economy, then the cheapest within STABLE_BAND of it,
+  // the sum over the economies breaking a tie. The proposal states the worst
+  // economy's peak; ranked on the excess summed over the economies, a mix that
+  // breaks the promise by more where it matters could win on the others (the
+  // offer stated a peak the choice did not minimise).
+  const least = solveLeastRise(ctx, extra, slack);
+  if (least.plan.ok) add(least);
+  // And on the window rows: the least rise there, from the bound's choice, then
+  // the cheapest within STABLE_BAND of it (r04: a mix that keeps the promise,
+  // where the bound read every mix as breaking it; L10, L44: a lower worst peak).
+  const winLeast = slack ? null : solveWindowLeast(ctx, extra, slack, least.plan.ok ? least.plan : undefined);
+  if (winLeast?.plan.ok) add(winLeast);
+  // Then the cheapest at no higher worst excess than the least found so far, on
+  // the TRUE peak (solveCostAtExcess): the least-rise searches are led by bounds
+  // and can miss a mix lower on both (r01+r02 typical: ₪65,492 cheaper at ₪63
+  // less excess, all קל"צ at 18 and 14 years).
+  if (!slack && cands.length) {
+    const ok = cands.filter((c) => Number.isFinite(c.excess) && Number.isFinite(c.cost));
+    const lead = ok.reduce((b, x) => (x.excess < b.excess || (x.excess === b.excess && x.cost < b.cost) ? x : b), ok[0]);
+    if (lead) {
+      const p = solveCostAtExcess(ctx, { shareCap: false, ...extra }, lead.sv.plan, Math.max(0, lead.excess));
+      if (p) add(p);
+    }
+  }
   if (!cands.length) return least;
+  // A mix the fallback's own searches find can keep the promise after all (r04, on the window rows: the
+  // saving goal's mix it offered broke the promise by ₪299; קל"צ over 12 years and all-purpose קל"צ over 10 keep it).
+  const later = keeping();
+  if (later) return later;
   // (A candidate whose figures are not finite, a mix the book cannot price, takes no part.)
   const pool = cands.filter((c) => Number.isFinite(c.total) && Number.isFinite(c.cost));
   if (!pool.length) return least.plan.ok ? least : cands[0].sv;
-  const minEx = Math.min(...pool.map((c) => c.total));
-  const best = cheapest(pool.filter((c) => c.total <= minEx + STABLE_BAND(ctx.ref.monthly)));
+  const minEx = Math.min(...pool.map((c) => c.excess));
+  const band = pool.filter((c) => c.excess <= minEx + STABLE_BAND(ctx.ref.monthly));
+  const least0 = Math.min(...band.map((c) => c.cost));
+  const best = band.filter((c) => c.cost <= least0 + 1e-9).reduce((b, x) => (x.total < b.total ? x : b));
   // The price of the full promise: the lowest month one of a mix that keeps it with no budget (L11: about ₪5,370 against ₪4,915).
   const full = solveTerms(ctx.debts, ctx.cols, { ...sP, budget: null, wMonthly: 1, wCost: 1e-3, lambda: 0 });
   const fullMonthly = full.ok ? bookOf(rowsOf(ctx, full).rows, ctx.input, ctx.f).metrics.monthly : null;
   return { ...best.sv, meta: { ...(least.meta ?? {}), ...(best.sv.meta ?? {}), stablePromise: 0, ...(fullMonthly !== null ? { promiseMonthly: Math.round(fullMonthly) } : {}) } };
 }
 
+/**
+ * Stability's peak on WINDOWS (solve.ts Spec.lifeAt): the life cut into
+ * STABLE_WINDOW months, and in each window of each economy every row at its own
+ * highest payment there. Their sum is still at least the true peak of the summed
+ * payments in that window, so a mix that keeps the promise on these rows keeps
+ * it on its own; but rows that peak in different windows are no longer summed,
+ * which the whole-life bound (every row's own peak, whenever it falls) did: a
+ * mix whose rows end or rise at different times read as breaking a promise it
+ * keeps (r04: on the bound no mix kept it; on these rows one does). One solve,
+ * no cutting planes.
+ */
+const STABLE_WINDOW = 60;
+const WINDOWS = new WeakMap<Ctx, NonNullable<Spec["lifeAt"]>>();
+function windowRows(ctx: Ctx): NonNullable<Spec["lifeAt"]> {
+  const had = WINDOWS.get(ctx);
+  if (had) return had;
+  const H = Math.max(ctx.maxYears * 12, ...ctx.debts.map((d) => d.months), 1);
+  const out: NonNullable<Spec["lifeAt"]> = [];
+  ECON.forEach((_, k) => {
+    for (let a = 1; a <= H; a += STABLE_WINDOW) {
+      const b = Math.min(H, a + STABLE_WINDOW - 1);
+      const debt: Record<string, number> = {};
+      let any = false;
+      let base = 0;
+      for (let m = a; m <= b; m++) {
+        let inDebts = 0;
+        for (const d of ctx.debts) {
+          const v = m === lumpMonth(d.row) ? 0 : d.priced.pay[k]?.[m - 1] ?? 0;
+          inDebts += v;
+          if (v > (debt[d.id] ?? 0)) debt[d.id] = v;
+        }
+        base = Math.max(base, (ctx.today.regular[k]?.[m - 1] ?? 0) - inDebts);
+      }
+      const col: Record<string, number> = {};
+      for (const c of ctx.cols) {
+        let x = 0;
+        const path = c.payLife?.[k] ?? [];
+        for (let m = a; m <= b && m <= path.length; m++) if (path[m - 1] > x) x = path[m - 1];
+        if (x > 0) {
+          col[c.key] = x;
+          any = true;
+        }
+      }
+      if (any || Object.keys(debt).length) out.push({ base: Math.max(0, base), debt, col });
+    }
+  });
+  WINDOWS.set(ctx, out);
+  return out;
+}
+
+/** A plan's rise on the window rows (windowRows): their highest sum less the typed month one, the figure Spec.riseCap caps when lifeAt is given. */
+function windowRise(ctx: Ctx, plan: Plan, rows: NonNullable<Spec["lifeAt"]>): number {
+  const refi = new Set(plan.refinance);
+  let P = 0;
+  for (const g of rows) {
+    let x = g.base;
+    for (const d of ctx.debts) if (!refi.has(d.id)) x += g.debt[d.id] ?? 0;
+    for (const [key, amt] of Object.entries(plan.amounts)) x += (g.col[key] ?? 0) * amt;
+    if (x > P) P = x;
+  }
+  return P - budgetRowOf(ctx, plan, ctx.cols) + ROUNDING * Object.keys(plan.amounts).length;
+}
+
+/**
+ * The cheapest risk-weighted mix (stability's cost) whose TRUE worst-economy
+ * excess over its own promise is at most `excess`: the promise row with that
+ * slack (Spec.riseShare + riseSlack, or riseCap in the floor's range) on the
+ * peak of the summed payments, by cutting planes (lifeRowAt) at each answer's
+ * worst month per economy. Each round is one MILP, the debts free, one term per
+ * track, on קל"צ at every term and the start's own tracks (where the steadiest
+ * cheap mixes are; the whole grid ran each round to its node cap). null when no
+ * round answers within the rows.
+ */
+function solveCostAtExcess(ctx: Ctx, over: Partial<Spec>, start: Plan, excess: number): Solved | null {
+  const share = MATERIAL.monthly(1e9) / 1e9;
+  const floor = MATERIAL.monthly(0);
+  const cap: Partial<Spec> = share * ctx.ref.monthly >= floor ? { riseShare: share, riseSlack: excess } : { riseCap: floor + excess };
+  const fams = new Set(Object.keys(start.amounts).map((k) => k.split("|").slice(0, 2).join("|")));
+  const cols = ctx.cols.filter((c) => c.track === "klz" || fams.has(`${c.track}|${c.segment}`));
+  const rows: NonNullable<Spec["lifeAt"]> = [];
+  const seen = new Set<string>();
+  const worst = (book: Book) => {
+    let added = 0;
+    ECON.forEach((_, k) => {
+      const reg = book.regular[k] ?? [];
+      let mm = 0;
+      for (let m = 1; m <= reg.length; m++) if (mm === 0 || (reg[m - 1] ?? 0) > (reg[mm - 1] ?? 0)) mm = m;
+      if (mm && !seen.has(`${k}|${mm}`)) {
+        seen.add(`${k}|${mm}`);
+        rows.push(lifeRowAt(ctx, k, mm));
+        added++;
+      }
+    });
+    return added;
+  };
+  worst(ctx.today);
+  worst(bookOf(rowsOf(ctx, start).rows, ctx.input, ctx.f));
+  let out: Solved | null = null;
+  for (let i = 0; i < 3; i++) {
+    const s = stableSpec(ctx, { ...over, ...cap, lifeAt: rows.slice() });
+    const p = solveOnce(ctx.debts, cols, s, false, true, FIRST_CAP);
+    if (!p.ok) break;
+    const book = bookOf(rowsOf(ctx, p).rows, ctx.input, ctx.f);
+    const m1 = book.metrics.monthly;
+    const ex = Math.max(...lifePeak(book, m1)) - m1 - MATERIAL.monthly(m1);
+    // Handed on under the window rows at its own rise there (an upper bound): the months listed here are a
+    // subset, and a later re-solve under them could peak at another month.
+    if (ex <= excess + 0.5) out = { plan: p, spec: stableSpec(ctx, { ...over, lifeAt: windowRows(ctx), riseCap: windowRise(ctx, p, windowRows(ctx)) }), cols };
+    if (!worst(book)) break;
+  }
+  return out;
+}
+
+/** One true-peak row (solve.ts Spec.lifeAt): every debt's payment in economy k at month m (a balloon's lump out, as the stress panel reads it), every column's per shekel, and what no debt row carries. */
+function lifeRowAt(ctx: Ctx, k: number, m: number): NonNullable<Spec["lifeAt"]>[number] {
+  const debt: Record<string, number> = {};
+  let inDebts = 0;
+  for (const d of ctx.debts) {
+    const v = m === lumpMonth(d.row) ? 0 : d.priced.pay[k]?.[m - 1] ?? 0;
+    debt[d.id] = v;
+    inDebts += v;
+  }
+  const col: Record<string, number> = {};
+  for (const c of ctx.cols) col[c.key] = c.payLife?.[k]?.[m - 1] ?? 0;
+  return { base: Math.max(0, (ctx.today.regular[k]?.[m - 1] ?? 0) - inDebts), debt, col };
+}
+
+/** Stability's fallback on the window rows: the least rise there, then the cheapest within STABLE_BAND of it. */
+function solveWindowLeast(ctx: Ctx, extra: Partial<Spec>, slack: number, start?: Plan): Solved | null {
+  const rows = windowRows(ctx);
+  // On קל"צ at every term and the start's own tracks (the whole grid made each solve run to its node cap: r04, 2.9 s more).
+  const fams = new Set(Object.keys(start?.amounts ?? {}).map((k) => k.split("|").slice(0, 2).join("|")));
+  const cols = ctx.cols.filter((c) => c.track === "klz" || fams.has(`${c.track}|${c.segment}`));
+  const solve = (s: Spec, from?: Plan) => solveTermsRaw(ctx.debts, cols, s, [], from?.ok ? restart(ctx, from, s, cols) : undefined, 2);
+  const s1 = stableSpec(ctx, { shareCap: false, wCost: 1e-4, wRise: 1, ...extra, lifeAt: rows }, slack);
+  const a = solve(s1, start);
+  if (!a.ok) return null;
+  const s2 = stableSpec(ctx, { shareCap: false, riseCap: windowRise(ctx, a, rows) + STABLE_BAND(ctx.ref.monthly), ...extra, lifeAt: rows }, slack);
+  const b = solve(s2, a);
+  return b.ok ? { plan: b, spec: s2, cols } : { plan: a, spec: s1, cols };
+}
+
+/** A mix's worst-economy excess over stability's promise, on its own rows: the true life peak less its month one and MATERIAL.monthly of it. */
+function stableExcess(ctx: Ctx, plan: Plan): number {
+  const book = bookOf(rowsOf(ctx, plan).rows, ctx.input, ctx.f);
+  const m1 = book.metrics.monthly;
+  return Math.max(...lifePeak(book, m1)) - m1 - MATERIAL.monthly(m1);
+}
+
 /** Does a mix keep stability's promise on its rows: in every economy the life peak at most month one plus MATERIAL.monthly of it? */
 const stableKept = (book: Book, monthly: number) => Math.max(...lifePeak(book, monthly)) - monthly <= MATERIAL.monthly(monthly) + 0.5;
 
 /** The least-rise mix within the budget, then the cheapest within STABLE_BAND of that rise (stability's fallback when no mix keeps its promise). */
-function solveLeastRise(ctx: Ctx, extra: Partial<Spec> = {}): Solved {
-  const s1 = costSpec(ctx, "stable", { shareCap: false, wCost: 1e-4, wRise: 1, ...extra });
-  let p1 = solveTerms(ctx.debts, ctx.cols, s1);
+function solveLeastRise(ctx: Ctx, extra: Partial<Spec> = {}, slack = 0): Solved {
+  const s1 = stableSpec(ctx, { shareCap: false, wCost: 1e-4, wRise: 1, ...extra }, slack);
+  const solve = (s: Spec) => (slack ? solveTermsRaw(ctx.debts, ctx.cols, s, POOL) : solveTerms(ctx.debts, ctx.cols, s));
+  let p1 = solve(s1);
   if (!p1.ok) {
     // The rise objective is degenerate (every all-קל"צ mix has none) and branch and
     // bound can drop every node of a feasible problem (L47: no answer, where the
     // same rules have one). The cheapest risk-weighted mix under the same rules is
     // then the start, and stands in when the rise search still finds nothing.
-    const s0 = costSpec(ctx, "stable", { shareCap: false, ...extra });
-    const p0 = solveTerms(ctx.debts, ctx.cols, s0);
+    const s0 = stableSpec(ctx, { shareCap: false, ...extra }, slack);
+    const p0 = solve(s0);
     if (!p0.ok) return { plan: p0, spec: s0, cols: ctx.cols };
     const again = solveTermsRaw(ctx.debts, ctx.cols, s1, POOL, restart(ctx, p0, s1, ctx.cols));
     p1 = again.ok ? again : p0;
   }
   const r1 = riseOf(ctx, p1, ctx.cols);
-  const s2 = costSpec(ctx, "stable", { shareCap: false, riseCap: r1 + STABLE_BAND(ctx.ref.monthly), ...extra });
+  const s2 = stableSpec(ctx, { shareCap: false, riseCap: r1 + STABLE_BAND(ctx.ref.monthly), ...extra }, slack);
   // The cost stage on the tracks the least rise uses, and קל"צ (no rise at
   // all), every term: within a band of a few tens of shekels another track can
   // barely enter, and on the whole grid the rise cap made each one-term
@@ -2360,7 +2616,8 @@ function solveLeastRise(ctx: Ctx, extra: Partial<Spec> = {}): Solved {
   const fams = new Set(Object.keys(p1.amounts).map((k) => k.split("|").slice(0, 2).join("|")));
   const cols = ctx.cols.filter((c) => c.track === "klz" || fams.has(`${c.track}|${c.segment}`));
   const p2 = solveTermsRaw(ctx.debts, cols, s2, POOL, restart(ctx, p1, s2, cols));
-  if (p2.ok) addToPool(p2, ctx.cols);
+  // (A plan solved at the budget's edge stays out of the pool: the pool seeds every goal's polish, whose own rows are strict.)
+  if (p2.ok && !slack) addToPool(p2, ctx.cols);
   return p2.ok ? { plan: p2, spec: s2, cols, meta: { rise: r1 } } : { plan: p1, spec: s1, cols: ctx.cols, meta: { rise: r1 } };
 }
 
@@ -4628,7 +4885,10 @@ function runGoals(ctx: Ctx, consolidateOk: boolean, wanted: Set<GoalId>): Run {
     // (The payment goal's cost stage already searched its band with the pool as seeds; under the guard a second pass ran 0.6 s on fuzz Z59.)
     if (goal === "payment" && sv.spec.wMonthly === 0) continue;
     const p2 = solveTermsRaw(ctx.debts, sv.cols, sv.spec, POOL, sv.plan);
-    if (p2.ok && p2.objective < sv.plan.objective - 1e-6) solvedBy.set(goal, { ...sv, plan: p2 });
+    // Stability's spec bounds its peak (the bound, the window rows, or the months a cutting-plane solve listed); a
+    // cheaper mix under it can peak higher elsewhere (L11 typical: true worst excess ₪2,833 → ₪4,170): it is taken
+    // only where its true worst excess is no higher.
+    if (p2.ok && p2.objective < sv.plan.objective - 1e-6 && (goal !== "stable" || stableExcess(ctx, p2) <= stableExcess(ctx, sv.plan) + 0.5)) solvedBy.set(goal, { ...sv, plan: p2 });
   }
   // SLIVERS. Each goal's answer without the tranches it can do without, under
   // its own rules (before the display order, which then compares the mixes the

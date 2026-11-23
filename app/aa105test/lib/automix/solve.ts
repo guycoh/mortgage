@@ -105,6 +105,8 @@ export type Column = {
   ahead?: number[];
   /** Per ₪1, every payment of the first 60 months, per economy — [economy][month − 1] (Spec.guardAt reads it). */
   pay60?: number[][];
+  /** The same, every month of the term (stability's true peak rows, index.ts lifeRowAt). */
+  payLife?: number[][];
   /** The forecast's all-in annual rate of the column, % (the rate at which its forecast payments are worth ₪1). */
   fRate?: number;
 };
@@ -138,6 +140,13 @@ export type Spec = {
   /** Cap on the typed month-one payment of the whole mix. */
   budget: number | null;
   /**
+   * Room in the budget row above `budget`, ₪ (default 0). The row keeps ROUNDING a
+   * tranche for the read-out's rounding, so a mix the board reads at the budget can
+   * sit above the row; a goal whose answer is re-read on its rows may widen it
+   * (index.ts stableSpec) and keep only what reads within the budget + ₪0.5.
+   */
+  budgetSlack?: number;
+  /**
    * Cap on the mix's monthly payment at every EARLY month in every economy: one
    * figure for all of them, or one per economy (ECONOMIES order) — the relative
    * guard, today's own five-year peak in that economy (index.ts guardCaps).
@@ -160,8 +169,20 @@ export type Spec = {
   riseCap?: number | null;
   /** Cap on the same bound as a share of month one: P ≤ (1 + riseShare) × the typed month-one payment (the stability promise, index.ts solveStable). */
   riseShare?: number | null;
+  /** ₪ added to the riseShare cap: P ≤ (1 + riseShare) × month one + riseSlack (stability's "no more excess over its promise than this"). */
+  riseSlack?: number;
   /** Cap on the same bound itself, ₪ a month: the worst-economy peak at most this (stability's material fall against today). */
   peakTop?: number | null;
+  /**
+   * The TRUE peak in place of the bound (index.ts solveOnTruePeak): P at least
+   * the summed payment of the mix at each listed (economy, month), every kept
+   * debt at its own payment that month (`debt`, ₪), each column per shekel
+   * (`col`), and what no debt row carries (`base`, ₪). Given, the rise rows of
+   * P, riseCap, riseShare and peakTop read the peak of the summed payments at
+   * these months instead of every row's own peak summed, which overstates a mix
+   * whose rows peak at different times.
+   */
+  lifeAt?: { base: number; debt: Record<string, number>; col: Record<string, number> }[] | null;
   /** Debts this goal keeps whole (rules.ts CHEAP_KEEP): locked for this solve. */
   hold?: string[];
   /**
@@ -377,7 +398,7 @@ function solveOnceInner(debts: SolverDebt[], colsIn: Column[], s: Spec, relaxed:
     add("t", "obj", costW * lam);
     for (const k of stressK) add("t", `wc${k}`, 1);
   }
-  if (s.budget !== null) C.set("budget", { max: s.budget - keptMonthly });
+  if (s.budget !== null) C.set("budget", { max: s.budget + (s.budgetSlack ?? 0) - keptMonthly });
   if (s.floor != null) C.set("floor", { min: s.floor - keptMonthly });
   const keptTyped = sum(debts.map((d) => d.typedPaid));
   if (s.paidCap != null) C.set("paid0", { max: (s.paidCap - keptPaid[0]) / U });
@@ -417,11 +438,18 @@ function solveOnceInner(debts: SolverDebt[], colsIn: Column[], s: Spec, relaxed:
   // Stability's rise: P ≥ Σ every row's own peak in economy k (an upper bound of
   // the mix's peak there), and the rise is P less the typed month-one payment.
   const rise = !!s.wRise || s.riseCap != null || s.riseShare != null || s.peakTop != null;
+  const life = s.lifeAt && s.lifeAt.length ? s.lifeAt : null;
   if (rise) {
-    for (const k of stressK) {
-      C.set(`rp${k}`, { min: sum(debts.map((d) => d.peak[k])) });
-      add("P", `rp${k}`, 1);
-    }
+    if (life)
+      life.forEach((g, j) => {
+        C.set(`lt${j}`, { min: g.base + sum(debts.map((d) => g.debt[d.id] ?? 0)) });
+        add("P", `lt${j}`, 1);
+      });
+    else
+      for (const k of stressK) {
+        C.set(`rp${k}`, { min: sum(debts.map((d) => d.peak[k])) });
+        add("P", `rp${k}`, 1);
+      }
     if (s.wRise) {
       add("P", "obj", s.wRise);
       objConst -= s.wRise * keptMonthly;
@@ -431,7 +459,7 @@ function solveOnceInner(debts: SolverDebt[], colsIn: Column[], s: Spec, relaxed:
       add("P", "rise", 1);
     }
     if (s.riseShare != null) {
-      C.set("riseS", { max: (1 + s.riseShare) * keptMonthly });
+      C.set("riseS", { max: (1 + s.riseShare) * keptMonthly + (s.riseSlack ?? 0) });
       add("P", "riseS", 1);
     }
     if (s.peakTop != null) {
@@ -488,7 +516,8 @@ function solveOnceInner(debts: SolverDebt[], colsIn: Column[], s: Spec, relaxed:
     if (aheadCap) aheadCap.forEach((_, j) => add(v, `ah${j}`, c.ahead?.[j] ?? 0));
     guardAt.forEach((g, j) => add(v, `ga${j}`, (g.col[c.key] ?? 0) * U));
     if (rise) {
-      for (const k of stressK) add(v, `rp${k}`, -c.peak[k] * U);
+      if (life) life.forEach((g, j) => add(v, `lt${j}`, -(g.col[c.key] ?? 0) * U));
+      else for (const k of stressK) add(v, `rp${k}`, -c.peak[k] * U);
       if (s.wRise) add(v, "obj", -s.wRise * c.monthly * U);
       if (s.riseCap != null) add(v, "rise", -c.monthly * U);
       if (s.riseShare != null) add(v, "riseS", -(1 + s.riseShare) * c.monthly * U);
@@ -647,7 +676,8 @@ function solveOnceInner(debts: SolverDebt[], colsIn: Column[], s: Spec, relaxed:
     if (aheadCap) aheadCap.forEach((_, j) => put(`ah${j}`, -(d.ahead?.[j] ?? 0) / U));
     guardAt.forEach((g, j) => put(`ga${j}`, -(g.debt[d.id] ?? 0)));
     if (rise) {
-      for (const kk of stressK) put(`rp${kk}`, d.peak[kk]);
+      if (life) life.forEach((g, j) => put(`lt${j}`, g.debt[d.id] ?? 0));
+      else for (const kk of stressK) put(`rp${kk}`, d.peak[kk]);
       if (s.wRise) {
         if (k === null) add(z, "obj", s.wRise * d.monthly);
         else if (k === 1) fixedObj += s.wRise * d.monthly;
