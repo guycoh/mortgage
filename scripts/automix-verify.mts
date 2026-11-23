@@ -2,7 +2,7 @@
 // (automix-check.mts) and the corpus/fuzz run (automix-corpus.mts).
 import { __test, type AutoMixInput, type AutoMixResult, type GoalId, type Proposal } from "../app/aa105test/lib/automix";
 import { ECONOMIES, scheduleIn } from "../app/aa105test/lib/automix/econ";
-import { MIN_TRANCHE, FIXED_MIN, LINKED_MAX, TRACK_SHARE_MAX, LTV_MAX, PTI_MAX, MATERIAL, AP_LTV, AP_LTV_RELIEF, AP_RELIEF_CAP, YEARS_STRETCH } from "../app/aa105test/lib/automix/rules";
+import { MIN_TRANCHE, FIXED_MIN, LINKED_MAX, TRACK_SHARE_MAX, LTV_MAX, PTI_MAX, MATERIAL, AP_LTV, AP_LTV_RELIEF, AP_RELIEF_CAP, YEARS_STRETCH, REFI_COST_MAX, SLIVER_SHARE } from "../app/aa105test/lib/automix/rules";
 import { NONBANK_LTV } from "../app/aa105test/lib/automix/tiers";
 import { EARLY } from "../app/aa105test/lib/automix/solve";
 import { priceLoan, todayPayment } from "../app/aa102test/lib/price";
@@ -39,6 +39,73 @@ export function verifier(market: MarketSnapshot, forecast: Forecast | null) {
     return true;
   }
 
+  /**
+   * Is a proposal's status decided at a knife-edge the inputs can genuinely
+   * cross: a measure within 5% of its own threshold (relief, saving, the years
+   * goal's 12 months, the cost share of the new money), or the break-even within
+   * 6 months of BREAK_EVEN_MAX? A status that flips on ±0.05pp anywhere else is
+   * the solve sitting on its own gate (audit W2), not the client's position.
+   */
+  function nearThreshold(p: Proposal, r: AutoMixResult): boolean {
+    const s0 = p.stress[0];
+    const refMonthly = r.dueNow?.reference.monthly ?? r.today.monthly;
+    const todayCost = (s0?.todayTotalPaid ?? 0) - r.today.balance;
+    const close = (x: number, t: number) => Math.abs(Math.abs(x) - t) <= 0.05 * t;
+    const relief = refMonthly - p.metrics.monthly;
+    const saving = s0 ? s0.todayTotalPaid - s0.totalPaid : 0;
+    const newMoney = p.tranches.reduce((a, t) => a + t.amount, 0);
+    const be = p.costs.breakEvenMonths;
+    // "No more in total than the reference" is itself a threshold: a mix that
+    // sits on it (the free relief, or a saving the typed read-out barely allows)
+    // moves across it with the price of new money (L16: ₪4 saved; L10 typed at today's).
+    const typedDelta = r.dueNow ? p.metrics.totalPaid - r.dueNow.reference.totalPaid : p.delta.totalPaid;
+    const edge = (x: number) => Math.abs(x) <= Math.max(MATERIAL.neutral(s0?.todayTotalPaid ?? 0), 0.002 * Math.abs(p.metrics.totalPaid));
+    return (
+      close(relief, MATERIAL.monthly(refMonthly)) ||
+      close(saving, MATERIAL.cost(todayCost)) ||
+      edge(saving) ||
+      edge(typedDelta) ||
+      (p.goal === "years" && close((r.dueNow?.reference.months ?? r.today.months) - p.metrics.months, MATERIAL.months)) ||
+      (newMoney > 0 && close((p.costs.prepaymentFees + p.costs.setup) / newMoney, REFI_COST_MAX)) ||
+      (be !== null && Math.abs(be - 120) <= 6)
+    );
+  }
+
+  /** Tallies across every build this verifier saw (the corpus prints them). */
+  const tally = { slivers: 0, slivMarked: 0, balanced: 0, tLow: 1, tSum: 0, tN: 0 };
+
+  /**
+   * A kept or moved debt's "why" may not claim a saving from refinancing into
+   * money dearer than the debt without naming the saving's real source (the
+   * term, the indexation, the balloon's principal): L09's "מחזורו מוסיף ₪2,302
+   * להחזר החודשי וחוסך ₪312,935 מסך התשלומים" beside "4.22% מול 6.32%".
+   */
+  function whyLint(tag: string, p: Proposal) {
+    for (const m of p.moves) {
+      const w = m.why;
+      // Only debt due now is "carried" as an addition (audit W4: a row a move to
+      // another bank refinances has payments of its own that stop).
+      if (/פירעונו מהכסף החדש מוסיף/.test(w)) check(!!m.due, `${tag}: ${m.label} is not due now but its why adds the gross new loan: ${w}`);
+      // A segment the mix opens no money in prices a kept debt at its own term:
+      // no term change to speak of (audit W9: L35's 20-year מל"צ against 10 years).
+      if (m.action === "keep" && !p.tranches.some((t) => t.segment === m.segment)) check(!/את התקופה מ-/.test(w), `${tag}: kept ${m.label} is explained by a term change where no money is opened: ${w}`);
+      // A moved debt that would be cheaper to keep says what the move buys (audit P2).
+      if (m.action !== "keep" && !m.due && !/^הוא עובר עם כל המשכנתא/.test(w) && /השארתו הייתה חוסכת|וסך התשלומים עליו עולה/.test(w))
+        check(/נדרש/.test(w), `${tag}: moved ${m.label} is cheaper to keep and its why does not say what the move buys: ${w}`);
+      const r = w.match(/הריבית היום (\d+\.\d+)% מול (\d+\.\d+)% לכסף חדש/) ?? w.match(/הריבית עליו (\d+\.\d+)% וכסף חדש עולה (\d+\.\d+)%/);
+      if (!r) continue;
+      // (Two rates rounded to 0.01: a printed gap of 0.05 can be 0.04 underneath.)
+      if (!(Number(r[2]) - Number(r[1]) > 0.06)) continue;
+      const claim =
+        m.action === "keep"
+          ? /(חוסך|חוסכת) ₪[\d,]+ מסך התשלומים|סך התשלומים יורד/.test(w)
+          : /השארתו[^.]*מוסיפה[^.]*₪[\d,]+ לסך התשלומים|סך התשלומים יורד/.test(w);
+      if (claim) check(/תקופה|מדד|הצמדה|קרן|ריבית בלבד/.test(w), `${tag}: ${m.label} why claims a saving from dearer money without its source: ${w}`);
+      // A kept debt cheaper than new money leads with the two rates.
+      if (m.action === "keep" && /^מחזורו/.test(w) && r[0].startsWith("הריבית היום")) check(false, `${tag}: kept ${m.label} is cheaper than new money (${r[1]}% vs ${r[2]}%) and does not lead with it: ${w}`);
+    }
+  }
+
   function shareCapOk(p: Proposal): boolean {
     const h = p.tranches.filter((t) => t.segment === "housing");
     const N = h.reduce((a, t) => a + t.amount, 0);
@@ -73,6 +140,7 @@ export function verifier(market: MarketSnapshot, forecast: Forecast | null) {
       p.caveats.forEach((x) => push("caveat", x));
       p.checks.forEach((c) => (push("check", c.label), push("check", c.value), push("check", c.rule)));
       p.moves.forEach((m) => (push("move", m.label), push("why", m.why)));
+      p.tranches.forEach((t) => push("keptSmall", t.keptSmall));
       p.stress.forEach((x) => push("stress", x.label));
     }
     for (const [where, x] of strings) check(!bad(x), `${name}: ${where} breaks house style: ${x}`);
@@ -261,29 +329,79 @@ export function verifier(market: MarketSnapshot, forecast: Forecast | null) {
         for (const mv of p.moves) if (mv.action !== "keep" && !mv.due && masterById.get(mv.id)?.source_eligibility) check(false, `${tag(p.goal)}: repays an eligibility loan (${mv.label})`);
       // 7. no "ok" proposal is worse than today on its own goal — or, with debt due
       // now, than the reference (today + the cheapest clearing of that debt).
+      // Total paid is compared within the neutral residue (rules.ts MATERIAL.neutral):
+      // a smaller difference is the rounding of ₪1,000 tranches, not a cost.
+      const s0 = p.stress[0];
+      const neutral = MATERIAL.neutral(s0?.todayTotalPaid ?? 0);
+      const ref = due?.reference;
+      const fP = s0 ? s0.totalPaid - s0.todayTotalPaid : 0;
+      const tP = ref ? p.metrics.totalPaid - ref.totalPaid : d.totalPaid;
       if (p.status === "ok") {
-        const s0 = p.stress[0];
         const worst = (k: "totalPaid" | "todayTotalPaid") => Math.max(...p.stress.slice(1).map((x) => x[k]));
-        const ref = due?.reference;
-        const own: Record<GoalId, boolean> = ref
-          ? {
-              payment: p.metrics.monthly <= ref.monthly + 0.5,
-              consolidate: p.metrics.monthly <= ref.monthly + 0.5,
-              years: p.metrics.months < ref.months,
-              savings: s0.totalPaid < s0.todayTotalPaid && p.metrics.totalPaid < ref.totalPaid,
-              balanced: p.metrics.monthly < ref.monthly && s0.totalPaid <= s0.todayTotalPaid && p.metrics.totalPaid <= ref.totalPaid,
-              stable: worst("totalPaid") < worst("todayTotalPaid"),
-            }
-          : {
-              payment: d.monthly < 0,
-              consolidate: d.monthly < 0,
-              years: d.months < 0,
-              savings: s0.totalPaid < s0.todayTotalPaid && d.totalPaid < 0,
-              balanced: d.monthly < 0 && s0.totalPaid <= s0.todayTotalPaid && d.totalPaid <= 0,
-              stable: worst("totalPaid") < worst("todayTotalPaid"),
-            };
-        check(own[p.goal], `${tag(p.goal)}: "ok" but not better than ${ref ? "the reference" : "today"} on its own goal`);
+        const relief = (ref ? ref.monthly : r.today.monthly) - p.metrics.monthly;
+        const own: Record<GoalId, boolean> = {
+          payment: relief > -0.5 && (ref ? true : d.monthly < 0),
+          consolidate: relief > -0.5 && (ref ? true : d.monthly < 0),
+          // קיצור שנים never costs more than the reference, forecast or typed.
+          years: (ref ? p.metrics.months < ref.months : d.months < 0) && fP <= neutral && tP <= neutral,
+          savings: fP < 0 && tP <= neutral,
+          // מאוזן: a relief that costs no more, or a saving at no higher a payment.
+          balanced: (relief > 0 && fP <= neutral && tP <= neutral) || (fP < 0 && tP <= neutral && relief >= -0.5),
+          stable: worst("totalPaid") < worst("todayTotalPaid"),
+        };
+        check(own[p.goal], `${tag(p.goal)}: "ok" but not better than ${ref ? "the reference" : "today"} on its own goal (relief ${relief}, forecast ${fmt(fP)}, typed ${fmt(tP)})`);
       }
+      // 7a. One-off costs out of proportion to the debt are never offered (override off).
+      if (p.status === "ok" && !input.profile.override && p.tranches.length) {
+        const newMoney = p.tranches.reduce((a, t) => a + t.amount, 0);
+        check(p.costs.prepaymentFees + p.costs.setup <= REFI_COST_MAX * newMoney + 0.5, `${tag(p.goal)}: "ok" with one-off costs ${fmt(p.costs.prepaymentFees + p.costs.setup)} over ${REFI_COST_MAX * 100}% of ${fmt(newMoney)} new money`);
+      }
+      // 7b. מאוזן's two measures: stated, consistent with the figures, in a reason, and its status rule.
+      if (p.goal === "balanced") {
+        const b = p.balance;
+        check(!!b, `${tag(p.goal)}: no balance figures`);
+        if (b && s0) {
+          const relief = (ref ? ref.monthly : r.today.monthly) - p.metrics.monthly;
+          check(Math.abs(b.relief - relief) <= 1 && Math.abs(b.saving + fP) <= 2, `${tag(p.goal)}: balance relief ${b.relief}/saving ${b.saving} ≠ the proposal's ${relief}/${-fP}`);
+          const fr = b.reliefMax > 0 ? b.relief / b.reliefMax : 0;
+          const sv = b.savingMax > 0 ? b.saving / b.savingMax : 0;
+          // (The figures are rounded to the shekel: a share of small figures carries that rounding.)
+          const slack = 0.01 + (b.reliefMax > 0 ? 1 / b.reliefMax : 0) + (b.savingMax > 0 ? 1 / b.savingMax : 0);
+          check([Math.min(fr, sv), fr, sv].some((x) => Math.abs(x - b.t) <= slack), `${tag(p.goal)}: t ${b.t} is neither share (${fr.toFixed(3)}, ${sv.toFixed(3)})`);
+          const todayCost = s0.todayTotalPaid - r.today.balance;
+          const both = !due && b.reliefMax >= MATERIAL.monthly(r.today.monthly) && b.savingMax >= 1.02 * MATERIAL.cost(todayCost);
+          if (p.status === "ok" && both) {
+            tally.balanced++;
+            tally.tLow = Math.min(tally.tLow, b.t);
+            tally.tSum += b.t;
+            tally.tN++;
+            // Both measured: never all relief and no saving (at least a tenth of the most
+            // saving), and the payment no higher. On a concave frontier both shares are ½
+            // or more; on a dented one, where relief comes only from a longer term and
+            // saving only from a shorter one, t can be small (fuzz Z49 0.29, Z258 0.16):
+            // the corpus prints the lowest and the mean.
+            check(b.saving >= 0.1 * b.savingMax && b.relief > -1, `${tag(p.goal)}: balanced ok with t ${b.t} (relief ${b.relief}/${b.reliefMax}, saving ${b.saving}/${b.savingMax})`);
+            const all = p.reasons.join(" ");
+            for (const v of [b.relief, b.reliefMax, b.saving, b.savingMax]) check(all.includes(`₪${Math.abs(v).toLocaleString("en-US")}`), `${tag(p.goal)}: the reasons do not state ${v}: ${p.reasons[0]}`);
+          }
+        }
+        // Never refused over a difference within the neutral residue.
+        const over = (p.note ?? "").match(/מייקרת את סך התשלומים ב-₪([\d,]+)/);
+        if (over) check(Number(over[1].replace(/,/g, "")) > neutral, `${tag(p.goal)}: refused over ₪${over[1]}, within the neutral ₪${fmt(neutral)}`);
+      }
+      // 7c. No needless sliver: every tranche under a tenth of its segment's new money says why it stays.
+      for (const seg of ["housing", "allPurpose"] as const) {
+        const ts = p.tranches.filter((t) => t.segment === seg);
+        if (ts.length < 2) continue;
+        const N = ts.reduce((a, t) => a + t.amount, 0);
+        for (const t of ts)
+          if (t.amount < SLIVER_SHARE * N) {
+            tally.slivers++;
+            if (t.keptSmall) tally.slivMarked++;
+            check(!!t.keptSmall, `${tag(p.goal)}: ${t.track} ${fmt(t.amount)} is under ${SLIVER_SHARE * 100}% of ${fmt(N)} with no reason to stay`);
+          }
+      }
+      whyLint(tag(p.goal), p);
       // The cost column (typed interest + indexation): a disagreement in sign with the forecast, or a
       // cost-claiming "ok" goal that shows a higher cost than today, is stated in the FIRST reason with its figures.
       {
@@ -296,7 +414,7 @@ export function verifier(market: MarketSnapshot, forecast: Forecast | null) {
           if (Math.abs(tC) >= 1000 && Math.abs(fC) >= 1000 && Math.sign(tC) !== Math.sign(fC) && p.moves.some((m) => m.action !== "keep"))
             check(has(first, tC) && has(first, fC), `${tag(p.goal)}: typed cost ${fmt(tC)} and forecast ${fmt(fC)} disagree in sign, first reason must name both: ${first}`);
         }
-        if (p.status === "ok" && !due && ["savings", "balanced", "stable"].includes(p.goal) && tC > 0)
+        if (p.status === "ok" && !due && ["savings", "balanced", "stable"].includes(p.goal) && tC > neutral)
           check(first.includes("הריבית וההצמדה") && has(first, tC), `${tag(p.goal)}: shows a higher cost (${fmt(tC)}) than today, first reason must say so: ${first}`);
       }
       // reasons and caveats exist and carry numbers
@@ -338,8 +456,11 @@ export function verifier(market: MarketSnapshot, forecast: Forecast | null) {
       for (const g of ["savings", "balanced", "consolidate", "stable"] as GoalId[]) {
         const p = by(g);
         // Only against mixes within years' own rules: the track share cap (a non-bank savings may
-        // adopt stable's single-track mix, corpus Z150) and no eligibility loan repaid where years may not.
+        // adopt stable's single-track mix, corpus Z150), no eligibility loan repaid where years may not,
+        // and no more paid in total than the reference (forecast and typed, within the neutral residue).
         if (!p || !shareCapOk(p)) continue;
+        const pn = MATERIAL.neutral(p.stress[0]?.todayTotalPaid ?? 0);
+        if ((p.stress[0] ? p.stress[0].totalPaid - p.stress[0].todayTotalPaid : 0) > pn || (due ? p.metrics.totalPaid - due.reference.totalPaid : p.delta.totalPaid) > pn) continue;
         check(years.metrics.months <= p.metrics.months + slack(years, p, "months"), `${name}: years ends at ${years.metrics.months} after ${g} ${p.metrics.months}`);
       }
     const sav = by("savings");
@@ -398,5 +519,5 @@ export function verifier(market: MarketSnapshot, forecast: Forecast | null) {
     const forcedBank = o && (input.profile.tier === "bank" || input.profile.tier === "bankPremium") && r.blocks.some((b) => ["insolvency", "enforcement", "arrears", "past-due", "outside"].includes(b.id));
     if (forcedBank) for (const p of r.proposals) check((p.caveats[0] ?? "").includes("בנק מסרב"), `${name}/${p.goal}: forced bank tier without the refusal caveat first`);
   }
-  return { check, failures, passed: () => passed, verify, verifyOverride, lint, guardOk, shareCapOk, BUDGET_GOALS };
+  return { check, failures, passed: () => passed, verify, verifyOverride, lint, guardOk, shareCapOk, BUDGET_GOALS, tally, nearThreshold };
 }

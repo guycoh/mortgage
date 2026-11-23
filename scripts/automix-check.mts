@@ -105,6 +105,21 @@ const V = verifier(market, forecast);
 const { check, failures, verify, verifyOverride, guardOk, shareCapOk, BUDGET_GOALS } = V;
 const section = (s: string) => console.log(`\n### ${s}`);
 
+/**
+ * A clean file under the override equals the same file without it, except the
+ * proposals the cost-share gate (rules.ts REFI_COST_MAX) refused without it:
+ * the override builds those, and each says so in a caveat. Their status can
+ * move the recommendation and the folding of identical mixes, so those two are
+ * compared only when no goal was gated.
+ */
+function sameUnderOverride(on: AutoMixResult, off: AutoMixResult): boolean {
+  const gated = new Set(off.proposals.filter((p) => (p.note ?? "").startsWith("הכסף החדש")).map((p) => p.goal));
+  for (const p of on.proposals) if (gated.has(p.goal) && p.status === "ok") check(p.caveats.some((c) => c.includes("גבוהות מדי ביחס לחוב")), `${p.goal}: built past the cost share without saying so`);
+  const cut = (x: AutoMixResult) =>
+    JSON.stringify({ ...x, ms: 0, ...(gated.size ? { recommended: null } : {}), proposals: x.proposals.map((p) => (gated.has(p.goal) ? { goal: p.goal } : gated.size ? { ...p, sameAs: undefined } : p)) });
+  return cut(on) === cut(off);
+}
+
 const inputOf = (master: ImportedLoan[], over: Partial<AutoMixInput> = {}, profile: Partial<ClientProfile> = {}): AutoMixInput => ({
   master,
   market,
@@ -170,10 +185,8 @@ for (const s of FIXTURE_SETS) {
   const rO = buildAutoMix(inputO);
   verify(`${s.id}+override`, inputO, rO);
   verifyOverride(`${s.id}+override`, inputO, rO);
-  if (!r.blocks.length) {
-    const strip = (x: AutoMixResult) => JSON.stringify({ ...x, ms: 0 });
-    check(strip(rO) === strip(r), `${s.id}: a clean file changed under the override`);
-  } else reals.push({ id: `${s.id}+override`, input: inputO, r: rO });
+  if (!r.blocks.length) check(sameUnderOverride(rO, r), `${s.id}: a clean file changed under the override`);
+  else reals.push({ id: `${s.id}+override`, input: inputO, r: rO });
 }
 
 section("B2. r05 under the override, at every tier");
@@ -412,7 +425,7 @@ const bad: BadCase[] = [
     master: [...mortgage(), ...loans()],
     profile: { tier: "nonbank" },
     expect: (on, off) => [
-      [!off.blocks.length && JSON.stringify({ ...on, ms: 0 }) === JSON.stringify({ ...off, ms: 0 }), "no blocks, and the override changes nothing"],
+      [!off.blocks.length && sameUnderOverride(on, off), "no blocks, and the override changes nothing but the cost-share gate"],
       [off.proposals.filter((p) => p.tranches.length).every((p) => p.checks.some((c) => c.label === "תקרת העלות בחוק אשראי הוגן")), "every proposal with new money checks the Fair Credit ceiling"],
       [off.proposals.some((p) => p.status === "ok"), "a clean non-bank file builds"],
     ],
@@ -549,6 +562,9 @@ if (!QUICK)
       const s = buildAutoMix({ ...input, master });
       for (const p of base.proposals) {
         const q = s.proposals.find((x) => x.goal === p.goal);
+        // מאוזן's status holds unless a threshold is genuinely crossed (audit W2: the solve sat on its own gate).
+        if (q && p.goal === "balanced" && p.status !== q.status && p.status !== "unavailable" && q.status !== "unavailable")
+          check(V.nearThreshold(p, base) || V.nearThreshold(q, s), `${id}/balanced @ balance×${db} rate${dr >= 0 ? "+" : ""}${dr}: status ${p.status} → ${q.status} away from every threshold`);
         if (!q || p.status !== "ok") continue;
         const moved = (x: Proposal) => new Map(x.moves.filter((m) => m.action !== "keep").map((m) => [input.master.findIndex((l) => l.id === m.id), m.balance]));
         const a = moved(p);
@@ -673,6 +689,12 @@ section("H. timing (Node)");
   for (const [id, ms] of times) check(ms < 2000, `${id}: ${ms.toFixed(0)}ms`);
 }
 
+{
+  const t = V.tally;
+  const z = __test.SLIVER_STATS;
+  console.log(`\n  slivers on the board: ${t.slivers} (${t.slivMarked} with a reason) · sliver pass: ${z.dropped} answers changed, at most ₪${fmt(z.cost)} (cost goals) and ₪${fmt(z.monthly)} a month (payment) given up`);
+  console.log(`  מאוזן with both measures: ${t.balanced}, t lowest ${t.tN ? t.tLow.toFixed(3) : "-"}, mean ${t.tN ? (t.tSum / t.tN).toFixed(3) : "-"}`);
+}
 console.log(`\n${V.passed()} checks passed, ${failures.length} failed`);
 for (const f of failures.slice(0, 80)) console.log("  ✗ " + f);
 process.exit(failures.length ? 1 : 0);
