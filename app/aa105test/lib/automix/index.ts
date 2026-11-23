@@ -2896,6 +2896,28 @@ function proposalOf(ctx: Ctx, goal: GoalId, solved: Solved): Proposal {
         usedSpec = fixed.spec;
         ({ rows, tranches } = r2);
         book = b2;
+        // The repaired mix is read for slivers under the spec it was repaired to,
+        // and the leaner mix is kept when its rows still hold the ceiling and the
+        // guard; where they do not, the sliver stays and says so. (Corpus L43 at
+        // 0% inflation: the repair left קל"צ ₪53,000 and מ"צ ₪50,000 of
+        // ₪1,177,425 with no reason, and nothing read them again.)
+        const sv3 = keepCheaper(ctx, unsliver(ctx, goal, { ...solved, plan: used, spec: usedSpec }));
+        if (sv3.plan !== used) {
+          const r3 = rowsOf(ctx, sv3.plan);
+          const b3 = bookOf(r3.rows, ctx.input, ctx.f);
+          if (b3.metrics.monthly <= ceilingOf(ctx, goal, solved) + 0.5 && guardHolds(b3, g5)) {
+            used = sv3.plan;
+            ({ rows, tranches } = r3);
+            book = b3;
+          } else {
+            const why = new Map(SLIVER_REASON.get(used) ?? []);
+            for (const x of sliversOf(used, solved.cols ?? ctx.cols)) {
+              const k = `${x.track}|${x.segment}`;
+              if (!why.has(k)) why.set(k, "מסלול קטן שנשאר כי בלעדיו ההחזר עולה מעל התקרה בחמש השנים הקרובות בתרחישי הלחץ");
+            }
+            SLIVER_REASON.set(used, why);
+          }
+        }
       }
     }
   }
