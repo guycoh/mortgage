@@ -1575,8 +1575,13 @@ function solveYears(ctx: Ctx): Solved {
   };
   let first: Tier | null = null;
   let chosen: Tier | null = null;
+  // The tier without a guard (the last), as the verdict read it: the ceiling it
+  // held an unguarded shortening to (today's payment unless the stretch was
+  // worth a year over it) and today's payment's end. yearsNote states them.
+  let free: Tier | null = null;
   for (let lvl = 0; lvl < levels; lvl++) {
     const r = at(lvl);
+    if (lvl === levels - 1 && r.g.kind === 0) free = r;
     if (!r.pick.ok) continue;
     first ??= r;
     // A tier whose material shortening cannot hold its guard on its rows is no
@@ -1610,6 +1615,7 @@ function solveYears(ctx: Ctx): Solved {
         // the stretch is taken; the stretch's end when it was not worth a year.
         ...(stretched?.ok ? { ...(ends.atToday !== undefined ? { atToday: ends.atToday } : {}), atStretch: ends.atStretch!, stretchBudget: ceiling, stretched: useStretch ? 1 : 0 } : {}),
         ...(guardedAt !== undefined ? { guardedAt } : {}),
+        ...(free && !chosen ? { freeCeiling: free.useStretch ? ceiling : ctx.budget, ...(free.base.ok ? { freeToday: free.base.T } : {}) } : {}),
       },
     };
   }
@@ -1754,17 +1760,40 @@ function yearsAtFrom(ctx: Ctx, T: number, seed?: { plan: Plan; spec: Spec }, bud
  * ₪797k interest-only balloon holds the end, and no +10% reaches a year. When
  * no payment does it, the debts are cheaper than new money (L20, L41): the note
  * gives the two rates and the move that shortens the mortgage at their price.
+ *
+ * The note states what the verdict used (audit 3 R6: L14 read no-gain while its
+ * note said a year took ₪3,345, under its ₪3,526 ceiling). The figure is the
+ * lowest payment of a mix under the verdict's own rules but the ceiling: the
+ * debts it held (CHEAP_KEEP), no more paid in total on the rows as the board
+ * prices them. When it sits under the answer's ceiling, the note names the rule
+ * that refused it: the five-year guard the answer holds, broken by that mix in a
+ * stress economy, and the stretch rule (a payment above today's is taken only
+ * when it ends the debt a year sooner than today's payment can).
  */
-function yearsWhatItTakes(ctx: Ctx, refMonths: number, ceiling: number): string {
+function yearsWhatItTakes(ctx: Ctx, refMonths: number, ceiling: number, solved?: Solved): string {
   const T = refMonths - MATERIAL.months;
   if (!(T > 0)) return "";
   const last = [...ctx.debts].filter((d) => !d.forced).sort((a, b) => b.months - a.months || b.balance - a.balance)[0];
   const unlock = eligibilityIds(ctx);
   const spec = specFor(ctx, { wMonthly: 1, wCost: 1e-3, lambda: 0, budget: null, finish: T, ...yearsCaps(ctx), ...(unlock.length ? { unlock } : {}) });
-  const p = solveTerms(ctx.debts, ctx.cols.filter((c) => c.years * 12 <= T), spec);
+  const solveIt = () => solveTerms(ctx.debts, ctx.cols.filter((c) => c.years * 12 <= T), { ...spec, hold: ctx.base.hold });
+  const p = solved?.spec ? withHold(ctx, solved.spec.hold, solveIt) : solveIt();
   const holder = last ? ` את המועד קובע ${last.label} של ${nis(last.balance)}${last.interestOnly ? " בריבית בלבד" : ""}, שנגמר בעוד ${yrs(last.months)}.` : "";
-  const need = p.ok ? shown(ctx, p).monthly : null;
-  const takes = need !== null ? ` קיצור של שנה, ל-${yrs(T)}, בלי לשלם יותר בסך הכול, מחייב החזר של ${nis(need)} בחודש${need > ceiling + 0.5 ? `, מעל התקרה של ${nis(ceiling)}` : ""}.` : "";
+  // "Without paying more in total" on the rows themselves, the verdict's own test.
+  const need = p.ok && costsNoMore(ctx, p) ? shown(ctx, p).monthly : null;
+  let refused = "";
+  if (need !== null && need <= ceiling + 0.5) {
+    const g = solved?.guard;
+    const book = bookOf(rowsOf(ctx, p).rows, ctx.input, ctx.f);
+    if (g?.kind && !guardHolds(book, g))
+      refused += `, אבל בתרחיש לחץ ההחזר שלו עולה בחמש השנים הקרובות עד ${nis(Math.max(...peak5Of(book)))}, מעל ${g.kind === 2 ? "מה שהתמהיל של היום היה מגיע אליו" : `התקרה של ${nis(ceiling)}`}`;
+    const free = solved?.meta?.freeCeiling;
+    if (typeof free === "number" && need > free + 0.5) {
+      const today = solved?.meta?.freeToday;
+      refused += `${refused ? ", ו" : ", "}בלי מגבלת חמש השנים התקרה היא ${nis(free)}: תקרה גבוהה יותר נלקחת רק כשהיא מקצרת את החוב בשנה לפחות יותר מההחזר של היום${typeof today === "number" ? `, שבו הוא נגמר בעוד ${yrs(today)}` : ""}`;
+    }
+  }
+  const takes = need !== null ? ` קיצור של שנה, ל-${yrs(T)}, בלי לשלם יותר בסך הכול, מחייב החזר של ${nis(need)} בחודש${need > ceiling + 0.5 ? `, מעל התקרה של ${nis(ceiling)}` : refused}.` : "";
   return `${holder}${takes}${cheaperThanNewMoney(ctx, need === null)}`;
 }
 
@@ -2984,7 +3013,7 @@ function yearsNote(ctx: Ctx, m: MixMetrics, solved: Solved): string {
   if (pin) return `החוב נגמר בעוד ${yrs(m.months)} בגלל ${pin.label} של ${nis(pin.balance)} שנשאר (${pin.lock}).`;
   const short = Math.max(0, ctx.ref.months - m.months);
   const head = short > 0 ? `הקיצור הוא ${short} חודשים, פחות משנה, ולא מצדיק מחזור.` : "במסגרת ההחזר אין מחזור שמקצר את החוב בלי לשלם יותר בסך הכול.";
-  return `${head}${yearsWhatItTakes(ctx, ctx.ref.months, ceilingOf(ctx, "years", solved))}`;
+  return `${head}${yearsWhatItTakes(ctx, ctx.ref.months, ceilingOf(ctx, "years", solved), solved)}`;
 }
 
 /** Proposal.balance for מאוזן: the two measures as shown, against the anchors it balanced. */

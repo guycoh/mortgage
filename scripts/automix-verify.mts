@@ -438,6 +438,17 @@ export function verifier(market: MarketSnapshot, forecast: Forecast | null) {
       const refPay = due?.reference.monthly ?? r.today.monthly;
       const given = !!(input.profile.budget && input.profile.budget > 0);
       const ceiling = p.goal === "years" ? p.budget ?? budget : budget;
+      // A years no-gain note that quotes what a one-year shortening takes never contradicts the verdict:
+      // the payment is above the ceiling, or the note names the rule that refused it (the five-year guard,
+      // the stretch rule). Audit 3 R6: L14 "מחייב החזר של ₪3,345" under its ₪3,526 ceiling, no-gain.
+      if (p.goal === "years" && p.status === "no-gain" && p.budget !== undefined) {
+        const need = (p.note ?? "").match(/מחייב החזר של ₪([\d,]+) בחודש/);
+        if (need)
+          check(
+            Number(need[1].replace(/,/g, "")) > p.budget + 0.5 || /אבל בתרחיש לחץ ההחזר שלו עולה|נלקחת רק כשהיא מקצרת את החוב בשנה לפחות/.test(p.note ?? ""),
+            `${tag(p.goal)}: no-gain, and its note says a year takes ₪${need[1]}, within the ₪${fmt(p.budget)} ceiling, without the rule that refused it`
+          );
+      }
       if (p.goal === "years" && p.status !== "unavailable") {
         check(p.budget !== undefined, `${tag(p.goal)}: no ceiling on the years proposal`);
         check(given ? Math.abs((p.budget ?? 0) - budget) <= 0.5 : (p.budget ?? 0) <= Math.round(refPay * (1 + YEARS_STRETCH)) + 0.5 && (p.budget ?? 0) >= budget - 0.5, `${tag(p.goal)}: years ceiling ${p.budget} outside [${budget}, ${Math.round(refPay * (1 + YEARS_STRETCH))}]`);
