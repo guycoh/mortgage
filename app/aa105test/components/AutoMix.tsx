@@ -390,8 +390,21 @@ export default function AutoMix({ master, forecast, forecastOn, inflation, disco
   const lifted = blocks.filter((b) => b.overridden);
   /** Some standing block is the lender's own law: no override lifts that one. */
   const canLift = openBlocks.some((b) => !b.law);
-  /** Nothing can be offered as things stand: the sheet shows why, and the way past it. */
-  const stopped = !failed && !!result?.ok && usable.length === 0 && (openBlocks.length > 0 || !!blocked);
+  /**
+   * Nothing can be offered as things stand: the sheet shows why, and the way
+   * past it. Only a real obstacle stops the sheet: a block in the document, or
+   * every goal refused. "Nothing improves it" is not one: a mortgage already at
+   * or under the market has nothing to build past, and offering "בנייה בכל זאת"
+   * there led to "no lender may write such a mix" for a client in good standing.
+   */
+  const refused = offered.length > 0 && offered.every((p) => p.status === "unavailable");
+  const stopped = !failed && !!result?.ok && usable.length === 0 && (openBlocks.length > 0 || (!!blocked && refused));
+  /** No goal improves it and nothing moves: every debt with the engine's reason for leaving it. */
+  const keptAll = useMemo(() => {
+    if (usable.length > 0) return [];
+    const p = offered.find((q) => q.status === "no-gain" && q.moves.length > 0 && q.moves.every((m) => m.action === "keep"));
+    return p ? p.moves : [];
+  }, [usable, offered]);
 
   // DEBT DUE NOW. Today's החזר חודשי does not carry it, so a plain "versus
   // today" would show every honest mix as a rise. The engine measures each goal
@@ -1019,7 +1032,36 @@ export default function AutoMix({ master, forecast, forecastOn, inflation, disco
                   </div>
                 </section>
               )}
-              {!current && <p className="am-detail am-quiet">אף מטרה לא מביאה שיפור ממשי בתנאים האלה. שינוי בנתוני הלקוח או בסוג המלווה יכול לשנות את התמונה.</p>}
+              {!current && (
+                <section className="am-detail" data-busy={busy || undefined} aria-label="אין מחזור שמשתלם היום">
+                  <div className="am-col">
+                    <h2 className="am-detail-h">אין מחזור שמשתלם היום</h2>
+                    <p className="am-quiet am-quiet-lead">אף מטרה לא מביאה שיפור ממשי בתנאים האלה. שינוי בנתוני הלקוח או בסוג המלווה יכול לשנות את התמונה.</p>
+                    {keptAll.length > 0 && (
+                      <>
+                        <h3>למה כל חוב נשאר</h3>
+                        <div className="am-kept am-kept-open">
+                          <ul>
+                            {keptAll.map((m) => (
+                              <li key={m.id}>
+                                <span>
+                                  <span className="am-fam" data-f={m.group} />
+                                  {m.label}
+                                </span>
+                                <span className="am-n">{m.rate > 0 ? pct(m.rate) : ""}</span>
+                                <Nis v={m.balance} />
+                                <p>
+                                  <Rich text={m.why} />
+                                </p>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </section>
+              )}
             </div>
           )}
         </div>
