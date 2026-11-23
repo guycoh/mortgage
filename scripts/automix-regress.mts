@@ -122,35 +122,24 @@ function verdict(goal: GoalId, o: Outcome, n: Outcome): { v: string; why: string
     if (o.months! <= n.months! - R.material.months) return { v: "OLD MIX BETTER", why: `ends ${n.months! - o.months!} months sooner` };
     return { v: n.months! <= o.months! - 1 ? "new better" : "same", why: `ends ${o.months} → ${n.months} months` };
   }
-  // stable: steadiness bought at the margin. Of the two mixes the cheaper in the
-  // forecast stands unless the other is steadier (a lower worst-economy peak over
-  // its own month one) and its extra forecast cost is at most STABLE_PRICE of the
-  // payments it removes there beyond what its own month one removes.
-  const pick = stablePick(o, n);
-  const other = pick === o ? n : o;
-  const dCost = n.paid![0] - o.paid![0];
-  const why = `peak/month one ${ratio(o).toFixed(3)} → ${ratio(n).toFixed(3)}, forecast ${sgn(dCost)}, removed ${fmt(removed(pick === o ? n : o, pick))} (new − old)`;
-  if (pick === o && Math.abs(o.paid![0] - other.paid![0]) > R.material.cost) return { v: "OLD MIX BETTER", why };
-  return { v: pick === n && (dCost < -R.neutral || ratio(n) < ratio(o) - 0.005) ? "new better" : "same", why };
+  // stable: the promise (index.ts solveStable). In every economy the true life
+  // peak at most the mix's own month one plus MATERIAL.monthly of it; among mixes
+  // that keep it the cheaper risk-weighted one is better; where neither keeps it,
+  // the smaller excess over it, summed over the economies.
+  const over = (x: Outcome) => x.peak!.map((p) => Math.max(0, p - x.monthly! - Math.max(150, 0.03 * x.monthly!)));
+  const keeps = (x: Outcome) => Math.max(...over(x)) <= 0.5;
+  const total = (x: Outcome) => over(x).reduce((a, b) => a + b, 0);
+  const dCost = riskCost(n, "stable") - riskCost(o, "stable");
+  const why = `peak/month one ${ratio(o).toFixed(3)} → ${ratio(n).toFixed(3)}, excess over the promise ${fmt(total(o))} → ${fmt(total(n))}, risk-weighted cost ${sgn(dCost)} (new − old)`;
+  if (!keeps(o) && keeps(n)) return { v: "new better", why: `the old mix breaks the peak promise (ratio ${ratio(o).toFixed(3)}); ${why}` };
+  if (keeps(o) && !keeps(n)) return { v: "OLD MIX BETTER", why: `the old mix keeps the peak promise and today's does not; ${why}` };
+  if (keeps(o) && keeps(n)) return { v: dCost > R.material.cost ? "OLD MIX BETTER" : dCost < -R.neutral ? "new better" : "same", why };
+  // Neither keeps it: the smaller excess, then the cheaper.
+  if (total(o) < total(n) - Math.max(20, 0.005 * R.monthly) && dCost >= -R.neutral) return { v: "OLD MIX BETTER", why };
+  return { v: total(n) < total(o) - 1 || dCost < -R.neutral ? "new better" : "same", why };
 }
-const STABLE_PRICE = 0.25;
 /** The worst-economy peak over month one, minus one. */
 const ratio = (x: Outcome) => worstPeak(x) / x.monthly! - 1;
-/** Payments B removes in A's worst economy beyond what B's own month one removes (A's path scaled to B's month one). */
-function removed(a: Outcome, b: Outcome): number {
-  const k = a.peak!.reduce((best, x, i) => (x > a.peak![best] ? i : best), 0);
-  const s = b.monthly! / a.monthly!;
-  const pa = a.regular![k];
-  const pb = b.regular![k];
-  let sum = 0;
-  for (let i = 0; i < Math.max(pa.length, pb.length); i++) sum += Math.max(0, (pa[i] ?? 0) * s - (pb[i] ?? 0));
-  return sum;
-}
-/** The stable choice between two mixes, at the margin. */
-function stablePick(x: Outcome, y: Outcome): Outcome {
-  const [a, b] = x.paid![0] <= y.paid![0] ? [x, y] : [y, x];
-  return ratio(b) < ratio(a) && b.paid![0] - a.paid![0] <= STABLE_PRICE * removed(a, b) ? b : a;
-}
 
 /* ---------------------------------------------------------------- the run */
 
@@ -194,7 +183,7 @@ for (const c of await cases()) {
           line = `${head}${`old mix breaks ${ro.rule}`.padEnd(26)} ${fig}`;
         } else if (ro.status !== "ok") {
           v = "old mix breaks";
-          line = `${head}${`old mix breaks ${ro.gate ? `the ${ro.gate} gate` : `its ${ro.status}`}`.padEnd(26)}old today: ${show(ro)}`;
+          line = `${head}${`old mix breaks ${ro.gate ? `the ${ro.gate} gate` : `its ${ro.status}`}`.padEnd(26)} old today: ${show(ro)}`;
         } else if (n.status !== "ok") {
           v = "OLD MIX BETTER";
           line = `${head}${v.padEnd(26)}today ${n.status}${n.note ? ` (${n.note.slice(0, 90)})` : ""}; the old mix today: ${show(ro)}`;

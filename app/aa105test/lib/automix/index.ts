@@ -1995,91 +1995,80 @@ function riseOf(ctx: Ctx, plan: Plan, cols: Column[]): number {
 }
 
 /**
- * יציבות מרבית, measured in the payment it promises: first the least rise of
- * the payment over the whole life of the mix in the worst economy (a five-year
- * horizon chose five-year variable tracks that reset into 2022–23 in the
- * back-test), within the budget; then, among the mixes within STABLE_BAND of
- * that rise, the cheapest risk-weighted one (λ = LAMBDA.stable). Measured in
- * worst-economy COST, stability took prime whenever prime stayed cheap under
- * the rate shock: 42–62% prime for 2016–2020 originations, a realised payment
- * peak of 1.13 times month one on average and 1.35 at worst, beaten on its own
- * promise by all-קל"צ in 431 of 636 builds.
+ * יציבות מרבית is a promise the client can read: in the worst economy, over the
+ * whole life, the payment never rises more than MATERIAL.monthly of the mix's
+ * OWN month one (3%, ₪150 at least) above that month one. The answer is the
+ * cheapest risk-weighted mix (λ = LAMBDA.stable) under the goal's rules that
+ * keeps it, measured on the TRUE peak (the peak of the summed payments, per
+ * economy); only where no mix keeps it (debts it must keep, the budget) the
+ * least excess over it, then the cheapest within STABLE_BAND of that excess.
+ * Against its own month one, stretching a variable debt buys nothing. History:
+ * measured in worst-economy cost (round 6) stability took 42–62% prime for
+ * 2016–2020 originations and a realised peak of 1.13–1.14 times month one;
+ * measured as the least shekel rise (wave 2) it bought the last shekel at any
+ * price the test against today allowed (L44 −₪119,292 with ₪416k of 30-year
+ * prime; L16 +₪32,798 at 360 months); priced at the margin against the cheaper
+ * candidate it went back to 30% prime and 1.12 (wave 3, not kept).
  */
 function solveStable(ctx: Ctx, extra: Partial<Spec> = {}, others: Plan[] = []): Solved {
-  const least = solveLeastRise(ctx, extra);
-  if (!least.plan.ok) return least;
-  return stableAtMargin(ctx, least, others, extra);
-}
-
-/**
- * Stability bought at the margin, not against today. The candidates are the
- * least-rise mix and every other goal's answer of this structure, re-solved
- * under stability's rules (the same debts, tracks and terms, the amounts for
- * its own risk-weighted cost). From the cheapest in the forecast, a steadier
- * candidate is taken only when its extra forecast cost is at most STABLE_PRICE
- * of the payments it removes in the worst economy relative to THAT candidate,
- * beyond what its own lower month one removes (the other's path scaled to its
- * month one), and steadier means a lower worst-economy peak over month one: a
- * variable track stretched to 30 years lowers every payment in shekels and
- * protects nothing. Round 6 to wave 2 bought the last shekels of rise at any
- * price the test against today allowed: L44 forecast saving ₪328,296 →
- * ₪119,292 with ₪416k of 30-year prime; L16 a saving of ₪68,356 → ₪32,798 more
- * than today at 360 months.
- */
-function stableAtMargin(ctx: Ctx, least: Solved, others: Plan[], extra: Partial<Spec>): Solved {
   const s0 = costSpec(ctx, "stable", { shareCap: false, ...extra });
-  type C = { sv: Solved; book: Book; paid: number; m1: number; ratio: number };
-  const of = (sv: Solved): C => {
+  // The promise in the solve: the bound on the peak (every row's own peak summed,
+  // at least the true peak) at most month one plus MATERIAL.monthly of it, so a
+  // mix the solve returns keeps the promise on its rows.
+  const share = MATERIAL.monthly(1e9) / 1e9;
+  const floor = MATERIAL.monthly(0);
+  const promise: Partial<Spec> = share * ctx.ref.monthly >= floor ? { riseShare: share } : { riseCap: floor };
+  const sP: Spec = { ...s0, ...promise };
+  // excess: over the promise in every economy, summed (a prime track that rises
+  // only in the rate shock counts even where the CPI shock is the worst).
+  type Cand = { sv: Solved; cost: number; m1: number; peak: number; excess: number; total: number };
+  const of = (sv: Solved): Cand => {
     const book = bookOf(rowsOf(ctx, sv.plan).rows, ctx.input, ctx.f);
     const m1 = book.metrics.monthly;
-    return { sv, book, paid: book.paid[0], m1, ratio: Math.max(...lifePeak(book, m1)) / Math.max(1, m1) - 1 };
+    const peaks = lifePeak(book, m1);
+    const over = peaks.map((p) => Math.max(0, p - m1 - MATERIAL.monthly(m1)));
+    return { sv, cost: costObjective(ctx, s0, sv.plan, sv.cols ?? ctx.cols), m1, peak: Math.max(...peaks), excess: Math.max(...over), total: sum(over) };
   };
-  const cands: C[] = [of(least)];
-  const seen = new Set([canonicalKey(least.plan)]);
+  // The goal's own test against today (judge): the worst peak falls materially.
+  const todayPeak = Math.max(...lifePeak(ctx.ref.book ?? ctx.today, ctx.ref.monthly));
+  const fallsEnough = (c: Cand) => todayPeak - c.peak >= MATERIAL.monthly(ctx.ref.monthly);
+  const cands: Cand[] = [];
+  const sT: Spec = { ...sP, peakTop: todayPeak - MATERIAL.monthly(ctx.ref.monthly) };
+  for (const s of [sT, sP]) {
+    const p = solveTerms(ctx.debts, ctx.cols, s);
+    if (p.ok) cands.push(of({ plan: p, spec: s, cols: ctx.cols }));
+  }
+  // The other goals' answers, re-solved under stability's rules: on the TRUE
+  // peak (the peak of the summed payments) one of them may keep the promise
+  // cheaper than the bound lets the solve see.
   for (const p of others) {
     const r = restart(ctx, p, s0, ctx.cols);
-    if (!r || seen.has(canonicalKey(r))) continue;
-    seen.add(canonicalKey(r));
-    cands.push(of({ plan: r, spec: { ...s0, riseCap: riseOf(ctx, r, ctx.cols) }, cols: ctx.cols }));
+    if (r) cands.push(of({ plan: r, spec: { ...s0, riseCap: riseOf(ctx, r, ctx.cols) }, cols: ctx.cols }));
   }
-  cands.sort((a, b) => a.paid - b.paid);
-  const base = cands[0];
-  let cur = base;
-  for (const b of cands.slice(1)) {
-    if (b.ratio < cur.ratio - 1e-4 && b.paid - cur.paid <= STABLE_PRICE * removedBy(cur.book, cur.m1, b.book, b.m1)) cur = b;
+  const kept = cands.filter((c) => c.excess <= 0.5 && Number.isFinite(c.cost));
+  const cheapest = (xs: Cand[]) => xs.reduce((b, x) => (x.cost < b.cost - 1e-9 ? x : b), xs[0]);
+  if (kept.length) {
+    // The cheapest that keeps the promise AND lowers today's worst peak materially (L08: a 9-year קל"צ, ₪1,359 → ₪743), else the cheapest that keeps it.
+    const falls = kept.filter(fallsEnough);
+    const best = cheapest(falls.length ? falls : kept);
+    // Held to the promise from here on (the polish keeps it on the bound).
+    const held = best.sv.spec === sP || best.sv.spec === sT ? best.sv.spec : { ...s0, riseCap: Math.max(best.sv.spec?.riseCap ?? 0, riseOf(ctx, best.sv.plan, ctx.cols)) };
+    return { ...best.sv, spec: held, meta: { ...(best.sv.meta ?? {}), stablePromise: 1 } };
   }
-  if (cur === base) return { ...cur.sv, meta: { ...(least.meta ?? {}), ...(cur.sv.meta ?? {}) } };
-  return {
-    ...cur.sv,
-    meta: {
-      ...(least.meta ?? {}),
-      ...(cur.sv.meta ?? {}),
-      marginCost: cur.paid - base.paid,
-      marginRemoved: removedBy(base.book, base.m1, cur.book, cur.m1),
-      marginPeakFrom: Math.max(...lifePeak(base.book, base.m1)),
-      marginPeakTo: Math.max(...lifePeak(cur.book, cur.m1)),
-    },
-  };
-}
-/** A plan's identity: its debt decisions and its tranches. */
-const canonicalKey = (p: Plan) => `${p.refinance.slice().sort().join(",")}|${Object.keys(p.amounts).sort().join(",")}`;
-/**
- * The payments mix B removes in A's worst economy (the economy of A's highest
- * life peak) beyond what B's own month one removes: A's path scaled to B's
- * month one, month by month, less B's, where positive.
- */
-function removedBy(a: Book, aM1: number, b: Book, bM1: number): number {
-  const peaks = lifePeak(a, aM1);
-  const k = peaks.reduce((best, x, i) => (x > peaks[best] ? i : best), 0);
-  const s = bM1 / Math.max(1, aM1);
-  const pa = a.regular[k];
-  const pb = b.regular[k];
-  let sum = 0;
-  for (let i = 0; i < Math.max(pa.length, pb.length); i++) sum += Math.max(0, (pa[i] ?? 0) * s - (pb[i] ?? 0));
-  return sum;
+  // No mix keeps it (debts it must keep, the budget): the least excess over the
+  // promise, then the cheapest within STABLE_BAND of that excess.
+  const least = solveLeastRise(ctx, extra);
+  if (least.plan.ok) cands.push(of(least));
+  if (!cands.length) return least;
+  // (A candidate whose figures are not finite, a mix the book cannot price, takes no part.)
+  const pool = cands.filter((c) => Number.isFinite(c.total) && Number.isFinite(c.cost));
+  if (!pool.length) return least.plan.ok ? least : cands[0].sv;
+  const minEx = Math.min(...pool.map((c) => c.total));
+  const best = cheapest(pool.filter((c) => c.total <= minEx + STABLE_BAND(ctx.ref.monthly)));
+  return { ...best.sv, meta: { ...(least.meta ?? {}), ...(best.sv.meta ?? {}), stablePromise: 0 } };
 }
 
-/** The least-rise mix within the budget, then the cheapest within STABLE_BAND of that rise (the candidate stableAtMargin starts from). */
+/** The least-rise mix within the budget, then the cheapest within STABLE_BAND of that rise (stability's fallback when no mix keeps its promise). */
 function solveLeastRise(ctx: Ctx, extra: Partial<Spec> = {}): Solved {
   const s1 = costSpec(ctx, "stable", { shareCap: false, wCost: 1e-4, wRise: 1, ...extra });
   let p1 = solveTerms(ctx.debts, ctx.cols, s1);
@@ -3598,13 +3587,9 @@ function reasonsOf(ctx: Ctx, goal: GoalId, book: Book, tranches: NewTranche[], r
   if (goal === "stable") {
     const s = stabilityOf(R.book ?? ctx.today, R.monthly, book, m.monthly);
     out.push(`בתרחיש הלחץ הקשה ביותר ההחזר הגבוה ביותר לאורך כל התקופה הוא ${nis(s.next)}, מול ${nis(s.now)} בתמהיל של ${R.book ? "היום ונשיאת החוב שעומד לפירעון" : "היום"}.`);
-    // What the steadiness costs at the margin: against the cheapest mix under the same rules, not against today.
-    const mc = solved.meta?.marginCost;
-    if (typeof mc === "number" && mc >= 1 && typeof solved.meta?.marginRemoved === "number" && typeof solved.meta?.marginPeakFrom === "number")
-      out.push(`היציבות עולה ${nis(mc)} יותר בתחזית מהתמהיל הזול ביותר באותם כללים, שבו ההחזר הגבוה בתרחיש הלחץ מגיע ל-${nis(solved.meta.marginPeakFrom)}. התוספת היא פחות מרבע מהתשלומים שהיא חוסכת בתרחיש הזה, ${nis(solved.meta.marginRemoved)}.`);
-    // The cheapest mix under the rules still costing more than today: its price is against today, and said so (L27).
-    else if (book.paid[0] - R.paid > MATERIAL.neutral(R.paid) && book.paid[0] - R.paid <= STABLE_PRICE * s.protection)
-      out.push(`היציבות עולה ${nis(book.paid[0] - R.paid)} יותר מהיום בתחזית, פחות מרבע מהתשלומים שהיא חוסכת בתרחיש הזה מול התמהיל של היום, ${nis(s.protection)}.`);
+    // The promise, with its figure, on the rows as the board prices them.
+    const rise = Math.max(0, Math.max(...lifePeak(book, m.monthly)) - m.monthly);
+    out.push(`גם בתרחיש הגרוע ההחזר לא עולה ביותר מ-${nis(Math.ceil(rise))} מעל ההחזר הראשון, לאורך כל התקופה.${rise > MATERIAL.monthly(m.monthly) + 0.5 ? " החובות שנשארים והמסגרת לא מאפשרים עלייה קטנה מזו." : ""}`);
   }
   const g = guardLine(ctx, goal, solved, book);
   if (g) out.push(g);

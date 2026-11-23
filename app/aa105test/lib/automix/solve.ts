@@ -149,6 +149,10 @@ export type Spec = {
   wRise?: number;
   /** Cap on the same rise, ₪ a month (the stability goal's band). */
   riseCap?: number | null;
+  /** Cap on the same bound as a share of month one: P ≤ (1 + riseShare) × the typed month-one payment (the stability promise, index.ts solveStable). */
+  riseShare?: number | null;
+  /** Cap on the same bound itself, ₪ a month: the worst-economy peak at most this (stability's material fall against today). */
+  peakTop?: number | null;
   /** Debts this goal keeps whole (rules.ts CHEAP_KEEP): locked for this solve. */
   hold?: string[];
   /**
@@ -391,7 +395,7 @@ function solveOnceInner(debts: SolverDebt[], colsIn: Column[], s: Spec, relaxed:
   if (aheadCap) aheadCap.forEach((cap, j) => C.set(`ah${j}`, { max: (cap - sum(debts.map((d) => d.ahead?.[j] ?? 0))) / U }));
   // Stability's rise: P ≥ Σ every row's own peak in economy k (an upper bound of
   // the mix's peak there), and the rise is P less the typed month-one payment.
-  const rise = !!s.wRise || s.riseCap != null;
+  const rise = !!s.wRise || s.riseCap != null || s.riseShare != null || s.peakTop != null;
   if (rise) {
     for (const k of stressK) {
       C.set(`rp${k}`, { min: sum(debts.map((d) => d.peak[k])) });
@@ -404,6 +408,14 @@ function solveOnceInner(debts: SolverDebt[], colsIn: Column[], s: Spec, relaxed:
     if (s.riseCap != null) {
       C.set("rise", { max: s.riseCap + keptMonthly });
       add("P", "rise", 1);
+    }
+    if (s.riseShare != null) {
+      C.set("riseS", { max: (1 + s.riseShare) * keptMonthly });
+      add("P", "riseS", 1);
+    }
+    if (s.peakTop != null) {
+      C.set("ptop", { max: s.peakTop });
+      add("P", "ptop", 1);
     }
   }
   // 329 §7 on the new money, per segment — bank law only.
@@ -457,6 +469,7 @@ function solveOnceInner(debts: SolverDebt[], colsIn: Column[], s: Spec, relaxed:
       for (const k of stressK) add(v, `rp${k}`, -c.peak[k] * U);
       if (s.wRise) add(v, "obj", -s.wRise * c.monthly * U);
       if (s.riseCap != null) add(v, "rise", -c.monthly * U);
+      if (s.riseShare != null) add(v, "riseS", -(1 + s.riseShare) * c.monthly * U);
     }
     if (bankLaw) {
       add(v, `fix_${seg}`, (FIXED[c.track] ? 1 : 0) - FIXED_MIN);
@@ -608,6 +621,7 @@ function solveOnceInner(debts: SolverDebt[], colsIn: Column[], s: Spec, relaxed:
         else if (k === 1) fixedObj += s.wRise * d.monthly;
       }
       if (s.riseCap != null) put("rise", d.monthly);
+      if (s.riseShare != null) put("riseS", (1 + s.riseShare) * d.monthly);
     }
     if (cs !== null) put("cshare", (d.fee - cs * (d.balance + d.fee)) / U);
     if (shared > 0 && d.segment === "housing") put("shn", -1);
