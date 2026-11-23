@@ -79,6 +79,8 @@ import {
   SEASONING_MONTHS,
   SMALL_MOVE,
   TRACK_SHARE_EXEMPT,
+  BANK_AP_MIN,
+  AP_GREEN,
 } from "./rules";
 import { solveTerms as solveTermsRaw, solveOnce, termsOf, canonical, STATS, EARLY, AHEAD, U, SHARE_SLACK, ROUNDING, FIRST_CAP, type Seed, type Column, type Plan, type Segment, type SolverDebt, type Spec } from "./solve";
 import history from "./history.json";
@@ -158,21 +160,11 @@ const DUE_GROWTH = { low: 0.15, high: 0.35 };
  * all-second-lien Series 4 averages ₪408,723 (S&P Maalot 12/07/2026) and
  * Meitav lends from ₪500,000. Under ₪50,000 (the solver's own MIN_TRANCHE) a
  * non-bank loan, or one built past debt due now, carries a caveat saying so.
- * Banks do publish smaller ones (BANK_AP_MIN), so for a bank the size is not
- * the test: the one-off costs' share of the loan is (rules.ts REFI_COST_MAX).
+ * Banks do publish smaller ones (rules.ts BANK_AP_MIN, ₪40,000, a floor the
+ * solve holds on the all-purpose money), so for a bank the one-off costs' share
+ * of the loan is the test beyond it (rules.ts REFI_COST_MAX).
  */
 const SMALL_LOAN = 50_000;
-/**
- * The smallest regular home-secured all-purpose loan a bank publishes:
- * Mizrahi-Tefahot, "הלוואה החל מ-40,000 ₪ לתקופה של 4-30 שנים", for its
- * mortgage customers, against their home
- * (https://www.mizrahi-tefahot.co.il/loans/privateloanslib/all-purpose-loan/,
- * read 23/11/2026). The same page offers a "מסלול ירוק" of ₪10,000 to ₪60,000
- * up to 30 years against the home, for clients with a mortgage and a current
- * account there: the exception, not the market. Quoted as a fact beside the
- * cost-share note, never as a reason on its own.
- */
-const BANK_AP_MIN = 40_000;
 /**
  * FAIR_CREDIT — חוק אשראי הוגן (formerly חוק הסדרת הלוואות חוץ-בנקאיות,
  * התשנ"ג-1993), consolidated text https://he.wikisource.org/wiki/חוק_אשראי_הוגן
@@ -2445,6 +2437,10 @@ function proposalOf(ctx: Ctx, goal: GoalId, solved: Solved): Proposal {
     const why = sliverWhy(ctx, goal, solved, used, x, tranches);
     return why ? { ...x, keptSmall: why } : x;
   });
+  // An all-purpose loan under the bank minimum stands only under the rule's own
+  // exception (rules.ts BANK_AP_MIN): the tranche says which, and so does a caveat.
+  const apSmall = apSmallWhy(ctx, refi, tranches);
+  if (apSmall) tranches = tranches.map((x) => (x.segment === "allPurpose" ? { ...x, keptSmall: apSmall } : x));
 
   const reasons = reasonsOf(ctx, goal, book, tranches, refi, fPaidDelta, worstDelta, be, fees + setup, solved);
   const structureWhy = structureText(ctx, solved, book);
@@ -2457,6 +2453,7 @@ function proposalOf(ctx: Ctx, goal: GoalId, solved: Solved): Proposal {
     reasons.splice(i, 1);
   }
   const caveats = caveatsOf(ctx, goal, book, refi, fPaidDelta, delta, solved, rows);
+  if (apSmall) caveats.push(apSmall);
   // An estimated fee the break-even rests on: offered when it pays back at the
   // band's low end, and said when it does not at its high end (fees.ts FEE_BAND).
   const band = verdict.band;
@@ -2836,6 +2833,28 @@ function costShareNote(newMoney: number, fees: number, setup: number): string {
       ? ` הלוואה בגודל כזה גם קטנה מ-${nis(BANK_AP_MIN)}, ההלוואה הקטנה ביותר לכל מטרה בביטחון דירה שבנק מפרסם (מזרחי טפחות, ומסלול ירוק של ₪10,000 עד ₪60,000 רק ללקוחות המשכנתא שלו).`
       : "";
   return `הכסף החדש ${nis(newMoney)}, והעלויות החד־פעמיות של המחזור, ${nis(cost)}${parts}, הן ${shareText(cost / newMoney)} ממנו, יותר מ-${pct(REFI_COST_MAX)}. העלויות גבוהות מדי ביחס לחוב, ועדיף לפרוע אותו ממקור אחר או להשאיר אותו כמות שהוא.${size}`;
+}
+
+/**
+ * A bank all-purpose loan under BANK_AP_MIN (rules.ts): the exception that
+ * allows it, in one sentence (the tranche's keptSmall and a caveat), or null
+ * when there is none to state. The solve holds the floor everywhere else
+ * (solve.ts Spec.apMin), so a null here with a small loan is a broken rule
+ * (scripts/automix-verify.mts says so).
+ */
+function apSmallWhy(ctx: Ctx, refi: Set<string>, tranches: NewTranche[]): string | null {
+  if (ctx.pricing.tier.tier === "nonbank") return null;
+  const N = sum(tranches.filter((x) => x.segment === "allPurpose").map((x) => x.amount));
+  if (!(N > 0 && N < BANK_AP_MIN)) return null;
+  const head = `הלוואה לכל מטרה של ${nis(N)}, פחות מ-${nis(BANK_AP_MIN)}, ההלוואה הקטנה ביותר לכל מטרה בביטחון דירה שבנק מפרסם`;
+  const ap = ctx.debts.filter((d) => d.segment === "allPurpose");
+  if (ap.some((d) => refi.has(d.id) && (d.due || d.called)) || ctx.debts.some((d) => !refi.has(d.id) && !d.forced && (d.cure ?? 0) > 0))
+    return `${head}: היא נדרשת לפירעון החוב שעומד לפירעון, ובנק עשוי שלא לכתוב הלוואה בגודל כזה. יש לאמת מול המלווה.`;
+  if ((ctx.variant === "bankMove" || ctx.moveWhole) && ap.some((d) => refi.has(d.id) && d.group === "mortgage"))
+    return `${head}: מסלול המשכנתא שמטרתו כל מטרה עובר עם כל המשכנתא לבנק האחר. יש לוודא שהבנק החדש כותב אותו בסכום הזה.`;
+  if (ctx.base.apMin === AP_GREEN.min && N >= AP_GREEN.min)
+    return `${head}: מזרחי טפחות מציע ללקוחות המשכנתא שלו שיש להם חשבון עו"ש בבנק הלוואה לכל מטרה במסלול ירוק, ${nis(AP_GREEN.min)} עד ${nis(AP_GREEN.max)}. יש לוודא שללקוח יש שם חשבון עו"ש.`;
+  return null;
 }
 
 /** Why קיצור שנים reads "no-gain": a locked debt holds the end, or no shortening of a year comes without paying more within the ceiling. */
@@ -4836,6 +4855,9 @@ function prepare(
     setupAp:
       SETUP_AP_ALONE - (nonbankLaw ? SETUP.file : 0) + (variant === "secondLien" ? SECOND_LIEN_CONSENT : 0) + openingFee(sum(debts.filter((d) => d.segment === "allPurpose").map((d) => d.balance))),
     setupApShared: SETUP.appraisal,
+    // The smallest all-purpose loan a bank writes (rules.ts BANK_AP_MIN); for a
+    // Mizrahi-Tefahot mortgage client refinanced there, its green track (AP_GREEN).
+    apMin: nonbankLaw ? null : variant === "bank" && !moveWhole && incumbent === AP_GREEN.bank && priceBank === AP_GREEN.bank ? AP_GREEN.min : BANK_AP_MIN,
     ...(cheap.length ? { hold: cheap.map((x) => x.id) } : {}),
   };
   const ctx: Ctx = {

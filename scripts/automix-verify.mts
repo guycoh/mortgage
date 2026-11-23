@@ -2,7 +2,7 @@
 // (automix-check.mts) and the corpus/fuzz run (automix-corpus.mts).
 import { __test, type AutoMixInput, type AutoMixResult, type GoalId, type Proposal } from "../app/aa105test/lib/automix";
 import { ECONOMIES, scheduleIn } from "../app/aa105test/lib/automix/econ";
-import { MIN_TRANCHE, FIXED_MIN, LINKED_MAX, TRACK_SHARE_MAX, TRACK_SHARE_EXEMPT, LTV_MAX, PTI_MAX, MATERIAL, AP_LTV, AP_LTV_RELIEF, AP_RELIEF_CAP, YEARS_STRETCH, REFI_COST_MAX, SLIVER_SHARE, BREAK_EVEN_MAX, SEASONING_MONTHS, SMALL_MOVE, STABLE_PRICE } from "../app/aa105test/lib/automix/rules";
+import { MIN_TRANCHE, FIXED_MIN, LINKED_MAX, TRACK_SHARE_MAX, TRACK_SHARE_EXEMPT, LTV_MAX, PTI_MAX, MATERIAL, AP_LTV, AP_LTV_RELIEF, AP_RELIEF_CAP, YEARS_STRETCH, REFI_COST_MAX, SLIVER_SHARE, BREAK_EVEN_MAX, SEASONING_MONTHS, SMALL_MOVE, STABLE_PRICE, BANK_AP_MIN, AP_GREEN } from "../app/aa105test/lib/automix/rules";
 import { NONBANK_LTV } from "../app/aa105test/lib/automix/tiers";
 import { EARLY } from "../app/aa105test/lib/automix/solve";
 import { priceLoan, todayPayment } from "../app/aa102test/lib/price";
@@ -217,7 +217,7 @@ export function verifier(market: MarketSnapshot, forecast: Forecast | null) {
   }
 
   /** Tallies of this wave's rules across builds (the corpus prints them). */
-  const wave = { guardRelative: 0, guardNone: 0, heldCheap: 0, gated: 0, recNull: 0, aligned: 0, moveGroups: 0, typedBinds: 0, staleWords: 0 };
+  const wave = { guardRelative: 0, guardNone: 0, heldCheap: 0, gated: 0, recNull: 0, aligned: 0, moveGroups: 0, typedBinds: 0, staleWords: 0, apSmall: 0 };
 
   /**
    * House style for every string the sheet shows: no "·" and no dash separators
@@ -314,6 +314,17 @@ export function verifier(market: MarketSnapshot, forecast: Forecast | null) {
         check(new Set(ts.map((t) => t.track)).size === ts.length, `${tag(p.goal)}: ${seg} two tranches on one track`);
         check(ts.length <= (seg === "housing" ? 4 : 2), `${tag(p.goal)}: ${seg} has ${ts.length} tranches`);
         if (ts.length > 1) check(ts.every((t) => t.amount >= MIN_TRANCHE - 1000), `${tag(p.goal)}: ${seg} tranche under ₪${MIN_TRANCHE}`);
+        // A bank writes no home-secured all-purpose loan under BANK_AP_MIN (rules.ts), unless the rule's own
+        // exception holds, and then the tranche says which (keptSmall): Mizrahi-Tefahot's green track (₪10,000 to
+        // ₪60,000) for a client whose mortgage stays there, or money the mix must lend (debt due now or its
+        // arrears under the override, a כל מטרה mortgage row moving with the whole mortgage).
+        if (seg === "allPurpose" && !nonbank && N < BANK_AP_MIN) {
+          wave.apSmall++;
+          const forced = p.moves.some((m) => m.action !== "keep" && m.segment === "allPurpose" && (m.due || (p.refinance === "move" && m.group === "mortgage"))) || p.moves.some((m) => (m.cure ?? 0) > 0);
+          const green = p.refinance === "internal" && p.priceBank === "Mizrahi Tefahot" && N >= AP_GREEN.min;
+          const said = ts.every((t) => !!t.keptSmall && t.keptSmall.includes(`₪${BANK_AP_MIN.toLocaleString("en-US")}`)) && p.caveats.some((c) => c === ts[0].keptSmall);
+          check((forced || green) && said, `${tag(p.goal)}: all-purpose loan ₪${fmt(N)} under the bank minimum ₪${fmt(BANK_AP_MIN)} (${forced ? "money it must lend" : green ? "green track" : "no exception"}, ${said ? "stated" : "not stated"})`);
+        }
         if (seg === "housing") {
           const linked = ts.filter((t) => t.track === "kz" || t.track === "mz").reduce((a, t) => a + t.amount, 0);
           check(linked / N <= LINKED_MAX + 0.005, `${tag(p.goal)}: CPI-linked ${(linked / N).toFixed(3)} > ⅓`);

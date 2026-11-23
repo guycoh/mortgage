@@ -79,8 +79,29 @@ export const LINKED_MAX = 1 / 3;
  */
 export const TRACK_SHARE_MAX = 2 / 3;
 export const TRACK_SHARE_EXEMPT: readonly string[] = ["klz"];
-/** Smallest tranche worth opening — practice (banks rarely open a track under ~₪50k). */
+/** Smallest tranche worth opening — practice (banks rarely open a track under ~₪50k). A segment's only tranche is exempt (a small mix is one tranche), except the bank all-purpose minimum below. */
 export const MIN_TRANCHE = 50_000;
+/**
+ * The smallest home-secured all-purpose loan a bank writes. Practice, from the
+ * one bank that publishes a floor: Mizrahi-Tefahot, "הלוואה החל מ-40,000 ₪
+ * לתקופה של 4-30 שנים", against the home
+ * (https://www.mizrahi-tefahot.co.il/loans/privateloanslib/all-purpose-loan/,
+ * read 23/11/2026). At a bank (bank and bankPremium tiers) the all-purpose money
+ * a mix lends is none or at least this, held in the solve (solve.ts, the
+ * segment's only tranche; two tranches are each MIN_TRANCHE already). Audit 3
+ * R1: r03 savings folded an 8-month loan into an ₪18,001 four-year loan, with
+ * nothing saying a bank does not write one that small. Exceptions, each stated
+ * on the tranche (NewTranche.keptSmall) and in a caveat:
+ *   · AP_GREEN: the same page's "הלוואה לכל מטרה במסלול ירוק", ₪10,000 to
+ *     ₪60,000 up to 30 years against the home, for clients with a mortgage and
+ *     a current account at Mizrahi-Tefahot: the floor is AP_GREEN.min where the
+ *     mortgage is there and the new money is that bank's (an internal refinance);
+ *   · money the mix must lend: debt due now and arrears under the override, and a
+ *     כל מטרה mortgage row that moves with the whole mortgage to another bank.
+ * A non-bank lender is not held to it (its own size caveat, index.ts SMALL_LOAN).
+ */
+export const BANK_AP_MIN = 40_000;
+export const AP_GREEN = { bank: "Mizrahi Tefahot", min: 10_000, max: 60_000 } as const;
 export const MAX_HOUSING_TRANCHES = 4;
 export const MAX_AP_TRANCHES = 2;
 /** Whole years only; a 5-year-reset track needs at least one full reset to be what it says. */

@@ -229,6 +229,15 @@ export type Spec = {
   /** Debt decisions held fixed (the term walk): ids refinanced; every other movable debt kept. */
   fixZ?: string[] | null;
   /**
+   * The smallest all-purpose loan the lender writes (rules.ts BANK_AP_MIN, or
+   * AP_GREEN.min at Mizrahi-Tefahot for its own mortgage client): the
+   * segment's only tranche at least this. Not held while the segment carries
+   * money the mix must lend: a forced all-purpose debt (debt due now, a row
+   * moving with a whole mortgage) or, under moveWhole, a כל מטרה mortgage row
+   * that moves; nor while arrears are cured from it. null = no floor (a non-bank).
+   */
+  apMin?: number | null;
+  /**
    * Whose law the new money is under. "bank": directive 329 (⅓ fixed on the new
    * money and on the property, no enlarging an LTV breach). "nonbank": 329 does
    * not bind a non-bank lender — its own LTV policy (`ltv`) and the Fair Credit
@@ -487,6 +496,13 @@ function solveOnceInner(debts: SolverDebt[], colsIn: Column[], s: Spec, relaxed:
   }
   // ---- tranche structure: open binaries, minimum size, count, share cap
   const bigM = (sum(debts.map((d) => d.balance + d.fee)) + cureAll + s.setupHousing + s.setupAp) / U + 1;
+  // The bank all-purpose minimum (Spec.apMin) on the segment's only tranche:
+  // lo: Σx − MIN·o + (MIN − floor)·single + floor·Σ z(exempt) ≥ 0, so a lone
+  // tranche is at least `floor` unless a debt the mix must lend for moves (then
+  // the row asks nothing). Arrears cured from the segment lift it (override only).
+  const apFloor = s.apMin && cureAll === 0 ? Math.min(s.apMin, MIN_TRANCHE) : 0;
+  const apExempt = (d: SolverDebt) => d.segment === "allPurpose" && (!!d.forced || (s.moveWhole && d.group === "mortgage"));
+  const apLo: string[] = [];
   for (const seg of ["h", "ap"] as const) {
     const maxTr = seg === "h" ? MAX_HOUSING_TRANCHES : MAX_AP_TRANCHES;
     const single = `single_${seg}`;
@@ -507,7 +523,9 @@ function solveOnceInner(debts: SolverDebt[], colsIn: Column[], s: Spec, relaxed:
       C.set(`lo:${tk}`, { min: 0 });
       add(o, `up:${tk}`, -bigM);
       add(o, `lo:${tk}`, -MIN_TRANCHE / U);
-      add(single, `lo:${tk}`, MIN_TRANCHE / U);
+      const floor = seg === "ap" ? apFloor : 0;
+      add(single, `lo:${tk}`, (MIN_TRANCHE - floor) / U);
+      if (floor > 0) apLo.push(`lo:${tk}`);
       for (const c of list) {
         add(`x:${c.key}`, `up:${tk}`, 1);
         add(`x:${c.key}`, `lo:${tk}`, 1);
@@ -624,6 +642,7 @@ function solveOnceInner(debts: SolverDebt[], colsIn: Column[], s: Spec, relaxed:
       if (s.riseShare != null) put("riseS", (1 + s.riseShare) * d.monthly);
     }
     if (cs !== null) put("cshare", (d.fee - cs * (d.balance + d.fee)) / U);
+    if (apExempt(d)) for (const row of apLo) put(row, apFloor / U);
     if (shared > 0 && d.segment === "housing") put("shn", -1);
     // Cleared, a debt in arrears needs no cure; kept, it needs its cure (fund_ap above, and an all-purpose file).
     const cure = cureOf(d);
