@@ -28,6 +28,7 @@ import type { CombinedRow, MixFullTotals } from "@/app/private/crm/leads/simulat
 import { freqMonths } from "@/lib/rate-frequency";
 import { bondAnchor, indexFactor, marketAnchorAt, nominalAt, type Forecast } from "./forecast";
 import { parseDate, startOfToday } from "./dates";
+import { primeAt } from "./boi";
 
 /** The board's economic assumptions. `forecast: null` is the flat mode. */
 export type Econ = { inflation: number; forecast: Forecast | null };
@@ -71,7 +72,31 @@ type Extra = Loan & {
   reset_fresh?: boolean;
   anchor_asof?: string;
   built_in_margin?: number;
+  loan_end_date?: string | null;
+  end_date?: string | null;
 };
+
+/**
+ * The month a row's schedule starts from — its OWN "today": תאריך סיום less the
+ * payments left. On an imported row that is the document's date (the import
+ * counts the term from it), on a row typed in today it is today.
+ *
+ * Every calendar fact about a row — when its rate resets, when it was last
+ * fixed — must be counted from here, because the schedule's month 1 is the
+ * month after this one. Counting from the wall clock instead slid every reset
+ * earlier by the letter's age: a 2024 letter viewed in 2026 had resets that
+ * had "already passed" and were pushed a whole interval out, so the board
+ * priced years at the old rate (Mercantile 08/09/2024: ריבית והצמדה ₪10,800
+ * under SmartNPV, which counts from the letter's date; Leumi 25/09/2024: ₪24,000
+ * under). Even a fresh letter lost a month whenever the calendar turned
+ * between the letter and the import.
+ */
+export function frameOf(l: Extra, fallback = startOfToday()): Date {
+  const end = parseDate(l.loan_end_date ?? l.end_date ?? null);
+  const n = Math.round(Number(l.months) || 0);
+  if (!end || !(n > 0)) return fallback;
+  return new Date(end.getFullYear(), end.getMonth() - n, Math.min(end.getDate(), 28));
+}
 
 /** Months between rate resets on a bond track. 60 when nothing says — the market's default. */
 export function intervalOf(l: Extra): number {
@@ -81,14 +106,15 @@ export function intervalOf(l: Extra): number {
 }
 
 /**
- * Months until the FIRST reset, counted from today — 451's `s`.
+ * Months until the FIRST reset, counted from the row's own frame (frameOf) —
+ * 451's `s`.
  *
  * A new proposal track resets one full interval out. A debt the client already
  * carries resets when its own calendar says: the bank letter's next-reset date
  * when one was printed, else the opening date's phase in the cycle. Without
  * either, it is treated as new — the only assumption that invents nothing.
  */
-export function firstResetOf(l: Extra, V: number, today = startOfToday()): number {
+export function firstResetOf(l: Extra, V: number, today = frameOf(l)): number {
   // Calendar months, not elapsed days: a reset dated 01/02/2031 seen from
   // 08/10/2026 leaves 52 payments at the old rate (Nov 2026 … Feb 2031) and the
   // new one is first paid in March — SmartNPV's schedule moves at month 53.
@@ -123,7 +149,7 @@ const ANCHOR_TOLERANCE = 0.5;
  * when it is being fixed now — a new track, a re-tracked row, a debt whose
  * calendar the document did not give. One reset interval before the next one.
  */
-export function lastResetYm(l: Extra, V: number, today = startOfToday()): string | null {
+export function lastResetYm(l: Extra, V: number, today = frameOf(l)): string | null {
   if (l.reset_fresh) return null;
   const ym = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
   const thisMonth = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -193,8 +219,13 @@ export function anchorReading(l: Loan, f: Forecast): { market: number; builtIn: 
 /**
  * The spread over the anchor the row keeps for life.
  *
- * PRIME: the stated margin (a prime margin is printed on every letter and means
- * one thing), else whatever puts month 1 at the typed rate.
+ * PRIME: the stated margin (a prime margin is printed on most letters and means
+ * one thing). Where none is printed, the rate less the prime IN FORCE ON THE
+ * ROW'S OWN DATE (BoI's policy-rate history, lib/boi): a Leumi letter of
+ * 16/02/2025 prints its prime parts at 6.00 with no margin — prime was 6.00 that
+ * day, so the margin is 0. Measured against today's forward prime (4.65) it read
+ * as +1.35, and ₪84,000 of ריבית והצמדה appeared that SmartNPV does not show.
+ * Past the history's reach, whatever puts month 1 at the typed rate.
  *
  * BOND TRACKS: the spread the rate was SET at, kept for life, so every reset is
  * the window's forward anchor + that spread (owner's rule, 2026-10-10: the bank's
@@ -215,6 +246,8 @@ function marginOf(l: Extra, f: Forecast, track: Track, V: number): number {
   if (track === "prime") {
     const stated = Number(l.anchor_margin);
     if (l.anchor_margin !== null && l.anchor_margin !== undefined && Number.isFinite(stated)) return stated;
+    const then = primeAt(frameOf(l));
+    if (then !== null) return Math.round((rate - then) * 100) / 100;
     return rate - (nominalAt(f, 1) + PRIME_SPREAD);
   }
   return anchorReading(l, f)!.margin;
@@ -373,7 +406,12 @@ export function priceLoan(loan: Loan, assume: Assume): PricedLoan {
   return {
     ...res,
     rates: res.schedule.map(() => Number(loan.rate) || 0),
-    index: res.schedule.map((_, k) => (linked ? Math.pow(1 + i, k + 1) : 1)),
+    // The balloon engine (schedule 3) indexes the balance at the END of each
+    // month, so its month-one payment carries no CPI yet; the others pay month
+    // one already indexed. Stated with one month too many, todayPayment took a
+    // month of CPI off a figure that had none (₪3,597 for SmartNPV's ₪3,603 on
+    // a Leumi בלון חלקי of ₪800,756 at 5.4%).
+    index: res.schedule.map((_, k) => (linked ? Math.pow(1 + i, k + (Number(loan.amortization_schedule_id) === 3 ? 0 : 1)) : 1)),
   };
 }
 

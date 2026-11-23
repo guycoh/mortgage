@@ -30,6 +30,7 @@ import {
 } from "@/app/aa102test/lib/forecast";
 import { ADMIN_COOKIE, verifyAdminCookie } from "@/app/simulator/lib/admin-auth";
 import boiLast from "./boi-last.json";
+import { BOI_SNAPSHOT } from "@/app/aa102test/lib/boi";
 
 export const dynamic = "force-dynamic";
 
@@ -118,7 +119,12 @@ async function boiHistory(): Promise<AnchorHistory | null> {
   } catch {
     value = null;
   }
-  historyCache = { at: value ? Date.now() : Date.now() - 12 * 3600_000 + 300_000, value };
+  const live = !!value;
+  // Unreachable → the copy in the bundle (lib/boi): without a history every
+  // lender's built-in margin goes unread and old anchors are judged against
+  // today's curve, which is what the live site did on 23/11/2026.
+  value ??= BOI_SNAPSHOT.history;
+  historyCache = { at: live ? Date.now() : Date.now() - 12 * 3600_000 + 300_000, value };
   return value;
 }
 

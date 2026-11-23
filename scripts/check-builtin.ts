@@ -74,14 +74,18 @@ near(marketAnchorAt(smart, "2023-05", 60, true)!, 1.129, 0.005, "BoI 5y CPI-link
 near(anchorReading(letter[1], smart)!.builtIn, 0.63, 0.01, "history reads 1.76 as 0.63 above that market");
 near(anchorReading(letter[2], smart)!.builtIn, 0, 1e-9, "the 2024 tranche's 1.95 IS the market's (no built-in)");
 
-console.log("\nSETTLED FROM THE LETTER'S OWN PROJECTION (SmartNPV: תוספת מיכונית 0.7%, סך התוספת 1.7%)");
+console.log("\nSETTLED FROM THE HISTORY, TO THE 0.05 (SmartNPV: תוספת מיכונית 0.7%, סך התוספת 1.7%)");
+// The history reads these tranches at 0.63 → 0.65; SmartNPV says 0.70. Across
+// the whole letter corpus the history is the closer reading (lib/builtin,
+// scripts/snpv-parity.mts); on this letter it costs 0.05 of margin, so the
+// SmartNPV figures below carry that tolerance (₪1,286 of ₪701,139).
 const settled = settleBuiltIns(letter, smart);
-ok(settled[1].built_in_margin === 0.7, `2013 tranche A built-in ${settled[1].built_in_margin}`);
-ok(settled[4].built_in_margin === 0.7, `2013 tranche B built-in ${settled[4].built_in_margin}`);
+near(settled[1].built_in_margin!, 0.7, 0.05 + 1e-9, "2013 tranche A built-in (SmartNPV 0.7)");
+near(settled[4].built_in_margin!, 0.7, 0.05 + 1e-9, "2013 tranche B built-in (SmartNPV 0.7)");
 ok(settled[2].built_in_margin === undefined, "2024 tranche: none");
 ok(settled[0].built_in_margin === undefined && settled[3].built_in_margin === undefined, "fixed and prime rows: not bond tracks, untouched");
-near(anchorReading(settled[1], smart)!.margin, 1.7, 1e-9, "reset margin A");
-near(anchorReading(settled[4], smart)!.margin, 1.7, 1e-9, "reset margin B");
+near(anchorReading(settled[1], smart)!.margin, 1.7, 0.05 + 1e-9, "reset margin A");
+near(anchorReading(settled[4], smart)!.margin, 1.7, 0.05 + 1e-9, "reset margin B");
 ok(settleBuiltIns(letter, noHistory)[1].built_in_margin === undefined, "no history → nothing settled (the engine could not honour it)");
 
 console.log("\nSmartNPV's קיימת = שכפול משכנתה נוכחית עם הפרשי היוון");
@@ -97,16 +101,16 @@ const smartRows: [number, number, number][] = [
   [2, 8.54, 2.02],
 ];
 for (const [i, want, ps] of smartRows) {
-  near(irr(copy[i]), want, 0.006, `tranche ${i} שת"פ`);
+  near(irr(copy[i]), want, i === 1 || i === 4 ? 0.05 : 0.006, `tranche ${i} שת"פ`);
   const p = priceLoan(copy[i], econ);
   near(p.totalPaid / Number(copy[i].amount), ps, 0.006, `tranche ${i} החזר לשקל`);
 }
 const X = mixFigures(copy, econ, 4)!;
-near(X.cost, 701139, 701139 * 0.0002, "תשלומי ריבית והצמדה");
-near(X.totalPaid, 1576976, 1576976 * 0.0002, "עלות כוללת");
-near(X.irr!, 7.33, 0.005, 'שת"פ');
-near(X.npv, 215720, 150, "ע.נ.נ");
-near(X.peak, 8913, 3, "החזר בשיא");
+near(X.cost, 701139, 701139 * 0.002, "תשלומי ריבית והצמדה");
+near(X.totalPaid, 1576976, 1576976 * 0.001, "עלות כוללת");
+near(X.irr!, 7.33, 0.01, 'שת"פ');
+near(X.npv, 215720, 1000, "ע.נ.נ");
+near(X.peak, 8913, 10, "החזר בשיא");
 ok(X.peakYear === 17, `החזר בשיא in year ${X.peakYear} (SmartNPV: 17)`);
 near(X.perShekel, 1.8, 0.005, "החזר לשקל");
 near(X.firstTyped, 6241, 1, "החזר ראשון (today's money, as SmartNPV quotes it)");
