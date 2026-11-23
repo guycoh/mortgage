@@ -3,7 +3,7 @@
 // independently; the caller falls back to the stored or committed snapshot.
 
 import { fitForecast, bondAnchor, type Forecast, type ZeroPoint } from "@/app/aa102test/lib/forecast";
-import { curveYield, type MarketSnapshot, type TrackKey } from "./market";
+import { curveYield, type FeeRow, type MarketSnapshot, type TrackKey } from "./market";
 
 const SDMX = "https://edge.boi.gov.il/FusionEdgeServer/ws/public/sdmxapi/rest/data/BOI.STATISTICS";
 const BIR_URL = `${SDMX},BIR_MRTG_99,1.0?lastNObservations=6`;
@@ -384,6 +384,106 @@ export async function tamInt(): Promise<BankTable & { history: Record<string, Re
 /** An effective (adjusted) annual rate → the nominal annual rate of a monthly-paid loan. */
 export const nominalOf = (effective: number) => (Math.pow(1 + effective / 100, 1 / 12) - 1) * 1200;
 
+/* ------------------------------ 5. average-rate tables (fees, fixed tracks) */
+
+// The Bank of Israel's average mortgage rates as the early-repayment fee order
+// (צו הבנקאות (עמלות פירעון מוקדם), התשס"ב-2002, §7(א) and the Second Schedule)
+// uses them: one table per sector, a rate per bucket of term, republished
+// monthly, each row effective from a stated day. Published at
+// https://www.boi.org.il/information/interestrates/mortgage/ ; both files carry
+// their whole history. Unlinked: by bucket for loans given from 01/03/2013, a
+// single rate before. CPI-linked: today's buckets (RESULT) and the pre-2011
+// buckets (RESULT_OLD), kept with their own edges. The rates are EFFECTIVE
+// annual rates; automix/fees.ts states them the way the banks' letters do.
+const FEE_BASE = "https://www.boi.org.il/boi_files/Pikuah";
+export const FEE_SOURCES = { unlinked: `${FEE_BASE}/mashfix.xls`, linked: `${FEE_BASE}/pribmash.xls`, page: "https://www.boi.org.il/information/interestrates/mortgage/" };
+
+/** One table: bucket upper edges in months (Infinity = open), rows newest first. */
+export type FeeTable = { edges: number[]; rows: FeeRow[] };
+export type FeeTables = { unlinked: FeeTable; unlinkedOld: FeeTable; linked: FeeTable; linkedOld: FeeTable };
+
+/** Excel serial or "dd/mm/yyyy" → "yyyy-mm-dd". */
+function feeDay(v: unknown): string | null {
+  if (typeof v === "number" && v > 20000 && v < 80000) return new Date(Date.UTC(1899, 11, 30) + v * 86400000).toISOString().slice(0, 10);
+  const m = String(v ?? "").trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  return m ? `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}` : null;
+}
+const feeNum = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? Math.round(v * 10000) / 10000 : null);
+const newestFirst = (rows: FeeRow[]) => rows.sort((a, b) => (a.effective < b.effective ? 1 : -1));
+
+function feeTable(rows: unknown[][], edges: number[], firstBucketCol: number, lastBucketCol: number, effCol: number, repCol: number): FeeTable {
+  const out: FeeTable = { edges, rows: [] };
+  for (const r of rows) {
+    const eff = feeDay(r[effCol]);
+    if (!eff) continue;
+    // Columns run from the longest bucket (left) to the shortest (right).
+    const rates: number[] = [];
+    for (let c = lastBucketCol; c >= firstBucketCol; c--) rates.push(feeNum(r[c]) ?? NaN);
+    if (rates.some((x) => !Number.isFinite(x))) continue;
+    out.rows.push({ effective: eff, report: feeDay(r[repCol]), rates });
+  }
+  newestFirst(out.rows);
+  return out;
+}
+
+/**
+ * Both files are published together, so one report month takes effect on one
+ * day in both. Where they disagree and one date is out of order (later than the
+ * NEXT report's), it is a typo and the other file's date stands: mashfix dates
+ * report 31/08/2026 to 31/10/2026, after report 30/09/2026 took effect on
+ * 19/10/2026; pribmash dates it 15/09/2026, and the A printed on letters of
+ * 04/10/2026 and 18/10/2026 is that report's.
+ */
+function repairFeeDates(t: FeeTable, twin: FeeTable, name: string, notes: string[]) {
+  const byReport = [...t.rows].sort((a, b) => ((a.report ?? "") < (b.report ?? "") ? -1 : 1));
+  byReport.forEach((r, i) => {
+    const next = byReport[i + 1];
+    if (!next || r.effective <= next.effective) return;
+    const other = twin.rows.find((x) => x.report === r.report);
+    if (!other || other.effective > next.effective) return void notes.push(`${name}: report ${r.report} effective ${r.effective} is out of order and has no usable twin`);
+    notes.push(`${name}: report ${r.report} effective ${r.effective} → ${other.effective} (twin file)`);
+    r.effective = other.effective;
+  });
+  newestFirst(t.rows);
+}
+
+/** The four tables, read from the BoI's two workbooks; `notes` says what was repaired. */
+export async function feeTables(): Promise<FeeTables & { notes: string[] }> {
+  const XLSX = await import("xlsx");
+  const book = async (name: string) => {
+    const res = await fetch(`${FEE_BASE}/${name}.xls`, { headers: { "user-agent": "Mozilla/5.0" }, cache: "no-store", signal: AbortSignal.timeout(30_000) });
+    if (!res.ok) throw new Error(`${name} ${res.status}`);
+    return XLSX.read(new Uint8Array(await res.arrayBuffer()), { type: "array" });
+  };
+  const [fix, cpi] = await Promise.all([book("mashfix"), book("pribmash")]);
+  const sheet = (wb: Awaited<ReturnType<typeof book>>, name: string): unknown[][] => {
+    if (!wb.Sheets[name]) throw new Error(`average-rate tables: sheet "${name}" not found`);
+    return XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[name], { header: 1, raw: true });
+  };
+  // Unlinked from 03/2013: [avg, >25, 20–25, 15–20, 10–15, 5–10, 1–5, ≤1, effective, report]
+  const unlinked = feeTable(sheet(fix, "הלוואות שניתנו מ-01.03.2013"), [12, 60, 120, 180, 240, 300, Infinity], 1, 7, 8, 9);
+  // Unlinked to 02/2013: [loans up to, effective, rate] — one rate, every term.
+  const unlinkedOld: FeeTable = { edges: [Infinity], rows: [] };
+  for (const r of sheet(fix, "הלוואות שניתנו עד-28.02.2013")) {
+    const eff = feeDay(r[1]);
+    const rate = feeNum(r[2]);
+    if (eff && rate !== null) unlinkedOld.rows.push({ effective: eff, report: feeDay(r[0]), rates: [rate] });
+  }
+  newestFirst(unlinkedOld.rows);
+  // CPI-linked now: [avg, >25, 20–25, 15–20, 10–15, 5–10, ≤5, effective, report]
+  const linked = feeTable(sheet(cpi, "RESULT"), [60, 120, 180, 240, 300, Infinity], 1, 6, 7, 8);
+  // CPI-linked before 08/2011: [avg, >20, 17–20, 15–17, 12–15, 5–12, ≤5, effective, report]
+  const linkedOld = feeTable(sheet(cpi, "RESULT_OLD"), [60, 144, 180, 204, 240, Infinity], 1, 6, 7, 8);
+  const notes: string[] = [];
+  repairFeeDates(unlinked, linked, "unlinked", notes);
+  repairFeeDates(linked, unlinked, "linked", notes);
+  if (!unlinked.rows.length || !linked.rows.length) throw new Error("average-rate tables: no rows read");
+  return { unlinked, unlinkedOld, linked, linkedOld, notes };
+}
+
+/** How many of the newest rows a snapshot carries: newFixedRate averages three, and a deploy is rarely older than a few months. */
+const FEE_ROWS_LIVE = 8;
+
 /* ---------------------------------------------------------- assemble */
 
 export type MarketBuild = { snapshot: MarketSnapshot; banks: BankTable; level: Level };
@@ -397,7 +497,7 @@ export type MarketBuild = { snapshot: MarketSnapshot; banks: BankTable; level: L
  * read, the Power BI comparison is the fallback (and its month says how old).
  */
 export async function buildMarket(): Promise<MarketBuild> {
-  const [lv, br, zcm] = await Promise.all([level(), boiRates(), curves()]);
+  const [lv, br, zcm, fee] = await Promise.all([level(), boiRates(), curves(), feeTables().catch(() => null)]);
   let banks: BankTable;
   let bankSource: { id: string; label: string; url: string };
   try {
@@ -480,6 +580,7 @@ export async function buildMarket(): Promise<MarketBuild> {
     allPurposePremium: { prime: premVar, klz: premFixed, kz: premFixed, mlz: premVar, mz: premVar },
     bankDelta,
     bankIrr,
+    ...(fee ? { feeRows: { unlinked: fee.unlinked.rows.slice(0, FEE_ROWS_LIVE), linked: fee.linked.rows.slice(0, FEE_ROWS_LIVE) } } : {}),
   };
   return { snapshot, banks, level: lv };
 }

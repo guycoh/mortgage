@@ -100,7 +100,21 @@ export type MarketSnapshot = {
   bankDelta: Record<string, Partial<Record<TrackKey, number>>>;
   /** Each bank's portfolio IRR (BoI's 451 calculation) for the comparison month. */
   bankIrr: Record<string, number>;
+  /**
+   * The newest rows of the BoI's two average-rate tables (mashfix.xls unlinked,
+   * pribmash.xls CPI-linked), read when this snapshot was built. The engine
+   * merges them over the tables committed with the code (automix/fees.ts
+   * mergeFeeRows), so a fixed track's price and a prepayment fee follow the
+   * month in hand and not the month of the last deploy: the back-test measured a
+   * 20-year קל"צ moving by 0.46 points on average between tables a few years apart,
+   * while prime and the 5-year tracks in this same snapshot are always current.
+   * Absent when the files could not be read; the committed tables then stand.
+   */
+  feeRows?: { unlinked: FeeRow[]; linked: FeeRow[] };
 };
+
+/** One published row of an average-rate table: the day it takes effect, its report month, a rate per term bucket (effective annual %). */
+export type FeeRow = { effective: string; report: string | null; rates: number[] };
 
 /* ------------------------------------------------------------ the curve */
 
