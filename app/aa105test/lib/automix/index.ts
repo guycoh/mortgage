@@ -1841,8 +1841,16 @@ function solveBalanced(ctx: Ctx, extra: Partial<Spec> = {}, fromGuard?: Guard["k
   // the same answer).
   const box = (relief: number, saving: number, from: Plan[], mode: string, debts: SolverDebt[] = ctx.debts, cols: Column[] = ctx.cols): Solved => {
     const spec = costSpec(ctx, "balanced", { budget: Math.min(budget, M0 - relief + 0.01), paidCap: Math.min(P0 - saving + 0.5, P0), ...rules });
-    const p = solveGuarded(ctx, spec, [...POOL, ...from.map((x) => seedOf(x, ctx.cols))], undefined, from[0], debts, cols);
-    const plan = p.ok ? p : from[0];
+    // The starts re-priced under the box's own objective (restart). A probe is
+    // solved for the cheapest FORECAST (λ 0); carried in as it is, its objective
+    // is lower than any risk-weighted one, so the search below and the polish in
+    // runGoals kept it as unbeatable and the box never moved off the probe
+    // (audit 3 F1, F3, F4: r01 ₪44,024, r04 ₪45,045, r01+r02 typical ₪172,636 of
+    // saving left at the same relief).
+    const starts = from.map((x) => restart(ctx, x, spec, ctx.cols)).filter((x): x is Plan => !!x?.ok);
+    const p = solveGuarded(ctx, spec, [...POOL, ...from.map((x) => seedOf(x, ctx.cols))], undefined, starts[0] ?? from[0], debts, cols);
+    const bestStart = starts.reduce<Plan | undefined>((b, x) => (!b || x.objective < b.objective ? x : b), undefined);
+    const plan = p.ok && (!bestStart || p.objective <= bestStart.objective + 1e-9) ? p : bestStart ?? (p.ok ? p : from[0]);
     if (plan.ok) addToPool(plan, ctx.cols);
     return { plan, meta: { ...anchors, mode }, spec, cols: ctx.cols, guard };
   };
@@ -1913,8 +1921,60 @@ function solveBalanced(ctx: Ctx, extra: Partial<Spec> = {}, fromGuard?: Guard["k
     if (q.s >= q.f) a = q;
     else b = q;
   }
-  const t = tOf(best);
-  return box(t * R, t * S, [best.plan], "both", between, near);
+  // THE POINT, refined on the whole problem. The probes run between the anchors
+  // on two rounds; at the point they found, the most forecast saving at the same
+  // relief is searched again with every debt free, every term on the grid, and
+  // the other goals' answers and the Bank of Israel's uniform baskets as starts
+  // (audit 3: r01 ₪44,024 and r04 ₪45,045 more saving at the same relief lay
+  // outside the anchors' region, keeping a debt both anchors move or at terms
+  // more than three years off theirs; on r04 basket 1, all קל"צ at 21 years,
+  // gave more relief and more saving than the answer).
+  const refine = (q: Pt): Pt => {
+    const spec = cheapestAt(M0 - q.f * R);
+    const start = restart(ctx, q.plan, spec, ctx.cols);
+    const p = solveGuarded(ctx, spec, [...POOL, seedOf(q.plan, ctx.cols), ...basketSeeds(ctx, q.plan)], undefined, start, ctx.debts, ctx.cols);
+    const r = p.ok ? pt(p) : null;
+    return r && r.s > q.s && r.f >= q.f - 1e-9 ? r : q;
+  };
+  const point = refine(best);
+  const t = tOf(point);
+  // The box: the cheapest risk-weighted mix (λ 0.5) at the point's relief and,
+  // within half the materiality of a saving, its saving: never less relief or
+  // materially less saving than the point it improves, a better worst economy
+  // where one is to be had.
+  const give = 0.5 * MATERIAL.cost(todayCostOf(ctx));
+  return box(point.f * R, Math.max(t * S, point.s * S - give), [point.plan, best.plan], "both");
+}
+
+/**
+ * The Bank of Israel's three uniform baskets (all קל"צ; ⅓ קל"צ ⅓ פריים ⅓ מ"צ; ½ קל"צ
+ * ½ פריים) as search starts on a plan's own debts: the housing money on the
+ * basket's tracks at the plan's weighted term, three years either side and every
+ * five years, the all-purpose money on the plan's own terms. Each start is
+ * re-solved under the goal's spec (solve.ts seeds), so its amounts follow the
+ * rules, not the basket's thirds.
+ */
+function basketSeeds(ctx: Ctx, plan: Plan): Seed[] {
+  if (!plan.ok) return [];
+  const housing = Object.entries(plan.amounts).filter(([k]) => k.split("|")[1] === "housing");
+  const N = sum(housing.map(([, a]) => a));
+  if (!(N > 0)) return [];
+  const avg = Math.round(sum(housing.map(([k, a]) => a * Number(k.split("|")[2]))) / N);
+  const ap: Record<string, number> = {};
+  for (const [f, y] of Object.entries(termsOf(plan, ctx.cols))) if (f.endsWith("|allPurpose")) ap[f] = y;
+  const keys = new Set(ctx.cols.map((c) => c.key));
+  const years = Array.from(new Set([avg - 3, avg, avg + 3, 10, 15, 20, 25, 30])).filter((y) => y >= MIN_YEARS.prime && y <= ctx.maxYears);
+  const out: Seed[] = [];
+  for (const y of years)
+    for (const tracks of [["klz"], ["klz", "prime", "mz"], ["klz", "prime"]] as TrackKey[][]) {
+      const terms: Record<string, number> = { ...ap };
+      for (const tr of tracks) {
+        const yy = Math.max(MIN_YEARS[tr], y);
+        if (keys.has(`${tr}|housing|${yy}`)) terms[`${tr}|housing`] = yy;
+      }
+      out.push({ refinance: plan.refinance.slice().sort(), terms });
+    }
+  return out;
 }
 
 /**

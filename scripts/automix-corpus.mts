@@ -108,7 +108,10 @@ function run(name: string, input: AutoMixInput, opts: { ok?: boolean; laws?: boo
     return null;
   }
   sane(name, r);
-  check(r.ms < 3000, `${name}: ${r.ms.toFixed(0)}ms`);
+  // 4 s (3 s before audit 3's fixes): מאוזן's point is refined on the whole problem, which costs the largest
+  // household 0.3 s (r02 typical 2.6 → 3.0 s idle) and buys ₪25–30k of forecast saving at the same relief on r01
+  // and r01+r02 typical. The 3 s limit left 45 ms of room and failed under a second process.
+  check(r.ms < 4000, `${name}: ${r.ms.toFixed(0)}ms`);
   if (r.ok) verify(name, input, r, { ok: opts.ok ?? r.ok });
   else {
     lint(name, r);
