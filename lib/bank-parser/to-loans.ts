@@ -138,17 +138,19 @@ function resetDateOf(t: BankTranche, st: BankStatement): string | null {
 /**
  * The tranche's monthly charge as the letter prints it, or undefined.
  *
- * It is the figure the board shows in החזר חודשי until the row is edited (see
- * boardMonthly in lib/credit) — SmartNPV shows the same one. The engine's own
- * first payment lands a little above it, by design rather than by error: it is
- * NEXT month's payment, one month of CPI later on a צמוד tranche, and the
- * letter's figure is the last one charged.
+ * Exported for readers of the letter itself (it is what was last charged), NOT
+ * as the board's החזר חודשי. From 2026-10-17 to 2026-11-23 the board showed it
+ * on the belief that SmartNPV does; measured on 45 letters (scripts/snpv-
+ * parity.mts) SmartNPV's החזר ראשון is the ENGINE's month one at the typed
+ * rate in today's money — ours to the shekel on 41 of 45 — while the printed
+ * charge (the last one collected, before this month's CPI and any rate step)
+ * matched on 22, up to ₪70 a month off (Leumi, Jerusalem, Hapoalim).
  *
  * Hapoalim prints the monthly per LOAN, and the per-tranche figure it leaves us
  * is our own balance-weighted share of it (see balanceApportioned). That is a
  * split we made, not a charge the bank stated, so those rows keep the engine.
  */
-function printedMonthlyOf(t: BankTranche): number | undefined {
+export function printedMonthlyOf(t: BankTranche): number | undefined {
   if (t.balanceApportioned) return undefined;
   return t.monthly !== null && t.monthly > 0 ? t.monthly : undefined;
 }
@@ -159,7 +161,6 @@ function toRow(t: BankTranche, mixId: string, st: BankStatement): ImportedLoan {
   const rate = t.rate ?? 0;
   const months = termOf(t, st.statementDate);
   const scheduleId = amortizationId(t.amortization);
-  const printed = printedMonthlyOf(t);
   return {
     id: crypto.randomUUID(),
     mix_id: mixId,
@@ -210,10 +211,13 @@ function toRow(t: BankTranche, mixId: string, st: BankStatement): ImportedLoan {
     // When the rate first moves — the forecast engine resets the anchor there.
     next_reset: resetDateOf(t, st),
     source_orig_amount: t.originalAmount ?? undefined,
-    // The letter's own charge, and the row it was true of — the same pair the
-    // credit report fills from 201-046. No grace: the row is imported without one.
-    source_monthly: printed,
-    source_monthly_basis: printed ? monthlyBasis(amount, rate, months, scheduleId, 0, 0) : undefined,
+    // The letter's own charge is NOT carried onto the row: boardMonthly would
+    // show it in place of the engine's month one, which is the figure SmartNPV
+    // quotes (see printedMonthlyOf). The credit report still fills this pair
+    // from 201-046 — SmartNPV reads no credit reports, and there the bureau's
+    // figure is the only charge on record.
+    source_monthly: undefined,
+    source_monthly_basis: undefined,
     source_purpose: t.purpose || PURPOSE_LABEL[t.purposeKind],
     // The board's own eleven-word list, from the kind and the raw wording —
     // the raw wording first, because it alone can say גישור or קבוצת רכישה.
@@ -234,6 +238,16 @@ function toRow(t: BankTranche, mixId: string, st: BankStatement): ImportedLoan {
 
 /** The הפרשי היוון column: the itemised component, else the printed total. */
 function feeOfTranche(t: BankTranche): number | null {
+  if (t.capitalizationFee === null || t.capitalizationFee === undefined) {
+    // No היוון line of its own. The צו (§4.2 of every letter's own appendix)
+    // charges no היוון on a rate that may change yearly or more often — prime,
+    // a 1–12-month variable — so whatever total such a part prints is the
+    // notice / operational fee, not הפרשי היוון. Poalim prints only a total
+    // (0.1% of every prime part), Jerusalem itemises but has no היוון line on
+    // its 12-month tracks; both used to land in this column. SmartNPV: 0.
+    const yearlyOrFaster = t.rateKind === "prime" || (t.rateKind === "variable" && (t.resetMonths ?? 0) > 0 && (t.resetMonths ?? 0) <= 12);
+    if (yearlyOrFaster && t.breakFee !== null && t.breakFee !== undefined) return 0;
+  }
   const v = t.capitalizationFee ?? t.breakFee;
   return v === null || v === undefined ? null : Math.round(v);
 }

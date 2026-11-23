@@ -10,65 +10,42 @@
 // SmartNPV reads the same letter the same way ("מצאנו כי התוספת המיכונית הינה
 // 0.7%, ולכן סך התוספת במסלול זה הינה 1.7%").
 //
-// HOW WE FIND IT. Two readings, one exact:
-//   · the engine always compares the printed anchor with the BoI market anchor
-//     of the month the rate was fixed (anchorReading in lib/price). A gap is
-//     the built-in, measured on monthly averages — right to about ±0.1.
-//   · the letter also prints the bank's own projection of the tranche, הריבית
-//     הכוללת החזויה, computed under directive 451 on the TRUE margin. Solving
-//     for the built-in that makes our projection land on that figure gives the
-//     bank's own number. On the 10/11/26 Mizrahi letter it gives 0.70 on both
-//     2013 tranches — SmartNPV's 0.7 — and nothing on the 2024 tranche.
-// The second is used when it agrees with the first (the history vetoes a
-// projection skewed by a curve weeks older than the letter); otherwise the
-// engine keeps the history's estimate.
+// HOW WE FIND IT. The printed anchor against the BoI market anchor of the
+// month the rate was fixed (anchorReading in lib/price), rounded to the
+// twentieth of a percent lenders set margins in. A gap of more than
+// ANCHOR_TOLERANCE is the built-in.
+//
+// Until 2026-11-23 a second reading could override it: solving for the
+// built-in that lands our projection of the tranche on the letter's own הריבית
+// הכוללת החזויה. Measured against SmartNPV over every Mizrahi letter in
+// ../Bank-Templates (scripts/snpv-parity.mts), that reading was the further of
+// the two on five letters of six — the bank computed its projection on ITS
+// curve of the letter's day, ours is another, so the solved margin absorbs the
+// difference between the curves (1.50 for SmartNPV's 1.70 on מסילתי, 12/10/26:
+// ₪7,971 of ריבית והצמדה). The history does not depend on any curve, which is
+// what a letter read weeks from now needs. Its one miss is the 10/11/26 letter
+// (0.65 for SmartNPV's 0.70, ₪1,286 on ₪701k — scripts/check-builtin.ts).
 //
 // Pure; run on import (Simulator.applyImport) against the board's forecast.
 
-import { anchorReading, priceLoan } from "./price";
+import { anchorReading } from "./price";
 import type { Forecast } from "./forecast";
-import { annualIRR } from "./yield";
 import type { ImportedLoan } from "./credit";
 
-/** Below this the history sees a printed anchor that IS the market's. */
-const DETECT = 0.3;
-/** How far the letter's figure may land from the history's and still be trusted. */
-const AGREE = 0.25;
+/** At or below this the printed anchor IS the market's — the engine's own ANCHOR_TOLERANCE. */
+const DETECT = 0.5;
 /** Lenders set margins in twentieths of a percent. */
 const STEP = 0.05;
 
-/** The tranche's projected שת"פ with `builtIn` added to its margin. */
-function projected(l: ImportedLoan, f: Forecast, builtIn: number): number | null {
-  const res = priceLoan({ ...l, built_in_margin: builtIn } as ImportedLoan, { inflation: 0, forecast: f });
-  return annualIRR(Number(l.amount) || 0, res.schedule.map((r) => r.payment));
-}
-
 /**
- * The row with `built_in_margin` settled, or the row unchanged when there is no
- * built-in to settle (or not enough to settle it with).
+ * The row with `built_in_margin` settled, or the row unchanged when the printed
+ * anchor is the market's (or there is no history to read it against).
  */
 export function settleBuiltIn(l: ImportedLoan, f: Forecast | null): ImportedLoan {
   if (!f?.history || l.built_in_margin !== undefined) return l;
-  const target = Number(l.source_forecast_rate);
-  if (!(target > 0) || !(Number(l.amount) > 0) || !(Number(l.months) > 0)) return l;
   const read = anchorReading(l, f);
-  if (!read || read.builtIn < DETECT) return l;
-  // The projection rises with the margin, so a bisection finds it.
-  let lo = 0;
-  let hi = 4;
-  const atLo = projected(l, f, lo);
-  const atHi = projected(l, f, hi);
-  if (atLo === null || atHi === null || atLo > target || atHi < target) return l;
-  for (let k = 0; k < 40; k++) {
-    const mid = (lo + hi) / 2;
-    const irr = projected(l, f, mid);
-    if (irr === null) return l;
-    if (irr < target) lo = mid;
-    else hi = mid;
-  }
-  const builtIn = Math.round((lo + hi) / 2 / STEP) * STEP;
-  if (Math.abs(builtIn - read.builtIn) > AGREE) return l;
-  return { ...l, built_in_margin: Math.round(builtIn * 100) / 100 };
+  if (!read || read.builtIn <= DETECT) return l;
+  return { ...l, built_in_margin: Math.round(Math.round(read.builtIn / STEP) * STEP * 100) / 100 };
 }
 
 /** Every row of a freshly imported document. */

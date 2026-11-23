@@ -30,8 +30,12 @@ import {
 } from "@/app/aa102test/lib/forecast";
 import { ADMIN_COOKIE, verifyAdminCookie } from "@/app/simulator/lib/admin-auth";
 import boiLast from "./boi-last.json";
+import { BOI_SNAPSHOT } from "@/app/aa102test/lib/boi";
+import { snpvForecast } from "@/app/aa102test/lib/snpv-forecast";
 
 export const dynamic = "force-dynamic";
+// Room for the SmartNPV probe calls (lib/snpv-forecast) on a cold start.
+export const maxDuration = 60;
 
 const BOI_URL =
   "https://edge.boi.org.il/FusionEdgeServer/sdmx/v2/data/dataflow/BOI.STATISTICS/ZCM/1.0/?lastNObservations=3&format=csv";
@@ -118,7 +122,12 @@ async function boiHistory(): Promise<AnchorHistory | null> {
   } catch {
     value = null;
   }
-  historyCache = { at: value ? Date.now() : Date.now() - 12 * 3600_000 + 300_000, value };
+  const live = !!value;
+  // Unreachable → the copy in the bundle (lib/boi): without a history every
+  // lender's built-in margin goes unread and old anchors are judged against
+  // today's curve, which is what the live site did on 23/11/2026.
+  value ??= BOI_SNAPSHOT.history;
+  historyCache = { at: live ? Date.now() : Date.now() - 12 * 3600_000 + 300_000, value };
   return value;
 }
 
@@ -153,6 +162,20 @@ async function readSaved(): Promise<Forecast[]> {
   }
 }
 
+/**
+ * SmartNPV republishes on the 1st and 15th; an hour in memory keeps the board
+ * on its newest curve within the hour, at 12 API calls per warm instance per
+ * hour. A failure is remembered for ten minutes, so an outage is not hammered.
+ */
+let snpvCache: { at: number; ttl: number; value: Forecast | null } | null = null;
+async function fromSnpv(boi: Forecast | null): Promise<Forecast | null> {
+  if (!process.env.SNPV_API_KEY) return null;
+  if (snpvCache && Date.now() - snpvCache.at < snpvCache.ttl) return snpvCache.value;
+  const value = await snpvForecast(boi);
+  snpvCache = { at: Date.now(), ttl: value ? 3600_000 : 600_000, value };
+  return value;
+}
+
 export async function GET() {
   const [fit, savedRaw, history] = await Promise.all([fromBoi(), readSaved(), boiHistory()]);
   // The history is the market's past, not a forecast, so every curve carries
@@ -161,7 +184,12 @@ export async function GET() {
   const withHistory = (f: Forecast): Forecast => (history ? { ...f, history } : f);
   const boi = fit ? withHistory(fit) : null;
   const saved = savedRaw.map(withHistory);
-  return NextResponse.json({ forecast: boi, boi, saved }, { headers: { "Cache-Control": "private, max-age=300" } });
+  // The default is SmartNPV's own curve whenever its API answers (and passes
+  // the checks in lib/snpv-forecast): the yardstick every advisor compares the
+  // board with. BoI stays the fallback, and stays in `boi` either way.
+  const snpv = await fromSnpv(fit);
+  const forecast = snpv ? withHistory(snpv) : boi;
+  return NextResponse.json({ forecast, boi, saved }, { headers: { "Cache-Control": "private, max-age=300" } });
 }
 
 const Body = z.union([

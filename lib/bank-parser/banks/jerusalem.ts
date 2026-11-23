@@ -77,6 +77,41 @@ function readRate(sugRibit: string, linkage: string, baseIndex: number | null): 
   return { kind, linkage: link };
 }
 
+/**
+ * What Jerusalem's "ריבית בסיס" stands on, read into the anchor and margin every
+ * other lender prints.
+ *
+ * On an UNLINKED variable track the base IS the market anchor (0.02 on a loan
+ * made in October 2021, 4.06 at its October 2026 reset — the BoI nominal yield
+ * of each day). On a CPI-LINKED one the bank adds a constant 5.00 to the real
+ * anchor so the base never prints negative: 6.69 on loans made in August 2024
+ * and 6.61 in September, when the BoI 30-month real anchor stood at 1.68 and
+ * 1.61, every tranche with the same −2.46 off it. So the real margin over the
+ * market is the printed one + 5 (2.54 here — SmartNPV reads the same letter the
+ * same way), and every reset is the market anchor + 2.54.
+ *
+ * Read as printed, the engine saw a 6.69 anchor four points above the market,
+ * took it for margin folded into the anchor, and measured each tranche against
+ * the market of its own month: four tranches sharing one contractual margin got
+ * four different ones (2.48–2.62).
+ *
+ * A linked base is recognised by its level: real anchors have run from about
+ * −1.6 to 2.5 since 2011, so a linked base of 3 or more carries the 5.
+ */
+const LINKED_BASE_OFFSET = 5;
+function baseAndMargin(
+  base: number | null,
+  margin: number | null,
+  kind: RateKind,
+  linkage: Linkage
+): { anchorRate: number | null; margin: number | null } {
+  if (kind !== "variable" || linkage !== "linked" || base === null || base < 3) return { anchorRate: base, margin };
+  return {
+    anchorRate: Math.round((base - LINKED_BASE_OFFSET) * 100) / 100,
+    margin: margin === null ? null : Math.round((margin + LINKED_BASE_OFFSET) * 100) / 100,
+  };
+}
+
 export function parseJerusalem(pages: RawPage[]): BankStatement {
   const warnings: string[] = [];
   const lines = pages.flatMap((p) => pageLines(p));
@@ -161,8 +196,7 @@ export function parseJerusalem(pages: RawPage[]): BankStatement {
       // Jerusalem names no anchor; it prints the base rate's current level and
       // the margin off it. The name stays blank rather than invented.
       anchor: kind === "fixed" ? "" : "ריבית בסיס",
-      anchorRate: pct(g("ריבית בסיס נוכחית")),
-      margin: pct(g("שיעור התוספת/הפחתה")),
+      ...baseAndMargin(pct(g("ריבית בסיס נוכחית")), pct(g("שיעור התוספת/הפחתה")), kind, linkage),
       resetMonths: num(g("תדירות שינוי הריבית")),
       nextReset: dotDate(g("מועד שינוי הריבית הקרוב")),
       startDate: dotDate(g("תאריך ביצוע")),
