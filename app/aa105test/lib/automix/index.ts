@@ -1134,13 +1134,16 @@ type Solved = {
   liftGain?: number;
   /** liftGain is a lower bound (the held problem's LP relaxation), not the held answer's own figure. */
   liftAtLeast?: boolean;
+  /** מאוזן lifted on the saving goal's verdict: liftGain is what holding costs the cheapest mix, not this one. */
+  liftFromSavings?: boolean;
 };
 
 /**
  * The goals that lift CHEAP_KEEP when keeping the cheap debts costs them
  * materially (rules.ts): the cost goals on their own objective, קיצור שנים on its
- * end. מאוזן's two anchors hold the rule (its relief share is what stretched
- * L44's 3.03% קל"צ), and the payment goal and the consolidation never hold it.
+ * end. מאוזן never lifts for its relief share (that is what stretched L44's
+ * 3.03% קל"צ): it follows the saving goal's verdict on the same debts
+ * (solveHolding). The payment goal and the consolidation never hold the rule.
  */
 const LIFT_GOALS: GoalId[] = ["savings", "stable", "years"];
 /**
@@ -1179,13 +1182,31 @@ function liftGain(ctx: Ctx, goal: GoalId, held: Solved, lifted: Solved): number 
  * more and the free answer's status is no worse. The held answer's LP
  * relaxation bounds what holding costs: when that bound is already material the
  * held search is not run, and the reason says "at least" (r02: about ₪27k of
- * short loans folded, ₪61k–₪230k to its budget goals). מאוזן's anchors always
- * hold the rule (its relief share stretched L44's 3.03% קל"צ); it is lifted only
- * when the goal has no answer with it.
+ * short loans folded, ₪61k–₪230k to its budget goals).
+ *
+ * מאוזן is a point between two anchors, not an optimum, and a held-against-free
+ * comparison of its own costs a second full search in every structure (measured:
+ * r01+r02 1.2 s → 2.0 s, r02 under a typical profile over 3 s). It takes the
+ * saving goal's verdict instead (`savings`, the same book and structure): when
+ * holding the cheap debts costs even the cheapest mix materially, מאוזן is
+ * solved free; otherwise it holds, so a cheap debt is never moved for the
+ * relief share alone (L44's 3.03% קל"צ stays). Held as a wall it cost r02
+ * ₪138,015 and ₪707 a month, r01+r02 ₪78,599 and ₪664 a month. The free answer
+ * stands only when it reads no worse than the held one would.
  */
-function solveHolding(ctx: Ctx, goal: GoalId, solve: () => Solved): Solved {
+function solveHolding(ctx: Ctx, goal: GoalId, solve: () => Solved, savings?: Solved): Solved {
   const hold = ctx.base.hold;
   if (goal === "payment" || goal === "consolidate" || !hold?.length) return solve();
+  if (goal === "balanced" && savings?.cheapLifted && savings.plan.ok && savings.liftGain !== undefined) {
+    const free = withoutHold(ctx, solve);
+    const lifted: Solved = { ...free, cheapLifted: true, liftGain: savings.liftGain, liftAtLeast: savings.liftAtLeast, liftFromSavings: true };
+    if (free.plan.ok && quickJudge(ctx, goal, free).status === "ok") return lifted;
+    // Not ok free: the held answer decides (it costs the second search only here).
+    const held = solve();
+    const rank = (s: Proposal["status"]) => (s === "ok" ? 0 : s === "no-gain" ? 1 : 2);
+    if (!held.plan.ok) return free.plan.ok ? lifted : held;
+    return free.plan.ok && rank(quickJudge(ctx, goal, free).status) < rank(quickJudge(ctx, goal, held).status) ? lifted : held;
+  }
   if (!LIFT_GOALS.includes(goal)) {
     const held = solve();
     return held.plan.ok ? held : { ...withoutHold(ctx, solve), cheapLifted: true };
@@ -2269,7 +2290,7 @@ function proposalOf(ctx: Ctx, goal: GoalId, solved: Solved): Proposal {
       else why = whyKept(ctx, d, flips.get(d.id), fc, todayRate);
     } else {
       why = whyMoved(ctx, d, flips.get(d.id), fc, todayRate, goal);
-      if (solved.cheapLifted && ctx.cheapBy.has(d.id)) why += ` ${liftWords(ctx.cheapBy.get(d.id)!, goal, solved.liftGain, !!solved.liftAtLeast)}.`;
+      if (solved.cheapLifted && ctx.cheapBy.has(d.id)) why += ` ${liftWords(ctx.cheapBy.get(d.id)!, goal, solved.liftGain, !!solved.liftAtLeast, !!solved.liftFromSavings)}.`;
     }
     return {
       id: d.id,
@@ -3325,9 +3346,11 @@ function flipText(f: Flip | undefined, moved: boolean, c: FlipCtx): string {
  * Why a debt cheaper than new money (rules.ts CHEAP_KEEP) is moved after all:
  * what keeping the cheap debts would cost this goal, with its figure.
  */
-function liftWords(by: number, goal: GoalId, gain: number | undefined, atLeast = false): string {
+function liftWords(by: number, goal: GoalId, gain: number | undefined, atLeast = false, fromSavings = false): string {
   const cheap = `הוא זול מכסף חדש ב-${by.toFixed(2)} נקודות האחוז`;
   if (gain === undefined) return `${cheap}, אבל בלי לגעת בחובות הזולים אין ליעד הזה תמהיל שעומד בכללים`;
+  // מאוזן follows the saving goal: the figure is what holding costs the cheapest mix, said as that.
+  if (fromSavings) return `${cheap}, ובכל זאת כדאי לגעת בו: גם התמהיל החסכוני ביותר שמשאיר את החובות הזולים עולה ${atLeast ? "לפחות " : "בכ-"}${nis(gain)} יותר, בתחזית ובתרחישי הלחץ יחד`;
   return goal === "years"
     ? `${cheap}, ובכל זאת כדאי לגעת בו: התמהיל שמשאיר את החובות הזולים נגמר ${atLeast ? "לפחות " : ""}${Math.round(gain)} חודשים מאוחר יותר`
     : `${cheap}, ובכל זאת כדאי לגעת בו: התמהיל שמשאיר את החובות הזולים עולה ${atLeast ? "לפחות" : "בכ-"}${atLeast ? " " : ""}${nis(gain)} יותר, בתחזית ובתרחישי הלחץ יחד`;
@@ -4134,6 +4157,14 @@ function runGoals(ctx: Ctx, consolidateOk: boolean, wanted: Set<GoalId>): Run {
     const spec = costSpec(ctx, goal, extra);
     return { plan: solveTerms(ctx.debts, ctx.cols, spec), spec, cols: ctx.cols };
   };
+  // Each goal under CHEAP_KEEP, once. מאוזן reads the saving goal's verdict on the cheap debts (solveHolding), so
+  // savings is solved ahead of it when the rule holds a debt, and that answer is the one savings itself takes.
+  const heldBy = new Map<GoalId, Solved>();
+  const holding = (goal: GoalId): Solved => {
+    let sv = heldBy.get(goal);
+    if (!sv) heldBy.set(goal, (sv = solveHolding(ctx, goal, () => solveGoal(goal), goal === "balanced" && ctx.base.hold?.length ? holding("savings") : undefined)));
+    return sv;
+  };
   for (const goal of ORDER) {
     if (!wanted.has(goal)) continue;
     if (goal === "consolidate") {
@@ -4147,8 +4178,7 @@ function runGoals(ctx: Ctx, consolidateOk: boolean, wanted: Set<GoalId>): Run {
         continue;
       }
     }
-    const solved = solveHolding(ctx, goal, () => solveGoal(goal));
-    solvedBy.set(goal, tag(solved));
+    solvedBy.set(goal, tag(holding(goal)));
   }
   for (const sv of Array.from(solvedBy.values())) if (sv.plan.ok && sv.cols) addToPool(sv.plan, sv.cols);
   // POLISH. Every goal's answer is a feasible starting point for the others —
@@ -4247,7 +4277,8 @@ function runGoals(ctx: Ctx, consolidateOk: boolean, wanted: Set<GoalId>): Run {
       if (quickJudge(ctx, g, alt2).status === "ok") {
         GATE_STATS.n++;
         tally.passed++;
-        solvedBy.set(g, { ...alt2, gated: true });
+        // A lifted goal stays lifted, its measured gain with it (the moved cheap debt's reason quotes it).
+        solvedBy.set(g, { ...alt2, gated: true, ...(sv.cheapLifted ? { cheapLifted: true, liftGain: sv.liftGain, liftAtLeast: sv.liftAtLeast, liftFromSavings: sv.liftFromSavings } : {}) });
         break;
       }
     }

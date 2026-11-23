@@ -169,7 +169,8 @@ export const SLIVER_GIVE = {
  * is held. The default gives way when the goal has no answer with it, and in the
  * cost goals and קיצור שנים when the answer without it is materially better on
  * the goal's own measure (index.ts liftGain: MATERIAL.cost of its objective,
- * MATERIAL.months sooner); מאוזן's anchors always hold it. No advisor stretches
+ * MATERIAL.months sooner); מאוזן follows the saving goal's verdict and never
+ * lifts for its relief share alone. No advisor stretches
  * a track cheaper than its replacement for a share or a sliver of payment, and
  * every advisor folds small cheap loans when the payment they free shortens the
  * big tranches (r02: about ₪27k at 3.7–4.75% freeing about ₪600 a month, worth

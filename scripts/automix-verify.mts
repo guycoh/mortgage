@@ -560,6 +560,14 @@ export function verifier(market: MarketSnapshot, forecast: Forecast | null) {
     // objective (audit S1); an offered savings that shows more than another goal
     // offered within its rules says so in a caveat that names that goal.
     const savD = by("savings");
+    // מאוזן follows the saving goal on the cheap debts (index.ts solveHolding): in the same structure it moves a debt
+    // savings holds as cheaper than new money only when it has no answer that keeps it, and then says so.
+    const balD = by("balanced");
+    if (savD && balD && savD.status !== "unavailable" && balD.status !== "unavailable" && !balD.sameAs && balD.structure === savD.structure && balD.refinance === savD.refinance && balD.priceBank === savD.priceBank)
+      for (const m of balD.moves) {
+        if (m.action === "keep" || savD.moves.find((x) => x.id === m.id)?.heldCheap === undefined) continue;
+        check(m.why.includes("אין ליעד הזה תמהיל שעומד בכללים"), `${name}: מאוזן moves ${m.label}, which savings holds as cheaper than new money`);
+      }
     if (savD && savD.status === "ok")
       for (const g of ["years", "balanced", "consolidate", "stable"] as GoalId[]) {
         const p = by(g);
