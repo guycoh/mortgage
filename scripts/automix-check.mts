@@ -16,7 +16,7 @@
 import { household, FIXTURE_SETS } from "./automix-fixtures.mts";
 import { buildAutoMix, DEFAULT_PROFILE, __test, type AutoMixInput, type AutoMixResult, type ClientProfile, type GoalId, type Proposal } from "../app/aa105test/lib/automix";
 import { ECONOMIES, scheduleIn } from "../app/aa105test/lib/automix/econ";
-import { MIN_TRANCHE, FIXED_MIN, LINKED_MAX, TRACK_SHARE_MAX, LTV_MAX, PTI_MAX } from "../app/aa105test/lib/automix/rules";
+import { MIN_TRANCHE, FIXED_MIN, LINKED_MAX, TRACK_SHARE_MAX, TRACK_SHARE_EXEMPT, LTV_MAX, PTI_MAX } from "../app/aa105test/lib/automix/rules";
 import { NONBANK_LTV, resolveTier, loanEvents, pricingRecord, EVENT_SHARE } from "../app/aa105test/lib/automix/tiers";
 import { averageRateIn } from "../app/aa105test/lib/automix/fees";
 import { EARLY } from "../app/aa105test/lib/automix/solve";
@@ -587,15 +587,45 @@ if (!QUICK)
         // A structure change between two mixes that cost the same (to 0.3%) at
         // nearly the same payment is a tie the optimum sits on, not a flip.
         const dPaid = Math.abs(q.stress[0].totalPaid - p.stress[0].totalPaid * db) / Math.max(1, p.stress[0].totalPaid);
-        const tie = changed && dPaid < 0.003 && dMonthly <= 0.03;
-        if (tie) ties.push(`${id}/${p.goal} @ balance×${db} rate${dr >= 0 ? "+" : ""}${dr} (cost Δ ${(dPaid * 100).toFixed(2)}%, payment Δ ${(dMonthly * 100).toFixed(1)}%)`);
-        const flip = (changed && !tie) || dMonthly > 0.03;
+        const costTie = changed && dPaid < 0.003 && dMonthly <= 0.03;
+        // מאוזן's own measure is t, the share of each anchor it gets: within the
+        // search's own stopping tolerance (BALANCED_TOL, 0.03) two structures tie
+        // on it (r04 at +0.05pp: t 0.661 against 0.643, two structures 4% apart in cost).
+        const tTie = changed && p.goal === "balanced" && !!p.balance && !!q.balance && Math.abs(p.balance.t - q.balance.t) <= 0.03 && dMonthly <= 0.03;
+        // קיצור שנים ends on a whole year: with its payment at its ceiling, a
+        // ceiling that moves with today's payment crosses a year's boundary
+        // (r01 at −0.05pp: 15 years at ₪12,582 of ₪12,583, then 16 years).
+        // Its five-year guard is held at the same ceiling, so a guard that binds within the same 1% is the same threshold (r02 at −0.05pp: 20 years with the stress peak at the ceiling, then 21).
+        const binds = (x: Proposal) => x.budget !== undefined && (x.metrics.monthly >= x.budget - Math.max(100, 0.01 * x.budget) || !guardOk(x.rows, input.inflation, x.budget - Math.max(100, 0.01 * x.budget)));
+        const yearStep = p.goal === "years" && [p, q].some(binds) && (Math.abs(q.metrics.months - p.metrics.months) >= 12 || dPaid < 0.03);
+        const tie = costTie || tTie || yearStep;
+        if (tie) ties.push(`${id}/${p.goal} @ balance×${db} rate${dr >= 0 ? "+" : ""}${dr} (${yearStep ? "a whole year at the ceiling, " : tTie ? `t ${p.balance!.t} vs ${q.balance!.t}, ` : ""}cost Δ ${(dPaid * 100).toFixed(2)}%, payment Δ ${(dMonthly * 100).toFixed(1)}%)`);
+        const flip = (changed && !tie) || (dMonthly > 0.03 && !yearStep);
         check(!flip, `${id}/${p.goal} @ balance×${db} rate${dr >= 0 ? "+" : ""}${dr}: moved-overlap ${jacc.toFixed(2)}, track-shift ${l1.toFixed(2)}, payment Δ ${(dMonthly * 100).toFixed(1)}%, cost Δ ${(dPaid * 100).toFixed(2)}%`);
       }
     }
   }
 console.log(`  ${failures.filter((f) => f.includes("@ balance")).length} unstable answers · ${ties.length} near-ties (same cost, different structure):`);
 for (const t of ties) console.log(`    ~ ${t}`);
+
+/* ============================================ F2. monotonicity in the price of new money */
+
+section("F2. monotonicity — new money 0.5 points dearer never improves a status (audit W1)");
+{
+  const rank = (s: Proposal["status"]) => (s === "ok" ? 0 : s === "no-gain" ? 1 : 2);
+  let probes = 0;
+  for (const { id, input, r } of reals) {
+    if (!r.ok) continue;
+    const dear = buildAutoMix({ ...input, profile: { ...input.profile, negotiated: (input.profile.negotiated || 0) - 0.5 } });
+    for (const p of r.proposals) {
+      const q = dear.proposals.find((x) => x.goal === p.goal);
+      if (!q) continue;
+      probes++;
+      check(rank(q.status) >= rank(p.status), `${id}/${p.goal}: ${p.status} at market, ${q.status} with new money 0.5 points dearer`);
+    }
+  }
+  console.log(`  ${probes} goal answers probed · ${failures.filter((f) => f.includes("0.5 points dearer")).length} improved with dearer money`);
+}
 
 /* ================================================================ G. optimality */
 
@@ -635,7 +665,8 @@ section("G. optimality — solver vs brute force (small cases)");
         const needH = ctx.debts.reduce((t, d, j) => t + (z[j] && d.group === "mortgage" ? d.balance + d.fee : 0), 0);
         const needAp = ctx.debts.reduce((t, d, j) => t + (z[j] && d.group === "loan" ? d.balance + d.fee : 0), 0);
         const NH = needH ? needH + spec.setupHousing : 0;
-        const NA = needAp ? needAp + spec.setupAp : 0;
+        // The appraisal is one for the property: with the housing file open, the all-purpose one pays file and lien only.
+        const NA = needAp ? needAp + spec.setupAp - (needH ? spec.setupApShared ?? 0 : 0) : 0;
         const apOptions = NA ? cols.filter((c) => c.segment === "allPurpose") : [null];
         for (const ap of apOptions)
           for (const y0 of YEARS)
@@ -655,7 +686,7 @@ section("G. optimality — solver vs brute force (small cases)");
                       });
                       const fixed = sh[1] + sh[2];
                       if (fixed < FIXED_MIN - 1e-9 || sh[2] > LINKED_MAX + 1e-9) okk = false;
-                      if (spec.shareCap && sh.some((x) => x * NH > TRACK_SHARE_MAX * NH + (1 - TRACK_SHARE_MAX) * 2 * MIN_TRANCHE)) okk = false;
+                      if (spec.shareCap && sh.some((x, i) => !TRACK_SHARE_EXEMPT.includes(H[i]) && x * NH > TRACK_SHARE_MAX * NH + (1 - TRACK_SHARE_MAX) * 2 * MIN_TRANCHE)) okk = false;
                       const open = xs.filter((x) => x.a > 0);
                       if (open.length > 1 && open.some((x) => x.a < MIN_TRANCHE)) okk = false;
                     } else if (a || b) continue;
@@ -694,6 +725,8 @@ section("H. timing (Node)");
   const z = __test.SLIVER_STATS;
   console.log(`\n  slivers on the board: ${t.slivers} (${t.slivMarked} with a reason) · sliver pass: ${z.dropped} answers changed, at most ₪${fmt(z.cost)} (cost goals) and ₪${fmt(z.monthly)} a month (payment) given up`);
   console.log(`  מאוזן with both measures: ${t.balanced}, t lowest ${t.tN ? t.tLow.toFixed(3) : "-"}, mean ${t.tN ? (t.tSum / t.tN).toFixed(3) : "-"}`);
+  const w = V.wave;
+  console.log(`  wave 2: gates held in the search ${__test.GATE_STATS.n} · savings kept over the display repair ${__test.DISPLAY_STATS.held} · payment cost stage ${__test.PAYMENT_STAGE.n} answers, at most ₪${fmt(__test.PAYMENT_STAGE.saved)} · terms aligned ${__test.ALIGN_STATS.n} · relative guard ${w.guardRelative} · no guard ${w.guardNone} · held cheap ${w.heldCheap} · move groups ${w.moveGroups}`);
 }
 console.log(`\n${V.passed()} checks passed, ${failures.length} failed`);
 for (const f of failures.slice(0, 80)) console.log("  ✗ " + f);

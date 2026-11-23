@@ -2,7 +2,7 @@
 // (automix-check.mts) and the corpus/fuzz run (automix-corpus.mts).
 import { __test, type AutoMixInput, type AutoMixResult, type GoalId, type Proposal } from "../app/aa105test/lib/automix";
 import { ECONOMIES, scheduleIn } from "../app/aa105test/lib/automix/econ";
-import { MIN_TRANCHE, FIXED_MIN, LINKED_MAX, TRACK_SHARE_MAX, LTV_MAX, PTI_MAX, MATERIAL, AP_LTV, AP_LTV_RELIEF, AP_RELIEF_CAP, YEARS_STRETCH, REFI_COST_MAX, SLIVER_SHARE } from "../app/aa105test/lib/automix/rules";
+import { MIN_TRANCHE, FIXED_MIN, LINKED_MAX, TRACK_SHARE_MAX, TRACK_SHARE_EXEMPT, LTV_MAX, PTI_MAX, MATERIAL, AP_LTV, AP_LTV_RELIEF, AP_RELIEF_CAP, YEARS_STRETCH, REFI_COST_MAX, SLIVER_SHARE, BREAK_EVEN_MAX, SEASONING_MONTHS, SMALL_MOVE, STABLE_PRICE } from "../app/aa105test/lib/automix/rules";
 import { NONBANK_LTV } from "../app/aa105test/lib/automix/tiers";
 import { EARLY } from "../app/aa105test/lib/automix/solve";
 import { priceLoan, todayPayment } from "../app/aa102test/lib/price";
@@ -22,19 +22,26 @@ export function verifier(market: MarketSnapshot, forecast: Forecast | null) {
   const typed = (inflation: number) => ({ inflation, forecast: null });
   const BUDGET_GOALS: GoalId[] = ["years", "savings", "stable", "balanced", "consolidate"];
 
-  /** The mix's payment at the guard's months in every economy — does it stay under `cap`? */
-  function guardOk(rows: ImportedLoan[], inflation: number, cap: number): boolean {
+  /**
+   * The mix's payment at the guard's months in every economy — does it stay
+   * under `cap` (one figure, or one per economy)? `months` defaults to the
+   * solver's samples (EARLY); a promise in words is tested on every month 1–60.
+   */
+  const EVERY60 = Array.from({ length: 60 }, (_, i) => i + 1);
+  function guardOk(rows: ImportedLoan[], inflation: number, cap: number | number[], months: number[] = EARLY): boolean {
     const owed = owedOnly(rows).filter((l) => Number(l.months) > 0 && Number(l.amount) > 0);
-    for (const e of ECONOMIES)
-      for (const m of EARLY) {
+    const sched = owed.map((l) => ECONOMIES.map((e) => scheduleIn(l, forecast, e).pay));
+    const first = owed.map((l) => Math.round(boardMonthly(l, todayPayment(priceLoan(l, typed(inflation))))));
+    for (let k = 0; k < ECONOMIES.length; k++)
+      for (const m of months) {
         let sum = 0;
-        for (const l of owed) {
+        owed.forEach((l, j) => {
           const sch = Number(l.amortization_schedule_id) || 1;
           const lump = sch === 3 || sch === 4 ? Math.round(Number(l.months)) : 0;
-          if (m === 1) sum += Math.round(boardMonthly(l, todayPayment(priceLoan(l, typed(inflation)))));
-          else if (m !== lump) sum += scheduleIn(l, forecast, e).pay[m - 1] ?? 0;
-        }
-        if (sum > cap + 1) return false;
+          if (m === 1) sum += first[j];
+          else if (m !== lump) sum += sched[j][k][m - 1] ?? 0;
+        });
+        if (sum > (Array.isArray(cap) ? cap[k] : cap) + 1) return false;
       }
     return true;
   }
@@ -46,7 +53,7 @@ export function verifier(market: MarketSnapshot, forecast: Forecast | null) {
    * 6 months of BREAK_EVEN_MAX? A status that flips on ±0.05pp anywhere else is
    * the solve sitting on its own gate (audit W2), not the client's position.
    */
-  function nearThreshold(p: Proposal, r: AutoMixResult): boolean {
+  function nearThreshold(p: Proposal, r: AutoMixResult, step = 0): boolean {
     const s0 = p.stress[0];
     const refMonthly = r.dueNow?.reference.monthly ?? r.today.monthly;
     const todayCost = (s0?.todayTotalPaid ?? 0) - r.today.balance;
@@ -67,7 +74,11 @@ export function verifier(market: MarketSnapshot, forecast: Forecast | null) {
       edge(typedDelta) ||
       (p.goal === "years" && close((r.dueNow?.reference.months ?? r.today.months) - p.metrics.months, MATERIAL.months)) ||
       (newMoney > 0 && close((p.costs.prepaymentFees + p.costs.setup) / newMoney, REFI_COST_MAX)) ||
-      (be !== null && Math.abs(be - 120) <= 6)
+      (be !== null && Math.abs(be - 120) <= 6) ||
+      // the budget edge: a mix that fits its ceiling by a couple of shekels (L33: a 19-year term ₪2 under ₪1,180, 20 years otherwise),
+      // or by less than a price step of `step` points moves its payment (new money × step / 12, the interest part's bound:
+      // L33 at +0.05, 19 years at ₪1,175 under ₪1,180, ₪6 for ₪152k; at today's price that term is ₪1 over and 20 years is taken)
+      (p.budget !== undefined && p.metrics.monthly >= p.budget - Math.max(3, 0.002 * p.budget, (newMoney * step) / 100 / 12))
     );
   }
 
@@ -106,11 +117,98 @@ export function verifier(market: MarketSnapshot, forecast: Forecast | null) {
     }
   }
 
+  /**
+   * Wave 2's rules on one proposal, recomputed from what it shows:
+   *   B/C/D the five-year guard: its sentence holds on every month 1–60 in every
+   *         economy; a relative guard never sits under the cap and holds; none is said;
+   *   G     a debt CHEAP_KEEP holds is never moved;
+   *   K     the appraisal is paid once; the notice fee is never charged on a
+   *         Hapoalim letter's figure and never mentioned on an internal refinance;
+   *   L     a CPI-linked all-purpose debt is never compared at its real rate;
+   *   M     the stale-prime words only where a stale prime row moved; a tranche
+   *         under a year old names its age; a saving against debt due now names
+   *         the reference; moveGroups partition the moves.
+   */
+  function waveLints(tag: string, input: AutoMixInput, r: AutoMixResult, p: Proposal) {
+    const refMonthly = r.dueNow?.reference.monthly ?? r.today.monthly;
+    const all = p.reasons.join(" ");
+    const promise = all.match(/בחמש השנים הקרובות, גם בתרחיש הלחץ הקשה ביותר, ההחזר לא עולה על (?:התקרה של )?₪([\d,]+)/);
+    if (promise) check(guardOk(p.rows, input.inflation, Number(promise[1].replace(/,/g, "")), EVERY60), `${tag}: the guard sentence (₪${promise[1]}) breaks on some month 1–60`);
+    if (p.goal === "payment" || p.goal === "balanced" || p.goal === "years") {
+      const g = p.guard;
+      check(!!g, `${tag}: no guard on the proposal`);
+      if (g) {
+        if (g.kind === "relative") {
+          wave.guardRelative++;
+          check(g.caps.every((c) => c >= (p.goal === "years" ? (p.budget ?? refMonthly) : refMonthly) - 1), `${tag}: a relative guard below the cap ${g.caps.join("/")}`);
+          if (g.holds) check(guardOk(p.rows, input.inflation, g.caps, EVERY60), `${tag}: relative guard said to hold, and the rows break it`);
+        }
+        if (g.kind === "absolute" && g.holds) check(guardOk(p.rows, input.inflation, g.caps[0], EVERY60), `${tag}: absolute guard said to hold, and the rows break it`);
+        if (g.kind === "none" && p.status !== "unavailable" && p.moves.some((m) => m.action !== "keep")) {
+          wave.guardNone++;
+          check(p.caveats.some((c) => c.includes("עלול לעלות בחמש השנים הקרובות")), `${tag}: holds no guard and does not say so`);
+        }
+        // קיצור שנים holds its guard where the solver looks (its samples), every economy.
+        // (The solver holds it before the tranches are rounded to ₪1,000: a few shekels a tranche.)
+        if (p.goal === "years" && p.status === "ok" && g.kind !== "none") check(guardOk(p.rows, input.inflation, g.caps.map((c) => c + 2 * p.tranches.length), EARLY), `${tag}: years breaks its ${g.kind} guard at a guard month`);
+      }
+    }
+    for (const m of p.moves) {
+      if (m.heldCheap !== undefined) {
+        wave.heldCheap++;
+        check(m.action === "keep", `${tag}: ${m.label} is ${m.heldCheap} points under new money and was moved`);
+      }
+      const src = input.master.find((l) => l.id === m.id);
+      const linkedAp = !!src && (Number(src.path_id) === 3 || Number(src.path_id) === 5) && m.segment === "allPurpose";
+      if (linkedAp) check(!/הריבית היום \d+\.\d+% מול \d+\.\d+% לכסף חדש|הריבית עליו \d+\.\d+% וכסף חדש/.test(m.why), `${tag}: CPI-linked all-purpose ${m.label} compared at its real rate: ${m.why}`);
+      // A Hapoalim letter's printed figure holds the 0.1% notice fee: it is charged net of it.
+      if (src && m.action !== "keep" && /הפועלים/.test(String(src.source_bank ?? "")) && src.prepayment_fee != null && Number(src.prepayment_fee) > 0 && src.group === "mortgage")
+        check(m.fee <= Math.max(0, Math.round(Number(src.prepayment_fee) - 0.001 * Number(src.amount))) + 1, `${tag}: ${m.label} charged ${m.fee}, the printed ${src.prepayment_fee} with the notice fee in it`);
+      // A tranche given less than SEASONING_MONTHS ago, refinanced, names its age.
+      if (src && m.action !== "keep" && src.group === "mortgage" && !m.due && src.source_start_date) {
+        const [d, mo, y] = String(src.source_start_date).split("/").map(Number);
+        const start = y ? new Date(y, mo - 1, d) : new Date(String(src.source_start_date));
+        const days = (Date.now() - start.getTime()) / 864e5;
+        if (Number.isFinite(days) && days >= 0 && days < SEASONING_MONTHS * 30.44) check(p.caveats.some((c) => /לפני \d+ (שבועות|חודשים) בלבד/.test(c)), `${tag}: refinances ${m.label}, given ${Math.round(days)} days ago, and does not say so`);
+      }
+    }
+    // The appraisal is one for the property: both files together pay it once.
+    if (p.tranches.some((t) => t.segment === "housing") && p.tranches.some((t) => t.segment === "allPurpose") && r.pricing.tier !== "nonbank")
+      check(p.costs.setup <= __test.SETUP_HOUSING + __test.SETUP_AP_ALONE - 2500 + 1, `${tag}: setup ${p.costs.setup} pays the appraisal twice`);
+    // The notice fee caveat only where a lender other than the debt's own refinances it.
+    if (p.refinance === "internal" && p.structure === "bank" && !!p.priceBank && p.priceBank !== "system") check(!p.caveats.some((c) => c.includes("הודעה מוקדמת של 10 ימים")), `${tag}: notice-fee caveat on an internal refinance`);
+    // W6: the stale-prime explanation only where a stale prime row moved.
+    if (p.caveats.some((c) => c.includes("משורות פריים שהודפסו בפריים של יום הדוח"))) {
+      wave.staleWords++;
+      const stale = r.findings.find((x) => x.id === "stale-prime");
+      check(!!stale && stale.rows.some((id) => p.moves.some((m) => m.id === id && m.action !== "keep")), `${tag}: blames stale prime rows that did not move`);
+    }
+    // P5: with debt due now, the totals sentence names the reference it measures from.
+    if (r.dueNow && p.status === "ok" && p.reasons.some((x) => x.includes("חיסכון של") && x.includes("במקום")))
+      check(p.reasons.some((x) => x.includes("ונשיאת החוב שעומד לפירעון, ₪")), `${tag}: a saving against the reference that does not name it`);
+    // P1: moveGroups partition the moves, with their counts and sums.
+    if (p.moveGroups) {
+      wave.moveGroups++;
+      const ids = p.moveGroups.flatMap((g) => g.ids);
+      check(ids.length === p.moves.length && new Set(ids).size === ids.length && p.moves.every((m) => ids.includes(m.id)), `${tag}: moveGroups do not partition the moves`);
+      for (const g of p.moveGroups) {
+        const ms = p.moves.filter((m) => g.ids.includes(m.id));
+        check(g.count === ms.length && g.balance === ms.reduce((a, m) => a + m.balance, 0) && ms.every((m) => m.action === g.action), `${tag}: moveGroup ${g.label} disagrees with its moves`);
+        if (g.count > 1) check(ms.every((m) => m.balance < SMALL_MOVE), `${tag}: moveGroup ${g.label} folds a move of ${SMALL_MOVE} or more`);
+      }
+    }
+    void STABLE_PRICE;
+  }
+
+  /** One track's share cap on the housing money, קל"צ exempt (rules.ts TRACK_SHARE_EXEMPT). */
   function shareCapOk(p: Proposal): boolean {
     const h = p.tranches.filter((t) => t.segment === "housing");
     const N = h.reduce((a, t) => a + t.amount, 0);
-    return h.every((t) => t.amount <= TRACK_SHARE_MAX * N + (1 - TRACK_SHARE_MAX) * 2 * MIN_TRANCHE + 1000);
+    return h.every((t) => TRACK_SHARE_EXEMPT.includes(t.track) || t.amount <= TRACK_SHARE_MAX * N + (1 - TRACK_SHARE_MAX) * 2 * MIN_TRANCHE + 1000);
   }
+
+  /** Tallies of this wave's rules across builds (the corpus prints them). */
+  const wave = { guardRelative: 0, guardNone: 0, heldCheap: 0, gated: 0, recNull: 0, aligned: 0, moveGroups: 0, typedBinds: 0, staleWords: 0 };
 
   /**
    * House style for every string the sheet shows: no "·" and no dash separators
@@ -347,9 +445,23 @@ export function verifier(market: MarketSnapshot, forecast: Forecast | null) {
           savings: fP < 0 && tP <= neutral,
           // מאוזן: a relief that costs no more, or a saving at no higher a payment.
           balanced: (relief > 0 && fP <= neutral && tP <= neutral) || (fP < 0 && tP <= neutral && relief >= -0.5),
-          stable: worst("totalPaid") < worst("todayTotalPaid"),
+          // יציבות מרבית in payment: the worst economy's highest payment over the whole life falls.
+          stable: Math.max(...p.stress.map((x) => x.peakMonthly)) < Math.max(...p.stress.map((x) => x.todayPeakMonthly)),
         };
         check(own[p.goal], `${tag(p.goal)}: "ok" but not better than ${ref ? "the reference" : "today"} on its own goal (relief ${relief}, forecast ${fmt(fP)}, typed ${fmt(tP)})`);
+      }
+      // 7d. The cost goals' gates hold on every offered answer: the costs come back
+      // within BREAK_EVEN_MAX (an estimated fee at the band's low end at least, and
+      // then a caveat says so), and stability's worst-economy peak falls materially.
+      if (p.status === "ok" && (p.goal === "savings" || p.goal === "balanced" || p.goal === "stable") && p.costs.prepaymentFees + p.costs.setup > 0) {
+        const be = p.costs.breakEvenMonths;
+        const within = be !== null ? be <= BREAK_EVEN_MAX : p.goal === "stable";
+        check(within || p.caveats.some((c) => c.startsWith("עמלות הפירעון הן הערכה")), `${tag(p.goal)}: "ok" with break-even ${be ?? "never"} and no fee-band caveat`);
+      }
+      if (p.status === "ok" && p.goal === "stable") {
+        const now = Math.max(...p.stress.map((x) => x.todayPeakMonthly));
+        const next = Math.max(...p.stress.map((x) => x.peakMonthly));
+        check(now - next >= MATERIAL.monthly(due ? due.reference.monthly : r.today.monthly) - 1, `${tag(p.goal)}: "ok" while the worst-economy peak falls only ${fmt(now - next)}`);
       }
       // 7a. One-off costs out of proportion to the debt are never offered (override off).
       if (p.status === "ok" && !input.profile.override && p.tranches.length) {
@@ -402,6 +514,7 @@ export function verifier(market: MarketSnapshot, forecast: Forecast | null) {
           }
       }
       whyLint(tag(p.goal), p);
+      waveLints(tag(p.goal), input, r, p);
       // The cost column (typed interest + indexation): a disagreement in sign with the forecast, or a
       // cost-claiming "ok" goal that shows a higher cost than today, is stated in the FIRST reason with its figures.
       {
@@ -443,13 +556,16 @@ export function verifier(market: MarketSnapshot, forecast: Forecast | null) {
     // …and a mix that repays an eligibility loan is outside savings' rules (only years and payment may).
     const zakFree = (p: Proposal) => p.structure === "firstLien" || !p.moves.some((m) => m.action !== "keep" && !m.due && masterById.get(m.id)?.source_eligibility);
     const pvOk = (p: Proposal) => zakFree(p) && (refPv === undefined || !p.metrics.outlook || p.metrics.outlook.pv <= refPv + 1);
+    // Savings shows the lowest typed cost only within DISPLAY_GIVE of its own
+    // objective (audit S1); an offered savings that shows more than another goal
+    // offered within its rules says so in a caveat that names that goal.
     const savD = by("savings");
-    if (savD)
+    if (savD && savD.status === "ok")
       for (const g of ["years", "balanced", "consolidate", "stable"] as GoalId[]) {
         const p = by(g);
-        if (!p || p.metrics.monthly > budget + 0.5 || !shareCapOk(p) || !pvOk(p)) continue;
-        check(savD.metrics.totalCost <= p.metrics.totalCost + 1 + slack(savD, p, "cost"), `${name}: savings shows cost ${fmt(savD.metrics.totalCost)} > ${g} ${fmt(p.metrics.totalCost)}`);
-        check(savD.delta.totalCost <= p.delta.totalCost + 1 + slack(savD, p, "cost"), `${name}: savings delta.totalCost ${fmt(savD.delta.totalCost)} > ${g} ${fmt(p.delta.totalCost)}`);
+        if (!p || p.status !== "ok" || p.sameAs === "savings" || p.metrics.monthly > budget + 0.5 || !shareCapOk(p) || !pvOk(p)) continue;
+        if (savD.metrics.totalCost <= p.metrics.totalCost + 1 + slack(savD, p, "cost")) continue;
+        check(savD.caveats.some((c) => c.includes(p.label)), `${name}: savings shows cost ${fmt(savD.metrics.totalCost)} > ${g} ${fmt(p.metrics.totalCost)} and no caveat names it`);
       }
     const years = by("years");
     if (years)
@@ -459,6 +575,10 @@ export function verifier(market: MarketSnapshot, forecast: Forecast | null) {
         // adopt stable's single-track mix, corpus Z150), no eligibility loan repaid where years may not,
         // and no more paid in total than the reference (forecast and typed, within the neutral residue).
         if (!p || !shareCapOk(p)) continue;
+        // …and its five-year guard at its ceiling (a mix that breaks it is outside years' rules).
+        // (Its caps are shown rounded up; the engine tests a rival at the cap itself, to the shekel.)
+        if (years.guard && years.guard.kind !== "none" && !guardOk(p.rows, input.inflation, years.guard.caps.map((c) => c - 1))) continue;
+        if (p.moves.some((m) => m.action !== "keep" && years.moves.some((x) => x.id === m.id && x.heldCheap !== undefined))) continue;
         const pn = MATERIAL.neutral(p.stress[0]?.todayTotalPaid ?? 0);
         if ((p.stress[0] ? p.stress[0].totalPaid - p.stress[0].todayTotalPaid : 0) > pn || (due ? p.metrics.totalPaid - due.reference.totalPaid : p.delta.totalPaid) > pn) continue;
         check(years.metrics.months <= p.metrics.months + slack(years, p, "months"), `${name}: years ends at ${years.metrics.months} after ${g} ${p.metrics.months}`);
@@ -466,15 +586,47 @@ export function verifier(market: MarketSnapshot, forecast: Forecast | null) {
     const sav = by("savings");
     if (sav) {
       const J = (p: Proposal) => 0.75 * p.stress[0].totalPaid + 0.25 * Math.max(...p.stress.map((s) => s.totalPaid));
-      // Lexicographic: savings shows the least interest; among mixes that show no more, it costs least.
+      // Savings' own objective: no offered mix within its rules (the budget, the
+      // share cap, the PV cap, the typed read-out within the neutral residue) costs
+      // less on it, by more than the display repair's allowance.
+      const nt = MATERIAL.neutral(sav.stress[0]?.todayTotalPaid ?? 0);
       for (const g of ["years", "balanced", "consolidate", "stable"] as GoalId[]) {
         const p = by(g);
-        if (!p || p.metrics.monthly > budget + 0.5 || (g === "stable" && !shareCapOk(p)) || !pvOk(p)) continue;
-        if (p.metrics.totalCost > sav.metrics.totalCost + 1) continue;
-        check(J(sav) <= J(p) * 1.0005 + 500 + slack(sav, p, "cost"), `${name}: savings cost ${fmt(J(sav))} > ${g} ${fmt(J(p))}`);
+        if (!p || p.status !== "ok" || p.metrics.monthly > budget + 0.5 || !shareCapOk(p) || !pvOk(p)) continue;
+        if ((due ? p.metrics.totalPaid - due.reference.totalPaid : p.delta.totalPaid) > nt) continue;
+        // …and none of the debts savings keeps as cheaper than new money (CHEAP_KEEP; the consolidation does not keep them).
+        if (p.moves.some((m) => m.action !== "keep" && sav.moves.some((x) => x.id === m.id && x.heldCheap !== undefined))) continue;
+        if (sav.status === "ok" && (p.costs.breakEvenMonths === null || p.costs.breakEvenMonths > BREAK_EVEN_MAX) && p.costs.prepaymentFees + p.costs.setup > 0) continue;
+        check(J(sav) <= J(p) * 1.0015 + 500 + slack(sav, p, "cost"), `${name}: savings cost ${fmt(J(sav))} > ${g} ${fmt(J(p))}`);
+      }
+      // Audit S2: stable never beats savings on payment, forecast, worst economy and present value at once.
+      // (Within savings' rules: a stable mix the typed read-out contradicts is one savings may not offer, L11 at 0% inflation.)
+      const st = by("stable");
+      const stTyped = st ? (due ? st.metrics.totalPaid - due.reference.totalPaid : st.delta.totalPaid) : Infinity;
+      if (st && sav.status !== "unavailable" && st.status === "ok" && sav.status === "ok" && shareCapOk(st) && pvOk(st) && stTyped <= nt) {
+        const w = (p: Proposal) => Math.max(...p.stress.map((x) => x.totalPaid));
+        const pv = (p: Proposal) => p.metrics.outlook?.pv ?? p.metrics.pv;
+        const m = 0.0015;
+        const dominated = st.metrics.monthly <= sav.metrics.monthly && st.stress[0].totalPaid < sav.stress[0].totalPaid * (1 - m) && w(st) < w(sav) * (1 - m) && pv(st) < pv(sav) * (1 - m);
+        check(!dominated, `${name}: stable dominates savings on payment, forecast, worst case and PV`);
       }
     }
     check(r.recommended === null || r.proposals.some((p) => p.goal === r.recommended && p.status === "ok"), `${name}: recommended ${r.recommended} is not an ok proposal`);
+    // F. The first offered goal that costs no more than the reference; a goal that
+    // buys something at a price only when a budget below today's payment asks for it.
+    {
+      const fP = (p: Proposal) => (p.stress[0] ? p.stress[0].totalPaid - p.stress[0].todayTotalPaid : 0);
+      const nt = MATERIAL.neutral(r.proposals[0]?.stress[0]?.todayTotalPaid ?? 0);
+      const offered = (g: GoalId) => r.proposals.find((p) => p.goal === g && p.status === "ok" && !p.sameAs);
+      const first = (["balanced", "savings", "stable", "years", "consolidate"] as GoalId[]).find((g) => {
+        const p = offered(g);
+        return p && fP(p) <= nt;
+      });
+      const asked = !!(input.profile.budget && input.profile.budget < (due?.reference.monthly ?? r.today.monthly) - 0.5);
+      const want = first ?? (asked ? (["balanced", "payment"] as GoalId[]).find((g) => offered(g)) : undefined) ?? null;
+      check(r.recommended === want, `${name}: recommended ${r.recommended} where the rule picks ${want}`);
+      if (r.recommended === null && r.proposals.some((p) => p.status === "ok")) wave.recNull++;
+    }
   }
 
   /**
@@ -519,5 +671,5 @@ export function verifier(market: MarketSnapshot, forecast: Forecast | null) {
     const forcedBank = o && (input.profile.tier === "bank" || input.profile.tier === "bankPremium") && r.blocks.some((b) => ["insolvency", "enforcement", "arrears", "past-due", "outside"].includes(b.id));
     if (forcedBank) for (const p of r.proposals) check((p.caveats[0] ?? "").includes("בנק מסרב"), `${name}/${p.goal}: forced bank tier without the refusal caveat first`);
   }
-  return { check, failures, passed: () => passed, verify, verifyOverride, lint, guardOk, shareCapOk, BUDGET_GOALS, tally, nearThreshold };
+  return { check, failures, passed: () => passed, verify, verifyOverride, lint, guardOk, shareCapOk, BUDGET_GOALS, tally, nearThreshold, wave };
 }
