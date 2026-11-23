@@ -1403,7 +1403,14 @@ function solvePayment(ctx: Ctx): Solved {
   const material = ctx.ref.monthly - MATERIAL.monthly(ctx.ref.monthly);
   const roof = low <= material ? material : ctx.ref.monthly - 1;
   const s2: Spec = { ...pick.spec, wMonthly: 0, wCost: 1, lambda: 0, budget: low + Math.min(SLIVER_GIVE.monthly(ctx.ref.monthly), Math.max(0, roof - low)) };
-  const p2 = solveGuarded(ctx, s2, POOL, 2, restart(ctx, pick.plan, s2, ctx.cols));
+  const p1 = solveGuarded(ctx, s2, POOL, 2, restart(ctx, pick.plan, s2, ctx.cols));
+  // Then one debt in and one out with the terms re-solved around the answer's:
+  // the term walk holds the decisions and the flips hold the terms, so a swap
+  // that only fits once a term moves is never seen (audit 3 F2 and the last OLD
+  // MIX BETTER line of the regress proof: r01+r02 typical, a 6% מ"צ of ₪48,642
+  // moved and a ₪22,675 מל"צ kept, the all-purpose term two years longer: the
+  // same payment, ₪89,330 cheaper in the forecast).
+  const p2 = swapRepair(ctx, p1.ok ? p1 : restart(ctx, pick.plan, s2, ctx.cols) ?? p1, s2);
   const cheaper = p2.ok && frontierPoint(ctx, p2, ctx.cols).saving > frontierPoint(ctx, pick.plan, ctx.cols).saving + 1;
   if (cheaper) {
     PAYMENT_STAGE.n++;
@@ -1412,6 +1419,60 @@ function solvePayment(ctx: Ctx): Solved {
   }
   return { plan: cheaper ? p2 : pick.plan, meta: { guard: pick.guard.kind, low }, spec: cheaper ? s2 : pick.spec, cols: ctx.cols, guard: pick.guard };
 }
+/**
+ * One debt in and one out of a plan at once (or one in alone), the terms
+ * re-solved around the plan's own (±SWAP_SPAN years, one term per track), the
+ * goal's spec unchanged: the best that improves its objective, polished by the
+ * usual local search. The debts tried in are the kept ones whose own forecast
+ * payments exceed what the plan's new money of their segment costs for their
+ * balance (the moves that save), at most SWAP_IN of them, largest saving first;
+ * every moved debt is tried out against each. Measured on r01+r02 under a typical
+ * profile (32 debts): 4 × 21 swaps, each a one-term MILP on a few columns with
+ * every decision fixed, 2 ms apiece.
+ */
+function swapRepair(ctx: Ctx, plan: Plan, spec: Spec): Plan {
+  if (!plan.ok) return plan;
+  const byKey = new Map(ctx.cols.map((c) => [c.key, c]));
+  const yearsOf = new Map<string, number>();
+  const perShekel = new Map<Segment, { paid: number; amount: number }>();
+  for (const [k, a] of Object.entries(plan.amounts)) {
+    const c = byKey.get(k);
+    if (!c) return plan;
+    yearsOf.set(`${c.track}|${c.segment}`, c.years);
+    const x = perShekel.get(c.segment) ?? { paid: 0, amount: 0 };
+    x.paid += c.paid[0] * a;
+    x.amount += a;
+    perShekel.set(c.segment, x);
+  }
+  const near = ctx.cols.filter((c) => {
+    const y = yearsOf.get(`${c.track}|${c.segment}`);
+    return y !== undefined && Math.abs(c.years - y) <= SWAP_SPAN;
+  });
+  const free = (d: Debt) => !d.forced && (!d.lock || !!spec.unlock?.includes(d.id)) && !spec.hold?.includes(d.id) && (d.group === "mortgage" ? !spec.keepMortgage && !spec.moveWhole : spec.loansAllowed) && perShekel.has(d.segment);
+  const moved = new Set(plan.refinance);
+  const saveIf = (d: Debt) => {
+    const x = perShekel.get(d.segment)!;
+    return d.paid[0] - (d.balance + d.fee) * (x.paid / x.amount);
+  };
+  const ins = ctx.debts.filter((d) => free(d) && !moved.has(d.id) && saveIf(d) > 0).sort((a, b) => saveIf(b) - saveIf(a)).slice(0, SWAP_IN);
+  const outs = ctx.debts.filter((d) => free(d) && moved.has(d.id));
+  let best = plan;
+  for (const x of ins)
+    for (const y of [null, ...outs]) {
+      const z = plan.refinance.filter((id) => id !== y?.id).concat(x.id);
+      const q = solveOnce(ctx.debts, near, { ...spec, fixZ: z }, false, true, FIRST_CAP);
+      if (q.ok && q.objective < best.objective - 1e-6 * Math.max(1, Math.abs(best.objective))) best = q;
+    }
+  if (best === plan) return plan;
+  SWAP_STATS.n++;
+  const polished = solveTermsRaw(ctx.debts, ctx.cols, spec, [], best, 2);
+  return polished.ok && polished.objective < best.objective ? polished : best;
+}
+const SWAP_SPAN = 3;
+const SWAP_IN = 4;
+/** How often the swap repair improved an answer across builds (the corpus prints it). */
+const SWAP_STATS = { n: 0 };
+
 /** What the payment goal's cost stage recovered across builds (the corpus prints it): answers changed, the most forecast saving, ₪. */
 const PAYMENT_STAGE = { n: 0, saved: 0 };
 
@@ -5253,4 +5314,4 @@ function regressOf(input: AutoMixInput, goal: GoalId, mix: RegressMix, guardCaps
   return { ok: true, rule: null, ...measure(plan, fix) };
 }
 
-export const __test = { regressOf, STATS, SLIVER_STATS, GATE_STATS, DISPLAY_STATS, PAYMENT_STAGE, ALIGN_STATS, runGoals, sliversOf, sliverTest, SLIVER_REASON, unsliver, solveBalanced, frontierPoint, solveGuarded, variantsFor, referenceOf, applyReference, prepare, solveTermsRaw, specFor, LAMBDA, bookOf, rowsOf, priceRow, debtsOf, columnsFor, pricingFor, trancheRow, SETUP_HOUSING, SETUP_AP_ALONE, isIndexedPath };
+export const __test = { SWAP_STATS, regressOf, STATS, SLIVER_STATS, GATE_STATS, DISPLAY_STATS, PAYMENT_STAGE, ALIGN_STATS, runGoals, sliversOf, sliverTest, SLIVER_REASON, unsliver, solveBalanced, frontierPoint, solveGuarded, variantsFor, referenceOf, applyReference, prepare, solveTermsRaw, specFor, LAMBDA, bookOf, rowsOf, priceRow, debtsOf, columnsFor, pricingFor, trancheRow, SETUP_HOUSING, SETUP_AP_ALONE, isIndexedPath };

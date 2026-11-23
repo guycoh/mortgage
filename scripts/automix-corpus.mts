@@ -515,7 +515,7 @@ if (!ONLY || ONLY === "fuzz") {
   console.log(`  sliver pass: ${z.dropped} answers changed, at most ₪${fmt(z.cost)} (cost goals, risk-weighted) and ₪${fmt(z.monthly)} a month (payment) given up`);
   const w = V.wave;
   console.log(`  wave 2: gates refused / then passed in the search, by goal and gate: ${Object.entries(__test.GATE_STATS.by as Record<string, { refused: number; passed: number }>).sort().map(([k, x]) => `${k} ${x.refused}/${x.passed}`).join(", ") || "none"}`);
-  console.log(`  wave 2: gates held in the search ${__test.GATE_STATS.n} · savings kept over the display repair ${__test.DISPLAY_STATS.held} · payment cost stage ${__test.PAYMENT_STAGE.n} answers, at most ₪${fmt(__test.PAYMENT_STAGE.saved)} saved · terms aligned ${__test.ALIGN_STATS.n}`);
+  console.log(`  wave 2: gates held in the search ${__test.GATE_STATS.n} · savings kept over the display repair ${__test.DISPLAY_STATS.held} · payment cost stage ${__test.PAYMENT_STAGE.n} answers, at most ₪${fmt(__test.PAYMENT_STAGE.saved)} saved · payment swap repair ${__test.SWAP_STATS.n} · terms aligned ${__test.ALIGN_STATS.n}`);
   console.log(`  wave 2: relative guard ${w.guardRelative} · no guard ${w.guardNone} · debts held cheap ${w.heldCheap} · move groups ${w.moveGroups} · stale-prime words ${w.staleWords} · no recommendation with ok goals ${w.recNull} · budget equivalence ${EQUIV.n - EQUIV.differ}/${EQUIV.n} identical · years ends not compared across guard tiers ${LAW_SKIPS.guardTier} · budget objectives not compared where the lower ceiling lifted CHEAP_KEEP ${LAW_SKIPS.cheapLift}`);
 }
 console.log(`\n${V.passed()} checks passed, ${failures.length} failed`);

@@ -726,7 +726,7 @@ section("H. timing (Node)");
   console.log(`\n  slivers on the board: ${t.slivers} (${t.slivMarked} with a reason) · sliver pass: ${z.dropped} answers changed, at most ₪${fmt(z.cost)} (cost goals) and ₪${fmt(z.monthly)} a month (payment) given up`);
   console.log(`  מאוזן with both measures: ${t.balanced}, t lowest ${t.tN ? t.tLow.toFixed(3) : "-"}, mean ${t.tN ? (t.tSum / t.tN).toFixed(3) : "-"}`);
   const w = V.wave;
-  console.log(`  wave 2: gates held in the search ${__test.GATE_STATS.n} · savings kept over the display repair ${__test.DISPLAY_STATS.held} · payment cost stage ${__test.PAYMENT_STAGE.n} answers, at most ₪${fmt(__test.PAYMENT_STAGE.saved)} · terms aligned ${__test.ALIGN_STATS.n} · relative guard ${w.guardRelative} · no guard ${w.guardNone} · held cheap ${w.heldCheap} · move groups ${w.moveGroups}`);
+  console.log(`  wave 2: gates held in the search ${__test.GATE_STATS.n} · savings kept over the display repair ${__test.DISPLAY_STATS.held} · payment cost stage ${__test.PAYMENT_STAGE.n} answers, at most ₪${fmt(__test.PAYMENT_STAGE.saved)} · payment swap repair ${__test.SWAP_STATS.n} · terms aligned ${__test.ALIGN_STATS.n} · relative guard ${w.guardRelative} · no guard ${w.guardNone} · held cheap ${w.heldCheap} · move groups ${w.moveGroups}`);
 }
 console.log(`\n${V.passed()} checks passed, ${failures.length} failed`);
 for (const f of failures.slice(0, 80)) console.log("  ✗ " + f);
