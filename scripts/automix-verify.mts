@@ -2,7 +2,7 @@
 // (automix-check.mts) and the corpus/fuzz run (automix-corpus.mts).
 import { __test, type AutoMixInput, type AutoMixResult, type GoalId, type Proposal } from "../app/aa105test/lib/automix";
 import { ECONOMIES, scheduleIn } from "../app/aa105test/lib/automix/econ";
-import { MIN_TRANCHE, FIXED_MIN, LINKED_MAX, TRACK_SHARE_MAX, TRACK_SHARE_EXEMPT, LTV_MAX, PTI_MAX, MATERIAL, AP_LTV, AP_LTV_RELIEF, AP_RELIEF_CAP, YEARS_STRETCH, REFI_COST_MAX, SLIVER_SHARE, BREAK_EVEN_MAX, SEASONING_MONTHS, SMALL_MOVE, STABLE_PRICE } from "../app/aa105test/lib/automix/rules";
+import { MIN_TRANCHE, FIXED_MIN, LINKED_MAX, TRACK_SHARE_MAX, TRACK_SHARE_EXEMPT, LTV_MAX, PTI_MAX, MATERIAL, AP_LTV, AP_LTV_RELIEF, AP_RELIEF_CAP, YEARS_STRETCH, REFI_COST_MAX, SLIVER_SHARE, BREAK_EVEN_MAX, SEASONING_MONTHS, SMALL_MOVE, STABLE_PRICE, BANK_AP_MIN, AP_GREEN } from "../app/aa105test/lib/automix/rules";
 import { NONBANK_LTV } from "../app/aa105test/lib/automix/tiers";
 import { EARLY } from "../app/aa105test/lib/automix/solve";
 import { priceLoan, todayPayment } from "../app/aa102test/lib/price";
@@ -132,11 +132,23 @@ export function verifier(market: MarketSnapshot, forecast: Forecast | null) {
   function waveLints(tag: string, input: AutoMixInput, r: AutoMixResult, p: Proposal) {
     const refMonthly = r.dueNow?.reference.monthly ?? r.today.monthly;
     const all = p.reasons.join(" ");
+    // Stability states its promise only when its rows keep it; above it, it says what it is instead (the steadiest within today's payment).
+    if (p.goal === "stable" && p.status === "ok" && p.stress.length) {
+      const excess = Math.max(...p.stress.map((s) => s.peakMonthly)) - p.metrics.monthly;
+      const allow = Math.max(150, 0.03 * p.metrics.monthly);
+      const promise = all.includes("גם בתרחיש הגרוע ההחזר לא עולה ביותר מ-");
+      const steadiest = all.includes("זה התמהיל היציב ביותר בתוך ההחזר של היום");
+      check(!(excess > allow + 2) || (steadiest && !promise), `${tag}: stable ${Math.round(excess)} above month one (promise ${Math.round(allow)}) and ${promise ? "states the promise" : "does not say it is the steadiest within today's payment"}`);
+      check(!(excess < allow - 2) || !steadiest, `${tag}: stable keeps its promise and says it cannot`);
+    }
     const promise = all.match(/בחמש השנים הקרובות, גם בתרחיש הלחץ הקשה ביותר, ההחזר לא עולה על (?:התקרה של )?₪([\d,]+)/);
     if (promise) check(guardOk(p.rows, input.inflation, Number(promise[1].replace(/,/g, "")), EVERY60), `${tag}: the guard sentence (₪${promise[1]}) breaks on some month 1–60`);
     if (p.goal === "payment" || p.goal === "balanced" || p.goal === "years") {
       const g = p.guard;
       check(!!g, `${tag}: no guard on the proposal`);
+      // An absolute or relative guard is stated only when the rows hold it on every month 1–60;
+      // a mix that breaks the guard its solve held reads "none" (audit 3 R4: L44 years, ₪19,220 against ₪19,192).
+      if (g && g.kind !== "none") check(g.holds, `${tag}: ${g.kind} guard stated and not held (${g.caps.join("/")})`);
       if (g) {
         if (g.kind === "relative") {
           wave.guardRelative++;
@@ -208,7 +220,7 @@ export function verifier(market: MarketSnapshot, forecast: Forecast | null) {
   }
 
   /** Tallies of this wave's rules across builds (the corpus prints them). */
-  const wave = { guardRelative: 0, guardNone: 0, heldCheap: 0, gated: 0, recNull: 0, aligned: 0, moveGroups: 0, typedBinds: 0, staleWords: 0 };
+  const wave = { guardRelative: 0, guardNone: 0, heldCheap: 0, gated: 0, recNull: 0, aligned: 0, moveGroups: 0, typedBinds: 0, staleWords: 0, apSmall: 0 };
 
   /**
    * House style for every string the sheet shows: no "·" and no dash separators
@@ -305,6 +317,17 @@ export function verifier(market: MarketSnapshot, forecast: Forecast | null) {
         check(new Set(ts.map((t) => t.track)).size === ts.length, `${tag(p.goal)}: ${seg} two tranches on one track`);
         check(ts.length <= (seg === "housing" ? 4 : 2), `${tag(p.goal)}: ${seg} has ${ts.length} tranches`);
         if (ts.length > 1) check(ts.every((t) => t.amount >= MIN_TRANCHE - 1000), `${tag(p.goal)}: ${seg} tranche under ₪${MIN_TRANCHE}`);
+        // A bank writes no home-secured all-purpose loan under BANK_AP_MIN (rules.ts), unless the rule's own
+        // exception holds, and then the tranche says which (keptSmall): Mizrahi-Tefahot's green track (₪10,000 to
+        // ₪60,000) for a client whose mortgage stays there, or money the mix must lend (debt due now or its
+        // arrears under the override, a כל מטרה mortgage row moving with the whole mortgage).
+        if (seg === "allPurpose" && !nonbank && N < BANK_AP_MIN) {
+          wave.apSmall++;
+          const forced = p.moves.some((m) => m.action !== "keep" && m.segment === "allPurpose" && (m.due || (p.refinance === "move" && m.group === "mortgage"))) || p.moves.some((m) => (m.cure ?? 0) > 0);
+          const green = p.refinance === "internal" && p.priceBank === "Mizrahi Tefahot" && N >= AP_GREEN.min;
+          const said = ts.every((t) => !!t.keptSmall && t.keptSmall.includes(`₪${BANK_AP_MIN.toLocaleString("en-US")}`)) && p.caveats.some((c) => c === ts[0].keptSmall);
+          check((forced || green) && said, `${tag(p.goal)}: all-purpose loan ₪${fmt(N)} under the bank minimum ₪${fmt(BANK_AP_MIN)} (${forced ? "money it must lend" : green ? "green track" : "no exception"}, ${said ? "stated" : "not stated"})`);
+        }
         if (seg === "housing") {
           const linked = ts.filter((t) => t.track === "kz" || t.track === "mz").reduce((a, t) => a + t.amount, 0);
           check(linked / N <= LINKED_MAX + 0.005, `${tag(p.goal)}: CPI-linked ${(linked / N).toFixed(3)} > ⅓`);
@@ -415,6 +438,17 @@ export function verifier(market: MarketSnapshot, forecast: Forecast | null) {
       const refPay = due?.reference.monthly ?? r.today.monthly;
       const given = !!(input.profile.budget && input.profile.budget > 0);
       const ceiling = p.goal === "years" ? p.budget ?? budget : budget;
+      // A years no-gain note that quotes what a one-year shortening takes never contradicts the verdict:
+      // the payment is above the ceiling, or the note names the rule that refused it (the five-year guard,
+      // the stretch rule). Audit 3 R6: L14 "מחייב החזר של ₪3,345" under its ₪3,526 ceiling, no-gain.
+      if (p.goal === "years" && p.status === "no-gain" && p.budget !== undefined) {
+        const need = (p.note ?? "").match(/מחייב החזר של ₪([\d,]+) בחודש/);
+        if (need)
+          check(
+            Number(need[1].replace(/,/g, "")) > p.budget + 0.5 || /אבל בתרחיש לחץ ההחזר שלו עולה|נלקחת רק כשהיא מקצרת את החוב בשנה לפחות/.test(p.note ?? ""),
+            `${tag(p.goal)}: no-gain, and its note says a year takes ₪${need[1]}, within the ₪${fmt(p.budget)} ceiling, without the rule that refused it`
+          );
+      }
       if (p.goal === "years" && p.status !== "unavailable") {
         check(p.budget !== undefined, `${tag(p.goal)}: no ceiling on the years proposal`);
         check(given ? Math.abs((p.budget ?? 0) - budget) <= 0.5 : (p.budget ?? 0) <= Math.round(refPay * (1 + YEARS_STRETCH)) + 0.5 && (p.budget ?? 0) >= budget - 0.5, `${tag(p.goal)}: years ceiling ${p.budget} outside [${budget}, ${Math.round(refPay * (1 + YEARS_STRETCH))}]`);
@@ -522,11 +556,25 @@ export function verifier(market: MarketSnapshot, forecast: Forecast | null) {
         const has = (x: string, v: number) => figures(x).some((f) => Math.abs(f - Math.round(Math.abs(v))) <= 2);
         const first = p.reasons[0] ?? "";
         const tC = d.totalCost;
+        // The forecast side is the stress panel's own figure, everything paid (stress[0]): one source for
+        // every forecast sentence (audit 3 R5: L16 stability said the forecast cost fell ₪13,636 and, three
+        // sentences on, that it rose ₪32,798; the first was interest and indexation net of the costs financed).
         if (p.metrics.outlook && r.today.outlook && !due) {
-          const fC = p.metrics.outlook.totalCost - r.today.outlook.totalCost;
-          if (Math.abs(tC) >= 1000 && Math.abs(fC) >= 1000 && Math.sign(tC) !== Math.sign(fC) && p.moves.some((m) => m.action !== "keep"))
-            check(has(first, tC) && has(first, fC), `${tag(p.goal)}: typed cost ${fmt(tC)} and forecast ${fmt(fC)} disagree in sign, first reason must name both: ${first}`);
+          if (Math.abs(tC) >= 1000 && Math.abs(fP) > Math.max(1000, neutral) && Math.sign(tC) !== Math.sign(fP) && p.moves.some((m) => m.action !== "keep"))
+            check(has(first, tC) && has(first, fP), `${tag(p.goal)}: typed cost ${fmt(tC)} and forecast ${fmt(fP)} disagree in sign, first reason must name both: ${first}`);
         }
+        // Every sentence that states the forecast change in what is paid states stress[0]'s figure.
+        if (s0)
+          for (const x of [...p.reasons, ...p.caveats, p.note ?? ""]) {
+            const said = [
+              ...Array.from(x.matchAll(/בתחזית בנק ישראל משלמים בסך הכול ₪[\d,]+ במקום ₪[\d,]+[^,]*, (?:חיסכון|תוספת) של ₪([\d,]+)/g)),
+              ...Array.from(x.matchAll(/בתחזית(?: בנק ישראל)? סך התשלומים(?:, כולל העמלות והעלויות,)? (?:עולה|יורד) ב-₪([\d,]+)/g)),
+              ...Array.from(x.matchAll(/ותחזית בנק ישראל, [^.]*?מראה (?:חיסכון|תוספת) של ₪([\d,]+)/g)),
+              ...Array.from(x.matchAll(/והמחיר הוא ₪([\d,]+) יותר בסך התשלומים בתחזית/g)),
+              ...Array.from(x.matchAll(/מייקר את סך התשלומים ב-₪([\d,]+), כי הפריסה/g)),
+            ];
+            for (const mm of said) check(Math.abs(Number(mm[1].replace(/,/g, "")) - Math.abs(fP)) <= 2, `${tag(p.goal)}: a forecast figure ₪${mm[1]} that is not the stress panel's ${fmt(fP)}: ${x.slice(0, 140)}`);
+          }
         if (p.status === "ok" && !due && ["savings", "balanced", "stable"].includes(p.goal) && tC > neutral)
           check(first.includes("הריבית וההצמדה") && has(first, tC), `${tag(p.goal)}: shows a higher cost (${fmt(tC)}) than today, first reason must say so: ${first}`);
       }

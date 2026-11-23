@@ -103,6 +103,8 @@ export type Column = {
   early: number[][];
   /** Per ₪1: the forecast position at each AHEAD month (paid through it plus the balance left). */
   ahead?: number[];
+  /** Per ₪1, every payment of the first 60 months, per economy — [economy][month − 1] (Spec.guardAt reads it). */
+  pay60?: number[][];
   /** The forecast's all-in annual rate of the column, % (the rate at which its forecast payments are worth ₪1). */
   fRate?: number;
 };
@@ -142,6 +144,13 @@ export type Spec = {
    */
   peakCap: number | number[] | null;
   /**
+   * The same guard at months outside the samples, one row each: the mix's
+   * payment in one economy and month at most `cap`, from each debt's own payment
+   * there (kept) and each column's per ₪1. Added where a proposal's own rows
+   * broke the guard between two samples (index.ts holdGuard).
+   */
+  guardAt?: { cap: number; debt: Record<string, number>; col: Record<string, number> }[] | null;
+  /**
    * Weight on the rise: the worst economy's payment peak over the whole life
    * (bounded above by the sum of every row's own peak there) less the typed
    * month-one payment, ₪ a month (יציבות מרבית, index.ts solveStable).
@@ -149,6 +158,10 @@ export type Spec = {
   wRise?: number;
   /** Cap on the same rise, ₪ a month (the stability goal's band). */
   riseCap?: number | null;
+  /** Cap on the same bound as a share of month one: P ≤ (1 + riseShare) × the typed month-one payment (the stability promise, index.ts solveStable). */
+  riseShare?: number | null;
+  /** Cap on the same bound itself, ₪ a month: the worst-economy peak at most this (stability's material fall against today). */
+  peakTop?: number | null;
   /** Debts this goal keeps whole (rules.ts CHEAP_KEEP): locked for this solve. */
   hold?: string[];
   /**
@@ -224,6 +237,15 @@ export type Spec = {
   setupApShared?: number;
   /** Debt decisions held fixed (the term walk): ids refinanced; every other movable debt kept. */
   fixZ?: string[] | null;
+  /**
+   * The smallest all-purpose loan the lender writes (rules.ts BANK_AP_MIN, or
+   * AP_GREEN.min at Mizrahi-Tefahot for its own mortgage client): the
+   * segment's only tranche at least this. Not held while the segment carries
+   * money the mix must lend: a forced all-purpose debt (debt due now, a row
+   * moving with a whole mortgage) or, under moveWhole, a כל מטרה mortgage row
+   * that moves; nor while arrears are cured from it. null = no floor (a non-bank).
+   */
+  apMin?: number | null;
   /**
    * Whose law the new money is under. "bank": directive 329 (⅓ fixed on the new
    * money and on the property, no enlarging an LTV breach). "nonbank": 329 does
@@ -386,12 +408,15 @@ function solveOnceInner(debts: SolverDebt[], colsIn: Column[], s: Spec, relaxed:
         pkRows.add(`pk${k}_${i}`);
         C.set(`pk${k}_${i}`, { max: capAt(k) - keptEarly[k][i] });
       });
+  // The guard at the months the samples missed (Spec.guardAt), every debt kept as the constant.
+  const guardAt = s.guardAt ?? [];
+  guardAt.forEach((g, j) => C.set(`ga${j}`, { max: g.cap - sum(debts.map((d) => g.debt[d.id] ?? 0)) }));
   // The break-even position test (index.ts gatesPass), at each AHEAD month.
   const aheadCap = s.ahead?.cap ?? null;
   if (aheadCap) aheadCap.forEach((cap, j) => C.set(`ah${j}`, { max: (cap - sum(debts.map((d) => d.ahead?.[j] ?? 0))) / U }));
   // Stability's rise: P ≥ Σ every row's own peak in economy k (an upper bound of
   // the mix's peak there), and the rise is P less the typed month-one payment.
-  const rise = !!s.wRise || s.riseCap != null;
+  const rise = !!s.wRise || s.riseCap != null || s.riseShare != null || s.peakTop != null;
   if (rise) {
     for (const k of stressK) {
       C.set(`rp${k}`, { min: sum(debts.map((d) => d.peak[k])) });
@@ -404,6 +429,14 @@ function solveOnceInner(debts: SolverDebt[], colsIn: Column[], s: Spec, relaxed:
     if (s.riseCap != null) {
       C.set("rise", { max: s.riseCap + keptMonthly });
       add("P", "rise", 1);
+    }
+    if (s.riseShare != null) {
+      C.set("riseS", { max: (1 + s.riseShare) * keptMonthly });
+      add("P", "riseS", 1);
+    }
+    if (s.peakTop != null) {
+      C.set("ptop", { max: s.peakTop });
+      add("P", "ptop", 1);
     }
   }
   // 329 §7 on the new money, per segment — bank law only.
@@ -453,10 +486,12 @@ function solveOnceInner(debts: SolverDebt[], colsIn: Column[], s: Spec, relaxed:
     if (s.ptiCap !== null) add(v, "pti", c.monthly * U);
     if (s.peakCap !== null) for (const k of stressK) EARLY.forEach((_, i) => pkRows.has(`pk${k}_${i}`) && add(v, `pk${k}_${i}`, c.early[k][i] * U));
     if (aheadCap) aheadCap.forEach((_, j) => add(v, `ah${j}`, c.ahead?.[j] ?? 0));
+    guardAt.forEach((g, j) => add(v, `ga${j}`, (g.col[c.key] ?? 0) * U));
     if (rise) {
       for (const k of stressK) add(v, `rp${k}`, -c.peak[k] * U);
       if (s.wRise) add(v, "obj", -s.wRise * c.monthly * U);
       if (s.riseCap != null) add(v, "rise", -c.monthly * U);
+      if (s.riseShare != null) add(v, "riseS", -(1 + s.riseShare) * c.monthly * U);
     }
     if (bankLaw) {
       add(v, `fix_${seg}`, (FIXED[c.track] ? 1 : 0) - FIXED_MIN);
@@ -474,6 +509,15 @@ function solveOnceInner(debts: SolverDebt[], colsIn: Column[], s: Spec, relaxed:
   }
   // ---- tranche structure: open binaries, minimum size, count, share cap
   const bigM = (sum(debts.map((d) => d.balance + d.fee)) + cureAll + s.setupHousing + s.setupAp) / U + 1;
+  // The bank all-purpose minimum (Spec.apMin) on the segment's only tranche:
+  // its own minimum row relieved by MIN − floor instead of MIN when it is the
+  // only one, so a lone tranche is at least `floor` and two are each MIN. Not
+  // held while the segment carries money the mix must lend (a forced
+  // all-purpose debt, or a כל מטרה mortgage row that moves with its lender) or
+  // cures arrears (override only). A separate row on the segment's total made
+  // yalps read feasible relaxations as infeasible (r04 קיצור שנים at 144 months).
+  const apExempt = (d: SolverDebt) => d.segment === "allPurpose" && (!!d.forced || (s.moveWhole && d.group === "mortgage"));
+  const apFloor = s.apMin && cureAll === 0 && !movable.some(apExempt) ? Math.min(s.apMin, MIN_TRANCHE) : 0;
   for (const seg of ["h", "ap"] as const) {
     const maxTr = seg === "h" ? MAX_HOUSING_TRANCHES : MAX_AP_TRANCHES;
     const single = `single_${seg}`;
@@ -494,7 +538,7 @@ function solveOnceInner(debts: SolverDebt[], colsIn: Column[], s: Spec, relaxed:
       C.set(`lo:${tk}`, { min: 0 });
       add(o, `up:${tk}`, -bigM);
       add(o, `lo:${tk}`, -MIN_TRANCHE / U);
-      add(single, `lo:${tk}`, MIN_TRANCHE / U);
+      add(single, `lo:${tk}`, (MIN_TRANCHE - (seg === "ap" ? apFloor : 0)) / U);
       for (const c of list) {
         add(`x:${c.key}`, `up:${tk}`, 1);
         add(`x:${c.key}`, `lo:${tk}`, 1);
@@ -601,6 +645,7 @@ function solveOnceInner(debts: SolverDebt[], colsIn: Column[], s: Spec, relaxed:
     if (s.ptiCap !== null && d.group === "mortgage") put("pti", -d.monthly);
     if (s.peakCap !== null) for (const kk of stressK) EARLY.forEach((_, i) => pkRows.has(`pk${kk}_${i}`) && put(`pk${kk}_${i}`, -d.early[kk][i]));
     if (aheadCap) aheadCap.forEach((_, j) => put(`ah${j}`, -(d.ahead?.[j] ?? 0) / U));
+    guardAt.forEach((g, j) => put(`ga${j}`, -(g.debt[d.id] ?? 0)));
     if (rise) {
       for (const kk of stressK) put(`rp${kk}`, d.peak[kk]);
       if (s.wRise) {
@@ -608,6 +653,7 @@ function solveOnceInner(debts: SolverDebt[], colsIn: Column[], s: Spec, relaxed:
         else if (k === 1) fixedObj += s.wRise * d.monthly;
       }
       if (s.riseCap != null) put("rise", d.monthly);
+      if (s.riseShare != null) put("riseS", (1 + s.riseShare) * d.monthly);
     }
     if (cs !== null) put("cshare", (d.fee - cs * (d.balance + d.fee)) / U);
     if (shared > 0 && d.segment === "housing") put("shn", -1);
