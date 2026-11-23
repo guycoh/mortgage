@@ -496,13 +496,14 @@ function solveOnceInner(debts: SolverDebt[], colsIn: Column[], s: Spec, relaxed:
   }
   // ---- tranche structure: open binaries, minimum size, count, share cap
   const bigM = (sum(debts.map((d) => d.balance + d.fee)) + cureAll + s.setupHousing + s.setupAp) / U + 1;
-  // The bank all-purpose minimum (Spec.apMin) on the segment's only tranche:
-  // lo: Σx − MIN·o + (MIN − floor)·single + floor·Σ z(exempt) ≥ 0, so a lone
-  // tranche is at least `floor` unless a debt the mix must lend for moves (then
-  // the row asks nothing). Arrears cured from the segment lift it (override only).
+  // The bank all-purpose minimum (Spec.apMin), a row of its own beside each
+  // track's minimum: apmin: Σx(all-purpose) − floor·Σo(all-purpose) + floor·Σz(exempt) ≥ 0.
+  // One open tranche is at least `floor`; two are each MIN_TRANCHE already; a
+  // debt the mix must lend for, moving, lifts it. Arrears cured from the
+  // segment lift it too (override only).
   const apFloor = s.apMin && cureAll === 0 ? Math.min(s.apMin, MIN_TRANCHE) : 0;
   const apExempt = (d: SolverDebt) => d.segment === "allPurpose" && (!!d.forced || (s.moveWhole && d.group === "mortgage"));
-  const apLo: string[] = [];
+  if (apFloor > 0) C.set("apmin", { min: 0 });
   for (const seg of ["h", "ap"] as const) {
     const maxTr = seg === "h" ? MAX_HOUSING_TRANCHES : MAX_AP_TRANCHES;
     const single = `single_${seg}`;
@@ -523,12 +524,13 @@ function solveOnceInner(debts: SolverDebt[], colsIn: Column[], s: Spec, relaxed:
       C.set(`lo:${tk}`, { min: 0 });
       add(o, `up:${tk}`, -bigM);
       add(o, `lo:${tk}`, -MIN_TRANCHE / U);
+      add(single, `lo:${tk}`, MIN_TRANCHE / U);
       const floor = seg === "ap" ? apFloor : 0;
-      add(single, `lo:${tk}`, (MIN_TRANCHE - floor) / U);
-      if (floor > 0) apLo.push(`lo:${tk}`);
+      if (floor > 0) add(o, "apmin", -floor / U);
       for (const c of list) {
         add(`x:${c.key}`, `up:${tk}`, 1);
         add(`x:${c.key}`, `lo:${tk}`, 1);
+        if (floor > 0) add(`x:${c.key}`, "apmin", 1);
       }
       // One term per track: a binary per (track, term), at most one of them, only if the track is open.
       if (oneTerm && list.length > 1) {
@@ -642,7 +644,7 @@ function solveOnceInner(debts: SolverDebt[], colsIn: Column[], s: Spec, relaxed:
       if (s.riseShare != null) put("riseS", (1 + s.riseShare) * d.monthly);
     }
     if (cs !== null) put("cshare", (d.fee - cs * (d.balance + d.fee)) / U);
-    if (apExempt(d)) for (const row of apLo) put(row, apFloor / U);
+    if (apFloor > 0 && apExempt(d)) put("apmin", apFloor / U);
     if (shared > 0 && d.segment === "housing") put("shn", -1);
     // Cleared, a debt in arrears needs no cure; kept, it needs its cure (fund_ap above, and an all-purpose file).
     const cure = cureOf(d);
