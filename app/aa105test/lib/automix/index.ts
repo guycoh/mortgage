@@ -4273,7 +4273,11 @@ const GATE_STATS = { n: 0, by: {} as Record<string, { refused: number; passed: n
  */
 function referenceOf(ctx: Ctx): Ctx["ref"] {
   const t = ctx.today;
-  const none = { monthly: t.metrics.monthly, paid: t.paid[0], typedPaid: t.metrics.totalPaid, typedCost: t.metrics.totalCost, months: t.metrics.months, worst: Math.max(...t.paid.slice(1)), due: 0, carry: 0, carryYears: 0, book: null };
+  // The totals are sums over the rows in the master's order: their last bits differ with that order (fuzz seed 31
+  // Z567: 3,637,845.8681318522 against …852), and as caps they sent a node-capped search down another branch.
+  // Rounded UP to the agora, today's own mix still meets them and the order no longer shows.
+  const c = (x: number) => Math.ceil(x * 100) / 100;
+  const none = { monthly: t.metrics.monthly, paid: c(t.paid[0]), typedPaid: c(t.metrics.totalPaid), typedCost: c(t.metrics.totalCost), months: t.metrics.months, worst: c(Math.max(...t.paid.slice(1))), due: 0, carry: 0, carryYears: 0, book: null };
   if (!(ctx.ref.due > 0)) return none;
   // The reference is a yardstick, not an offer: today's mix as it stands may
   // already break the PTI or LTV guardrail, and the yardstick must still exist.
@@ -4286,11 +4290,11 @@ function referenceOf(ctx: Ctx): Ctx["ref"] {
   const lent = sum(built.tranches.map((x) => x.amount));
   return {
     monthly: b.metrics.monthly,
-    paid: b.paid[0],
-    typedPaid: b.metrics.totalPaid,
-    typedCost: b.metrics.totalCost,
+    paid: c(b.paid[0]),
+    typedPaid: c(b.metrics.totalPaid),
+    typedCost: c(b.metrics.totalCost),
     months: b.metrics.months,
-    worst: Math.max(...b.paid.slice(1)),
+    worst: c(Math.max(...b.paid.slice(1))),
     due: ctx.ref.due,
     carry: b.metrics.monthly - t.metrics.monthly,
     carryYears: years,
