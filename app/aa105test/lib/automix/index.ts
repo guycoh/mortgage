@@ -3113,7 +3113,7 @@ function unsliver(ctx: Ctx, goal: GoalId, sv: Solved): Solved {
     const spec = sv.spec;
     const known = new Set(sliversOf(cur, cols).map((x) => `${x.track}|${x.segment}`));
     // In the canonical order (solve.ts): the first improving flip is taken, so the board's row order may not decide which.
-    const flippable = (canonical(ctx.debts) as Debt[]).filter((d) => !d.forced && (!d.lock || !!spec.unlock?.includes(d.id)) && !spec.hold?.includes(d.id) && (d.group === "mortgage" ? !spec.keepMortgage : spec.loansAllowed));
+    const flippable = (canonical(ctx.debts) as Debt[]).filter((d) => !d.forced && (!d.lock || !!spec.unlock?.includes(d.id)) && !spec.hold?.includes(d.id) && (d.group === "mortgage" ? !spec.keepMortgage : spec.loansAllowed) && flipsAlone(d, spec));
     for (const d of flippable) {
       const keys = new Set(Object.keys(cur.amounts));
       const z = cur.refinance.includes(d.id) ? cur.refinance.filter((id) => id !== d.id) : [...cur.refinance, d.id];
@@ -3190,6 +3190,16 @@ const KEEP_SLIVER = new WeakMap<Plan, string[]>();
  * weight on cost in the payment goal let it stand. A plan is never made worse,
  * a cap on the shown cost is held, and no sliver is added.
  */
+/**
+ * Whether a debt's decision may be flipped on its own. When the whole mortgage
+ * moves (the move structure, or a bank the advisor picked that does not hold it)
+ * a lender's mortgage rows go together, as in the solver (solve.ts moveWhole):
+ * keeping one of them alone leaves a lien behind the new bank's first lien. The
+ * sliver pass and keepCheaper flipped one at a time and did (check
+ * move-to-discount: מאוזן kept the 2.4% ק"צ and moved the bank's other three).
+ */
+const flipsAlone = (d: Debt, spec: Spec) => !(spec.moveWhole && d.group === "mortgage");
+
 function keepCheaper(ctx: Ctx, sv: Solved): Solved {
   if (!sv.plan.ok || !sv.spec) return sv;
   const spec = sv.spec;
@@ -3202,7 +3212,7 @@ function keepCheaper(ctx: Ctx, sv: Solved): Solved {
     const keys = new Set(Object.keys(cur.amounts));
     let changed = false;
     for (const d of canonical(ctx.debts) as Debt[]) {
-      if (!cur.refinance.includes(d.id) || d.forced || (flips.get(d.id)?.paid ?? 0) > -100) continue;
+      if (!cur.refinance.includes(d.id) || d.forced || !flipsAlone(d, spec) || (flips.get(d.id)?.paid ?? 0) > -100) continue;
       const p = solveOnce(ctx.debts, cols.filter((c) => keys.has(c.key)), { ...spec, fixZ: cur.refinance.filter((id) => id !== d.id) });
       // Better on the goal's objective, or no worse and cheaper in the forecast: the
       // payment goal weighs cost at 1/1000, too little for its search to see (Z426).
