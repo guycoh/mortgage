@@ -82,8 +82,13 @@ const LAMBDA = __test.LAMBDA as Record<GoalId, number>;
 /** A goal's risk-weighted forecast cost: (1 − λ) of the forecast economy and λ of the worst one. */
 const riskCost = (o: Outcome, goal: GoalId) => (1 - LAMBDA[goal]) * o.paid![0] + LAMBDA[goal] * Math.max(...o.paid!);
 const worstPeak = (o: Outcome) => Math.max(...o.peak!);
-const mixOf = (p: Proposal) => ({
-  structure: p.structure,
+// The variant a proposal was built in. A bank structure reports "bank" for both
+// the internal refinance and the move; under the system price the move is its
+// own variant (bankMove, priced at the system average), so a moved mix must be
+// re-priced there, not at the incumbent's published surcharge. (With a picked
+// bank "move" is the bank variant itself, priced at that bank.)
+const mixOf = (p: Proposal, input: AutoMixInput) => ({
+  structure: p.structure === "bank" && p.refinance === "move" && input.profile.bank === "system" ? ("bankMove" as const) : p.structure,
   refinance: p.moves.filter((m) => m.action !== "keep").map((m) => m.id),
   tranches: p.tranches.map((t) => ({ track: t.track, segment: t.segment, years: t.years, amount: t.amount })),
 });
@@ -185,8 +190,8 @@ for (const c of await cases()) {
         const ceiling = goal === "years" ? n.budget : undefined;
         // Today's answer moved a debt CHEAP_KEEP holds by default: the goal lifted the rule on its own measure.
         const lifted = n.moves.some((m) => m.action !== "keep" && /זול מכסף חדש ב-/.test(m.why));
-        const ro = __test.regressOf(input, goal, mixOf(o), caps, ceiling, lifted);
-        const rn = n.status === "ok" || n.tranches.length ? __test.regressOf(input, goal, mixOf(n), caps, ceiling, lifted) : null;
+        const ro = __test.regressOf(input, goal, mixOf(o, input), caps, ceiling, lifted);
+        const rn = n.status === "ok" || n.tranches.length ? __test.regressOf(input, goal, mixOf(n, input), caps, ceiling, lifted) : null;
         if (!ro.ok) {
           v = "old mix breaks";
           // The figure: what the old mix gives with that one rule set aside.
