@@ -3693,21 +3693,26 @@ function reasonsOf(ctx: Ctx, goal: GoalId, book: Book, tranches: NewTranche[], r
   // it and the forecast disagree in sign, or a goal that claims a cost result
   // shows a HIGHER typed cost than today, the first reason says so, with both figures.
   // With debt due now both are measured from the reference (today + clearing it).
+  // The forecast side is everything paid in the forecast, fees and costs
+  // included: the figure of the totals sentence, the typed-versus-forecast
+  // caveat and the stress panel (stress[0]), one source for every forecast
+  // sentence. It was interest and indexation net of the costs financed into the
+  // new balances, a second figure for the same cost (audit 3 R5: L16 stability,
+  // "יורדות ב-₪3,464" in the first reason against "תוספת של ₪17,293" in the fourth).
   const R = ctx.ref;
   const typedCost = m.totalCost - R.typedCost;
-  const forecastCost = book.paid[0] - (m.totalPaid - m.totalCost) - (R.paid - (R.typedPaid - R.typedCost));
   const way = (x: number) => (x > 0 ? "עולות" : "יורדות");
-  const disagree = Math.abs(typedCost) >= 1000 && Math.abs(forecastCost) >= 1000 && Math.sign(typedCost) !== Math.sign(forecastCost);
-  const costClaim = goal === "savings" || goal === "balanced" || goal === "stable";
   // Within the neutral residue (rules.ts MATERIAL.neutral) two totals are the same cost.
   const neutral = MATERIAL.neutral(R.paid);
+  const disagree = Math.abs(typedCost) >= 1000 && Math.abs(fPaidDelta) > Math.max(1000, neutral) && Math.sign(typedCost) !== Math.sign(fPaidDelta);
+  const costClaim = goal === "savings" || goal === "balanced" || goal === "stable";
+  const paidWords = `סך התשלומים${switchCost > 0 ? ", כולל העמלות והעלויות," : ""} ${fPaidDelta > 0 ? "עולה" : "יורד"} ב-${nis(fPaidDelta)}`;
   let lead = "";
-  if (disagree)
-    lead = `בלוח התמהיל, לפי הריבית המוקלדת, הריבית וההצמדה ${way(typedCost)} ב-${nis(typedCost)}, ובתחזית בנק ישראל הן ${way(forecastCost)} ב-${nis(forecastCost)}.`;
+  if (disagree) lead = `בלוח התמהיל, לפי הריבית המוקלדת, הריבית וההצמדה ${way(typedCost)} ב-${nis(typedCost)}, ובתחזית בנק ישראל ${paidWords}.`;
   else if (costClaim && typedCost > neutral) {
     // Stability's price is said against what it buys, in payment.
     const s = goal === "stable" ? stabilityOf(R.book ?? ctx.today, R.monthly, book, m.monthly) : null;
-    lead = `הריבית וההצמדה בלוח עולות ב-${nis(typedCost)}${forecastCost > 0 ? `, ובתחזית ב-${nis(forecastCost)}` : ""}${s ? `, תמורת החזר שבתרחיש הגרוע לא עולה על ${nis(s.next)} במקום ${nis(s.now)}` : ""}.`;
+    lead = `הריבית וההצמדה בלוח עולות ב-${nis(typedCost)}${fPaidDelta > neutral ? `, ובתחזית ${paidWords}` : ""}${s ? `, תמורת החזר שבתרחיש הגרוע לא עולה על ${nis(s.next)} במקום ${nis(s.now)}` : ""}.`;
   }
   // With debt due now the end is measured from the reference, whose last payment clears it.
   const end =

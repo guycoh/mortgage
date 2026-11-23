@@ -545,11 +545,25 @@ export function verifier(market: MarketSnapshot, forecast: Forecast | null) {
         const has = (x: string, v: number) => figures(x).some((f) => Math.abs(f - Math.round(Math.abs(v))) <= 2);
         const first = p.reasons[0] ?? "";
         const tC = d.totalCost;
+        // The forecast side is the stress panel's own figure, everything paid (stress[0]): one source for
+        // every forecast sentence (audit 3 R5: L16 stability said the forecast cost fell ₪13,636 and, three
+        // sentences on, that it rose ₪32,798; the first was interest and indexation net of the costs financed).
         if (p.metrics.outlook && r.today.outlook && !due) {
-          const fC = p.metrics.outlook.totalCost - r.today.outlook.totalCost;
-          if (Math.abs(tC) >= 1000 && Math.abs(fC) >= 1000 && Math.sign(tC) !== Math.sign(fC) && p.moves.some((m) => m.action !== "keep"))
-            check(has(first, tC) && has(first, fC), `${tag(p.goal)}: typed cost ${fmt(tC)} and forecast ${fmt(fC)} disagree in sign, first reason must name both: ${first}`);
+          if (Math.abs(tC) >= 1000 && Math.abs(fP) > Math.max(1000, neutral) && Math.sign(tC) !== Math.sign(fP) && p.moves.some((m) => m.action !== "keep"))
+            check(has(first, tC) && has(first, fP), `${tag(p.goal)}: typed cost ${fmt(tC)} and forecast ${fmt(fP)} disagree in sign, first reason must name both: ${first}`);
         }
+        // Every sentence that states the forecast change in what is paid states stress[0]'s figure.
+        if (s0)
+          for (const x of [...p.reasons, ...p.caveats, p.note ?? ""]) {
+            const said = [
+              ...Array.from(x.matchAll(/בתחזית בנק ישראל משלמים בסך הכול ₪[\d,]+ במקום ₪[\d,]+[^,]*, (?:חיסכון|תוספת) של ₪([\d,]+)/g)),
+              ...Array.from(x.matchAll(/בתחזית(?: בנק ישראל)? סך התשלומים(?:, כולל העמלות והעלויות,)? (?:עולה|יורד) ב-₪([\d,]+)/g)),
+              ...Array.from(x.matchAll(/ותחזית בנק ישראל, [^.]*?מראה (?:חיסכון|תוספת) של ₪([\d,]+)/g)),
+              ...Array.from(x.matchAll(/והמחיר הוא ₪([\d,]+) יותר בסך התשלומים בתחזית/g)),
+              ...Array.from(x.matchAll(/מייקר את סך התשלומים ב-₪([\d,]+), כי הפריסה/g)),
+            ];
+            for (const mm of said) check(Math.abs(Number(mm[1].replace(/,/g, "")) - Math.abs(fP)) <= 2, `${tag(p.goal)}: a forecast figure ₪${mm[1]} that is not the stress panel's ${fmt(fP)}: ${x.slice(0, 140)}`);
+          }
         if (p.status === "ok" && !due && ["savings", "balanced", "stable"].includes(p.goal) && tC > neutral)
           check(first.includes("הריבית וההצמדה") && has(first, tC), `${tag(p.goal)}: shows a higher cost (${fmt(tC)}) than today, first reason must say so: ${first}`);
       }
