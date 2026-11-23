@@ -219,6 +219,31 @@ export type DebtMove = {
   due?: boolean;
   /** Override only: arrears on this KEPT debt, brought current from the new money, ₪. */
   cure?: number;
+  /**
+   * Set when the debt is clearly cheaper than the new money that would replace
+   * it (rules.ts CHEAP_KEEP): how many points its forecast all-in rate sits
+   * under the cheapest new money of its segment at its own term. Set on a debt
+   * the answer keeps under the rule. Every goal but the lowest payment and the
+   * consolidation holds such a debt by default; savings, stability and קיצור
+   * שנים move it when holding costs them materially, and the moved debt's `why`
+   * then says what holding would cost.
+   */
+  heldCheap?: number;
+};
+
+/** Small rows of one lender, track and decision, shown as one line (Proposal.moveGroups). */
+export type MoveGroup = {
+  /** The DebtMove ids in this line (one id = a line of its own). */
+  ids: string[];
+  label: string;
+  action: DebtMove["action"];
+  count: number;
+  /** Σ balance, ₪. */
+  balance: number;
+  /** Σ fee, ₪. */
+  fee: number;
+  /** The single move's own `why`, or one sentence for the group. */
+  why: string;
 };
 
 export type NewTranche = {
@@ -336,7 +361,23 @@ export type Proposal = {
   };
 
   moves: DebtMove[];
+  /**
+   * `moves` for a short list: every move under SMALL_MOVE (rules.ts, ₪20,000) of
+   * one lender, track and decision folded into one line with a count and a sum;
+   * every other move a line of its own, in `moves` order. Present only when it
+   * folds something. `moves` stays complete.
+   */
+  moveGroups?: MoveGroup[];
   tranches: NewTranche[];
+  /**
+   * החזר חודשי נמוך, מאוזן, קיצור שנים: the five-year payment guard. "absolute":
+   * no payment above `caps[0]` in any economy (today's payment; קיצור שנים its
+   * ceiling); "relative": today's own mix rises above that in a stress economy,
+   * so in each economy the mix pays no more than today's mix would there at its
+   * own five-year peak (`caps` per economy, `stress` order); "none": neither.
+   * `holds`: the proposal's own rows hold it on every month 1–60.
+   */
+  guard?: { kind: "absolute" | "relative" | "none"; caps: number[]; holds: boolean };
   /** Why this mix — three to five sentences, each carrying its numbers. */
   reasons: string[];
   /** What the advisor must check or tell the client before filing it. */

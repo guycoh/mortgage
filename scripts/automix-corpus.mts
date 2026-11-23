@@ -128,6 +128,8 @@ function run(name: string, input: AutoMixInput, opts: { ok?: boolean; laws?: boo
  * A larger budget only widens what a budget goal may build: it can never come
  * out worse on its own measure. The default budget is the reference payment.
  */
+/** Law comparisons set aside by a documented exemption (printed with the tallies). */
+const LAW_SKIPS = { guardTier: 0, cheapLift: 0 };
 function budgetLaw(name: string, input: AutoMixInput, r: AutoMixResult) {
   if (!r.ok || input.profile.budget) return;
   const base = r.dueNow?.budget ?? r.today.monthly;
@@ -141,18 +143,41 @@ function budgetLaw(name: string, input: AutoMixInput, r: AutoMixResult) {
     // The goal's OWN objective may never get worse. Its status may: the
     // break-even gate sits outside the solve, and a wider budget can buy a mix
     // whose costs come back later. Only "years" holds its status (its objective
-    // is the months themselves).
-    if (g === "years") check(b.status === "ok", `${tag}: was ok, now ${b.status}`);
+    // is the months themselves), unless the wider answer sits on "no more in
+    // total than the reference" (fuzz Z312: the same 144 months, ₪829 over on
+    // ₪1.2M paid, where the lower ceiling's mix had passed).
+    if (g === "years") check(b.status === "ok" || V.nearThreshold(b, wide), `${tag}: was ok, now ${b.status}`);
     if (b.status === "unavailable") {
       check(false, `${tag}: was ok, now unavailable`);
       continue;
     }
-    if (g === "years") check(b.metrics.months <= a.metrics.months, `${tag}: ends later ${b.metrics.months} > ${a.metrics.months}`);
+    // CHEAP_KEEP is lifted only when the goal has no answer with it (rules.ts):
+    // the lower ceiling may have had to move a cheap debt the higher one keeps,
+    // and moving it can lower the goal's own objective (fuzz Z36 savings: two
+    // debts moved at the lower ceiling and kept at the higher, 1.2% apart). The
+    // objectives are compared when both answers hold the same debts.
+    if (b.moves.some((m) => m.heldCheap !== undefined && a.moves.find((x) => x.id === m.id)?.action !== "keep")) {
+      LAW_SKIPS.cheapLift++;
+      continue;
+    }
+    // The five-year guard is tiered (absolute, then relative to today's own
+    // peak): a higher ceiling can bring the absolute guard within reach, and
+    // the stronger guard may end later than the relative one did at the lower
+    // ceiling (fuzz Z327: relative 252 months, absolute 312). The end is
+    // compared under the same guard only.
+    if (g === "years" && a.guard?.kind !== b.guard?.kind) LAW_SKIPS.guardTier++;
+    else if (g === "years") check(b.metrics.months <= a.metrics.months, `${tag}: ends later ${b.metrics.months} > ${a.metrics.months}`);
     // Savings minimises its own objective (forecast paid, ¾ base + ¼ worst economy), not the typed cost.
     const J = (p: (typeof a)) => 0.75 * p.stress[0].totalPaid + 0.25 * Math.max(...p.stress.map((x) => x.totalPaid));
     if (g === "savings") check(J(b) <= J(a) * 1.0005 + 500, `${tag}: savings objective worse ${fmt(J(b))} > ${fmt(J(a))}`);
+    // Stability's own objective is the rise of its payment in the worst economy, then the cost within STABLE_BAND
+    // of the least rise (rules.ts): a wider budget may buy a steadier mix at a higher cost (fuzz Z402: rise ₪148 → ₪1,
+    // +0.3% on the cost), and that is not compared on cost. The rise itself is not compared: the solver holds each
+    // track's own peak summed, a bound on the mix's peak, and a lower bound can come with a higher true peak on the
+    // rows (Z27: ₪120 → ₪189 on the rows at ₪26k less cost).
     const W = (p: (typeof a)) => 0.05 * p.stress[0].totalPaid + 0.95 * Math.max(...p.stress.map((x) => x.totalPaid));
-    if (g === "stable") check(W(b) <= W(a) * 1.0005 + 500, `${tag}: stable objective worse ${fmt(W(b))} > ${fmt(W(a))}`);
+    const rise = (p: (typeof a)) => Math.max(...p.stress.map((x) => x.peakMonthly)) - p.metrics.monthly;
+    if (g === "stable" && rise(b) >= rise(a) - Math.max(20, 0.005 * base)) check(W(b) <= W(a) * 1.0005 + 500, `${tag}: stable objective worse ${fmt(W(b))} > ${fmt(W(a))}`);
   }
 }
 
@@ -171,8 +196,53 @@ function negotiatedLaw(name: string, input: AutoMixInput, r: AutoMixResult) {
     const s = buildAutoMix({ ...input, profile: { ...input.profile, negotiated: (input.profile.negotiated || 0) + dn } });
     const b = s.proposals.find((p) => p.goal === "balanced");
     if (!b || b.status === a.status) continue;
-    check(V.nearThreshold(a, r) || V.nearThreshold(b, s), `${name}/balanced negotiated ${dn > 0 ? "+" : ""}${dn}: ${a.status} → ${b.status} away from every threshold (${b.note ?? a.note ?? ""})`);
+    check(V.nearThreshold(a, r, Math.abs(dn)) || V.nearThreshold(b, s, Math.abs(dn)), `${name}/balanced negotiated ${dn > 0 ? "+" : ""}${dn}: ${a.status} → ${b.status} away from every threshold (${b.note ?? a.note ?? ""})`);
   }
+}
+
+/**
+ * Input equivalence (audit S1): leaving the budget empty and typing today's
+ * payment into it are the same instruction, so every goal but קיצור שנים (whose
+ * +10% stretch is by design for an empty budget only) shows the same answer.
+ * Savings is compared on its own objective within DISPLAY_GIVE, the rest on
+ * their figures.
+ */
+const EQUIV = { n: 0, differ: 0 };
+function budgetEquivalenceLaw(name: string, input: AutoMixInput, r: AutoMixResult) {
+  if (!r.ok || input.profile.budget) return;
+  const today = r.dueNow?.reference.monthly ?? r.today.monthly;
+  const typed = buildAutoMix({ ...input, profile: { ...input.profile, budget: today } });
+  EQUIV.n++;
+  let differ = false;
+  for (const a of r.proposals) {
+    if (a.goal === "years") continue;
+    const b = typed.proposals.find((p) => p.goal === a.goal);
+    if (!b) continue;
+    const tag = `${name}/${a.goal} budget empty vs ₪${fmt(today)}`;
+    check(a.status === b.status, `${tag}: ${a.status} → ${b.status}`);
+    if (a.status !== b.status) differ = true;
+    if (a.status === "unavailable" || b.status === "unavailable") continue;
+    const J = (p: (typeof a)) => 0.75 * p.stress[0].totalPaid + 0.25 * Math.max(...p.stress.map((x) => x.totalPaid));
+    const give = 0.001 * (a.stress[0]?.todayTotalPaid ?? 0);
+    if (a.goal === "savings") {
+      check(Math.abs(J(a) - J(b)) <= give + 1, `${tag}: savings objective ${fmt(J(a))} → ${fmt(J(b))}`);
+      if (Math.abs(J(a) - J(b)) > give + 1) differ = true;
+    } else if (a.metrics.monthly !== b.metrics.monthly || Math.abs(a.stress[0].totalPaid - b.stress[0].totalPaid) > give + 1) {
+      check(false, `${tag}: ₪${fmt(a.metrics.monthly)}/${fmt(a.stress[0].totalPaid)} → ₪${fmt(b.metrics.monthly)}/${fmt(b.stress[0].totalPaid)}`);
+      differ = true;
+    }
+  }
+  if (differ) EQUIV.differ++;
+}
+
+/**
+ * A bankPremium client at the bank that holds the mortgage pays the bank's
+ * difference or the premium, never both (audit U4): picking that bank in the
+ * profile prices the new money exactly as the automatic internal refinance does.
+ */
+function ownBankLaw(name: string, none: AutoMixResult | null, own: AutoMixResult | null, bank: BankId) {
+  if (!none?.ok || !own?.ok || none.pricing.tier !== "bankPremium" || bank === "system" || none.pricing.bank !== bank) return;
+  check(JSON.stringify(none.pricing.rows) === JSON.stringify(own.pricing.rows), `${name}: own bank picked prices new money differently from the internal refinance (${JSON.stringify(own.pricing.rows[0])} vs ${JSON.stringify(none.pricing.rows[0])})`);
 }
 
 /* ------------------------------------------------------------ the profile grid */
@@ -251,13 +321,17 @@ if (!ONLY || ONLY === "letters") {
     }
     read++;
     const base = buildAutoMix(inputOf(master));
+    let none: AutoMixResult | null = null;
     for (const g of grid(master, base.today.monthly)) {
       const input = inputOf(master, g.over, g.profile);
       const r = run(`${id}/${g.tag}`, input, { laws: g.laws });
       if (g.tag === "none" && r) {
+        none = r;
         budgetLaw(`${id}/${g.tag}`, input, r);
         negotiatedLaw(`${id}/${g.tag}`, input, r);
+        budgetEquivalenceLaw(`${id}/${g.tag}`, input, r);
       }
+      if (g.tag === "own-bank") ownBankLaw(`${id}/own-bank`, none, r, bankOf(master));
       if (g.tag === "none" || g.tag === "typical") console.log(`  ${id} ${String(st.bank).padEnd(10)} ${String(master.length).padStart(2)} rows ${fmt(base.today.monthly).padStart(7)}/mo ${g.tag.padEnd(8)} ${r?.pricing.tier ?? ""} ${(r?.ms ?? 0).toFixed(0).padStart(4)}ms ${status(r)}`);
     }
   }
@@ -273,13 +347,17 @@ if (!ONLY || ONLY === "reports") {
   for (const s of FIXTURE_SETS) {
     const h = await household(s.id, s.files);
     const base = buildAutoMix(inputOf(h.master, { analysis: h.analysis }));
+    let none: AutoMixResult | null = null;
     for (const g of grid(h.master, base.today.monthly)) {
       const input = inputOf(h.master, { analysis: h.analysis, ...g.over }, g.profile);
       const r = run(`${s.id}/${g.tag}`, input, { laws: g.laws });
       if (g.tag === "none" && r) {
+        none = r;
         budgetLaw(`${s.id}/${g.tag}`, input, r);
         negotiatedLaw(`${s.id}/${g.tag}`, input, r);
+        budgetEquivalenceLaw(`${s.id}/${g.tag}`, input, r);
       }
+      if (g.tag === "own-bank") ownBankLaw(`${s.id}/own-bank`, none, r, bankOf(h.master));
       if (g.tag === "typical" || g.tag === "tight") console.log(`  ${s.id.padEnd(8)} ${g.tag.padEnd(8)} ${r?.pricing.tier ?? ""} ${(r?.ms ?? 0).toFixed(0).padStart(4)}ms ${status(r)}`);
     }
   }
@@ -432,6 +510,10 @@ if (!ONLY || ONLY === "fuzz") {
   console.log(`\n  slivers on the board: ${t.slivers} (${t.slivMarked} with a reason) · מאוזן with both measures: ${t.balanced}, t lowest ${t.tN ? t.tLow.toFixed(3) : "-"}, mean ${t.tN ? (t.tSum / t.tN).toFixed(3) : "-"}`);
   const z = __test.SLIVER_STATS;
   console.log(`  sliver pass: ${z.dropped} answers changed, at most ₪${fmt(z.cost)} (cost goals, risk-weighted) and ₪${fmt(z.monthly)} a month (payment) given up`);
+  const w = V.wave;
+  console.log(`  wave 2: gates refused / then passed in the search, by goal and gate: ${Object.entries(__test.GATE_STATS.by as Record<string, { refused: number; passed: number }>).sort().map(([k, x]) => `${k} ${x.refused}/${x.passed}`).join(", ") || "none"}`);
+  console.log(`  wave 2: gates held in the search ${__test.GATE_STATS.n} · savings kept over the display repair ${__test.DISPLAY_STATS.held} · payment cost stage ${__test.PAYMENT_STAGE.n} answers, at most ₪${fmt(__test.PAYMENT_STAGE.saved)} saved · terms aligned ${__test.ALIGN_STATS.n}`);
+  console.log(`  wave 2: relative guard ${w.guardRelative} · no guard ${w.guardNone} · debts held cheap ${w.heldCheap} · move groups ${w.moveGroups} · stale-prime words ${w.staleWords} · no recommendation with ok goals ${w.recNull} · budget equivalence ${EQUIV.n - EQUIV.differ}/${EQUIV.n} identical · years ends not compared across guard tiers ${LAW_SKIPS.guardTier} · budget objectives not compared where the lower ceiling lifted CHEAP_KEEP ${LAW_SKIPS.cheapLift}`);
 }
 console.log(`\n${V.passed()} checks passed, ${failures.length} failed`);
 const groups = new Map<string, string[]>();

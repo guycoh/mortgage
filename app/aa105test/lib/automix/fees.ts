@@ -118,15 +118,38 @@ export function averageRateIn(linked: boolean, months: number, ym: string): numb
 }
 
 /**
- * What a NEW fixed-rate housing loan of `months` costs today: the BoI's average
- * rate on the loans banks made in the newest report month, by bucket of term
- * (the same tables the fees use: mashfix.xls unlinked, pribmash.xls CPI-linked),
- * converted from effective annual to nominal, and interpolated linearly between
- * bucket midpoints (flat before the first and after the last). One spread on a
- * zero curve calibrated at ~20 years priced 4–10-year fixed money 0.4–0.8 points
- * below what banks actually lent at (audit 2026-11-21: 4-year קל"צ 3.87 vs 4.50).
+ * What a NEW fixed-rate housing loan of `months` costs today: the term SHAPE of
+ * the BoI's average-rate tables for the newest report month (the same tables the
+ * fees use: mashfix.xls unlinked, pribmash.xls CPI-linked), converted from
+ * effective annual to nominal and interpolated linearly between bucket midpoints
+ * (flat before the first and after the last), at the LEVEL of the Supervisor's
+ * own housing average for the track (`level`: TamInt010, nominal, read at the
+ * month's average term).
+ *
+ * Why the level is not the tables' own: the tables are every new loan "לשם
+ * רכישת דירת מגורים או במישכון דירת מגורים" (the fee order's definition, §1),
+ * so each bucket blends housing loans with all-purpose loans secured by a home,
+ * which carry 1.9–2.5 points more; in the unlinked file the short buckets also
+ * hold variable loans by the time to their next change. Rebuilt from the
+ * Supervisor's monthly report 877 for seven months of 2022–2026, the published
+ * buckets match the volume-weighted blend of tables 877-1/2 (housing) and
+ * 877-4/5 (secured by a home) to about ±0.005 points; TamInt010's system rate is
+ * the housing-purpose column alone (bullet and balloon loans out), rebuilt
+ * exactly. The all-purpose share of a long bucket is 4–10% unlinked and 10–42%
+ * CPI-linked, which is why the tables stood +0.17…0.19 (קל"צ) and +0.31…0.35
+ * (ק"צ) above TamInt010 in every year of the back-test but 2022 (when those
+ * shares were 1–3% and 4–11%). The term shape stays the tables': one spread on a
+ * zero curve calibrated at ~20 years priced 4–10-year fixed money 0.4–0.8
+ * points below what banks actually lent at (audit 2026-11-21: 4-year קל"צ 3.87
+ * vs 4.50). Without `level` the tables' own level stands.
  */
-export function newFixedRate(linked: boolean, months: number): { rate: number; report: string | null } {
+export function newFixedRate(linked: boolean, months: number, level?: { rate: number; months: number } | null): { rate: number; report: string | null } {
+  const shape = tableRate(linked, months);
+  if (!level || !Number.isFinite(level.rate) || !(level.months > 0)) return shape;
+  return { rate: shape.rate - tableRate(linked, level.months).rate + level.rate, report: shape.report };
+}
+
+function tableRate(linked: boolean, months: number): { rate: number; report: string | null } {
   const t = linked ? T.linked : T.unlinked;
   const row = t.rows[0];
   const mids: number[] = [];

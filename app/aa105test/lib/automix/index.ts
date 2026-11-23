@@ -27,7 +27,7 @@
 
 import { owedOnly, foldMasterRow, isIndexedPath, type ImportedLoan } from "@/app/aa102test/lib/credit";
 import { priceLoan, type Econ } from "@/app/aa102test/lib/price";
-import { addMonths, startOfToday, toIso } from "@/app/aa102test/lib/dates";
+import { addMonths, parseDate, startOfToday, toIso } from "@/app/aa102test/lib/dates";
 import { lenderOf } from "@/app/aa102test/lib/lenders";
 import { FREQ_FIXED, FREQ_PRIME, freqLabel } from "@/lib/rate-frequency";
 import { BANKS, RESET_MONTHS, TRACK_PATH, TRACK_SHORT, TRACKS, newRate, round2, type BankId, type MarketSnapshot, type TrackKey } from "@/app/aa107test/lib/market";
@@ -41,6 +41,7 @@ import type {
   Finding,
   GoalId,
   MixMetrics,
+  MoveGroup,
   NewTranche,
   Proposal,
   StressRow,
@@ -71,8 +72,15 @@ import {
   REFI_COST_MAX,
   SLIVER_SHARE,
   SLIVER_GIVE,
+  CHEAP_KEEP,
+  DISPLAY_GIVE,
+  STABLE_BAND,
+  STABLE_PRICE,
+  SEASONING_MONTHS,
+  SMALL_MOVE,
+  TRACK_SHARE_EXEMPT,
 } from "./rules";
-import { solveTerms as solveTermsRaw, solveOnce, termsOf, canonical, STATS, EARLY, U, SHARE_SLACK, ROUNDING, FIRST_CAP, type Seed, type Column, type Plan, type Segment, type SolverDebt, type Spec } from "./solve";
+import { solveTerms as solveTermsRaw, solveOnce, termsOf, canonical, STATS, EARLY, AHEAD, U, SHARE_SLACK, ROUNDING, FIRST_CAP, type Seed, type Column, type Plan, type Segment, type SolverDebt, type Spec } from "./solve";
 import history from "./history.json";
 
 export * from "./types";
@@ -327,7 +335,24 @@ type Priced = {
   peak: number[];
   /** Payments at the guard's sample months, per economy (EARLY in solve.ts). */
   early: number[][];
+  /** Forecast position at each AHEAD month (solve.ts): paid through it plus the balance left. */
+  ahead: number[];
 };
+
+/** Paid through month M plus the balance left at M, for each AHEAD month — the break-even gate's position. */
+function aheadOf(pay: number[], bal: number[]): number[] {
+  const out: number[] = [];
+  let cum = 0;
+  let j = 0;
+  for (let m = 1; j < AHEAD.length; m++) {
+    if (m <= pay.length) cum += pay[m - 1];
+    if (m === AHEAD[j]) {
+      out.push(cum + (m <= bal.length ? bal[m - 1] : 0));
+      j++;
+    }
+  }
+  return out;
+}
 
 /** A balloon (schedule 3/4) repays its principal in one last payment: that month is not a "monthly payment". */
 const lumpMonth = (l: ImportedLoan) => {
@@ -364,6 +389,7 @@ function priceRow(l: ImportedLoan, inflation: number, f: Forecast, discountRate?
       return mx;
     }),
     early: pay.map((p) => EARLY.map((m) => (m === 1 ? (p.length ? t.monthly : 0) : m === lumpMonth(l) ? 0 : p[m - 1] ?? 0))),
+    ahead: aheadOf(pay[0], bal[0]),
   };
 }
 
@@ -486,12 +512,19 @@ function pricingFor(
   // the bank's difference, the purpose premium and the negotiated discount stay
   // as newRate adds them. Variable tracks: anchor + margin, as before. `extra`
   // is a per-track shift (the client's own record at their bank, see prepare).
+  // The fixed tracks' level: the Supervisor's housing average for the track
+  // (TamInt010, the same source as every other track's level), at the month's
+  // average term for ק"צ and the snapshot's reference term for קל"צ, whose
+  // average term no BoI series states (fees.ts newFixedRate says why).
+  const avg = m.housing?.avg;
+  const levelOf = (track: "klz" | "kz") =>
+    avg && Number.isFinite(avg[track]) ? { rate: avg[track], months: Math.round(12 * (track === "kz" ? avg.kzTermYears : avg.klzRefTermYears)) } : null;
   const quote = (track: TrackKey, years: number, segment: Segment) => {
     const p = newRate(m, f, track, years * 12, segment, opt);
     const shift = extra[track] ?? 0;
     if (track !== "klz" && track !== "kz") return shift ? { ...p, rate: p.rate + shift, margin: p.margin === null ? null : p.margin + shift } : p;
     const base = newRate(m, f, track, years * 12, "housing", { bank: "system", discount: 0 }).rate;
-    return { ...p, rate: newFixedRate(track === "kz", years * 12).rate + (p.rate - base) + shift };
+    return { ...p, rate: newFixedRate(track === "kz", years * 12, levelOf(track)).rate + (p.rate - base) + shift };
   };
   const bankRate = (track: TrackKey, years: number, segment: Segment) => {
     const p = quote(track, years, segment);
@@ -588,6 +621,8 @@ function columnsFor(pr: Pricing, input: AutoMixInput, f: Forecast, maxYears: num
           typedInterest: p.typedInterest / PROBE,
           peak: p.peak.map((x) => x / PROBE),
           early: p.early.map((e) => e.map((x) => x / PROBE)),
+          ahead: p.ahead.map((x) => x / PROBE),
+          fRate: irrOf(p.pay[0], PROBE) ?? undefined,
           price,
         });
       }
@@ -607,6 +642,8 @@ type Debt = SolverDebt & {
   feeEstimated: boolean;
   feeBasis: string;
   cpiAveraging: number;
+  /** An estimated fee's likely range, ₪ (fees.ts FEE_BAND): the break-even gate is tested at both ends. */
+  feeBand?: { low: number; high: number };
   priced: Priced;
   /** A debt due now (override): what it is in the document. */
   due?: DueDebt;
@@ -634,6 +671,7 @@ function dueDebtOf(d: DueDebt, row: ImportedLoan | null): Debt {
     typedInterest: 0,
     peak: zeros,
     early: ECON.map(() => EARLY.map(() => 0)),
+    ahead: AHEAD.map(() => 0),
     lock: null,
     forced: true,
     row: placeholder,
@@ -645,10 +683,22 @@ function dueDebtOf(d: DueDebt, row: ImportedLoan | null): Debt {
     feeEstimated: false,
     feeBasis: "חוב לפירעון מיידי",
     cpiAveraging: 0,
-    priced: { typedMonthly: 0, typedInterest: 0, typedPaid: 0, typedPay: [], pay: ECON.map(() => []), bal: ECON.map(() => []), paid: zeros, pv: 0, peak: zeros, early: ECON.map(() => EARLY.map(() => 0)) },
+    priced: { typedMonthly: 0, typedInterest: 0, typedPaid: 0, typedPay: [], pay: ECON.map(() => []), bal: ECON.map(() => []), paid: zeros, pv: 0, peak: zeros, early: ECON.map(() => EARLY.map(() => 0)), ahead: AHEAD.map(() => 0) },
     due: d,
   };
 }
+
+/**
+ * Bank Hapoalim prints one "עמלת פירעון מוקדם" per loan with the 0.1% notice fee
+ * inside it (on every prime loan it is exactly 0.1% of the balance, 8 of 8 in
+ * the fee study), and the parser shares that total among the loan's parts by
+ * balance, so each part carries 0.1% of its own balance of it. The notice fee is
+ * avoided by ten days' notice and is not charged at all on the part the same
+ * bank refinances (fee order §3(2)), so it is not a cost of the move (audit P4:
+ * ₪294 on ₪294,118 charged as a fee while the caveat called it avoidable).
+ */
+const NOTICE_FEE = 0.001;
+const NOTICE_INSIDE = /^הפועלים$/;
 
 function debtsOf(master: ImportedLoan[], input: AutoMixInput, f: Forecast, skipped: AutoMixResult["skipped"]): Debt[] {
   const out: Debt[] = [];
@@ -677,12 +727,18 @@ function debtsOf(master: ImportedLoan[], input: AutoMixInput, f: Forecast, skipp
     let feeEstimated = false;
     let feeBasis = "";
     let cpiAveraging = 0;
+    let feeBand: { low: number; high: number } | undefined;
     if (group === "mortgage") {
       const q = prepaymentFee(l);
       fee = q.fee;
       feeEstimated = q.estimated;
       feeBasis = q.basis;
       cpiAveraging = q.cpiAveraging;
+      feeBand = q.band;
+      if (!q.estimated && q.fee > 0 && NOTICE_INSIDE.test(lenderKey(l))) {
+        fee = Math.max(0, Math.round(q.fee - NOTICE_FEE * amount));
+        feeBasis = `${q.basis}, בלי עמלת אי ההודעה (0.1% מהיתרה) שהבנק כולל בסכום ושאינה נגבית בהודעה מוקדמת`;
+      }
     } else if (Number(l.prepayment_fee) > 0) {
       fee = Math.round(Number(l.prepayment_fee));
       feeBasis = "עמלת פירעון כפי שנמסרה";
@@ -707,6 +763,7 @@ function debtsOf(master: ImportedLoan[], input: AutoMixInput, f: Forecast, skipp
       pv: priced.pv,
       peak: priced.peak,
       early: priced.early,
+      ahead: priced.ahead,
       lock,
       row: l,
       label,
@@ -717,6 +774,7 @@ function debtsOf(master: ImportedLoan[], input: AutoMixInput, f: Forecast, skipp
       feeEstimated,
       feeBasis,
       cpiAveraging,
+      ...(feeBand ? { feeBand } : {}),
       priced,
     });
   }
@@ -769,13 +827,15 @@ type Ctx = {
    * payment that can carry it (`carry`) and its balance to everything still to
    * be paid — no goal can promise relief that is only the unpaid debt.
    */
-  ref: { monthly: number; paid: number; typedPaid: number; typedCost: number; months: number; worst: number; due: number; carry: number; carryYears: number; book: Book | null; pv?: number | null };
+  ref: { monthly: number; paid: number; typedPaid: number; typedCost: number; months: number; worst: number; due: number; carry: number; carryYears: number; carryRate?: number; book: Book | null; pv?: number | null };
   /**
    * The structure this context prices: a bank (an internal refinance at the bank
    * that holds the mortgage, or the bank the advisor picked), the whole mortgage
    * moved to another bank, or a non-bank lender on the first or the second lien.
    */
   variant: Variant;
+  /** Debts CHEAP_KEEP holds in this structure, and by how many points they are under new money. */
+  cheapBy: Map<string, number>;
 };
 
 /**
@@ -1064,33 +1124,275 @@ type Solved = {
   altMissing?: Variant;
   /** The missing structure's lowest monthly payment, when it has one. */
   altFloor?: number;
+  /** The five-year guard the solve held (payment, balanced, years). */
+  guard?: Guard;
+  /** The gates were held in the solve after its first answer failed one (runGoals, GATED_GOALS). */
+  gated?: boolean;
+  /** Solved without CHEAP_KEEP's holds: with them the goal had no answer, or (liftGain) a materially worse one. */
+  cheapLifted?: boolean;
+  /** What lifting CHEAP_KEEP bought on the goal's own measure: ₪ for the cost goals, months sooner for קיצור שנים. */
+  liftGain?: number;
+  /** liftGain is a lower bound (the held problem's LP relaxation), not the held answer's own figure. */
+  liftAtLeast?: boolean;
 };
+
+/**
+ * The goals that lift CHEAP_KEEP when keeping the cheap debts costs them
+ * materially (rules.ts): the cost goals on their own objective, קיצור שנים on its
+ * end. מאוזן's two anchors hold the rule (its relief share is what stretched
+ * L44's 3.03% קל"צ), and the payment goal and the consolidation never hold it.
+ */
+const LIFT_GOALS: GoalId[] = ["savings", "stable", "years"];
+/**
+ * What the answer without CHEAP_KEEP gains over the one with it, on the goal's
+ * own measure, when that gain is material and the lifted answer moves a debt the
+ * rule held; null otherwise. Savings and stability: the risk-weighted forecast
+ * cost they minimise, by at least MATERIAL.cost (stability only when its
+ * payment can rise no more than STABLE_BAND above the held answer's). קיצור
+ * שנים: at least MATERIAL.months sooner. r02's budget goals: about ₪27k of
+ * short loans at 3.7–4.75% folded free about ₪600 a month that shortens the
+ * big tranches, ₪61k–₪230k of forecast cost.
+ */
+function liftGain(ctx: Ctx, goal: GoalId, held: Solved, lifted: Solved): number | null {
+  if (!held.plan.ok || !lifted.plan.ok) return null;
+  const hold = held.spec?.hold ?? [];
+  if (!lifted.plan.refinance.some((id) => hold.includes(id))) return null;
+  if (goal === "years") {
+    const end = (sv: Solved) => (typeof sv.meta?.finish === "number" ? sv.meta.finish : Infinity);
+    const sooner = end(held) - end(lifted);
+    return Number.isFinite(sooner) && sooner >= MATERIAL.months ? sooner : null;
+  }
+  const hc = held.cols ?? ctx.cols;
+  const lc = lifted.cols ?? ctx.cols;
+  if (goal === "stable" && riseOf(ctx, lifted.plan, lc) > riseOf(ctx, held.plan, hc) + STABLE_BAND(ctx.ref.monthly)) return null;
+  const lam = { lambda: lambdaOf(ctx, goal) } as Spec;
+  const gain = (costObjective(ctx, lam, held.plan, hc) - costObjective(ctx, lam, lifted.plan, lc)) * U;
+  return gain >= MATERIAL.cost(todayCostOf(ctx)) ? gain : null;
+}
+
+/**
+ * A goal under CHEAP_KEEP, a default and not a wall (rules.ts). The goal is
+ * solved free first: when its answer keeps every cheap debt the rule is not in
+ * the way, and that answer stands (with the rule in its spec, so no later stage
+ * moves them). When it moves one, holding is measured on the goal's own measure
+ * (liftGain) and the free answer is taken only when holding costs materially
+ * more and the free answer's status is no worse. The held answer's LP
+ * relaxation bounds what holding costs: when that bound is already material the
+ * held search is not run, and the reason says "at least" (r02: about ₪27k of
+ * short loans folded, ₪61k–₪230k to its budget goals). מאוזן's anchors always
+ * hold the rule (its relief share stretched L44's 3.03% קל"צ); it is lifted only
+ * when the goal has no answer with it.
+ */
+function solveHolding(ctx: Ctx, goal: GoalId, solve: () => Solved): Solved {
+  const hold = ctx.base.hold;
+  if (goal === "payment" || goal === "consolidate" || !hold?.length) return solve();
+  if (!LIFT_GOALS.includes(goal)) {
+    const held = solve();
+    return held.plan.ok ? held : { ...withoutHold(ctx, solve), cheapLifted: true };
+  }
+  const free = withoutHold(ctx, solve);
+  if (!free.plan.ok) return free;
+  if (!free.plan.refinance.some((id) => hold.includes(id))) return { ...free, ...(free.spec ? { spec: { ...free.spec, hold } } : {}) };
+  const freeOk = quickJudge(ctx, goal, free).status === "ok";
+  const bound = freeOk ? heldBound(ctx, goal, free) : null;
+  if (bound !== null) return { ...free, cheapLifted: true, liftGain: bound, liftAtLeast: true };
+  const held = solve();
+  if (!held.plan.ok) return { ...free, cheapLifted: true };
+  const gain = liftGain(ctx, goal, held, free);
+  const rank = (s: Proposal["status"]) => (s === "ok" ? 0 : s === "no-gain" ? 1 : 2);
+  // Never at the price of the status (r06 stable: the free mix saved more and read no-gain on its price).
+  if (gain !== null && rank(freeOk ? "ok" : quickJudge(ctx, goal, free).status) <= rank(quickJudge(ctx, goal, held).status)) return { ...free, cheapLifted: true, liftGain: gain };
+  return held;
+}
+
+/**
+ * A lower bound on what holding CHEAP_KEEP costs the goal against its free
+ * answer, from the held problem's LP relaxation, when that bound is already
+ * material; null otherwise (and always for stability, whose test also weighs
+ * the rise). Savings: the LP's risk-weighted cost above the free answer's, ₪.
+ * קיצור שנים: the first deadline the held LP reaches within the higher ceiling
+ * and no guard, months after the free answer's end.
+ */
+function heldBound(ctx: Ctx, goal: GoalId, free: Solved): number | null {
+  const unlock = eligibilityIds(ctx);
+  if (goal === "savings") {
+    const lp = solveOnce(ctx.debts, ctx.cols, costSpec(ctx, goal), true);
+    if (!lp.ok) return null;
+    const gain = (lp.objective - costObjective(ctx, { lambda: lambdaOf(ctx, goal) } as Spec, free.plan, free.cols ?? ctx.cols)) * U;
+    return gain >= MATERIAL.cost(todayCostOf(ctx)) ? gain : null;
+  }
+  if (goal !== "years" || typeof free.meta?.finish !== "number") return null;
+  const T = free.meta.finish;
+  const stretch = ctx.input.profile.budget && ctx.input.profile.budget > 0 ? ctx.budget : Math.round(ctx.ref.monthly * (1 + YEARS_STRETCH));
+  const reaches = (finish: number) => solveOnce(ctx.debts, ctx.cols, specFor(ctx, { wMonthly: 1, wCost: 1e-3, lambda: 0, budget: Math.max(ctx.budget, stretch), finish, peakCap: null, ...yearsCaps(ctx), ...(unlock.length ? { unlock } : {}) }), true).ok;
+  if (reaches(T + MATERIAL.months - 1)) return null;
+  const cands = Array.from(new Set([...Array.from({ length: ctx.maxYears }, (_, i) => 12 * (i + 1)), ...ctx.debts.map((d) => d.months)])).filter((m) => m >= T + MATERIAL.months).sort((a, b) => a - b);
+  const first = cands.find((m) => reaches(m));
+  return first === undefined ? null : first - T;
+}
+
+/** Runs f with CHEAP_KEEP's holds lifted (every spec built inside reads ctx.base). */
+function withoutHold<T>(ctx: Ctx, f: () => T): T {
+  const h = ctx.base.hold;
+  ctx.base.hold = undefined;
+  try {
+    return f();
+  } finally {
+    ctx.base.hold = h;
+  }
+}
+/** Runs f with the given holds in ctx.base (the holds another solve of the same goal ran with). */
+function withHold<T>(ctx: Ctx, hold: string[] | undefined, f: () => T): T {
+  const h = ctx.base.hold;
+  ctx.base.hold = hold;
+  try {
+    return f();
+  } finally {
+    ctx.base.hold = h;
+  }
+}
+
+/** A plan's verdict as its proposal would read it (rows built and priced, no reasons written). */
+function quickJudge(ctx: Ctx, goal: GoalId, sv: Solved): Verdict {
+  const { rows, tranches } = rowsOf(ctx, sv.plan);
+  return judge(ctx, goal, sv, sv.plan, bookOf(rows, ctx.input, ctx.f), rows, tranches);
+}
+
+/**
+ * The cost goals' gates held in the solve: the one-off costs' share of the new
+ * money (override off) and the break-even position at every AHEAD month,
+ * against the reference. Asked for only when the goal's own optimum failed a
+ * gate (audit W1: r06 savings and stable read "no-gain", fee ₪62,812 and
+ * break-even 131 months, while keeping the mortgage and moving only the consumer
+ * and all-purpose debt saved about ₪125k in the forecast, broke even at month 84
+ * and fit the budget, ₪7,952 of ₪8,048).
+ */
+function gateRows(ctx: Ctx): Partial<Spec> {
+  const ref = ctx.ref.book ?? ctx.today;
+  return { ...(ctx.override ? {} : { costShareMax: REFI_COST_MAX }), ahead: { cap: aheadOf(ref.pay[0], ref.bal[0]) } };
+}
+const GATED_GOALS: GoalId[] = ["savings", "balanced", "stable"];
 
 function specFor(ctx: Ctx, over: Partial<Spec>): Spec {
   return { ...ctx.base, ...over };
 }
 
-/** The lowest payment under every guardrail — and, when it can be had, a payment that survives the bad economies. */
+/**
+ * The five-year payment guard, in one of three forms (Solved.guard.kind):
+ *   1  absolute — in every economy, for five years, no payment above the cap
+ *      (today's payment; קיצור שנים: the ceiling it is held to);
+ *   2  relative — today's own mix already rises above the cap in a stress
+ *      economy (L07; L11, 81% CPI-linked), so no mix that keeps any of it can
+ *      hold the absolute guard: in each economy the new mix pays no more than
+ *      TODAY'S MIX would there at its own five-year peak, never less than the cap;
+ *   0  none — neither holds, and the proposal says so.
+ * `caps` is the cap per economy (ECONOMIES order).
+ */
+type Guard = { kind: 0 | 1 | 2; caps: number[] };
+
+/** The reference's highest payment in each economy over the next five years, month one as the read-out shows it. */
+function refPeak5(ctx: Ctx): number[] {
+  const b = ctx.ref.book ?? ctx.today;
+  // Up to the agora, as the reference totals (referenceOf): the last bits follow the master's row order (fuzz seed 31 Z396).
+  return ECON.map((_, k) => agoraUp(Math.max(ctx.ref.monthly, ...b.regular[k].slice(1, 60))));
+}
+/** The two guards at cap c, strongest first. */
+function guardTiers(ctx: Ctx, c: number): Guard[] {
+  const abs: Guard = { kind: 1, caps: ECON.map(() => c) };
+  const rel: Guard = { kind: 2, caps: refPeak5(ctx).map((p) => Math.max(c, p)) };
+  // When today's own peak never exceeds the cap the relative guard IS the absolute one.
+  return rel.caps.every((x, k) => x <= abs.caps[k] + 0.5) ? [abs] : [abs, rel];
+}
+const capOf = (g: Guard): number | number[] => (g.caps.every((x) => Math.abs(x - g.caps[0]) < 1e-9) ? g.caps[0] : g.caps);
+
+/** A mix's highest payment over the next five years in each economy, month one as the read-out shows it (every month, not the guard's samples). */
+function peak5Of(book: Book): number[] {
+  return ECON.map((_, k) => Math.max(book.metrics.monthly, ...book.regular[k].slice(1, 60)));
+}
+/** Does a mix's own rows hold the guard on every month 1–60 in every economy (₪1 of rounding)? */
+const guardHolds = (book: Book, g: Guard) => peak5Of(book).every((p, k) => p <= g.caps[k] + 1);
+
+/** A plan's payment at the guard's sample months, as the solver states it, under the caps? */
+function earlyOk(ctx: Ctx, plan: Plan, cols: Column[], caps: number[]): boolean {
+  const byKey = new Map(cols.map((c) => [c.key, c]));
+  const refi = new Set(plan.refinance);
+  return ECON.every((_, k) =>
+    EARLY.every((_, i) => {
+      let x = 0;
+      for (const d of ctx.debts) if (!refi.has(d.id)) x += d.early[k][i];
+      for (const [key, a] of Object.entries(plan.amounts)) x += (byKey.get(key)?.early[k][i] ?? 0) * a;
+      return x <= caps[k] + 1;
+    })
+  );
+}
+
+/** A plan's typed month-one payment as the budget row reads it: kept debts, new money, and the read-out's rounding room per opened track. */
+function budgetRowOf(ctx: Ctx, plan: Plan, cols: Column[]): number {
+  const byKey = new Map(cols.map((c) => [c.key, c]));
+  const refi = new Set(plan.refinance);
+  let x = 0;
+  for (const d of ctx.debts) if (!refi.has(d.id)) x += d.monthly;
+  const fams = new Set<string>();
+  for (const [key, a] of Object.entries(plan.amounts)) {
+    const c = byKey.get(key);
+    if (!c) continue;
+    x += c.monthly * a;
+    fams.add(`${c.track}|${c.segment}`);
+  }
+  return x + ROUNDING * fams.size;
+}
+
+/**
+ * The lowest payment under every guardrail — and, when it can be had, a payment
+ * that survives the bad economies (the absolute guard, else the relative one).
+ * Then, at that payment (within SLIVER_GIVE.monthly, the sliver pass's own
+ * tolerance), the cheapest mix: the payment objective weighs cost at 1/1000,
+ * too little for branch and bound to break ties on (round 6's open question 2).
+ */
 function solvePayment(ctx: Ctx): Solved {
   const unlock = eligibilityIds(ctx);
-  const s = specFor(ctx, { wMonthly: 1, wCost: 1e-3, lambda: 0, budget: null, ...(unlock.length ? { unlock } : {}) });
-  // Soundness: for the next five years, in every economy, the payment should not rise above what is paid today.
-  const gs = { ...s, peakCap: ctx.ref.monthly };
+  const s = specFor(ctx, { wMonthly: 1, wCost: 1e-3, lambda: 0, budget: null, hold: undefined, ...(unlock.length ? { unlock } : {}) });
   // The unguarded optimum first: it is cheap, and when it already keeps the
   // guard it is the guarded optimum too (the guard only removes mixes). The
   // guarded MILP is the hard one (r04: 1.3s at the node cap against 8ms), so it
   // runs only when the free answer breaks the guard.
   const free = solveTerms(ctx.debts, ctx.cols, s);
-  if (free.ok) {
-    const keys = new Set(Object.keys(free.amounts));
-    const held = solveOnce(ctx.debts, ctx.cols.filter((c) => keys.has(c.key)), { ...gs, fixZ: free.refinance });
-    if (held.ok && held.objective <= free.objective + 1e-6 * Math.max(1, Math.abs(free.objective)))
-      return { plan: held, meta: { guard: 1 }, spec: gs, cols: ctx.cols };
+  let pick: { plan: Plan; spec: Spec; guard: Guard } | null = null;
+  for (const g of guardTiers(ctx, ctx.ref.monthly)) {
+    const gs = { ...s, peakCap: capOf(g) };
+    if (free.ok) {
+      const keys = new Set(Object.keys(free.amounts));
+      const held = solveOnce(ctx.debts, ctx.cols.filter((c) => keys.has(c.key)), { ...gs, fixZ: free.refinance });
+      if (held.ok && held.objective <= free.objective + 1e-6 * Math.max(1, Math.abs(free.objective))) {
+        pick = { plan: held, spec: gs, guard: g };
+        break;
+      }
+    }
+    const guarded = solveTerms(ctx.debts, ctx.cols, gs);
+    if (guarded.ok) {
+      pick = { plan: guarded, spec: gs, guard: g };
+      break;
+    }
   }
-  const guarded = solveTerms(ctx.debts, ctx.cols, gs);
-  if (guarded.ok) return { plan: guarded, meta: { guard: 1 }, spec: gs, cols: ctx.cols };
-  return { plan: free, meta: { guard: 0 }, spec: s, cols: ctx.cols };
+  pick ??= { plan: free, spec: s, guard: { kind: 0, caps: ECON.map(() => ctx.ref.monthly) } };
+  if (!pick.plan.ok) return { plan: pick.plan, meta: { guard: 0 }, spec: pick.spec, cols: ctx.cols, guard: pick.guard };
+  // The cost stage: the same rules, the payment held within the tolerance of the lowest.
+  const low = budgetRowOf(ctx, pick.plan, ctx.cols);
+  // Never above the reference, and a material relief stays material: the stage only breaks ties.
+  const material = ctx.ref.monthly - MATERIAL.monthly(ctx.ref.monthly);
+  const roof = low <= material ? material : ctx.ref.monthly - 1;
+  const s2: Spec = { ...pick.spec, wMonthly: 0, wCost: 1, lambda: 0, budget: low + Math.min(SLIVER_GIVE.monthly(ctx.ref.monthly), Math.max(0, roof - low)) };
+  const p2 = solveGuarded(ctx, s2, POOL, 2, restart(ctx, pick.plan, s2, ctx.cols));
+  const cheaper = p2.ok && frontierPoint(ctx, p2, ctx.cols).saving > frontierPoint(ctx, pick.plan, ctx.cols).saving + 1;
+  if (cheaper) {
+    PAYMENT_STAGE.n++;
+    PAYMENT_STAGE.saved = Math.max(PAYMENT_STAGE.saved, frontierPoint(ctx, p2, ctx.cols).saving - frontierPoint(ctx, pick.plan, ctx.cols).saving);
+    addToPool(p2, ctx.cols);
+  }
+  return { plan: cheaper ? p2 : pick.plan, meta: { guard: pick.guard.kind, low }, spec: cheaper ? s2 : pick.spec, cols: ctx.cols, guard: pick.guard };
 }
+/** What the payment goal's cost stage recovered across builds (the corpus prints it): answers changed, the most forecast saving, ₪. */
+const PAYMENT_STAGE = { n: 0, saved: 0 };
 
 function costSpec(ctx: Ctx, goal: GoalId, over: Partial<Spec> = {}): Spec {
   return specFor(ctx, { wMonthly: 0, wCost: 1, lambda: lambdaOf(ctx, goal), budget: ctx.base.budget, ...pvCapOf(ctx, goal), ...over });
@@ -1107,7 +1409,7 @@ function pvCapOf(ctx: Ctx, goal: GoalId): Partial<Spec> {
   // the cap is today's present value in that same economy.
   const shifted = ctx.input.tuning?.baseShift && !ctx.ref.book ? sum(ctx.debts.map((d) => d.pv ?? 0)) : null;
   const pv = shifted ?? ctx.ref.pv ?? (ctx.ref.book ?? ctx.today).metrics.outlook?.pv;
-  return typeof pv === "number" ? { pvCap: pv } : {};
+  return typeof pv === "number" ? { pvCap: agoraUp(pv) } : {};
 }
 function solveCost(ctx: Ctx, goal: GoalId, over: Partial<Spec> = {}): Plan {
   return solveTerms(ctx.debts, ctx.cols, costSpec(ctx, goal, over));
@@ -1123,27 +1425,48 @@ function solveCost(ctx: Ctx, goal: GoalId, over: Partial<Spec> = {}): Plan {
  */
 function solveYears(ctx: Ctx): Solved {
   const unlock = eligibilityIds(ctx);
-  const base = earliestFinish(ctx, ctx.budget, unlock);
   const given = ctx.input.profile.budget && ctx.input.profile.budget > 0;
   const ceiling = given ? ctx.budget : Math.round(ctx.ref.monthly * (1 + YEARS_STRETCH));
-  const stretched = ceiling > ctx.budget + 0.5 ? earliestFinish(ctx, ceiling, unlock) : null;
-  const useStretch = !!stretched?.ok && (!base.ok || base.T - stretched.T >= MATERIAL.months);
-  const pick = useStretch ? stretched! : base;
-  if (!pick.ok) return { plan: { ok: false, status: "infeasible", refinance: [], amounts: {}, objective: NaN, setupHousing: 0, setupAp: 0 } };
-  const sv = yearsAtFrom(ctx, pick.T, pick.seed, pick.budget, unlock);
-  return {
-    ...sv,
-    meta: {
-      ...(sv.meta ?? {}),
-      budget: pick.budget,
-      // What the other ceiling reaches, for the reason: today's payment's end when
-      // the stretch is taken; the stretch's end when it was not worth a year.
-      ...(stretched?.ok ? { ...(base.ok ? { atToday: base.T } : {}), atStretch: stretched.T, stretchBudget: ceiling, stretched: useStretch ? 1 : 0 } : {}),
-    },
-  };
+  // The ceiling holds in the stress economies too, for five years (the guard the
+  // payment goal and מאוזן carry), at the ceiling each search is held to: the
+  // back-test found קיצור שנים above its ceiling in real terms in 421 of 636
+  // builds (65–67% prime for 2018–2021 originations: the lowest payment per
+  // shekel buys the shortest term), 90 with the guard. The relative guard stands
+  // in when today's own mix breaks the absolute one; no guard when neither holds.
+  const tiersAt = (c: number): Guard[] => [...guardTiers(ctx, c), { kind: 0, caps: ECON.map(() => c) }];
+  const levels = Math.max(tiersAt(ctx.budget).length, ceiling > ctx.budget + 0.5 ? tiersAt(ceiling).length : 0);
+  for (let lvl = 0; lvl < levels; lvl++) {
+    const gAt = (c: number) => {
+      const t = tiersAt(c);
+      return t[Math.min(lvl, t.length - 1)];
+    };
+    const g0 = gAt(ctx.budget);
+    const base = earliestFinish(ctx, ctx.budget, unlock, g0);
+    const g1 = ceiling > ctx.budget + 0.5 ? gAt(ceiling) : null;
+    const stretched = g1 ? earliestFinish(ctx, ceiling, unlock, g1) : null;
+    const useStretch = !!stretched?.ok && (!base.ok || base.T - stretched.T >= MATERIAL.months);
+    const pick = useStretch ? stretched! : base;
+    if (!pick.ok) continue;
+    const g = useStretch ? g1! : g0;
+    const sv = yearsAtFrom(ctx, pick.T, pick.seed?.(), pick.budget, unlock, g);
+    return {
+      ...sv,
+      guard: g,
+      meta: {
+        ...(sv.meta ?? {}),
+        budget: pick.budget,
+        guard: g.kind,
+        // What the other ceiling reaches, for the reason: today's payment's end when
+        // the stretch is taken; the stretch's end when it was not worth a year.
+        ...(stretched?.ok ? { ...(base.ok ? { atToday: base.T } : {}), atStretch: stretched.T, stretchBudget: ceiling, stretched: useStretch ? 1 : 0 } : {}),
+      },
+    };
+  }
+  return { plan: { ok: false, status: "infeasible", refinance: [], amounts: {}, objective: NaN, setupHousing: 0, setupAp: 0 } };
 }
 
-type Finish = { ok: true; T: number; budget: number; seed?: { plan: Plan; spec: Spec } } | { ok: false; T: number; budget: number };
+// The seed is solved only for the ceiling taken (each guarded one ran ~1 s on fuzz Z567), from the pool as it stood when the deadline was found.
+type Finish = { ok: true; T: number; budget: number; seed?: () => { plan: Plan; spec: Spec } | undefined } | { ok: false; T: number; budget: number };
 
 /**
  * קיצור שנים never costs more than the reference: everything still to be paid,
@@ -1166,8 +1489,20 @@ function costsNoMore(ctx: Ctx, plan: Plan): boolean {
   return b.paid[0] <= ctx.ref.paid + n && b.metrics.totalPaid <= ctx.ref.typedPaid + n;
 }
 
+/** קיצור שנים: the unguarded lowest payment at each deadline, per structure (earliestFinish). */
+const FREE_AT = new WeakMap<Ctx, Map<string, Plan>>();
+/**
+ * Node cap of the last guarded test of a deadline (every decision free). A
+ * test that finds no point runs to its cap at ~8 ms a node on a 32-year
+ * deadline (fuzz Z88: 5.4 s at 500 nodes). Over fuzz seeds 7, 23, 31, 11
+ * (2,400 households) the test ran 726 times: of the 90 that found a point at
+ * 500 nodes, 88 found it at 250 (both misses at today's end, where the next,
+ * weaker guard tier is then tried), 83 at 150, 66 at 80. No corpus answer changes.
+ */
+const PROBE_CAP = 250;
+
 /** The earliest feasible finish month within `budget` (binary search over whole years and the debts' own ends). */
-function earliestFinish(ctx: Ctx, budget: number, unlock: string[]): Finish {
+function earliestFinish(ctx: Ctx, budget: number, unlock: string[], guard?: Guard): Finish {
   // Candidate finish months: whole years for new money, and every kept debt's own end.
   const cands = new Set<number>();
   for (let y = 1; y <= ctx.maxYears; y++) cands.add(y * 12);
@@ -1175,11 +1510,47 @@ function earliestFinish(ctx: Ctx, budget: number, unlock: string[]): Finish {
   const sorted = Array.from(cands).sort((a, b) => a - b);
   const todayEnd = Math.max(0, ...ctx.debts.map((d) => d.months));
   const found = new Map<number, { plan: Plan; spec: Spec }>();
+  const peakCap = guard?.kind ? capOf(guard) : null;
+  const specAt = (T: number) => specFor(ctx, { wMonthly: 1, wCost: 1e-3, lambda: 0, budget, finish: T, peakCap, ...yearsCaps(ctx), ...(unlock.length ? { unlock } : {}) });
+  const colsAt = (T: number) => ctx.cols.filter((c) => c.years * 12 <= T);
+  // Under the guard a deadline is feasible when the unguarded answer, its
+  // decisions held, holds the guard on its own tracks or on any; only then the
+  // full guarded search. The search's own lowest payment is solved once, at the
+  // deadline found (it anchors yearsAtFrom's band). Each full guarded search ran
+  // 80–230 ms on r01 with a profile, five or six per ceiling.
   const feasible = (T: number) => {
-    const spec = specFor(ctx, { wMonthly: 1, wCost: 1e-3, lambda: 0, budget, finish: T, ...yearsCaps(ctx), ...(unlock.length ? { unlock } : {}) });
-    const p = solveTerms(ctx.debts, ctx.cols.filter((c) => c.years * 12 <= T), spec);
+    const spec = specAt(T);
+    const cols = colsAt(T);
+    let p: Plan;
+    if (peakCap === null) p = solveTerms(ctx.debts, cols, spec);
+    else {
+      // The unguarded search at a deadline does not depend on the guard: solved once per deadline and ceiling, for every guard tried.
+      const memo = FREE_AT.get(ctx) ?? new Map<string, Plan>();
+      FREE_AT.set(ctx, memo);
+      const key = `${budget}|${T}|${unlock.join(",")}|${(ctx.base.hold ?? []).join(",")}`;
+      const free = memo.get(key) ?? solveTerms(ctx.debts, cols, { ...spec, peakCap: null });
+      memo.set(key, free);
+      if (!free.ok) return false;
+      const keys = new Set(Object.keys(free.amounts));
+      p = solveOnce(ctx.debts, cols.filter((c) => keys.has(c.key)), { ...spec, fixZ: free.refinance });
+      // A guard no point of the relaxation meets is out of reach at once.
+      if (!p.ok && !solveOnce(ctx.debts, cols, spec, true).ok) return false;
+      if (!p.ok) p = solveOnce(ctx.debts, cols, { ...spec, fixZ: free.refinance }, false, true, FIRST_CAP);
+      // Then one capped MILP with every decision free; a deadline none of these reaches is read as out of
+      // reach (the full multi-round search per deadline took fuzz Z344 to 11 s and Z59 to 2.5 s).
+      if (!p.ok) p = solveOnce(ctx.debts, cols, spec, false, true, PROBE_CAP);
+    }
     if (p.ok) found.set(T, { plan: p, spec });
     return p.ok;
+  };
+  const seedAt = (T: number) => {
+    const pool = POOL.slice();
+    return () => {
+      if (peakCap === null) return found.get(T);
+      const spec = specAt(T);
+      const p = solveGuarded(ctx, spec, pool, undefined, undefined, ctx.debts, colsAt(T));
+      return p.ok ? { plan: p, spec } : found.get(T);
+    };
   };
   let lo = 0;
   let hi = sorted.findIndex((T) => T >= todayEnd);
@@ -1187,10 +1558,12 @@ function earliestFinish(ctx: Ctx, budget: number, unlock: string[]): Finish {
   if (!feasible(sorted[hi])) {
     // Clearing debt due now can make today's end date unreachable within the budget: the goal is then the
     // earliest finish that is reachable at all (it will not read "ok" unless it is earlier than today's).
+    // (Without debt due now a later end is no answer at all: the scan is skipped. Under the guard it ran a full search per deadline: fuzz Z344, 11 s.)
+    if (!ctx.ref.due) return { ok: false, T: Infinity, budget };
     const later = sorted.slice(hi + 1).findIndex((T) => feasible(T));
-    if (later < 0 || !ctx.ref.due) return { ok: false, T: Infinity, budget };
+    if (later < 0) return { ok: false, T: Infinity, budget };
     const T = sorted[hi + 1 + later];
-    return { ok: true, T, budget, seed: found.get(T) };
+    return { ok: true, T, budget, seed: seedAt(T) };
   }
   while (lo < hi) {
     const mid = (lo + hi) >> 1;
@@ -1198,7 +1571,7 @@ function earliestFinish(ctx: Ctx, budget: number, unlock: string[]): Finish {
     else lo = mid + 1;
   }
   const T = sorted[hi];
-  return { ok: true, T, budget, seed: found.get(T) };
+  return { ok: true, T, budget, seed: seedAt(T) };
 }
 
 /**
@@ -1207,7 +1580,7 @@ function earliestFinish(ctx: Ctx, budget: number, unlock: string[]): Finish {
  * as infeasible (yalps drops cycled nodes), and a goal that HAS an answer must
  * not read "unavailable" (corpus Z39: a larger budget made years unavailable).
  */
-function yearsAtFrom(ctx: Ctx, T: number, seed?: { plan: Plan; spec: Spec }, budget: number = ctx.base.budget ?? ctx.budget, unlock: string[] = []): Solved {
+function yearsAtFrom(ctx: Ctx, T: number, seed?: { plan: Plan; spec: Spec }, budget: number = ctx.base.budget ?? ctx.budget, unlock: string[] = [], guard?: Guard): Solved {
   // At the earliest end T, the payment stays within a material margin of the
   // LOWEST payment that reaches T (the search's own answer), and within that band
   // the cheapest, risk-weighted mix wins. Cheapest-within-the-ceiling filled the
@@ -1216,11 +1589,11 @@ function yearsAtFrom(ctx: Ctx, T: number, seed?: { plan: Plan; spec: Spec }, bud
   // The band is anchored on the lowest payment, so it does not move with it.
   const low = seed?.plan.ok ? shown(ctx, seed.plan).monthly : null;
   const band = low !== null ? Math.min(budget, Math.ceil(low + Math.max(low * YEARS_BAND, YEARS_BAND_MIN))) : budget;
-  const at = yearsAt(ctx, T, seed?.plan.ok ? seed.plan : undefined, band, unlock);
+  const at = yearsAt(ctx, T, seed?.plan.ok ? seed.plan : undefined, band, unlock, guard);
   if (at.plan.ok || !seed) return at;
-  const again = yearsAt(ctx, T, seed.plan, budget, unlock);
+  const again = yearsAt(ctx, T, seed.plan, budget, unlock, guard);
   if (again.plan.ok) return again;
-  return { plan: seed.plan, meta: { finish: T }, spec: seed.spec, cols: ctx.cols.filter((c) => c.years * 12 <= T) };
+  return { plan: seed.plan, meta: { finish: T }, spec: seed.spec, cols: ctx.cols.filter((c) => c.years * 12 <= T), ...(guard ? { guard } : {}) };
 }
 
 /**
@@ -1262,7 +1635,7 @@ function cheaperThanNewMoney(ctx: Ctx, none = true): string {
     const m = marketRateFor(ctx, d);
     if (m === null) continue;
     w += d.balance;
-    own += d.balance * effectiveRate(d);
+    own += d.balance * ownCost(d, effectiveRate(d)).rate;
     mkt += d.balance * m;
   }
   const what = ctx.debts.some((d) => d.group === "mortgage") ? "המשכנתא" : "החוב";
@@ -1275,12 +1648,21 @@ function cheaperThanNewMoney(ctx: Ctx, none = true): string {
 const YEARS_BAND = 0.01;
 const YEARS_BAND_MIN = 100;
 
-/** The cheapest (λ = 0.35) mix within budget whose last payment is by month T. */
-function yearsAt(ctx: Ctx, T: number, start?: Plan, budget: number = ctx.base.budget ?? ctx.budget, unlock: string[] = []): Solved {
+/** The cheapest (λ = 0.35) mix within budget whose last payment is by month T, under the goal's guard. */
+function yearsAt(ctx: Ctx, T: number, start?: Plan, budget: number = ctx.base.budget ?? ctx.budget, unlock: string[] = [], guard?: Guard): Solved {
   const cols = ctx.cols.filter((c) => c.years * 12 <= T);
-  const spec = specFor(ctx, { wMonthly: 0, wCost: 1, lambda: lambdaOf(ctx, "years"), budget, finish: T, ...yearsCaps(ctx), ...(unlock.length ? { unlock } : {}) });
-  const plan = start ? solveTermsRaw(ctx.debts, cols, spec, POOL, start) : solveTerms(ctx.debts, cols, spec);
-  return { plan, meta: { finish: T }, spec, cols };
+  const peakCap = guard?.kind ? capOf(guard) : null;
+  const spec = specFor(ctx, { wMonthly: 0, wCost: 1, lambda: lambdaOf(ctx, "years"), budget, finish: T, peakCap, ...yearsCaps(ctx), ...(unlock.length ? { unlock } : {}) });
+  // A start from another spec (the search's lowest payment, another goal's mix) is re-priced under this one.
+  const from = start ? restart(ctx, start, spec, cols) : undefined;
+  const plan =
+    peakCap !== null
+      ? solveGuarded(ctx, spec, POOL, undefined, from, ctx.debts, cols)
+      : from
+        ? solveTermsRaw(ctx.debts, cols, spec, POOL, from)
+        : solveTerms(ctx.debts, cols, spec);
+  if (peakCap !== null && plan.ok && !start) addToPool(plan, cols);
+  return { plan, meta: { finish: T }, spec, cols, ...(guard ? { guard } : {}) };
 }
 
 /**
@@ -1381,36 +1763,39 @@ const todayCostOf = (ctx: Ctx) => ctx.today.paid[0] - sum(ctx.debts.filter((d) =
  * totals would remove real answers: the typed read-out often cannot fall ₪250
  * under today's while the forecast saves ₪22k–₪105k (L07, L11).
  */
-function solveBalanced(ctx: Ctx): Solved {
+function solveBalanced(ctx: Ctx, extra: Partial<Spec> = {}, fromGuard?: Guard["kind"]): Solved {
   const B = reliefBudget(ctx);
   const budget = Math.min(ctx.base.budget ?? B, B);
   const M0 = ctx.ref.monthly;
   const P0 = ctx.ref.paid;
-  const rules: Partial<Spec> = { peakCap: M0, typedPaidCap: ctx.ref.typedPaid, ...pvCapOf(ctx, "balanced") };
+  const rules: Partial<Spec> = { peakCap: M0, typedPaidCap: ctx.ref.typedPaid, ...pvCapOf(ctx, "balanced"), ...extra };
   const cheapestAt = (m: number) => specFor(ctx, { wMonthly: 0, wCost: 1, lambda: 0, budget: Math.min(budget, m), ...rules });
-  let sSpec = cheapestAt(budget);
-  let sPlan = solveGuarded(ctx, sSpec);
-  let rSpec = specFor(ctx, { wMonthly: 1, wCost: 1e-3, lambda: 0, budget, paidCap: P0, ...rules });
-  let rPlan = solveGuarded(ctx, rSpec);
+  let sSpec: Spec = cheapestAt(budget);
+  let sPlan: Plan = { ok: false, status: "x", refinance: [], amounts: {}, objective: NaN, setupHousing: 0, setupAp: 0 };
+  let rSpec: Spec = sSpec;
+  let rPlan: Plan = sPlan;
   // The five-year guard compares with today's payment, and today's own mix can
   // break it (CPI-linked or prime rows rise in the stress economies: L11, 81%
-  // linked; L07). When no mix holds it, it cannot be the bar: the anchors are
-  // solved without it, and the proposal says so (caveatsOf, as the payment goal).
-  let guard = 1;
-  if (!sPlan.ok && !rPlan.ok) {
-    guard = 0;
-    rules.peakCap = null;
+  // linked; L07). Then the relative guard holds instead (Guard), and when no mix
+  // holds even that the anchors are solved without one and the proposal says so.
+  let guard: Guard = { kind: 0, caps: ECON.map(() => M0) };
+  // (A re-solve under the gates starts at the guard its first answer held: the stronger ones already had no anchor.)
+  const rank = (k: Guard["kind"]) => (k === 1 ? 0 : k === 2 ? 1 : 2);
+  for (const g of [...guardTiers(ctx, M0), guard].filter((x) => fromGuard === undefined || rank(x.kind) >= rank(fromGuard))) {
+    rules.peakCap = g.kind ? capOf(g) : null;
     sSpec = cheapestAt(budget);
     sPlan = solveGuarded(ctx, sSpec);
     rSpec = specFor(ctx, { wMonthly: 1, wCost: 1e-3, lambda: 0, budget, paidCap: P0, ...rules });
     rPlan = solveGuarded(ctx, rSpec);
+    guard = g;
+    if (sPlan.ok || rPlan.ok) break;
   }
   const at = (p: Plan) => frontierPoint(ctx, p, ctx.cols);
   const R = rPlan.ok ? Math.max(0, at(rPlan).relief) : 0;
   const S = sPlan.ok ? Math.max(0, at(sPlan).saving) : 0;
   const materialR = R >= MATERIAL.monthly(M0);
   const materialS = S >= MATERIAL.cost(todayCostOf(ctx));
-  const anchors = { reliefMax: R, savingMax: S, guard };
+  const anchors = { reliefMax: R, savingMax: S, guard: guard.kind };
   // The cheapest risk-weighted mix with at least `relief` and at least `saving`,
   // started from the mix known to hold both caps (the box is a small region
   // around it: a cold search cost r01+r02 under a typical profile 1.2 s more for
@@ -1420,19 +1805,19 @@ function solveBalanced(ctx: Ctx): Solved {
     const p = solveGuarded(ctx, spec, [...POOL, ...from.map((x) => seedOf(x, ctx.cols))], undefined, from[0], debts, cols);
     const plan = p.ok ? p : from[0];
     if (plan.ok) addToPool(plan, ctx.cols);
-    return { plan, meta: { ...anchors, mode }, spec, cols: ctx.cols };
+    return { plan, meta: { ...anchors, mode }, spec, cols: ctx.cols, guard };
   };
   if (!rPlan.ok && !sPlan.ok) {
     // Nothing meets the rules with a relief or a saving: the cheapest mix within
     // the relief budget stands in, and reads "no-gain" unless it happens to gain.
-    const spec = costSpec(ctx, "balanced", { budget });
-    return { plan: solveTerms(ctx.debts, ctx.cols, spec), meta: { ...anchors, mode: "none" }, spec, cols: ctx.cols };
+    const spec = costSpec(ctx, "balanced", { budget, ...extra });
+    return { plan: solveTerms(ctx.debts, ctx.cols, spec), meta: { ...anchors, mode: "none" }, spec, cols: ctx.cols, guard };
   }
   if (!materialR && materialS && sPlan.ok) {
     addToPool(sPlan, ctx.cols);
-    return { plan: sPlan, meta: { ...anchors, mode: "saving" }, spec: sSpec, cols: ctx.cols };
+    return { plan: sPlan, meta: { ...anchors, mode: "saving" }, spec: sSpec, cols: ctx.cols, guard };
   }
-  if (!materialS || !sPlan.ok || !materialR) return rPlan.ok ? box(R, 0, [rPlan], materialR ? "relief" : "none") : { plan: sPlan, meta: { ...anchors, mode: "none" }, spec: sSpec, cols: ctx.cols };
+  if (!materialS || !sPlan.ok || !materialR) return rPlan.ok ? box(R, 0, [rPlan], materialR ? "relief" : "none") : { plan: sPlan, meta: { ...anchors, mode: "none" }, spec: sSpec, cols: ctx.cols, guard };
   // Both anchors material: the frontier search. Shares f = relief/R, s = saving/S;
   // `a` keeps s ≥ f (the saving side), `b` keeps f ≥ s (the relief side).
   type Pt = { plan: Plan; f: number; s: number };
@@ -1510,6 +1895,9 @@ function ceilingOf(ctx: Ctx, goal: GoalId, solved?: Solved): number {
   return ctx.budget;
 }
 
+/** Does a plan move a debt the goal's spec holds (CHEAP_KEEP)? */
+const movesHeld = (plan: Plan, spec?: Spec) => !!spec?.hold?.length && plan.refinance.some((id) => spec.hold!.includes(id));
+
 /** Does a plan repay a debt that is locked for every goal but the one that unlocked it (קיצור שנים, an eligibility loan)? */
 function lockedIn(ctx: Ctx, plan: Plan, allowed: string[] = []): boolean {
   return plan.refinance.some((id) => !!ctx.debts.find((d) => d.id === id)?.lock && !allowed.includes(id));
@@ -1543,6 +1931,83 @@ function reliefSolve(ctx: Ctx, goal: "balanced" | "consolidate", payMin: number,
   return { plan: p1, meta: { phi: 0, payMin } };
 }
 
+/**
+ * A plan's rise as the solver states it: the worst economy's sum of every row's
+ * own peak payment over its whole life (an upper bound of the mix's peak there),
+ * less the typed month-one payment, ₪ a month.
+ */
+function riseOf(ctx: Ctx, plan: Plan, cols: Column[]): number {
+  const byKey = new Map(cols.map((c) => [c.key, c]));
+  const refi = new Set(plan.refinance);
+  let m1 = 0;
+  const P = ECON.map(() => 0);
+  for (const d of ctx.debts)
+    if (!refi.has(d.id)) {
+      m1 += d.monthly;
+      d.peak.forEach((x, k) => (P[k] += x));
+    }
+  for (const [key, a] of Object.entries(plan.amounts)) {
+    const c = byKey.get(key);
+    if (!c) continue;
+    m1 += c.monthly * a;
+    c.peak.forEach((x, k) => (P[k] += x * a));
+  }
+  return Math.max(...P) - m1;
+}
+
+/**
+ * יציבות מרבית, measured in the payment it promises: first the least rise of
+ * the payment over the whole life of the mix in the worst economy (a five-year
+ * horizon chose five-year variable tracks that reset into 2022–23 in the
+ * back-test), within the budget; then, among the mixes within STABLE_BAND of
+ * that rise, the cheapest risk-weighted one (λ = LAMBDA.stable). Measured in
+ * worst-economy COST, stability took prime whenever prime stayed cheap under
+ * the rate shock: 42–62% prime for 2016–2020 originations, a realised payment
+ * peak of 1.13 times month one on average and 1.35 at worst, beaten on its own
+ * promise by all-קל"צ in 431 of 636 builds.
+ */
+function solveStable(ctx: Ctx, extra: Partial<Spec> = {}): Solved {
+  const s1 = costSpec(ctx, "stable", { shareCap: false, wCost: 1e-4, wRise: 1, ...extra });
+  let p1 = solveTerms(ctx.debts, ctx.cols, s1);
+  if (!p1.ok) {
+    // The rise objective is degenerate (every all-קל"צ mix has none) and branch and
+    // bound can drop every node of a feasible problem (L47: no answer, where the
+    // same rules have one). The cheapest risk-weighted mix under the same rules is
+    // then the start, and stands in when the rise search still finds nothing.
+    const s0 = costSpec(ctx, "stable", { shareCap: false, ...extra });
+    const p0 = solveTerms(ctx.debts, ctx.cols, s0);
+    if (!p0.ok) return { plan: p0, spec: s0, cols: ctx.cols };
+    const again = solveTermsRaw(ctx.debts, ctx.cols, s1, POOL, restart(ctx, p0, s1, ctx.cols));
+    p1 = again.ok ? again : p0;
+  }
+  const r1 = riseOf(ctx, p1, ctx.cols);
+  const s2 = costSpec(ctx, "stable", { shareCap: false, riseCap: r1 + STABLE_BAND(ctx.ref.monthly), ...extra });
+  // The cost stage on the tracks the least rise uses, and קל"צ (no rise at
+  // all), every term: within a band of a few tens of shekels another track can
+  // barely enter, and on the whole grid the rise cap made each one-term
+  // neighbourhood MILP run to its node cap (r02: 150 ms each, three of them).
+  const fams = new Set(Object.keys(p1.amounts).map((k) => k.split("|").slice(0, 2).join("|")));
+  const cols = ctx.cols.filter((c) => c.track === "klz" || fams.has(`${c.track}|${c.segment}`));
+  const p2 = solveTermsRaw(ctx.debts, cols, s2, POOL, restart(ctx, p1, s2, cols));
+  if (p2.ok) addToPool(p2, ctx.cols);
+  return p2.ok ? { plan: p2, spec: s2, cols, meta: { rise: r1 } } : { plan: p1, spec: s1, cols: ctx.cols, meta: { rise: r1 } };
+}
+
+/**
+ * A plan carried into another spec's search as its start, re-priced under that
+ * spec (its decisions and columns held): solveTerms keeps a start it cannot
+ * improve on by comparing objectives, and an objective from another spec is on
+ * another scale (stability's rise in ₪ a month against a cost in ₪ thousands:
+ * r03 kept a 5-year term where 4 years was ₪3,500 cheaper). undefined when the
+ * plan does not satisfy the new spec.
+ */
+function restart(ctx: Ctx, plan: Plan, spec: Spec, cols: Column[]): Plan | undefined {
+  if (!plan.ok) return undefined;
+  const keys = new Set(Object.keys(plan.amounts));
+  const p = solveOnce(ctx.debts, cols.filter((c) => keys.has(c.key)), { ...spec, fixZ: plan.refinance });
+  return p.ok ? p : undefined;
+}
+
 /** Every shekel still to be paid under a plan — in the forecast, and on the board's typed read-out. */
 function paidOfPlan(ctx: Ctx, plan: Plan): { forecast: number; typed: number } {
   const { rows } = rowsOf(ctx, plan);
@@ -1557,12 +2022,13 @@ function paidOfPlan(ctx: Ctx, plan: Plan): { forecast: number; typed: number } {
  * costs more, half the way — and the proposal says what it costs.
  */
 function solveConsolidate(ctx: Ctx): Solved {
-  const s = specFor(ctx, { keepMortgage: true, loansAllowed: true, shareCap: false });
+  // (Consolidation folds consumer debt by design: CHEAP_KEEP does not hold it.)
+  const s = specFor(ctx, { keepMortgage: true, loansAllowed: true, shareCap: false, hold: undefined });
   const minSpec = { ...s, wMonthly: 1, wCost: 1e-3, lambda: 0, budget: null };
   const min = solveTerms(ctx.debts, ctx.cols, minSpec);
   if (!min.ok) return { plan: min };
   const payMin = bookOf(rowsOf(ctx, min).rows, ctx.input, ctx.f).metrics.monthly;
-  const neutral = reliefSolve(ctx, "consolidate", payMin, 0.75, { keepMortgage: true, loansAllowed: true, shareCap: false });
+  const neutral = reliefSolve(ctx, "consolidate", payMin, 0.75, { keepMortgage: true, loansAllowed: true, shareCap: false, hold: undefined });
   // "Keep everything" satisfies "no more relief than costs nothing" — for consolidation that is not an answer:
   // when no material relief is free, take half the way and say what it costs.
   if (neutral.plan.ok && neutral.plan.refinance.length && ctx.ref.monthly - shown(ctx, neutral.plan).monthly >= MATERIAL.monthly(ctx.ref.monthly)) return neutral;
@@ -1634,7 +2100,9 @@ function shown(ctx: Ctx, plan: Plan) {
 
 /** Does a plan satisfy a goal's rules (its spec), whatever its objective? */
 function fits(ctx: Ctx, plan: Plan, sv: Solved): boolean {
-  if (!sv.spec || !plan.ok) return false;
+  // A mix that moves a debt this goal holds (CHEAP_KEEP) is outside its rules: fixZ cannot move a held debt, and the
+  // test would pass on a different mix (fuzz seed 11 Z436: savings adopted years' lifted mix at ₪1,209 over its ₪1,101).
+  if (!sv.spec || !plan.ok || movesHeld(plan, sv.spec)) return false;
   const keys = new Set(Object.keys(plan.amounts));
   const cols = (sv.cols ?? ctx.cols).filter((c) => keys.has(c.key));
   if (cols.length !== keys.size) return false;
@@ -1657,11 +2125,18 @@ function enforceDisplayOrder(ctx: Ctx, solvedBy: Map<GoalId, Solved>) {
       }
     }
   }
-  // Savings shows the least COST (interest + indexation) on the typed read-out.
-  // Not סה״כ ריבית: it leaves out indexation, and "least interest" would steer
-  // savings into CPI-linked tracks whose cost that column cannot see.
+  // Savings shows the least COST (interest + indexation) on the typed read-out,
+  // when that costs savings' own objective (the forecast and the worst economy)
+  // no more than DISPLAY_GIVE and never turns an offered saving into "no-gain"
+  // (audit S1). Not סה״כ ריבית: it leaves out indexation, and "least interest"
+  // would steer savings into CPI-linked tracks whose cost that column cannot see.
+  // When another goal then shows a lower typed figure, savings' typed-versus-
+  // forecast caveat explains why.
   const sav = solvedBy.get("savings");
   if (sav?.plan.ok && sav.spec) {
+    const give = DISPLAY_GIVE(ctx.ref.paid) / U;
+    const ownObjective = costObjective(ctx, sav.spec, sav.plan, sav.cols ?? ctx.cols);
+    const wasOk = quickJudge(ctx, "savings", sav).status === "ok";
     for (let round = 0; round < 3; round++) {
       const cur = solvedBy.get("savings")!;
       const own = shown(ctx, cur.plan).totalCost;
@@ -1683,10 +2158,18 @@ function enforceDisplayOrder(ctx: Ctx, solvedBy: Map<GoalId, Solved>) {
         (p) => p.ok && shown(ctx, p).totalCost <= rival!.cost + 0.5
       );
       tries.sort((x, y) => x.objective - y.objective);
-      solvedBy.set("savings", tries.length ? { ...sav, plan: tries[0], spec } : { ...sav, plan: rival.plan, meta: { ...(sav.meta ?? {}), adopted: rival.g } });
+      const next: Solved = tries.length ? { ...sav, plan: tries[0], spec } : { ...sav, plan: rival.plan, meta: { ...(sav.meta ?? {}), adopted: rival.g } };
+      const worse = costObjective(ctx, sav.spec, next.plan, sav.cols ?? ctx.cols) - ownObjective;
+      if (worse > give || (wasOk && quickJudge(ctx, "savings", next).status !== "ok")) {
+        DISPLAY_STATS.held++;
+        break;
+      }
+      solvedBy.set("savings", next);
     }
   }
 }
+/** How often savings kept its own answer over the display repair (the corpus prints it). */
+const DISPLAY_STATS = { held: 0 };
 
 /* ------------------------------------------------------------ the proposal */
 
@@ -1714,11 +2197,14 @@ function proposalOf(ctx: Ctx, goal: GoalId, solved: Solved): Proposal {
   if (!plan.ok) {
     const mortgageBal = sum(ctx.debts.filter((d) => d.group === "mortgage").map((d) => d.balance));
     const overLtv = ctx.propertyValue && mortgageBal / ctx.propertyValue > LTV_MAX[ctx.input.profile.propertyType];
-    const why = overLtv
-      ? `שיעור המימון היום ${pct(mortgageBal / ctx.propertyValue!)}, מעל ${pct(LTV_MAX[ctx.input.profile.propertyType])}. מחזור אסור להגדיל אותו (הוראה 329 סעיף 9), ועמלות ועלויות שממומנות בהלוואה מגדילות אותו, ולכן יש לשלם אותן במזומן.`
-      : goal === "years" || goal === "savings" || goal === "stable"
-        ? `אין תמהיל שעומד בכל הכללים בהחזר של עד ${nis(ctx.budget)}. המסגרת נמוכה מדי לתנאי השוק של הלקוח.`
-        : "אין תמהיל שעומד בכל הכללים יחד.";
+    const gap = equityGap(ctx);
+    const why = gap
+      ? gap
+      : overLtv
+        ? `שיעור המימון היום ${pct(mortgageBal / ctx.propertyValue!)}, מעל ${pct(LTV_MAX[ctx.input.profile.propertyType])}. מחזור אסור להגדיל אותו (הוראה 329 סעיף 9), ועמלות ועלויות שממומנות בהלוואה מגדילות אותו, ולכן יש לשלם אותן במזומן.`
+        : goal === "years" || goal === "savings" || goal === "stable"
+          ? `אין תמהיל שעומד בכל הכללים בהחזר של עד ${nis(ctx.budget)}. המסגרת נמוכה מדי לתנאי השוק של הלקוח.`
+          : "אין תמהיל שעומד בכל הכללים יחד.";
     return empty("unavailable", why);
   }
   let { rows, tranches } = rowsOf(ctx, plan);
@@ -1734,7 +2220,8 @@ function proposalOf(ctx: Ctx, goal: GoalId, solved: Solved): Proposal {
     const base = solved.spec ?? costSpec(ctx, goal);
     const cap = Math.min(base.budget ?? ctx.budget, ctx.budget) - over - 2 * (i + 1);
     const spec = { ...base, budget: cap };
-    const q = solveTermsRaw(ctx.debts, solved.cols ?? ctx.cols, spec, POOL, used);
+    // (The mix itself is a start only when it meets the tightened budget: a start the search cannot improve on is kept as it is, over the budget: fuzz seed 11 Z175.)
+    const q = solveTermsRaw(ctx.debts, solved.cols ?? ctx.cols, spec, POOL, restart(ctx, used, spec, solved.cols ?? ctx.cols));
     if (!q.ok) break;
     used = q;
     usedSpec = spec;
@@ -1762,7 +2249,8 @@ function proposalOf(ctx: Ctx, goal: GoalId, solved: Solved): Proposal {
   const fees = sum(ctx.debts.filter((d) => refi.has(d.id)).map((d) => d.fee));
   const feesEstimated = ctx.debts.some((d) => refi.has(d.id) && d.feeEstimated);
   const setup = used.setupHousing + used.setupAp;
-  const be = refi.size ? breakEven(ctx.today, book, fees + setup) : null;
+  const verdict = judge(ctx, goal, solved, used, book, rows, tranches);
+  const be = verdict.be;
 
   // What each decision is worth: the goal's own problem re-solved with that one
   // debt's decision flipped (terms held). The number every "why" leads with.
@@ -1781,6 +2269,7 @@ function proposalOf(ctx: Ctx, goal: GoalId, solved: Solved): Proposal {
       else why = whyKept(ctx, d, flips.get(d.id), fc, todayRate);
     } else {
       why = whyMoved(ctx, d, flips.get(d.id), fc, todayRate, goal);
+      if (solved.cheapLifted && ctx.cheapBy.has(d.id)) why += ` ${liftWords(ctx.cheapBy.get(d.id)!, goal, solved.liftGain, !!solved.liftAtLeast)}.`;
     }
     return {
       id: d.id,
@@ -1796,6 +2285,7 @@ function proposalOf(ctx: Ctx, goal: GoalId, solved: Solved): Proposal {
       feeEstimated: moved ? d.feeEstimated : false,
       ...(d.due || d.called ? { due: true } : {}),
       ...(!moved && (d.cure ?? 0) > 0 ? { cure: Math.round(d.cure!) } : {}),
+      ...(solved.spec?.hold?.includes(d.id) && ctx.cheapBy.has(d.id) ? { heldCheap: Math.round(ctx.cheapBy.get(d.id)! * 100) / 100 } : {}),
     };
   });
 
@@ -1815,7 +2305,186 @@ function proposalOf(ctx: Ctx, goal: GoalId, solved: Solved): Proposal {
   const worstDelta = worst(book) - R.worst;
   const relief = R.monthly - m.monthly;
 
-  // Status — each goal judged on its own measure (rules.MATERIAL).
+  // Status: judge (each goal on its own measure, then the gates).
+  let status = verdict.status;
+  let note = verdict.note;
+  const held = ceilingOf(ctx, goal, solved);
+  const newMoney = sum(tranches.map((x) => x.amount));
+  const balance = goal === "balanced" ? balanceOf(solved, relief, -fPaidDelta) : undefined;
+  tranches = tranches.map((x) => {
+    const why = sliverWhy(ctx, goal, solved, used, x, tranches);
+    return why ? { ...x, keptSmall: why } : x;
+  });
+
+  const reasons = reasonsOf(ctx, goal, book, tranches, refi, fPaidDelta, worstDelta, be, fees + setup, solved);
+  const structureWhy = structureText(ctx, solved, book);
+  if (structureWhy) reasons.splice(Math.min(2, reasons.length), 0, structureWhy);
+  // Five at most; the sentence on the debt due now is never the one dropped.
+  const dueText = R.due > 0 ? nis(R.due) : null;
+  while (reasons.length > 5) {
+    let i = reasons.length - 1;
+    while (i > 0 && dueText && reasons[i].includes(dueText)) i--;
+    reasons.splice(i, 1);
+  }
+  const caveats = caveatsOf(ctx, goal, book, refi, fPaidDelta, delta, solved, rows);
+  // An estimated fee the break-even rests on: offered when it pays back at the
+  // band's low end, and said when it does not at its high end (fees.ts FEE_BAND).
+  const band = verdict.band;
+  if (status === "ok" && band && (goal === "savings" || goal === "balanced" || goal === "stable")) {
+    const within = (x: number | null) => x !== null && x <= BREAK_EVEN_MAX;
+    const range = `${nis(band.feeLow)} עד ${nis(band.feeHigh)}`;
+    if (!within(band.high))
+      caveats.push(
+        within(be)
+          ? `עמלות הפירעון הן הערכה, ${range}. בהערכה עצמה העלויות חוזרות תוך ${be} חודשים, ובקצה העליון של הטווח ${band.high === null ? "הן לא חוזרות" : `רק אחרי ${band.high} חודשים`}. יש לבקש מכתב יתרה לפני ההגשה.`
+          : `עמלות הפירעון הן הערכה, ${range}, והעלויות חוזרות תוך ${BREAK_EVEN_MAX / 12} שנים רק אם הבנק גובה את הנמוך שבטווח: אז הן חוזרות תוך ${band.low} חודשים, ובהערכה עצמה ${be === null ? "הן לא חוזרות" : `רק אחרי ${be} חודשים`}. יש לבקש מכתב יתרה לפני ההגשה.`
+      );
+  }
+  // Under the override, the proposal the cost-share gate would have refused says so.
+  if (status === "ok" && ctx.override && newMoney > 0 && fees + setup > REFI_COST_MAX * newMoney)
+    caveats.push(`העלויות החד־פעמיות של המחזור, ${nis(fees + setup)}, הן ${shareText((fees + setup) / newMoney)} מהכסף החדש (${nis(newMoney)}), גבוהות מדי ביחס לחוב, והתמהיל נבנה למרות זאת.`);
+  const checks = checksOf(ctx, rows, used, m, goal, held);
+  if (status === "ok" && checks.some((c) => !c.ok)) {
+    status = "unavailable";
+    note = `נכשלה בדיקה: ${checks.filter((c) => !c.ok).map((c) => c.label).join(", ")}`;
+  }
+  const guard = guardOf(ctx, goal, solved, book);
+  const moveGroups = moveGroupsOf(moves);
+  return {
+    goal,
+    label: LABEL[goal],
+    tagline: TAGLINE[goal],
+    status,
+    note,
+    ...(goal !== "payment" ? { budget: Math.round(held) } : {}),
+    structure: isBankVariant(ctx.variant) ? "bank" : ctx.variant,
+    ...(structureWhy ? { structureWhy } : {}),
+    // Always set on a bank structure: "move" when the whole mortgage goes to another
+    // bank (the move structure, or a bank the advisor picked that does not hold it).
+    ...(isBankVariant(ctx.variant) ? { refinance: ctx.variant === "bankMove" || ctx.moveWhole ? ("move" as const) : ("internal" as const) } : {}),
+    ...(isBankVariant(ctx.variant) ? { priceBank: ctx.priceBank } : {}),
+    rows,
+    target: Math.round(sum(owedOnly(rows).map((r) => Number(r.amount) || 0))),
+    metrics: m,
+    delta,
+    ...(balance ? { balance } : {}),
+    costs: { prepaymentFees: fees, feesEstimated, setup, financed: true, breakEvenMonths: be },
+    moves,
+    ...(moveGroups ? { moveGroups } : {}),
+    tranches,
+    ...(guard ? { guard } : {}),
+    reasons,
+    caveats,
+    checks,
+    // With debt due now the stress panel's "today" is the reference: today cannot go on as it is.
+    stress: stressOf(ctx.ref.book ?? ctx.today, book),
+  };
+}
+
+/**
+ * Debt due now that the property cannot carry: every mortgage row stays secured
+ * on it (kept, or refinanced into the new loan), the due debt and its cures must
+ * be paid from new money on it, and the one-off costs come on top. When that is
+ * more than the lender's cap on the property, no goal can be built, and the note
+ * says by how much (audit U7: r05 under a non-bank and the override, a ₪760,000
+ * property: ₪418k of mortgage and ₪381k due against the lender's 80%, ₪608k).
+ */
+function equityGap(ctx: Ctx): string | null {
+  const ltv = ctx.base.ltv;
+  if (!ltv || !ctx.propertyValue || !(ctx.ref.due > 0)) return null;
+  const mortgage = sum(ctx.debts.filter((d) => d.group === "mortgage" && !d.due).map((d) => d.balance)) + (ctx.base.secured?.balance ?? 0);
+  const fees = sum(ctx.debts.filter((d) => d.forced && d.group === "mortgage").map((d) => d.fee));
+  const setup = ctx.base.setupAp + (ctx.debts.some((d) => d.forced && d.group === "mortgage") ? ctx.base.setupHousing - (ctx.base.setupApShared ?? 0) : 0);
+  const need = mortgage + ctx.ref.due + fees + setup;
+  const share = ltv.withAp;
+  const cap = share * ltv.value;
+  if (need <= cap + 1) return null;
+  return `החוב שעומד לפירעון, ${nis(ctx.ref.due)}, יחד עם המשכנתא (${nis(mortgage)}) ועלויות המחזור, הם ${nis(need)} בביטחון הנכס, מעל ${nis(cap)} שהמלווה מממן (${pct(share)} משווי של ${nis(ltv.value)}). חסרים כ-${nis(Math.ceil((need - cap) / 1000) * 1000)}: הון עצמי, ביטחון נוסף או שמאות גבוהה יותר.`;
+}
+
+/**
+ * Proposal.moveGroups: rows under SMALL_MOVE of one lender, track and decision
+ * folded into one line with their count and sum (audit P1: L44 מאוזן listed 14
+ * moved rows, some of ₪1,014 to ₪2,542, each with its own sentence). Every other
+ * move stays a line of its own, in order. undefined when nothing folds.
+ */
+function moveGroupsOf(moves: DebtMove[]): MoveGroup[] | undefined {
+  const key = (m: DebtMove) => `${m.label}|${m.action}|${m.segment}`;
+  const small = new Map<string, DebtMove[]>();
+  for (const m of moves) if (m.balance < SMALL_MOVE && !m.due) small.set(key(m), [...(small.get(key(m)) ?? []), m]);
+  if (!Array.from(small.values()).some((xs) => xs.length > 1)) return undefined;
+  const out: MoveGroup[] = [];
+  const done = new Set<string>();
+  const verb: Record<DebtMove["action"], string> = { keep: "נשארים", refinance: "ממוחזרים", consolidate: "מאוחדים" };
+  for (const m of moves) {
+    const xs = m.balance < SMALL_MOVE && !m.due ? small.get(key(m)) : undefined;
+    if (xs && xs.length > 1) {
+      if (done.has(key(m))) continue;
+      done.add(key(m));
+      const balance = sum(xs.map((x) => x.balance));
+      const fee = sum(xs.map((x) => x.fee));
+      out.push({
+        ids: xs.map((x) => x.id),
+        label: m.label,
+        action: m.action,
+        count: xs.length,
+        balance,
+        fee,
+        why: `${xs.length} מסלולים של ${m.label}, כל אחד מתחת ל-${nis(SMALL_MOVE)} ובסך הכול ${nis(balance)}, ${verb[m.action]} יחד${fee > 0 ? `, עם עמלות פירעון של ${nis(fee)}` : ""}.`,
+      });
+    } else out.push({ ids: [m.id], label: m.label, action: m.action, count: 1, balance: m.balance, fee: m.fee, why: m.why });
+  }
+  return out;
+}
+
+/** What a proposal's status rests on: the status, its note, the gate (if any) that refused a material gain, and the break-even figures. */
+type Verdict = {
+  status: Proposal["status"];
+  note?: string;
+  /**
+   * The gate that turned a material gain into "no-gain" (runGoals then looks
+   * for the best mix that passes it): break-even, present value, the costs'
+   * share, savings' typed read-out (the owner's rule that a saving the board
+   * contradicts is not claimed), stability's price.
+   */
+  gate: "breakEven" | "pv" | "share" | "typed" | "price" | null;
+  /** Stability's figures, for the price test's levels (stable only). */
+  stable?: { now: number; next: number; protection: number };
+  be: number | null;
+  /** Estimated fees (fees.ts FEE_BAND): break-even at the band's low and high fee, months (null = never). */
+  band: { low: number | null; high: number | null; feeLow: number; feeHigh: number } | null;
+};
+
+/**
+ * A proposal's status: each goal on its own measure (rules.ts MATERIAL), then
+ * the gates an advisor applies before filing a cost goal: the switching costs
+ * come back within BREAK_EVEN_MAX months and (savings, balanced) the saving is
+ * not only payments moved earlier (present value). Break-even is measured
+ * against the reference, like every other "versus today" figure: with debt due
+ * now today's payments leave that debt out, and against today a proposal is
+ * never ahead (audit W5: r05 under the override at a bank tier read savings
+ * "the costs never return" while it saved ₪429,281 against the reference). An
+ * estimated fee is tested at both ends of its band: a move that cannot pay back
+ * even at the band's low fee is refused; one that pays back only at the point
+ * estimate or the low end is offered with a caveat (caveatsOf). The one-off
+ * costs' share of the new money binds every goal.
+ */
+function judge(ctx: Ctx, goal: GoalId, solved: Solved, used: Plan, book: Book, rows: ImportedLoan[], tranches: NewTranche[]): Verdict {
+  const R = ctx.ref;
+  const m = book.metrics;
+  const refi = new Set(used.refinance);
+  const moved = ctx.debts.filter((d) => refi.has(d.id));
+  const fees = sum(moved.map((d) => d.fee));
+  const setup = used.setupHousing + used.setupAp;
+  const refBook = R.book ?? ctx.today;
+  const be = refi.size ? breakEven(refBook, book, fees + setup) : null;
+  const band = refi.size ? bandBreakEven(ctx, refBook, book, rows, moved, fees + setup) : null;
+  const fPaidDelta = book.paid[0] - R.paid;
+  const typedPaidDelta = m.totalPaid - R.typedPaid;
+  const relief = R.monthly - m.monthly;
+  let gate: Verdict["gate"] = null;
+  let stable: Verdict["stable"];
+
   const neutral = MATERIAL.neutral(R.paid);
   const monthlyGain = relief >= MATERIAL.monthly(R.monthly);
   const todayCost = todayCostOf(ctx);
@@ -1858,6 +2527,7 @@ function proposalOf(ctx: Ctx, goal: GoalId, solved: Solved): Proposal {
         typedPaidDelta > neutral && -fPaidDelta >= MATERIAL.cost(todayCost)
           ? `בתחזית חוסכים ${nis(-fPaidDelta)}, אבל לפי הריבית המוקלדת בלוח סך התשלומים עולה ב-${nis(typedPaidDelta)}, ולא מציגים חיסכון שהלוח סותר.`
           : `החיסכון בתחזית הוא ${nis(Math.max(0, -fPaidDelta))}, פחות מהסף של ${nis(MATERIAL.cost(todayCost))} שמצדיק את העלויות והטרחה.`;
+      if (typedPaidDelta > neutral && -fPaidDelta >= MATERIAL.cost(todayCost)) gate = "typed";
     }
   } else if (goal === "balanced") {
     // Either measure carries it: a material relief that costs no more than the
@@ -1875,40 +2545,45 @@ function proposalOf(ctx: Ctx, goal: GoalId, solved: Solved): Proposal {
             : "אין הקלה משמעותית בהחזר בלי לשלם יותר בסך הכול, ואין חיסכון משמעותי במסגרת ההחזר.";
     }
   } else if (goal === "stable") {
-    // Stability is claimed in money: the worst economy must cost materially less.
-    // Exposure bought at a price that the worst case does not repay is not a gain.
-    // And its expected price must be small next to that: the shocks are the
-    // 10th/90th percentiles, so a household lands in one of the two bad tails
-    // roughly one time in five — certainty that costs more than a quarter of
-    // what it protects is an expensive policy, not stability.
-    if (-worstDelta < MATERIAL.cost(todayCost)) {
+    // Stability is claimed in the payment it promises: the highest payment over
+    // the whole life, in the worst economy, falls materially against today's mix.
+    // Its price is stated and capped: the forecast extra cost may not exceed
+    // STABLE_PRICE of the payments it removes in that economy.
+    const s = stabilityOf(refBook, R.monthly, book, m.monthly);
+    stable = { now: s.now, next: s.next, protection: s.protection };
+    if (s.now - s.next < MATERIAL.monthly(R.monthly)) {
       status = "no-gain";
-      note = `בתרחיש הגרוע התמהיל חוסך רק ${nis(Math.max(0, -worstDelta))}, פחות מהסף של ${nis(MATERIAL.cost(todayCost))}, ואין יציבות שמצדיקה מחזור.`;
-    } else if (fPaidDelta > 0.25 * -worstDelta) {
+      note =
+        s.next < s.now
+          ? `בתרחיש הגרוע ההחזר הגבוה ביותר יורד רק ב-${nis(s.now - s.next)}, מ-${nis(s.now)} ל-${nis(s.next)}, פחות מהסף של ${nis(MATERIAL.monthly(R.monthly))}, ואין יציבות שמצדיקה מחזור.`
+          : `בתרחיש הגרוע ההחזר הגבוה ביותר לא יורד (${nis(s.next)} מול ${nis(s.now)} היום), ואין יציבות שמצדיקה מחזור.`;
+    } else if (fPaidDelta > neutral && fPaidDelta > STABLE_PRICE * s.protection) {
       status = "no-gain";
-      note = `היציבות עולה ${nis(fPaidDelta)} בתחזית כדי לחסוך ${nis(-worstDelta)} בתרחיש הגרוע, יותר מרבע מההגנה, ולכן יקרה מדי.`;
+      note = `היציבות עולה ${nis(fPaidDelta)} בתחזית, יותר מרבע מהתשלומים שהיא חוסכת בתרחיש הגרוע (${nis(s.protection)} לאורך התקופה), ולכן יקרה מדי.`;
+      gate = "price";
     }
   }
-  // A cost goal's gain must survive two tests an advisor applies before filing:
-  // the switching costs come back within BREAK_EVEN_MAX months, and (savings,
-  // balanced) the saving is not only payments moved earlier: discounted at the
-  // board's own rate (the ע.נ.נ input), the client must not pay more than today.
   if (status === "ok" && (goal === "savings" || goal === "balanced" || goal === "stable") && fees + setup > 0) {
     // Forecast present value when the forecast is on, the typed read-out's otherwise.
-    const base = (R.book ?? ctx.today).metrics;
+    const base = refBook.metrics;
     const pvNow = ctx.input.forecastOn ? base.outlook?.pv : base.pv;
     const pvNew = ctx.input.forecastOn ? m.outlook?.pv : m.pv;
     // Never ahead: a saving or a balanced relief that never pays its costs back is
     // not one (stability may, by design: it buys protection, capped by its own rule).
-    if ((be !== null && be > BREAK_EVEN_MAX) || (be === null && goal !== "stable")) {
+    // With an estimated fee the test is at the band's low end (it cannot pay at all otherwise).
+    const test = band ? band.low : be;
+    if ((test !== null && test > BREAK_EVEN_MAX) || (test === null && goal !== "stable")) {
       status = "no-gain";
+      gate = "breakEven";
+      const low = band ? `, וגם בעמלה הנמוכה בטווח ההערכה (${nis(band.feeLow + setup)}) ${band.low === null ? "הן לא חוזרות" : `רק אחרי ${band.low} חודשים`}` : "";
       note =
         be === null
-          ? `העמלות והעלויות, ${nis(fees + setup)}, לא חוזרות לאורך חיי ההלוואה, ולכן המחזור לא כדאי ביעד הזה.`
-          : `העמלות והעלויות, ${nis(fees + setup)}, חוזרות רק אחרי ${be} חודשים, יותר מ-${BREAK_EVEN_MAX / 12} שנים, ולכן המחזור לא כדאי ביעד הזה.`;
+          ? `העמלות והעלויות, ${nis(fees + setup)}, לא חוזרות לאורך חיי ההלוואה${low}, ולכן המחזור לא כדאי ביעד הזה.`
+          : `העמלות והעלויות, ${nis(fees + setup)}, חוזרות רק אחרי ${be} חודשים, יותר מ-${BREAK_EVEN_MAX / 12} שנים${low}, ולכן המחזור לא כדאי ביעד הזה.`;
     } else if (goal !== "stable" && pvNow !== undefined && pvNew !== undefined && pvNew > pvNow + 1) {
       // (Stability may cost a little by design: its own rule caps that price.)
       status = "no-gain";
+      gate = "pv";
       note = `בערך נוכחי, בהיוון של ${ctx.input.discountRate}% בשנה, התמהיל עולה ${nis(pvNew - pvNow)} יותר מהיום: החיסכון בסך התשלומים בא מתשלום מוקדם יותר, לא מריבית זולה יותר.`;
     }
   }
@@ -1928,60 +2603,93 @@ function proposalOf(ctx: Ctx, goal: GoalId, solved: Solved): Proposal {
   // goal's own (L26 payment: −₪24 a month, and ₪3,130 of costs on ₪12,950).
   const newMoney = sum(tranches.map((x) => x.amount));
   if (!ctx.override && newMoney > 0 && fees + setup > REFI_COST_MAX * newMoney) {
+    if (status === "ok") gate = "share";
     status = "no-gain";
     note = costShareNote(newMoney, fees, setup);
   }
-  const balance = goal === "balanced" ? balanceOf(solved, relief, -fPaidDelta) : undefined;
-  tranches = tranches.map((x) => {
-    const why = sliverWhy(ctx, goal, solved, used, x, tranches);
-    return why ? { ...x, keptSmall: why } : x;
-  });
+  return { status, note, gate, be, band, ...(stable ? { stable } : {}) };
+}
 
-  const reasons = reasonsOf(ctx, goal, book, tranches, refi, fPaidDelta, worstDelta, be, fees + setup, solved);
-  const structureWhy = structureText(ctx, solved, book);
-  if (structureWhy) reasons.splice(Math.min(2, reasons.length), 0, structureWhy);
-  // Five at most; the sentence on the debt due now is never the one dropped.
-  const dueText = R.due > 0 ? nis(R.due) : null;
-  while (reasons.length > 5) {
-    let i = reasons.length - 1;
-    while (i > 0 && dueText && reasons[i].includes(dueText)) i--;
-    reasons.splice(i, 1);
+/** The highest payment over a mix's whole life in each economy (month one as the read-out shows it). */
+function lifePeak(book: Book, monthly: number): number[] {
+  // As the stress panel shows it (stressOf): every regular payment of the forecast schedule, a balloon's lump excluded.
+  void monthly;
+  return book.regular.map((r) => Math.max(0, ...r));
+}
+
+/**
+ * Stability in payment, against the reference: the worst economy's highest
+ * payment over the whole life, today and in the mix, and what the mix removes
+ * there month by month (₪ in total: the payments today's mix would make in that
+ * economy above the mix's own).
+ */
+function stabilityOf(refBook: Book, refMonthly: number, book: Book, monthly: number): { now: number; next: number; k: number; protection: number } {
+  const a = lifePeak(refBook, refMonthly);
+  const b = lifePeak(book, monthly);
+  const k = a.reduce((best, x, i) => (x > a[best] ? i : best), 0);
+  const ra = refBook.regular[k];
+  const rb = book.regular[k];
+  let protection = 0;
+  for (let i = 0; i < Math.max(ra.length, rb.length); i++) protection += Math.max(0, (ra[i] ?? 0) - (rb[i] ?? 0));
+  return { now: Math.max(...a), next: Math.max(...b), k, protection };
+}
+
+/** breakEven on raw arrays: today's and the proposal's forecast payments and balances. */
+function breakEvenOn(a: number[], ba: number[], b: number[], bb: number[]): number | null {
+  const n = Math.max(a.length, b.length);
+  let cum = 0;
+  let hit: number | null = null;
+  for (let m = 0; m < n; m++) {
+    cum += (a[m] ?? 0) - (b[m] ?? 0);
+    const d = cum + (ba[m] ?? 0) - (bb[m] ?? 0);
+    if (d >= 0 && hit === null) hit = m + 1;
+    if (d < 0) hit = null;
   }
-  const caveats = caveatsOf(ctx, goal, book, refi, fPaidDelta, delta, solved);
-  // Under the override, the proposal the cost-share gate would have refused says so.
-  if (status === "ok" && ctx.override && newMoney > 0 && fees + setup > REFI_COST_MAX * newMoney)
-    caveats.push(`העלויות החד־פעמיות של המחזור, ${nis(fees + setup)}, הן ${shareText((fees + setup) / newMoney)} מהכסף החדש (${nis(newMoney)}), גבוהות מדי ביחס לחוב, והתמהיל נבנה למרות זאת.`);
-  const checks = checksOf(ctx, rows, used, m, goal, held);
-  if (status === "ok" && checks.some((c) => !c.ok)) {
-    status = "unavailable";
-    note = `נכשלה בדיקה: ${checks.filter((c) => !c.ok).map((c) => c.label).join(", ")}`;
-  }
+  return hit === 1 ? 0 : hit;
+}
+
+/**
+ * Break-even at the two ends of the estimated fees' band (fees.ts FEE_BAND): the
+ * fee is financed, so a different fee changes the new money of its segment pro
+ * rata, and with it that segment's payments and balances (a tranche's schedule
+ * is linear in its principal). null when no moved debt's fee is an estimate with a band.
+ */
+function bandBreakEven(ctx: Ctx, refBook: Book, book: Book, rows: ImportedLoan[], moved: Debt[], cost: number): Verdict["band"] {
+  const banded = moved.filter((d) => d.feeBand && d.fee > 0);
+  if (!banded.length) return null;
+  const per = (seg: Segment) => {
+    const fresh = owedOnly(rows).filter((r) => r.source_type === AUTOMIX_SOURCE && (r.group === "loan" ? "allPurpose" : "housing") === seg);
+    const N = sum(fresh.map((r) => Number(r.amount) || 0));
+    const pay: number[] = [];
+    const bal: number[] = [];
+    for (const r of fresh) {
+      const s = scheduleIn(r, ctx.f, ECON[0]);
+      addInto(pay, s.pay);
+      addInto(bal, s.bal);
+    }
+    return N > 0 ? { pay: pay.map((x) => x / N), bal: bal.map((x) => x / N) } : null;
+  };
+  const unit = { housing: per("housing"), allPurpose: per("allPurpose") };
+  const at = (end: "low" | "high") => {
+    const pay = book.pay[0].slice();
+    const bal = book.bal[0].slice();
+    for (const d of banded) {
+      const u = unit[d.segment];
+      if (!u) continue;
+      const delta = d.feeBand![end] - d.fee;
+      for (let i = 0; i < u.pay.length; i++) {
+        pay[i] = (pay[i] ?? 0) + delta * u.pay[i];
+        bal[i] = (bal[i] ?? 0) + delta * u.bal[i];
+      }
+    }
+    return cost + sum(banded.map((d) => d.feeBand![end] - d.fee)) <= 0 ? 0 : breakEvenOn(refBook.pay[0], refBook.bal[0], pay, bal);
+  };
+  const fees = sum(moved.map((d) => d.fee));
   return {
-    goal,
-    label: LABEL[goal],
-    tagline: TAGLINE[goal],
-    status,
-    note,
-    ...(goal !== "payment" ? { budget: Math.round(held) } : {}),
-    structure: isBankVariant(ctx.variant) ? "bank" : ctx.variant,
-    ...(structureWhy ? { structureWhy } : {}),
-    // Always set on a bank structure: "move" when the whole mortgage goes to another
-    // bank (the move structure, or a bank the advisor picked that does not hold it).
-    ...(isBankVariant(ctx.variant) ? { refinance: ctx.variant === "bankMove" || ctx.moveWhole ? ("move" as const) : ("internal" as const) } : {}),
-    ...(isBankVariant(ctx.variant) ? { priceBank: ctx.priceBank } : {}),
-    rows,
-    target: Math.round(sum(owedOnly(rows).map((r) => Number(r.amount) || 0))),
-    metrics: m,
-    delta,
-    ...(balance ? { balance } : {}),
-    costs: { prepaymentFees: fees, feesEstimated, setup, financed: true, breakEvenMonths: be },
-    moves,
-    tranches,
-    reasons,
-    caveats,
-    checks,
-    // With debt due now the stress panel's "today" is the reference: today cannot go on as it is.
-    stress: stressOf(ctx.ref.book ?? ctx.today, book),
+    low: at("low"),
+    high: at("high"),
+    feeLow: fees + sum(banded.map((d) => d.feeBand!.low - d.fee)),
+    feeHigh: fees + sum(banded.map((d) => d.feeBand!.high - d.fee)),
   };
 }
 
@@ -2045,7 +2753,7 @@ const SLIVER_REASON = new WeakMap<Plan, Map<string, string>>();
 const SLIVER_STATS = { dropped: 0, cost: 0, monthly: 0 };
 
 /** What a goal may give up on its own objective to drop slivers (rules.ts SLIVER_GIVE), in objective units. */
-const sliverGive = (ctx: Ctx, goal: GoalId) => (goal === "payment" ? SLIVER_GIVE.monthly(ctx.ref.monthly) : SLIVER_GIVE.cost(ctx.ref.paid) / U);
+const sliverGive = (ctx: Ctx, spec: Spec) => (spec.wMonthly > 0 ? SLIVER_GIVE.monthly(ctx.ref.monthly) : SLIVER_GIVE.cost(ctx.ref.paid) / U);
 
 /**
  * A plan's tranches under SLIVER_SHARE of their segment's new money, smallest
@@ -2092,7 +2800,7 @@ function sliverTest(ctx: Ctx, goal: GoalId, spec: Spec, cols: Column[], plan: Pl
   const dropped = inUse.get(`${track}|${segment}`) ?? [];
   const before = new Set(sliversOf(plan, cols).map((x) => `${x.track}|${x.segment}`));
   before.delete(`${track}|${segment}`);
-  const give = sliverGive(ctx, goal);
+  const give = sliverGive(ctx, spec);
   const held = { ...spec, fixZ: plan.refinance };
   const near = (entering: boolean) =>
     cols.filter((c) => {
@@ -2124,7 +2832,7 @@ function sliverTest(ctx: Ctx, goal: GoalId, spec: Spec, cols: Column[], plan: Pl
       ? "מסלול קטן שנשאר כי בלעדיו התמהיל עומד בכללים רק עם מסלול קטן אחר במקומו"
       : !p
       ? "מסלול קטן שנשאר כי בלעדיו התמהיל אינו עומד בכללים"
-      : goal === "payment"
+      : spec.wMonthly > 0
         ? `מסלול קטן שנשאר כי בלעדיו ההחזר עולה ב-${nis(lost)} בחודש`
         : `מסלול קטן שנשאר כי בלעדיו העלות עולה בכ-${nis(lost * U)}`,
   };
@@ -2170,7 +2878,7 @@ function unsliver(ctx: Ctx, goal: GoalId, sv: Solved): Solved {
     const spec = sv.spec;
     const known = new Set(sliversOf(cur, cols).map((x) => `${x.track}|${x.segment}`));
     // In the canonical order (solve.ts): the first improving flip is taken, so the board's row order may not decide which.
-    const flippable = (canonical(ctx.debts) as Debt[]).filter((d) => !d.forced && (!d.lock || !!spec.unlock?.includes(d.id)) && (d.group === "mortgage" ? !spec.keepMortgage : spec.loansAllowed));
+    const flippable = (canonical(ctx.debts) as Debt[]).filter((d) => !d.forced && (!d.lock || !!spec.unlock?.includes(d.id)) && !spec.hold?.includes(d.id) && (d.group === "mortgage" ? !spec.keepMortgage : spec.loansAllowed));
     for (const d of flippable) {
       const keys = new Set(Object.keys(cur.amounts));
       const z = cur.refinance.includes(d.id) ? cur.refinance.filter((id) => id !== d.id) : [...cur.refinance, d.id];
@@ -2178,14 +2886,60 @@ function unsliver(ctx: Ctx, goal: GoalId, sv: Solved): Solved {
       if (p.ok && p.objective < cur.objective - 1e-6 && capOk(p) && sliversOf(p, cols).every((x) => known.has(`${x.track}|${x.segment}`))) cur = p;
     }
   }
+  // One term per segment where the tracks' terms differ by a year or two: a
+  // contract of 20, 21 and 19 years (audit P3: L05 מאוזן) says nothing a single
+  // term does not, and aligning them is accepted within the same allowance.
+  cur = alignTerms(ctx, sv.spec, cols, cur, base + sliverGive(ctx, sv.spec), capOk);
   SLIVER_REASON.set(cur, why);
   if (cur !== sv.plan) {
     SLIVER_STATS.dropped++;
     const lost = cur.objective - base;
-    if (goal === "payment") SLIVER_STATS.monthly = Math.max(SLIVER_STATS.monthly, lost);
+    if (sv.spec.wMonthly > 0) SLIVER_STATS.monthly = Math.max(SLIVER_STATS.monthly, lost);
     else SLIVER_STATS.cost = Math.max(SLIVER_STATS.cost, lost * U);
   }
   return cur === sv.plan ? sv : { ...sv, plan: cur };
+}
+
+/** Terms of one segment within this many years of each other are aligned when it costs no more than SLIVER_GIVE. */
+const ALIGN_SPAN = 2;
+const ALIGN_STATS = { n: 0 };
+
+/**
+ * One common term per segment whose tracks' terms differ by at most ALIGN_SPAN
+ * years: every term from the shortest to the longest tried, the debt decisions
+ * and the other segment held (one LP each), the best kept when it stays within
+ * `limit` on the goal's own objective, passes `ok`, and adds no sliver.
+ */
+function alignTerms(ctx: Ctx, spec: Spec, cols: Column[], plan: Plan, limit: number, ok: (p: Plan) => boolean): Plan {
+  const byKey = new Map(cols.map((c) => [c.key, c]));
+  let cur = plan;
+  for (const seg of ["housing", "allPurpose"] as Segment[]) {
+    const used = Object.keys(cur.amounts)
+      .map((k) => byKey.get(k))
+      .filter((c): c is Column => !!c && c.segment === seg);
+    const fams = Array.from(new Set(used.map((c) => c.track)));
+    if (fams.length < 2) continue;
+    const ys = used.map((c) => c.years);
+    const lo = Math.min(...ys);
+    const hi = Math.max(...ys);
+    if (hi === lo || hi - lo > ALIGN_SPAN) continue;
+    const other = Object.keys(cur.amounts).filter((k) => byKey.get(k)?.segment !== seg);
+    const known = new Set(sliversOf(cur, cols).map((x) => `${x.track}|${x.segment}`));
+    let best: Plan | null = null;
+    for (let T = lo; T <= hi; T++) {
+      const keys = new Set([...other, ...fams.map((t) => `${t}|${seg}|${T}`)]);
+      const set = cols.filter((c) => keys.has(c.key));
+      if (set.length !== keys.size) continue;
+      const p = solveOnce(ctx.debts, set, { ...spec, fixZ: cur.refinance });
+      if (!p.ok || p.objective > limit || !ok(p) || !sliversOf(p, cols).every((x) => known.has(`${x.track}|${x.segment}`))) continue;
+      if (!best || p.objective < best.objective - 1e-9) best = p;
+    }
+    if (best) {
+      cur = best;
+      ALIGN_STATS.n++;
+    }
+  }
+  return cur;
 }
 
 /** Moved debts keepCheaper would have kept but for the sliver keeping them leaves (the "why" says so). */
@@ -2382,8 +3136,12 @@ const termWords = (d: Debt, term: number) => `${term < d.months ? "מקצר" : "
  * indexation the forecast expects, which its stated rate leaves out.
  */
 function forecastRate(d: Debt): number | null {
-  const pay = d.priced.pay[0];
-  if (!pay?.length || !(d.balance > 0)) return null;
+  return irrOf(d.priced.pay[0], d.balance);
+}
+
+/** The annual rate (monthly × 12, %) at which a payment stream is worth `principal`; null outside −4.8%…60%. */
+function irrOf(pay: number[] | undefined, principal: number): number | null {
+  if (!pay?.length || !(principal > 0)) return null;
   const pv = (r: number) => {
     let s = 0;
     let df = 1;
@@ -2392,10 +3150,10 @@ function forecastRate(d: Debt): number | null {
   };
   let lo = -0.004;
   let hi = 0.05;
-  if (pv(lo) < d.balance || pv(hi) > d.balance) return null;
+  if (pv(lo) < principal || pv(hi) > principal) return null;
   for (let k = 0; k < 60; k++) {
     const mid = (lo + hi) / 2;
-    if (pv(mid) > d.balance) lo = mid;
+    if (pv(mid) > principal) lo = mid;
     else hi = mid;
   }
   return ((lo + hi) / 2) * 1200;
@@ -2485,7 +3243,7 @@ function keepTest(ctx: Ctx, goal: GoalId, solved: Solved, plan: Plan, d: Debt): 
   const from = typeof solved.meta?.adopted === "string" ? (solved.meta.adopted as GoalId) : null;
   if (from && from !== goal) return `מחזורו נדרש לתמהיל של יעד "${LABEL[from]}", שמוצג גם כאן כי ${goal === "payment" ? "ההחזר בו נמוך יותר" : "העלות בו בלוח נמוכה יותר"}`;
   if (!(worse > 1e-6 * Math.max(1, Math.abs(plan.objective)))) return null;
-  return goal === "payment"
+  return solved.spec.wMonthly > 0
     ? `מחזורו נדרש להחזר הנמוך: בלעדיו ההחזר גבוה ב-${nis(worse)}`
     : `מחזורו נדרש כי בלעדיו העלות, בתחזית ובתרחישי הלחץ יחד, גבוהה בכ-${nis(worse * U)}`;
 }
@@ -2563,6 +3321,18 @@ function flipText(f: Flip | undefined, moved: boolean, c: FlipCtx): string {
   return `${who} ${verb(one, !mo)} ${one.text}`;
 }
 
+/**
+ * Why a debt cheaper than new money (rules.ts CHEAP_KEEP) is moved after all:
+ * what keeping the cheap debts would cost this goal, with its figure.
+ */
+function liftWords(by: number, goal: GoalId, gain: number | undefined, atLeast = false): string {
+  const cheap = `הוא זול מכסף חדש ב-${by.toFixed(2)} נקודות האחוז`;
+  if (gain === undefined) return `${cheap}, אבל בלי לגעת בחובות הזולים אין ליעד הזה תמהיל שעומד בכללים`;
+  return goal === "years"
+    ? `${cheap}, ובכל זאת כדאי לגעת בו: התמהיל שמשאיר את החובות הזולים נגמר ${atLeast ? "לפחות " : ""}${Math.round(gain)} חודשים מאוחר יותר`
+    : `${cheap}, ובכל זאת כדאי לגעת בו: התמהיל שמשאיר את החובות הזולים עולה ${atLeast ? "לפחות" : "בכ-"}${atLeast ? " " : ""}${nis(gain)} יותר, בתחזית ובתרחישי הלחץ יחד`;
+}
+
 /** A debt's reason: the measured effect, then the figures behind it — plain sentences. */
 function whyOf(effect: string, detail: string[]): string {
   const sentences = [effect, ...detail].filter(Boolean);
@@ -2580,6 +3350,12 @@ function effectiveRate(d: Debt): number {
   return d.rate;
 }
 
+/**
+ * What new money of this debt's kind costs this client, %: the same track and
+ * term for housing debt; for all-purpose debt the cheaper of all-purpose prime
+ * and קל"צ, both unlinked. A CPI-linked all-purpose debt is therefore compared at
+ * its forecast all-in rate (ownCost, compareWords), never at its stated real rate.
+ */
 function marketRateFor(ctx: Ctx, d: Debt): number | null {
   const track = TRACK_OF[d.path];
   if (!track) return null;
@@ -2594,19 +3370,23 @@ function marketRateFor(ctx: Ctx, d: Debt): number | null {
 
 const feeWords = (d: Debt) => (d.fee > 0 ? `עמלת הפירעון ${nis(d.fee)}${d.feeEstimated ? " בהערכה" : ""}` : d.group === "mortgage" ? "אין עמלת היוון" : "");
 const rateWords = (todayRate: number, mkt: number | null) => (mkt === null ? "" : `הריבית היום ${todayRate.toFixed(2)}% מול ${mkt.toFixed(2)}% לכסף חדש`);
+/** A debt against new money in one sentence, like for like (a CPI-linked all-purpose debt at its forecast all-in rate: new all-purpose money is unlinked). */
+function compareWords(ctx: Ctx, d: Debt, todayRate: number): string {
+  const own = ownCost(d, todayRate);
+  const mkt = marketRateFor(ctx, d);
+  return own.indexed && mkt !== null ? `עם המדד הצפוי הוא עולה כ-${own.rate.toFixed(2)}% בשנה מול ${mkt.toFixed(2)}% לכסף חדש` : rateWords(todayRate, mkt);
+}
 
 function keepDetail(ctx: Ctx, d: Debt, todayRate: number): string[] {
   const out: string[] = [];
   if (d.interestOnly) out.push(`זה מסלול ריבית בלבד של ${nis(d.balance)}, והמרתו ללוח שפיצר מעלה את ההחזר`);
-  const own = ownCost(d, todayRate);
-  const mkt = marketRateFor(ctx, d);
-  out.push(own.indexed && mkt !== null ? `עם המדד הצפוי הוא עולה כ-${own.rate.toFixed(2)}% בשנה מול ${mkt.toFixed(2)}% לכסף חדש` : rateWords(todayRate, mkt));
+  out.push(compareWords(ctx, d, todayRate));
   if (d.fee > 0) out.push(feeWords(d));
   return out;
 }
 
 function moveDetail(ctx: Ctx, d: Debt, todayRate: number, goal: GoalId): string[] {
-  if (d.called) return ["בפיגור של 90 יום ומעלה, והמלווה מעמיד אותו לפירעון מלא", rateWords(todayRate, marketRateFor(ctx, d))];
+  if (d.called) return ["בפיגור של 90 יום ומעלה, והמלווה מעמיד אותו לפירעון מלא", compareWords(ctx, d, todayRate)];
   if (d.due)
     return [
       d.due.kind === "past-due" ? "מועד פירעונו חלף והוא עומד לפירעון מיידי" : d.due.kind === "enforcement" ? "תיק בהוצאה לפועל שנפרע ונסגר" : "חוב בפיגור מחוץ לתמהיל, לפירעון מיידי",
@@ -2619,7 +3399,7 @@ function moveDetail(ctx: Ctx, d: Debt, todayRate: number, goal: GoalId): string[
       feeWords(d),
       goal === "years" ? `היום היא נגמרת בעוד ${yrs(d.months)}, וכל עוד היא נשארת החוב לא נגמר לפני כן` : `ההחזר עליה היום ${nis(d.monthly)} בחודש, עד ${yrs(d.months)}`,
     ];
-  const out: string[] = [rateWords(todayRate, marketRateFor(ctx, d)), feeWords(d)];
+  const out: string[] = [compareWords(ctx, d, todayRate), feeWords(d)];
   if (d.interestOnly) out.push("המסלול עובר מריבית בלבד לפירעון קרן חודשי");
   if (d.group === "mortgage" && d.segment === "allPurpose") out.push("מטרתו כל מטרה, ולכן הוא ממוחזר ככסף לכל מטרה");
   if (goal === "years") out.push(`היום הוא נגמר בעוד ${yrs(d.months)}`);
@@ -2652,8 +3432,9 @@ function reasonsOf(ctx: Ctx, goal: GoalId, book: Book, tranches: NewTranche[], r
   if (disagree)
     lead = `בלוח התמהיל, לפי הריבית המוקלדת, הריבית וההצמדה ${way(typedCost)} ב-${nis(typedCost)}, ובתחזית בנק ישראל הן ${way(forecastCost)} ב-${nis(forecastCost)}.`;
   else if (costClaim && typedCost > neutral) {
-    const w = (b: Book) => Math.max(...b.paid.slice(1));
-    lead = `הריבית וההצמדה בלוח עולות ב-${nis(typedCost)}${forecastCost > 0 ? `, ובתחזית ב-${nis(forecastCost)}` : ""}${goal === "stable" ? `, תמורת ${nis(w(R.book ?? ctx.today) - w(book))} פחות בתרחיש הגרוע` : ""}.`;
+    // Stability's price is said against what it buys, in payment.
+    const s = goal === "stable" ? stabilityOf(R.book ?? ctx.today, R.monthly, book, m.monthly) : null;
+    lead = `הריבית וההצמדה בלוח עולות ב-${nis(typedCost)}${forecastCost > 0 ? `, ובתחזית ב-${nis(forecastCost)}` : ""}${s ? `, תמורת החזר שבתרחיש הגרוע לא עולה על ${nis(s.next)} במקום ${nis(s.now)}` : ""}.`;
   }
   // With debt due now the end is measured from the reference, whose last payment clears it.
   const end =
@@ -2678,7 +3459,7 @@ function reasonsOf(ctx: Ctx, goal: GoalId, book: Book, tranches: NewTranche[], r
       ? `בתחזית בנק ישראל משלמים בסך הכול ${nis(book.paid[0])}${costs}. זה התמהיל שההשוואה נמדדת מולו, ההחזר הנמוך ביותר שמסלק את החוב העומד לפירעון.`
       : Math.abs(fPaidDelta) <= neutral
         ? `בתחזית בנק ישראל סך התשלומים נשאר כמו ${R.due > 0 ? "בתמהיל של היום ונשיאת החוב שעומד לפירעון" : "היום"}, ${nis(book.paid[0])}${costs}.`
-        : `בתחזית בנק ישראל משלמים בסך הכול ${nis(book.paid[0])} במקום ${nis(R.paid)}${R.due > 0 ? " (התמהיל של היום ונשיאת החוב שעומד לפירעון)" : ""}, ${fPaidDelta <= 0 ? `חיסכון של ${nis(fPaidDelta)}` : `תוספת של ${nis(fPaidDelta)}`}${costs}.`;
+        : `בתחזית בנק ישראל משלמים בסך הכול ${nis(book.paid[0])} במקום ${nis(R.paid)}${R.due > 0 ? ` (${refWords(R)})` : ""}, ${fPaidDelta <= 0 ? `חיסכון של ${nis(fPaidDelta)}` : `תוספת של ${nis(fPaidDelta)}`}${costs}.`;
   if (goal === "payment" && fPaidDelta > neutral && dm < 0) {
     // The lowest payment says its price first, in words.
     const costNow = ctx.today.paid[0] - t.balance;
@@ -2693,16 +3474,17 @@ function reasonsOf(ctx: Ctx, goal: GoalId, book: Book, tranches: NewTranche[], r
     out.push(dm === 0 ? `ההחזר החודשי נשאר ${nis(m.monthly)}, ו${end}.` : `ההחזר החודשי ${dm < 0 ? "יורד" : "עולה"} מ-${nis(t.monthly)} ל-${nis(m.monthly)}, ו${end}.`);
     out.push(totals);
   }
-  if (goal === "stable" || goal === "balanced" || goal === "savings") {
+  if (goal === "balanced" || goal === "savings") {
     const w = (b: Book) => Math.max(...b.paid.slice(1));
     out.push(`בתרחיש הגרוע מבין ארבעת תרחישי הלחץ משלמים ${nis(w(book))} במקום ${nis(w(R.book ?? ctx.today))}${R.book ? " בתמהיל של היום ונשיאת החוב שעומד לפירעון" : " היום"}.`);
   }
-  if (goal === "payment" && solved.meta?.guard === 1)
-    out.push(
-      ctx.ref.due > 0
-        ? `בחמש השנים הקרובות, גם בתרחיש הלחץ הקשה ביותר, ההחזר לא עולה על ${nis(ctx.ref.monthly)}, ההחזר של היום כולל נשיאת החוב שעומד לפירעון.`
-        : `בחמש השנים הקרובות, גם בתרחיש הלחץ הקשה ביותר, ההחזר לא עולה על ${nis(t.monthly)} שמשלמים היום.`
-    );
+  // Stability says what it promises, in payment.
+  if (goal === "stable") {
+    const s = stabilityOf(R.book ?? ctx.today, R.monthly, book, m.monthly);
+    out.push(`בתרחיש הלחץ הקשה ביותר ההחזר הגבוה ביותר לאורך כל התקופה הוא ${nis(s.next)}, מול ${nis(s.now)} בתמהיל של ${R.book ? "היום ונשיאת החוב שעומד לפירעון" : "היום"}.`);
+  }
+  const g = guardLine(ctx, goal, solved, book);
+  if (g) out.push(g);
   // מאוזן says first what it balances: its share of the free relief and of the most saving.
   if (goal === "balanced") {
     const s = balancedSentence(ctx, solved, R.monthly - m.monthly, R.paid - book.paid[0]);
@@ -2754,6 +3536,52 @@ function reasonsOf(ctx: Ctx, goal: GoalId, book: Book, tranches: NewTranche[], r
   return out.slice(0, 5);
 }
 
+/**
+ * The guard a proposal's own rows hold on every month 1–60 in every economy:
+ * the absolute guard at the goal's cap, else the relative guard the solve held,
+ * else none (Proposal.guard). Only what the rows hold is stated as a promise.
+ */
+function guardOf(ctx: Ctx, goal: GoalId, solved: Solved, book: Book): Proposal["guard"] {
+  if (goal !== "payment" && goal !== "balanced" && goal !== "years") return undefined;
+  const c = goal === "years" ? ceilingOf(ctx, goal, solved) : ctx.ref.monthly;
+  const abs: Guard = { kind: 1, caps: ECON.map(() => c) };
+  if (guardHolds(book, abs)) return { kind: "absolute", caps: abs.caps.map(Math.ceil), holds: true };
+  const imposed = solved.guard;
+  if (imposed?.kind === 2) return { kind: "relative", caps: imposed.caps.map(Math.ceil), holds: guardHolds(book, imposed) };
+  if (imposed?.kind === 1) return { kind: "absolute", caps: abs.caps.map(Math.ceil), holds: false };
+  // A mix adopted from another goal (the display order) is measured on its own rows.
+  const rel = guardTiers(ctx, c).find((x) => x.kind === 2);
+  if (rel && guardHolds(book, rel)) return { kind: "relative", caps: rel.caps.map(Math.ceil), holds: true };
+  return { kind: "none", caps: abs.caps.map(Math.ceil), holds: false };
+}
+
+/** The guard's sentence for the payment goal and קיצור שנים, stated only as strongly as the rows hold it. */
+function guardLine(ctx: Ctx, goal: GoalId, solved: Solved, book: Book): string | null {
+  if (goal !== "payment" && goal !== "years") return null;
+  const g = guardOf(ctx, goal, solved, book);
+  if (!g || g.kind === "none") return null;
+  const peak = Math.max(...peak5Of(book));
+  const c = g.caps[0];
+  const today = ctx.ref.due > 0 ? `${nis(ctx.ref.monthly)}, ההחזר של היום כולל נשיאת החוב שעומד לפירעון` : `${nis(ctx.ref.monthly)} שמשלמים היום`;
+  const cap = goal === "years" ? `התקרה של ${nis(c)}` : today;
+  if (g.kind === "absolute" && g.holds) return `בחמש השנים הקרובות, גם בתרחיש הלחץ הקשה ביותר, ההחזר לא עולה על ${cap}.`;
+  if (g.kind === "relative" && g.holds) {
+    const todayPeak = Math.max(...refPeak5(ctx));
+    return `התמהיל של היום עצמו עולה בתרחישי הלחץ עד ${nis(todayPeak)} בחמש השנים הקרובות. בכל תרחיש התמהיל הזה לא עולה על מה שהתמהיל של היום היה מגיע אליו באותו תרחיש, ובתרחיש הקשה ביותר הוא מגיע לכל היותר ל-${nis(peak)}.`;
+  }
+  return `בחמש השנים הקרובות, בתרחיש הלחץ הקשה ביותר, ההחזר מגיע לכל היותר ל-${nis(peak)}, מול ${cap}.`;
+}
+
+/**
+ * The reference a saving is claimed against when debt is due now, named in the
+ * same sentence (audit P5: r05 years "saves ₪950,837" against a 30-year loan at
+ * a grade-D price, with no word of what it was measured from).
+ */
+function refWords(R: Ctx["ref"]): string {
+  const loan = R.carryYears > 0 ? `, בהלוואה ל-${R.carryYears} שנים${R.carryRate !== undefined ? ` ב-${R.carryRate.toFixed(2)}%` : ""}` : "";
+  return `התמהיל של היום ונשיאת החוב שעומד לפירעון, ${nis(R.due)}${loan}`;
+}
+
 /** What is due now and what the comparison is measured from, in one or two sentences (override). */
 function dueSentence(ctx: Ctx): string {
   const t = ctx.today.metrics;
@@ -2785,7 +3613,61 @@ function dueSentence(ctx: Ctx): string {
   return `${parts.join(", ")}${total}. ${versus}`;
 }
 
-function caveatsOf(ctx: Ctx, goal: GoalId, book: Book, refi: Set<string>, fPaidDelta: number, delta: Proposal["delta"], solved: Solved): string[] {
+/** Days since the debt was given (its start date), or null when the row has none. */
+function ageOf(d: Debt): number | null {
+  const s = d.row.source_start_date ? parseDate(d.row.source_start_date) : null;
+  if (!s) return null;
+  const days = (startOfToday().getTime() - s.getTime()) / 864e5;
+  return days >= 0 ? days : null;
+}
+
+/**
+ * Why the board's typed read-out and the BoI forecast disagree on a proposal's
+ * total, attributed from the rows that change (a kept row is the same on both
+ * sides and cancels): a prime row printed at the report day's prime, prime and
+ * the five-year tracks moving along the curve, and CPI against the board's
+ * typed inflation. Audit W6: the caveat blamed "פריים שהודפסו בפריים של יום
+ * הדוח" on 844 proposals, 485 of them in builds with no such row (L02 payment:
+ * the מ"צ rows' resets +₪141,341 and prime on the forward curve +₪95,211).
+ */
+function gapWords(ctx: Ctx, rows: ImportedLoan[], refi: Set<string>, gap: number): string {
+  const generic = "ההפרש נובע מכך שהלוח מחזיק את הריבית והמדד כפי שהוקלדו, ותחזית בנק ישראל מזיזה את הפריים, את המסלולים המשתנים כל חמש שנים ואת המדד לפי ציפיות השוק.";
+  if (ctx.ref.due > 0 || Math.abs(gap) < 1) return generic;
+  const prime = primeOn(toIso(startOfToday()));
+  const parts = { stale: 0, prime: 0, bond: 0, cpi: 0 };
+  const add = (l: ImportedLoan, sign: number) => {
+    if (!(Number(l.months) > 0) || !(Number(l.amount) > 0)) return;
+    const typed = typedRow(l, ctx.input.inflation).totalPaid;
+    const g = typed - scheduleIn(l, ctx.f, ECON[0]).totalPaid;
+    const path = Number(l.path_id);
+    if (path === 1) {
+      const mg = Number(l.anchor_margin);
+      const stale =
+        prime !== null && l.anchor_margin !== null && l.anchor_margin !== undefined && Number.isFinite(mg) && Math.abs(Number(l.rate) - (prime + mg)) >= 0.1
+          ? typed - typedRow({ ...l, rate: round2(prime + mg) }, ctx.input.inflation).totalPaid
+          : 0;
+      parts.stale += sign * stale;
+      parts.prime += sign * (g - stale);
+    } else if (path === 4 || path === 5) parts.bond += sign * g;
+    else if (path === 3) parts.cpi += sign * g;
+  };
+  for (const d of ctx.debts) if (refi.has(d.id)) add(d.row, -1);
+  for (const r of owedOnly(rows)) if (r.source_type === AUTOMIX_SOURCE) add(r, 1);
+  const words: Record<keyof typeof parts, string> = {
+    stale: "משורות פריים שהודפסו בפריים של יום הדוח, ולא בפריים של היום",
+    prime: "מהפריים, שהלוח מחזיק כמו היום ותחזית בנק ישראל מזיזה לפי העקום",
+    bond: "מהמסלולים המשתנים כל חמש שנים, שהתחזית מעדכנת לפי העקום",
+    cpi: `מהמדד, שהלוח מחשב ב-${ctx.input.inflation}% בשנה והתחזית לפי ציפיות האינפלציה`,
+  };
+  const top = (Object.keys(parts) as (keyof typeof parts)[])
+    .filter((k) => Math.sign(parts[k]) === Math.sign(gap) && Math.abs(parts[k]) >= 0.25 * Math.abs(gap))
+    .sort((a, b) => Math.abs(parts[b]) - Math.abs(parts[a]))
+    .slice(0, 2);
+  if (!top.length) return generic;
+  return `ההפרש נובע בעיקר ${words[top[0]]}${top[1] ? ` ו${words[top[1]]}` : ""}.`;
+}
+
+function caveatsOf(ctx: Ctx, goal: GoalId, book: Book, refi: Set<string>, fPaidDelta: number, delta: Proposal["delta"], solved: Solved, rows: ImportedLoan[] = []): string[] {
   const out: string[] = [];
   const moved = ctx.debts.filter((d) => refi.has(d.id));
   const tier = ctx.pricing.tier;
@@ -2808,8 +3690,23 @@ function caveatsOf(ctx: Ctx, goal: GoalId, book: Book, refi: Set<string>, fPaidD
   if (moved.some((d) => d.group === "loan" && d.feeEstimated)) out.push("עמלת פירעון מוקדם על הלוואות צרכניות בריבית קבועה לא חושבה. יש לבקש מכתב יתרה.");
   const cpi = sum(moved.map((d) => d.cpiAveraging));
   if (cpi > 0) out.push(`פירעון המסלולים הצמודים אחרי ה-15 בחודש חוסך עמלת מיצוע מדד של כ-${nis(cpi)} (סעיף 5 לצו).`);
-  // The fee order's notice fee is on prepaying a loan; debt due now is paid, not prepaid.
-  if (moved.some((d) => !d.due && !d.called)) out.push("הודעה מוקדמת של 10 ימים לפחות חוסכת עמלה של 0.1% מהסכום (סעיף 3(2) לצו).");
+  // The fee order's notice fee is on prepaying a home-secured loan, and not on the
+  // part a new loan from the SAME bank refinances (§3(2)); debt due now is paid,
+  // not prepaid. It is never charged here (Hapoalim's printed figure is net of it,
+  // NOTICE_FEE), so it is said only where it would otherwise be due.
+  const internal = ctx.variant === "bank" && !ctx.moveWhole && !!ctx.incumbent;
+  if (!internal && moved.some((d) => d.group === "mortgage" && !d.due && !d.called)) out.push("הודעה מוקדמת של 10 ימים לפחות חוסכת עמלה של 0.1% מהסכום (סעיף 3(2) לצו).");
+  // A tranche refinanced within a year of being given (audit U6: L35, six weeks).
+  const young = moved
+    .map((d) => ({ d, age: ageOf(d) }))
+    .filter((x): x is { d: Debt; age: number } => x.age !== null && x.age < SEASONING_MONTHS * 30.44 && x.d.group === "mortgage" && !x.d.due);
+  if (young.length) {
+    const y = young.reduce((a, b) => (b.age < a.age ? b : a));
+    const ageWords = y.age < 60 ? `${Math.max(1, Math.round(y.age / 7))} שבועות` : `${Math.round(y.age / 30.44)} חודשים`;
+    out.push(
+      `${young.length === 1 ? `${y.d.label} ניתן` : `${young.length} מהמסלולים הממוחזרים ניתנו בשנה האחרונה, הצעיר שבהם`} לפני ${ageWords} בלבד. מחזור של משכנתא שניתנה לא מזמן יש לבדוק מול הבנק ומול הלקוח לפני שמציגים אותו.`
+    );
+  }
   if (moved.some((d) => d.interestOnly)) out.push("מסלולי ריבית בלבד מוחלפים במסלולים שמחזירים קרן כל חודש, ולכן חלק משינוי ההחזר הוא פירעון קרן ולא ריבית.");
   if (moved.some((d) => d.group === "mortgage" && d.segment === "allPurpose")) out.push("מסלולי משכנתא שמטרתם כל מטרה ממוחזרים ככסף לכל מטרה, כפי שבנק מתמחר אותם.");
   const neutral = MATERIAL.neutral(ctx.ref.paid);
@@ -2821,16 +3718,25 @@ function caveatsOf(ctx: Ctx, goal: GoalId, book: Book, refi: Set<string>, fPaidD
     );
   }
   if (goal === "consolidate" && solved.meta?.costs && fPaidDelta > neutral) out.push(`איחוד ההלוואות מוריד את ההחזר אבל מייקר את סך התשלומים ב-${nis(fPaidDelta)}, כי הפריסה ארוכה יותר.`);
-  if ((goal === "payment" || goal === "balanced") && solved.meta?.guard === 0)
+  // Which five-year guard the rows hold (Proposal.guard): none is said here, and the
+  // relative one by מאוזן and קיצור שנים (the payment goal says it in its reasons).
+  const guard = guardOf(ctx, goal, solved, book);
+  if (guard?.kind === "none")
     out.push(
-      `בתרחיש לחץ ההחזר עלול לעלות בחמש השנים הקרובות מעל ${nis(ctx.ref.monthly)}${ctx.ref.due > 0 ? ", ההחזר של היום כולל נשיאת החוב שעומד לפירעון" : " שמשלמים היום"}, ואין תמהיל שמונע זאת בהחזר הזה.`
+      goal === "years"
+        ? `בתרחיש לחץ ההחזר עלול לעלות בחמש השנים הקרובות מעל התקרה של ${nis(guard.caps[0])}, ואין תמהיל שמונע זאת ומקצר את החוב.`
+        : `בתרחיש לחץ ההחזר עלול לעלות בחמש השנים הקרובות מעל ${nis(ctx.ref.monthly)}${ctx.ref.due > 0 ? ", ההחזר של היום כולל נשיאת החוב שעומד לפירעון" : " שמשלמים היום"}, ואין תמהיל שמונע זאת בהחזר הזה.`
+    );
+  else if (guard?.kind === "relative" && goal !== "payment")
+    out.push(
+      `התמהיל של היום עצמו עולה בתרחישי הלחץ עד ${nis(Math.max(...refPeak5(ctx)))} בחמש השנים הקרובות, מעל ${goal === "years" ? `התקרה של ${nis(ceilingOf(ctx, goal, solved))}` : `ההחזר של היום, ${nis(ctx.ref.monthly)}`}, ולכן אין תמהיל שנשאר תמיד מתחתיה. התמהיל הזה נבנה כך שבכל תרחיש לא יעלה על מה שהתמהיל של היום היה מגיע אליו באותו תרחיש.`
     );
   const typedPaidDelta = book.metrics.totalPaid - ctx.ref.typedPaid;
   void delta;
   if (Math.abs(typedPaidDelta - fPaidDelta) > Math.max(10_000, 0.2 * Math.abs(fPaidDelta))) {
     const word = (x: number) => (Math.abs(x) <= neutral ? "סך תשלומים כמו היום" : x <= 0 ? `חיסכון של ${nis(x)}` : `תוספת של ${nis(x)}`);
     out.push(
-      `לוח התמהיל מחשב לפי הריבית כפי שהוקלדה ומראה ${word(typedPaidDelta)} בסך התשלומים, ותחזית בנק ישראל, בפריים של היום ובתחזית הריבית והמדד, מראה ${word(fPaidDelta)}. ההפרש נובע בעיקר משורות פריים שהודפסו בפריים של יום הדוח.`
+      `לוח התמהיל מחשב לפי הריבית כפי שהוקלדה ומראה ${word(typedPaidDelta)} בסך התשלומים, ותחזית בנק ישראל, בפריים של היום ובתחזית הריבית והמדד, מראה ${word(fPaidDelta)}. ${gapWords(ctx, rows, refi, typedPaidDelta - fPaidDelta)}`
     );
   }
   if (ctx.ref.due > 0) {
@@ -2861,7 +3767,7 @@ function caveatsOf(ctx: Ctx, goal: GoalId, book: Book, refi: Set<string>, fPaidD
     out.push(
       ctx.incumbent && (ctx.priceBasis === "incumbent" || ctx.priceBasis === "record" || ctx.priceBasis === "premium")
         ? `התמהיל הוא מחזור פנימי של מסלולים נבחרים בבנק ${BANKS.find((b) => b.id === ctx.incumbent)?.label}, ולכן הכסף החדש תומחר ${
-            ctx.priceBasis === "record" ? "לפי מה שהבנק הזה גבה מהלקוח עצמו, מתחת לממוצע שלו" : ctx.priceBasis === "premium" ? "בממוצע הבנקים ועוד תוספת הסיכון של הלקוח" : "בריביות של הבנק הזה"
+            ctx.priceBasis === "record" ? "לפי מה שהבנק הזה גבה מהלקוח עצמו, מתחת לממוצע שלו" : ctx.priceBasis === "premium" ? (TRACKS.some((t) => (ctx.priceExtra[t] ?? 0) > 0) ? "בריביות של הבנק הזה, שגבוהות מממוצע הבנקים ועוד תוספת הסיכון המוערכת של הלקוח" : "בממוצע הבנקים ועוד תוספת הסיכון של הלקוח") : "בריביות של הבנק הזה"
           }. מעבר לבנק אחר מעביר את כל המשכנתא.`
         : "התמהיל מניח מחזור פנימי של מסלולים נבחרים בבנק הקיים. מעבר לבנק אחר מעביר את כל המשכנתא."
     );
@@ -2883,14 +3789,17 @@ function caveatsOf(ctx: Ctx, goal: GoalId, book: Book, refi: Set<string>, fPaidD
 function findingsOf(ctx: Ctx, analysis: AutoMixInput["analysis"]): Finding[] {
   const out: Finding[] = [];
   const avg = (xs: { w: number; v: number }[]) => sum(xs.map((x) => x.w * x.v)) / (sum(xs.map((x) => x.w)) || 1);
-  const dear: { d: Debt; annual: number; mkt: number; rate: number }[] = [];
+  const dear: { d: Debt; annual: number; mkt: number; rate: number; indexed: boolean }[] = [];
   for (const d of ctx.debts) {
     if (d.zak || d.due || !(d.rate > 0)) continue;
     const mkt = marketRateFor(ctx, d);
     if (mkt === null) continue;
-    const rate = effectiveRate(d);
+    // Like for like: a CPI-linked all-purpose debt against unlinked new money at its
+    // forecast all-in rate (audit U3: L03 ₪938k at 5.40% real read as cheaper than 6.30%).
+    const own = ownCost(d, effectiveRate(d));
+    const rate = own.rate;
     const annual = (d.balance * (rate - mkt)) / 100;
-    if (rate - mkt >= (d.group === "loan" ? 1 : 0.5) && annual >= 500) dear.push({ d, annual, mkt, rate });
+    if (rate - mkt >= (d.group === "loan" ? 1 : 0.5) && annual >= 500) dear.push({ d, annual, mkt, rate, indexed: own.indexed });
   }
   for (const [id, group] of [["dear-mortgage", "mortgage"], ["dear-consumer", "loan"]] as const) {
     const xs = dear.filter((x) => x.d.group === group);
@@ -2905,7 +3814,7 @@ function findingsOf(ctx: Ctx, analysis: AutoMixInput["analysis"]): Finding[] {
       title: group === "mortgage" ? (xs.length === 1 ? "מסלול משכנתא יקר מהשוק" : `${xs.length} מסלולי משכנתא יקרים מהשוק`) : `הלוואות צרכניות יקרות ב-${nis(bal)}`,
       detail:
         group === "mortgage"
-          ? `${nis(bal)} בריבית ממוצעת של ${r.toFixed(2)}% מול ${k.toFixed(2)}% לכסף חדש היום, כ-${nis(annual)} בשנה.`
+          ? `${nis(bal)} בריבית ממוצעת של ${r.toFixed(2)}%${xs.some((x) => x.indexed) ? " עם המדד הצפוי" : ""} מול ${k.toFixed(2)}% לכסף חדש היום, כ-${nis(annual)} בשנה.`
           : `ריבית ממוצעת של ${r.toFixed(2)}% מול ${k.toFixed(2)}% בהלוואה בביטחון הנכס, כ-${nis(annual)} בשנה.`,
       rows: xs.map((x) => x.d.id),
       annualCost: Math.round(annual),
@@ -3216,9 +4125,17 @@ function runGoals(ctx: Ctx, consolidateOk: boolean, wanted: Set<GoalId>): Run {
   const solvedPayment = tag(solvePayment(ctx));
   // On a first lien the whole mortgage moves, so "the mortgage untouched" is the second-lien structure's goal.
   const consolidateHere = !((ctx.variant === "firstLien" || ctx.variant === "bankMove") && ctx.debts.some((d) => d.group === "mortgage"));
+  const solveGoal = (goal: GoalId, extra: Partial<Spec> = {}, fromGuard?: Guard["kind"]): Solved => {
+    if (goal === "consolidate") return solveConsolidate(ctx);
+    if (goal === "payment") return solvedPayment;
+    if (goal === "years") return solveYears(ctx);
+    if (goal === "balanced") return solveBalanced(ctx, extra, fromGuard);
+    if (goal === "stable") return solveStable(ctx, extra);
+    const spec = costSpec(ctx, goal, extra);
+    return { plan: solveTerms(ctx.debts, ctx.cols, spec), spec, cols: ctx.cols };
+  };
   for (const goal of ORDER) {
     if (!wanted.has(goal)) continue;
-    let solved: Solved;
     if (goal === "consolidate") {
       if (!hasLoans || !consolidateHere) continue;
       if (!consolidateOk) {
@@ -3229,17 +4146,8 @@ function runGoals(ctx: Ctx, consolidateOk: boolean, wanted: Set<GoalId>): Run {
         };
         continue;
       }
-      solved = solveConsolidate(ctx);
-    } else if (goal === "payment") solved = solvedPayment;
-    else if (goal === "years") solved = solveYears(ctx);
-    else if (goal === "balanced") solved = solveBalanced(ctx);
-    else if (goal === "stable") {
-      const spec = costSpec(ctx, "stable", { shareCap: false });
-      solved = { plan: solveTerms(ctx.debts, ctx.cols, spec), spec, cols: ctx.cols };
-    } else {
-      const spec = costSpec(ctx, goal);
-      solved = { plan: solveTerms(ctx.debts, ctx.cols, spec), spec, cols: ctx.cols };
     }
+    const solved = solveHolding(ctx, goal, () => solveGoal(goal));
     solvedBy.set(goal, tag(solved));
   }
   for (const sv of Array.from(solvedBy.values())) if (sv.plan.ok && sv.cols) addToPool(sv.plan, sv.cols);
@@ -3250,6 +4158,8 @@ function runGoals(ctx: Ctx, consolidateOk: boolean, wanted: Set<GoalId>): Run {
   // budget-holding answer reached, when that answer obeys its rules.
   for (const [goal, sv] of Array.from(solvedBy.entries())) {
     if (!sv.spec || !sv.cols || !sv.plan.ok) continue;
+    // (The payment goal's cost stage already searched its band with the pool as seeds; under the guard a second pass ran 0.6 s on fuzz Z59.)
+    if (goal === "payment" && sv.spec.wMonthly === 0) continue;
     const p2 = solveTermsRaw(ctx.debts, sv.cols, sv.spec, POOL, sv.plan);
     if (p2.ok && p2.objective < sv.plan.objective - 1e-6) solvedBy.set(goal, { ...sv, plan: p2 });
   }
@@ -3278,10 +4188,13 @@ function runGoals(ctx: Ctx, consolidateOk: boolean, wanted: Set<GoalId>): Run {
           // (The re-solve is started from the other goal's mix, and the search keeps
           // a start it cannot improve on without testing it against years' caps:
           // fuzz Z276 took stable's mix at ₪132k more on the typed read-out.)
-          const use = at.plan.ok ? at : { ...sv, meta: { finish: f } };
-          if (!costsNoMore(ctx, use.plan)) continue;
+          // The re-solve first, then the other goal's mix itself, each held to years' own rules: no more paid in total,
+          // its guard, and the debts CHEAP_KEEP keeps (fuzz Z344: the re-solve failed the rows' cost test while the mix passed).
+          const okForYears = (c: Solved) => costsNoMore(ctx, c.plan) && !(yrs0.guard?.kind && !earlyOk(ctx, c.plan, c.cols ?? ctx.cols, yrs0.guard.caps)) && !movesHeld(c.plan, yrs0.spec);
+          const use = [at.plan.ok ? at : null, { ...sv, meta: { finish: f } } as Solved].find((c): c is Solved => !!c && okForYears(c));
+          if (!use) continue;
           const stretchedNow = !!yrs0.meta.stretched;
-          solvedBy.set("years", tag({ ...use, meta: { ...yrs0.meta, finish: f, ...(stretchedNow ? { atStretch: f } : typeof yrs0.meta.atStretch === "number" ? { atToday: f } : {}) } }));
+          solvedBy.set("years", tag({ ...use, guard: yrs0.guard, meta: { ...yrs0.meta, finish: f, ...(stretchedNow ? { atStretch: f } : typeof yrs0.meta.atStretch === "number" ? { atToday: f } : {}) } }));
           T = f;
         }
       }
@@ -3310,9 +4223,47 @@ function runGoals(ctx: Ctx, consolidateOk: boolean, wanted: Set<GoalId>): Run {
     const shared = Array.from(solvedBy.entries()).some(([h, x]) => h !== g && x.plan === sv.plan);
     if (!shared) solvedBy.set(g, keepCheaper(ctx, unsliver(ctx, g, sv)));
   }
+  // THE GATES IN THE SEARCH. A cost goal whose answer has a material gain that a
+  // gate refuses (break-even, present value, the costs' share of the new money)
+  // is solved again with the gates as rows, and the best mix that passes them all
+  // is the answer; only when none does is the goal "no-gain".
+  for (const g of GATED_GOALS) {
+    const sv = solvedBy.get(g);
+    if (!sv?.plan.ok || !wanted.has(g)) continue;
+    const v = quickJudge(ctx, g, sv);
+    if (v.status !== "no-gain" || !v.gate) continue;
+    const tally = (GATE_STATS.by[`${g}/${v.gate}`] ??= { refused: 0, passed: 0 });
+    tally.refused++;
+    // Every gate at once, so the answer passes them all: the rows, savings' typed
+    // read-out at most the reference's, and stability at a price its protection
+    // allows, then at no extra cost in the forecast.
+    const rows = { ...gateRows(ctx), ...(g === "savings" ? { typedPaidCap: ctx.ref.typedPaid } : {}) };
+    const levels: Partial<Spec>[] =
+      g === "stable" ? [rows, { ...rows, paidCap: ctx.ref.paid + STABLE_PRICE * (v.stable?.protection ?? 0) }, { ...rows, paidCap: ctx.ref.paid }] : [rows];
+    for (const extra of levels) {
+      const alt = withHold(ctx, sv.spec?.hold, () => solveGoal(g, extra, sv.guard?.kind));
+      if (!alt.plan.ok) continue;
+      const alt2 = keepCheaper(ctx, unsliver(ctx, g, tag(alt)));
+      if (quickJudge(ctx, g, alt2).status === "ok") {
+        GATE_STATS.n++;
+        tally.passed++;
+        solvedBy.set(g, { ...alt2, gated: true });
+        break;
+      }
+    }
+  }
+  // A cost goal the gates re-solved can end sooner than years did: years takes it when it obeys years' rules (fuzz Z344).
+  if (GATED_GOALS.some((g) => solvedBy.get(g)?.gated)) {
+    const before = solvedBy.get("years")?.plan;
+    yearsFromOthers();
+    const after = solvedBy.get("years");
+    if (after && after.plan !== before && !Array.from(solvedBy.entries()).some(([h, x]) => h !== "years" && x.plan === after.plan)) solvedBy.set("years", keepCheaper(ctx, unsliver(ctx, "years", after)));
+  }
   for (const [g, sv] of Array.from(solvedBy.entries())) solvedBy.set(g, tag(sv));
   return { ctx, solvedBy, unavailableConsolidate };
 }
+/** How often the gates in the search found an answer the first solve's gate had refused, in all and per goal and gate (the corpus prints it). */
+const GATE_STATS = { n: 0, by: {} as Record<string, { refused: number; passed: number }> };
 
 /**
  * "Today, honestly" when debt is due now: keep today's mix and clear the due
@@ -3321,27 +4272,37 @@ function runGoals(ctx: Ctx, consolidateOk: boolean, wanted: Set<GoalId>): Run {
  * least any plan must do; its payment is the default budget, and every
  * "versus today" figure is measured from it. Without debt due now it is today.
  */
+/** Up to the agora: a sum over rows in the master's order, as a cap, without its order-dependent last bits. */
+const agoraUp = (x: number) => Math.ceil(x * 100) / 100;
+
 function referenceOf(ctx: Ctx): Ctx["ref"] {
   const t = ctx.today;
-  const none = { monthly: t.metrics.monthly, paid: t.paid[0], typedPaid: t.metrics.totalPaid, typedCost: t.metrics.totalCost, months: t.metrics.months, worst: Math.max(...t.paid.slice(1)), due: 0, carry: 0, carryYears: 0, book: null };
+  // The totals are sums over the rows in the master's order: their last bits differ with that order (fuzz seed 31
+  // Z567: 3,637,845.8681318522 against …852), and as caps they sent a node-capped search down another branch.
+  // Rounded UP to the agora, today's own mix still meets them and the order no longer shows.
+  const c = agoraUp;
+  const none = { monthly: t.metrics.monthly, paid: c(t.paid[0]), typedPaid: c(t.metrics.totalPaid), typedCost: c(t.metrics.totalCost), months: t.metrics.months, worst: c(Math.max(...t.paid.slice(1))), due: 0, carry: 0, carryYears: 0, book: null };
   if (!(ctx.ref.due > 0)) return none;
   // The reference is a yardstick, not an offer: today's mix as it stands may
   // already break the PTI or LTV guardrail, and the yardstick must still exist.
-  const spec = specFor(ctx, { wMonthly: 1, wCost: 1e-3, lambda: 0, budget: null, peakCap: null, finish: null, keepMortgage: true, loansAllowed: false, shareCap: false, ptiCap: null, ltv: null });
+  const spec = specFor(ctx, { wMonthly: 1, wCost: 1e-3, lambda: 0, budget: null, peakCap: null, finish: null, keepMortgage: true, loansAllowed: false, shareCap: false, ptiCap: null, ltv: null, hold: undefined });
   const plan = solveTermsRaw(ctx.debts, ctx.cols, spec, []);
   if (!plan.ok) return ctx.ref;
-  const b = bookOf(rowsOf(ctx, plan).rows, ctx.input, ctx.f);
+  const built = rowsOf(ctx, plan);
+  const b = bookOf(built.rows, ctx.input, ctx.f);
   const years = Math.max(0, ...Object.keys(plan.amounts).map((k) => Number(k.split("|")[2])));
+  const lent = sum(built.tranches.map((x) => x.amount));
   return {
     monthly: b.metrics.monthly,
-    paid: b.paid[0],
-    typedPaid: b.metrics.totalPaid,
-    typedCost: b.metrics.totalCost,
+    paid: c(b.paid[0]),
+    typedPaid: c(b.metrics.totalPaid),
+    typedCost: c(b.metrics.totalCost),
     months: b.metrics.months,
-    worst: Math.max(...b.paid.slice(1)),
+    worst: c(Math.max(...b.paid.slice(1))),
     due: ctx.ref.due,
     carry: b.metrics.monthly - t.metrics.monthly,
     carryYears: years,
+    ...(lent > 0 ? { carryRate: sum(built.tranches.map((x) => x.amount * x.rate)) / lent } : {}),
     book: b,
   };
 }
@@ -3441,16 +4402,38 @@ function adoptAcross(ctx: Ctx, solvedBy: Map<GoalId, Solved>) {
   if (yrs?.plan.ok)
     for (const g of BUDGET_GOALS) {
       const sv = solvedBy.get(g);
-      if (g === "years" || !sv || !holds(sv) || sv.ctx === solvedBy.get("years")!.ctx || !costsNoMore(sv.ctx ?? ctx, sv.plan)) continue;
-      if (view(sv).months < view(solvedBy.get("years")!).months - (homeward(sv) ? 0 : MATERIAL.months)) solvedBy.set("years", { ...sv, meta: { ...(sv.meta ?? {}), adopted: g } });
+      const cur = solvedBy.get("years")!;
+      if (g === "years" || !sv || !holds(sv) || sv.ctx === cur.ctx || !costsNoMore(sv.ctx ?? ctx, sv.plan)) continue;
+      // Years' own rules: its five-year guard and the debts CHEAP_KEEP keeps.
+      if ((cur.guard?.kind && !earlyOk(sv.ctx ?? ctx, sv.plan, sv.cols ?? (sv.ctx ?? ctx).cols, cur.guard.caps)) || movesHeld(sv.plan, cur.spec)) continue;
+      if (view(sv).months < view(cur).months - (homeward(sv) ? 0 : MATERIAL.months)) solvedBy.set("years", { ...sv, guard: cur.guard, meta: { ...(sv.meta ?? {}), adopted: g } });
     }
   const sav = solvedBy.get("savings");
   if (sav?.plan.ok)
     for (const g of BUDGET_GOALS) {
       const sv = solvedBy.get(g);
-      if (g === "savings" || !sv || !holds(sv) || sv.ctx === solvedBy.get("savings")!.ctx || lockedIn(sv.ctx ?? ctx, sv.plan)) continue;
-      if (view(sv).totalCost < view(solvedBy.get("savings")!).totalCost - (homeward(sv) ? 1 : mCost)) solvedBy.set("savings", { ...sv, meta: { ...(sv.meta ?? {}), adopted: g } });
+      const cur = solvedBy.get("savings")!;
+      if (g === "savings" || !sv || !holds(sv) || sv.ctx === cur.ctx || lockedIn(sv.ctx ?? ctx, sv.plan) || movesHeld(sv.plan, cur.spec)) continue;
+      // Savings' own objective first (rules.ts DISPLAY_GIVE): another structure's mix
+      // is adopted for its lower shown cost only when it is no worse on savings' objective.
+      if (!(costObjective(sv.ctx ?? ctx, cur.spec, sv.plan, sv.cols ?? (sv.ctx ?? ctx).cols) <= costObjective(cur.ctx ?? ctx, cur.spec, cur.plan, cur.cols ?? (cur.ctx ?? ctx).cols) + DISPLAY_GIVE(ctx.ref.paid) / U)) continue;
+      if (view(sv).totalCost < view(cur).totalCost - (homeward(sv) ? 1 : mCost)) solvedBy.set("savings", { ...sv, meta: { ...(sv.meta ?? {}), adopted: g } });
     }
+}
+
+/**
+ * A plan's value on a cost goal's own objective (spec.lambda: the forecast and
+ * the worst economy), k₪, from the plan itself: kept debts and new money as the
+ * solver prices them. It compares mixes solved under other specs on one goal's measure.
+ */
+function costObjective(ctx: Ctx, spec: Spec | undefined, plan: Plan, cols: Column[]): number {
+  const lam = Math.min(1, Math.max(0, spec?.lambda ?? 0));
+  const byKey = new Map(cols.map((c) => [c.key, c]));
+  const refi = new Set(plan.refinance);
+  const paid = ECON.map(() => 0);
+  for (const d of ctx.debts) if (!refi.has(d.id)) d.paid.forEach((x, k) => (paid[k] += x));
+  for (const [key, a] of Object.entries(plan.amounts)) byKey.get(key)?.paid.forEach((x, k) => (paid[k] += x * a));
+  return ((1 - lam) * paid[0] + lam * Math.max(...paid)) / U;
 }
 
 /* ------------------------------------------------------------ entry */
@@ -3464,6 +4447,34 @@ function sameMix(a: Proposal, b: Proposal): boolean {
   const tb = b.tranches.map((x) => `${x.track}${x.segment}${x.years}`).sort().join(",");
   if (ta !== tb) return false;
   return a.tranches.every((x) => b.tranches.some((y) => y.track === x.track && y.segment === x.segment && Math.abs(y.amount - x.amount) <= 1000));
+}
+
+/**
+ * The debts CHEAP_KEEP keeps (rules.ts): the forecast all-in rate of the debt
+ * (indexation included) at least CHEAP_KEEP points under the cheapest new money
+ * of its segment at its own remaining term (each track's column nearest that
+ * term, by its own forecast all-in rate). Debts the structure moves (a whole
+ * mortgage to another bank, a first lien), debt due now, and locked or
+ * state-eligibility loans (their own rules) are not held.
+ */
+function cheapDebts(debts: Debt[], cols: Column[], moveWhole: boolean): { id: string; by: number }[] {
+  const out: { id: string; by: number }[] = [];
+  for (const d of debts) {
+    if (d.lock || d.forced || d.zak || d.due || (moveWhole && d.group === "mortgage")) continue;
+    const own = forecastRate(d);
+    if (own === null) continue;
+    const want = Math.max(1, Math.round(d.months / 12));
+    const nearest = new Map<TrackKey, Column>();
+    for (const c of cols) {
+      if (c.segment !== d.segment || c.fRate === undefined) continue;
+      const b = nearest.get(c.track);
+      if (!b || Math.abs(c.years - want) < Math.abs(b.years - want)) nearest.set(c.track, c);
+    }
+    if (!nearest.size) continue;
+    const best = Math.min(...Array.from(nearest.values()).map((c) => c.fRate!));
+    if (own <= best - CHEAP_KEEP) out.push({ id: d.id, by: best - own });
+  }
+  return out;
 }
 
 /** Everything a solve needs, from the input — the check script drives the solver through this too. */
@@ -3560,7 +4571,19 @@ function prepare(
       if (rec !== null && rec < own) priceBasis = "record";
     }
   } else if (!target && variant === "bank" && incumbent && tier.tier === "bankPremium") priceBasis = "premium";
-  const pricing = pricingFor(input.market, f, input, tier, variant === "secondLien" ? "second" : "first", target ?? "system", priceExtra);
+  // A bankPremium client at the bank that holds the mortgage (refinanced there,
+  // or that bank picked in the profile) pays the bank's difference OR the
+  // premium, never both (audit U4: L47 savings −₪131,420 automatically, −₪22,613
+  // with its own bank picked; r07 −₪99,300 and −₪58,625). A premium read from the
+  // client's own record is measured against the system and already holds that
+  // bank's level; a premium that is an estimate (no record that strong: r07's
+  // 0.50 floor for bureau non-payment) is the larger of the two, track by track.
+  const atIncumbent = tier.tier === "bankPremium" && variant === "bank" && !!incumbent && (!target || target === incumbent);
+  if (atIncumbent) {
+    const measured = !!tier.record && tier.record.level >= PREMIUM_EVIDENCE;
+    for (const t of TRACKS) priceExtra[t] = measured ? 0 : Math.max(0, (input.market.bankDelta[incumbent!]?.[t] ?? 0) - tier.premium);
+  }
+  const pricing = pricingFor(input.market, f, input, tier, variant === "secondLien" ? "second" : "first", atIncumbent ? "system" : target ?? "system", priceExtra);
   // The age limit at the end of the loan is bank practice, not law: the override lifts it.
   const ageCap = profile.age && !override ? Math.max(1, Math.floor(AGE_AT_END - profile.age)) : TERM_MAX_YEARS;
   // The shortest term on the menu is MIN_YEARS.prime (4): a client whose age
@@ -3606,6 +4629,7 @@ function prepare(
       ? ["housing", "allPurpose"]
       : ["housing"];
   const cols = columnsFor(pricing, input, f, maxYears, apYears, segments);
+  const cheap = cheapDebts(debts, cols, moveWhole);
   // THE REFERENCE when debt is due now: today's mix kept as it is, and the due
   // debt carried at the lowest monthly payment the lender's menu allows (the
   // cheapest-per-shekel all-purpose column — the longest term). It is the least
@@ -3623,6 +4647,7 @@ function prepare(
     due: dueAll,
     carry,
     carryYears: carryCol?.years ?? 0,
+    ...(carryCol ? { carryRate: carryCol.price.rate } : {}),
     book: null as Book | null,
   };
   const budget = profile.budget && profile.budget > 0 ? profile.budget : ref.monthly;
@@ -3650,6 +4675,8 @@ function prepare(
     setupHousing: SETUP_HOUSING - (nonbankLaw ? SETUP.file : 0) + openingFee(sum(mortgages.filter((d) => d.segment === "housing").map((d) => d.balance))),
     setupAp:
       SETUP_AP_ALONE - (nonbankLaw ? SETUP.file : 0) + (variant === "secondLien" ? SECOND_LIEN_CONSENT : 0) + openingFee(sum(debts.filter((d) => d.segment === "allPurpose").map((d) => d.balance))),
+    setupApShared: SETUP.appraisal,
+    ...(cheap.length ? { hold: cheap.map((x) => x.id) } : {}),
   };
   const ctx: Ctx = {
     input,
@@ -3680,6 +4707,7 @@ function prepare(
     override,
     ref,
     variant,
+    cheapBy: new Map(cheap.map((x) => [x.id, x.by])),
   };
 
   return { ctx, consolidateOk };
@@ -3748,7 +4776,11 @@ function buildIn(input: AutoMixInput): AutoMixResult {
   let unavailableConsolidate: Proposal | null = null;
   for (const goal of ORDER) {
     const options = runs.map((r) => r.solvedBy.get(goal)).filter((x): x is Solved => !!x);
-    const ok = options.filter((x) => x.plan.ok);
+    const solvedOk = options.filter((x) => x.plan.ok);
+    // A cost goal's structure that passes its gates is preferred over one whose
+    // better objective a gate refuses (the gates are part of the answer: W1).
+    const passing = GATED_GOALS.includes(goal) && solvedOk.length > 1 ? solvedOk.filter((x) => quickJudge(x.ctx!, goal, x).status === "ok") : [];
+    const ok = passing.length ? passing : solvedOk;
     if (!options.length) {
       unavailableConsolidate = goal === "consolidate" ? runs.map((r) => r.unavailableConsolidate).find(Boolean) ?? null : unavailableConsolidate;
       continue;
@@ -3761,7 +4793,7 @@ function buildIn(input: AutoMixInput): AutoMixResult {
     // must beat it MATERIALLY on the goal's own measure to replace it.
     const anchors = goal === "balanced" ? { R: Math.max(0, ...ok.map((x) => Number(x.meta?.reliefMax ?? 0))), S: Math.max(0, ...ok.map((x) => Number(x.meta?.savingMax ?? 0))) } : undefined;
     const best = ok.reduce((b, x) => (beatsMaterially(goal, x, b, anchors) ? x : b), ok[0]);
-    const other = ok.filter((x) => x !== best).reduce<Solved | null>((b, x) => (!b || better(score(goal, x, anchors), score(goal, b, anchors)) ? x : b), null);
+    const other = solvedOk.filter((x) => x !== best).reduce<Solved | null>((b, x) => (!b || better(score(goal, x, anchors), score(goal, b, anchors)) ? x : b), null);
     const missing = runs.length > 1 && !other ? runs.find((r) => r.ctx.variant !== best.ctx!.variant && r.solvedBy.has(goal)) : undefined;
     const floorPlan = missing?.solvedBy.get("payment");
     solvedBy.set(goal, {
@@ -3793,14 +4825,27 @@ function buildIn(input: AutoMixInput): AutoMixResult {
       if (b === i) break;
     }
   }
+  // Savings' own objective comes first (rules.ts DISPLAY_GIVE): where another
+  // offered goal within savings' budget shows a lower typed cost, the savings
+  // line says so and why, with the figures of both views.
+  const sav = proposals.find((p) => p.goal === "savings" && p.status === "ok");
+  if (sav)
+    for (const p of proposals) {
+      if (p === sav || p.status !== "ok" || p.sameAs === "savings" || !BUDGET_GOALS.includes(p.goal) || p.metrics.monthly > ctx.budget + 0.5) continue;
+      if (!(sav.metrics.totalCost > p.metrics.totalCost + 1)) continue;
+      const dF = (sav.stress[0]?.totalPaid ?? 0) - (p.stress[0]?.totalPaid ?? 0);
+      const worstOf = (x: Proposal) => Math.max(...x.stress.map((s) => s.totalPaid));
+      const dW = worstOf(sav) - worstOf(p);
+      const word = (x: number) => (x <= 0 ? `${nis(x)} פחות` : `${nis(x)} יותר`);
+      sav.caveats.push(
+        `בלוח, לפי הריבית המוקלדת, יעד "${p.label}" מראה ריבית והצמדה נמוכות יותר, ${nis(p.metrics.totalCost)} מול ${nis(sav.metrics.totalCost)}. בתחזית בנק ישראל התמהיל הזה משלם ${word(dF)} בסך הכול ובתרחיש הגרוע ${word(dW)}, והחיסכון נמדד כך: הלוח מחזיק את הריבית והמדד קבועים.`
+      );
+    }
   // Blocks — always — and, on every proposal built past one, the first caveat names it with its condition.
   const blocks = blocksOf(ctx, proposals);
   const lead = overrideCaveat(ctx, blocks);
   if (lead) for (const p of proposals) p.caveats.unshift(lead);
-  // Recommendation: the balanced mix when it is a real gain; else the first real
-  // gain in the order savings → consolidate → payment → years → stable.
-  const pickOrder: GoalId[] = ["balanced", "savings", "consolidate", "payment", "years", "stable"];
-  const recommended = pickOrder.find((g) => proposals.some((p) => p.goal === g && p.status === "ok" && !p.sameAs)) ?? null;
+  const recommended = recommendationOf(ctx, proposals);
 
   const rate = (t: TrackKey, y: number) => round2(pricing.rate(t, Math.min(y, maxYears), "housing").rate);
   const asOf = input.market.levelPeriod;
@@ -3808,7 +4853,9 @@ function buildIn(input: AutoMixInput): AutoMixResult {
   const dmy = (d: string) => d.split("-").reverse().join("/");
   const notes = [
     `רמת הריבית לפי מסלול ולפי בנק לקוחה מהשוואת הריביות של בנק ישראל (TamInt010) לחודש ${input.market.bankPeriod.split("-").reverse().join("/")}, והומרה מריבית מתואמת לריבית נקובה.`,
-    `ריבית קבועה לפי תקופה: הממוצע של בנק ישראל להלוואות חדשות בכל טווח תקופה (טבלאות הריבית הממוצעת, דוח ${dmy(newFixedRate(false, 120).report ?? "")}), בהמרה לריבית נקובה. הפריים ${input.market.boi.prime.toFixed(2)}% (ריבית בנק ישראל ${input.market.boi.rate.toFixed(2)}% מ-${dmy(input.market.boi.since)}).`,
+    input.market.housing?.avg
+      ? `ריבית קבועה לפי תקופה: ההפרשים בין טווחי התקופה לפי טבלאות הריבית הממוצעת של בנק ישראל (דוח ${dmy(newFixedRate(false, 120).report ?? "")}), ברמה של ממוצע הלוואות הדיור באותו מסלול (TamInt010), כי הטבלאות כוללות גם הלוואות לכל מטרה בביטחון דירה. הפריים ${input.market.boi.prime.toFixed(2)}% (ריבית בנק ישראל ${input.market.boi.rate.toFixed(2)}% מ-${dmy(input.market.boi.since)}).`
+      : `ריבית קבועה לפי תקופה: הממוצע של בנק ישראל להלוואות חדשות בכל טווח תקופה (טבלאות הריבית הממוצעת, דוח ${dmy(newFixedRate(false, 120).report ?? "")}), בהמרה לריבית נקובה. הפריים ${input.market.boi.prime.toFixed(2)}% (ריבית בנק ישראל ${input.market.boi.rate.toFixed(2)}% מ-${dmy(input.market.boi.since)}).`,
     `תוספת כל מטרה של ${Math.min(input.market.allPurposePremium.klz, input.market.allPurposePremium.prime).toFixed(2)} עד ${Math.max(input.market.allPurposePremium.klz, input.market.allPurposePremium.prime).toFixed(2)} נק׳ לפי BIR_MRTG_99, ונבדקה מול לוח n12b לאוקטובר 2026.`,
     "הלוואה לכל מטרה עד 30 שנה לפי הוראה 329, והתקופה הממוצעת שניתנה בפועל באוקטובר 2026 הייתה 23.7 שנים (בנק ישראל, n12b).",
     `עמלות הפירעון לפי טבלאות הריבית הממוצעת של בנק ישראל שבתוקף מ-${dmy(feeTableAsOf().unlinked)}.`,
@@ -3840,6 +4887,31 @@ function buildIn(input: AutoMixInput): AutoMixResult {
   };
 }
 
+/**
+ * The recommendation: the first offered goal that does not cost more than the
+ * reference in the forecast (beyond the neutral residue), in the order מאוזן →
+ * savings → stability → years → consolidation. A goal that buys something at a
+ * price (the lowest payment, a consolidation or a stability that costs) is
+ * recommended only when the advisor's inputs ask for it: a budget typed below
+ * today's payment asks for relief (מאוזן, else the lowest payment). Otherwise
+ * nothing is recommended and the sheet shows no badge. Audit S3: in 37 corpus
+ * builds the recommendation was the lowest payment at +₪24k…+₪365k while
+ * another offered goal saved money (L14: +₪248,298 while years saved ₪67,658);
+ * in the back-test all 23 payment fallbacks cost more than keeping (mean +₪249,347).
+ */
+function recommendationOf(ctx: Ctx, proposals: Proposal[]): GoalId | null {
+  const neutral = MATERIAL.neutral(ctx.ref.paid);
+  const offered = (g: GoalId) => proposals.find((p) => p.goal === g && p.status === "ok" && !p.sameAs);
+  const costsNoMoreThanRef = (p: Proposal) => (p.stress[0] ? p.stress[0].totalPaid - p.stress[0].todayTotalPaid : 0) <= neutral;
+  for (const g of ["balanced", "savings", "stable", "years", "consolidate"] as GoalId[]) {
+    const p = offered(g);
+    if (p && costsNoMoreThanRef(p)) return g;
+  }
+  const typed = ctx.input.profile.budget;
+  if (typed && typed > 0 && typed < ctx.ref.monthly - 0.5) for (const g of ["balanced", "payment"] as GoalId[]) if (offered(g)) return g;
+  return null;
+}
+
 /** AutoMixResult.dueNow — the debt due now and the reference measured from it. */
 function dueNowOf(ctx: Ctx): AutoMixResult["dueNow"] {
   if (!ctx.override || !(ctx.ref.due > 0)) return null;
@@ -3864,4 +4936,4 @@ function dueNowOf(ctx: Ctx): AutoMixResult["dueNow"] {
 }
 
 /** Exposed for the check script. */
-export const __test = { STATS, SLIVER_STATS, runGoals, sliversOf, sliverTest, SLIVER_REASON, unsliver, solveBalanced, frontierPoint, solveGuarded, variantsFor, referenceOf, applyReference, prepare, solveTermsRaw, specFor, LAMBDA, bookOf, rowsOf, priceRow, debtsOf, columnsFor, pricingFor, trancheRow, SETUP_HOUSING, SETUP_AP_ALONE, isIndexedPath };
+export const __test = { STATS, SLIVER_STATS, GATE_STATS, DISPLAY_STATS, PAYMENT_STAGE, ALIGN_STATS, runGoals, sliversOf, sliverTest, SLIVER_REASON, unsliver, solveBalanced, frontierPoint, solveGuarded, variantsFor, referenceOf, applyReference, prepare, solveTermsRaw, specFor, LAMBDA, bookOf, rowsOf, priceRow, debtsOf, columnsFor, pricingFor, trancheRow, SETUP_HOUSING, SETUP_AP_ALONE, isIndexedPath };
