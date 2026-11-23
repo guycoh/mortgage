@@ -10,8 +10,11 @@
 //        them as alternatives; none of them replaces the default by itself.
 // POST → save or clear the override. Console admin session only (/console).
 //
-// Nothing here can fail the board: no BoI, no table, no network → the answer
-// says so and the board stays on flat inflation.
+// Nothing here can fail the board: no table, no network → the answer says so.
+// The BoI's data service does go down (2026-11-23 evening: no connection for
+// hours, and with `boi: null` תמהיל אופטימלי cannot price at all), so the last
+// curves it published ride in the bundle (boi-last.json, refreshed by
+// scripts/forecast-snapshot.mts) and stand in, labelled as the saved copy.
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
@@ -26,6 +29,7 @@ import {
   type ZeroPoint,
 } from "@/app/aa102test/lib/forecast";
 import { ADMIN_COOKIE, verifyAdminCookie } from "@/app/simulator/lib/admin-auth";
+import boiLast from "./boi-last.json";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +40,14 @@ const BOI_URL =
 const NOMINAL = [1, 2, 3, 4, 5, 7, 10, 15];
 const REAL = [1, 2, 3, 4, 5, 7, 10, 15, 20];
 const code = (kind: "N" | "R", y: number) => `ZC_TSB_Z${kind}D_${String(y).padStart(2, "0")}Y_MA`;
+
+/** The newest BoI curves this build shipped with, for when the BoI cannot be reached. */
+function lastKnown(): Forecast | null {
+  const { asOf, nominal, inflation } = boiLast as { asOf: string; nominal: number[]; inflation: number[] };
+  if (!/^\d{4}-\d{2}$/.test(asOf) || nominal.length !== HORIZON || inflation.length !== HORIZON) return null;
+  const [yy, mm] = asOf.split("-");
+  return { asOf, source: "boi", label: `בנק ישראל · ${mm}/${yy} (עותק שמור)`, nominal, inflation };
+}
 
 /** Six hours in memory — the BoI publishes twice a month. */
 let boiCache: { at: number; value: Forecast | null } | null = null;
@@ -79,8 +91,11 @@ async function fromBoi(): Promise<Forecast | null> {
   } catch {
     value = null;
   }
-  // A failure is cached briefly too, so a BoI outage is not hammered per click.
-  boiCache = { at: value ? Date.now() : Date.now() - 6 * 3600_000 + 300_000, value };
+  // A failure is cached briefly too, so a BoI outage is not hammered per click;
+  // meanwhile the board runs on the last curves the BoI published.
+  const live = !!value;
+  value ??= lastKnown();
+  boiCache = { at: live ? Date.now() : Date.now() - 6 * 3600_000 + 300_000, value };
   return value;
 }
 
