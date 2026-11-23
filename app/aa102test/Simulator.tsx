@@ -391,6 +391,8 @@ export default function Simulator({
   }, []);
   const activeForecast =
     (SAVED_FORECASTS_ENABLED && forecastSource && forecastState?.saved.find((s) => s.label === forecastSource)) ||
+    // The route's default: SmartNPV's own curve when it can be read (lib/snpv-forecast), else BoI.
+    forecastState?.forecast ||
     forecastState?.boi ||
     null;
   /**
@@ -2213,7 +2215,7 @@ export default function Simulator({
       {autoMix && autoOpen && master && (
         <AutoMix
           master={master.loans}
-          forecast={forecastState?.boi ?? null}
+          forecast={forecastState?.forecast ?? forecastState?.boi ?? null}
           forecastOn={econMode === "forecast" && !!activeForecast}
           inflation={annualInflation}
           discountRate={annualDiscount}
