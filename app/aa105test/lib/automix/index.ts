@@ -1293,7 +1293,8 @@ type Guard = { kind: 0 | 1 | 2; caps: number[] };
 /** The reference's highest payment in each economy over the next five years, month one as the read-out shows it. */
 function refPeak5(ctx: Ctx): number[] {
   const b = ctx.ref.book ?? ctx.today;
-  return ECON.map((_, k) => Math.max(ctx.ref.monthly, ...b.regular[k].slice(1, 60)));
+  // Up to the agora, as the reference totals (referenceOf): the last bits follow the master's row order (fuzz seed 31 Z396).
+  return ECON.map((_, k) => agoraUp(Math.max(ctx.ref.monthly, ...b.regular[k].slice(1, 60))));
 }
 /** The two guards at cap c, strongest first. */
 function guardTiers(ctx: Ctx, c: number): Guard[] {
@@ -1408,7 +1409,7 @@ function pvCapOf(ctx: Ctx, goal: GoalId): Partial<Spec> {
   // the cap is today's present value in that same economy.
   const shifted = ctx.input.tuning?.baseShift && !ctx.ref.book ? sum(ctx.debts.map((d) => d.pv ?? 0)) : null;
   const pv = shifted ?? ctx.ref.pv ?? (ctx.ref.book ?? ctx.today).metrics.outlook?.pv;
-  return typeof pv === "number" ? { pvCap: pv } : {};
+  return typeof pv === "number" ? { pvCap: agoraUp(pv) } : {};
 }
 function solveCost(ctx: Ctx, goal: GoalId, over: Partial<Spec> = {}): Plan {
   return solveTerms(ctx.debts, ctx.cols, costSpec(ctx, goal, over));
@@ -4271,12 +4272,15 @@ const GATE_STATS = { n: 0, by: {} as Record<string, { refused: number; passed: n
  * least any plan must do; its payment is the default budget, and every
  * "versus today" figure is measured from it. Without debt due now it is today.
  */
+/** Up to the agora: a sum over rows in the master's order, as a cap, without its order-dependent last bits. */
+const agoraUp = (x: number) => Math.ceil(x * 100) / 100;
+
 function referenceOf(ctx: Ctx): Ctx["ref"] {
   const t = ctx.today;
   // The totals are sums over the rows in the master's order: their last bits differ with that order (fuzz seed 31
   // Z567: 3,637,845.8681318522 against …852), and as caps they sent a node-capped search down another branch.
   // Rounded UP to the agora, today's own mix still meets them and the order no longer shows.
-  const c = (x: number) => Math.ceil(x * 100) / 100;
+  const c = agoraUp;
   const none = { monthly: t.metrics.monthly, paid: c(t.paid[0]), typedPaid: c(t.metrics.totalPaid), typedCost: c(t.metrics.totalCost), months: t.metrics.months, worst: c(Math.max(...t.paid.slice(1))), due: 0, carry: 0, carryYears: 0, book: null };
   if (!(ctx.ref.due > 0)) return none;
   // The reference is a yardstick, not an offer: today's mix as it stands may
