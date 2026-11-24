@@ -132,23 +132,32 @@ export const TRACK_LABEL: Record<string, string> = {
   "fixed-linked": "קבועה צמודה",
   "variable-unlinked": "משתנה לא צמודה",
   "variable-linked": "משתנה צמודה",
+  // One bucket per currency, because they are not one exposure: the shekel can
+  // fall against the dollar in the same month it rises against the euro. "fx"
+  // is kept for a letter that says only "נקובה במטבע חוץ".
+  "fx-usd": 'מט"ח דולר',
+  "fx-eur": 'מט"ח יורו',
   fx: 'צמודת מט"ח',
   unknown: "לא מסווג",
 };
 
+/** Matches TRACK_HEX on the board — paths 6 and 7 carry the same two hues. */
 export const TRACK_COLOR: Record<string, string> = {
   prime: "#2563eb",
   "fixed-unlinked": "#0d8b9b",
   "fixed-linked": "#14905a",
   "variable-unlinked": "#ad7804",
   "variable-linked": "#c62370",
+  "fx-usd": "#a21caf",
+  "fx-eur": "#4d7c0f",
   fx: "#6b53d8",
   unknown: "#8b93a7",
 };
 
 /** The composition key a tranche belongs to. */
 export function trackKey(t: BankTranche): string {
-  if (t.linkage === "fx") return "fx";
+  if (t.linkage === "fx")
+    return t.fxCurrency === "USD" ? "fx-usd" : t.fxCurrency === "EUR" ? "fx-eur" : "fx";
   if (t.rateKind === "prime") return "prime";
   if (t.rateKind === "unknown" || t.linkage === "unknown") return "unknown";
   const kind = t.rateKind === "variable" ? "variable" : "fixed";

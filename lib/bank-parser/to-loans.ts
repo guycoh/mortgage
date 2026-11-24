@@ -15,19 +15,36 @@ import type { Loan } from "@/app/private/crm/leads/simulators/components/LoanTab
 import { freqLabel } from "@/lib/rate-frequency";
 import { scheduleFromText } from "@/lib/payment-shape";
 import { paymentsLeft, toDate } from "./text";
-import type { BankStatement, BankTranche } from "./types";
+import type { BankStatement, BankTranche, FxCurrency } from "./types";
 import { PURPOSE_LABEL } from "./purpose";
 import { purposeFrom, type PurposeId } from "@/app/aa102test/lib/purposes";
 import { monthlyBasis } from "@/app/aa102test/lib/credit";
 
 /**
- * Which of the five canonical tracks this tranche is.
+ * Which canonical track this tranche is.
  *
- * Prime is its own track and is tested first: a prime tranche is variable and
- * unlinked, so testing linkage first would file it as מל"צ and lose the fact
- * that it moves with the Bank of Israel rate.
+ * CURRENCY FIRST. A מט"ח tranche is a track of its own, whatever its rate does:
+ * it is not priced off the prime or off a shekel bond anchor, its balance moves
+ * with an exchange rate rather than with the index, and the trade names it by
+ * the currency. Filing the Mizrahi dollar part below as מל"צ — which is what
+ * happened before paths 6 and 7 existed — put a dollar debt on the board under
+ * a shekel track with a shekel forecast.
+ *
+ * An UNNAMED foreign currency ("other": "נקובה במטבע חוץ" and nothing more)
+ * falls through to the shekel tracks rather than claiming the dollar. The two
+ * מט"ח tracks are the dollar and the euro; a tranche that cannot say which it is
+ * has no business on either, and lib/bank-parser/checks.ts flags it so the gap
+ * is visible instead of silent.
+ *
+ * Prime is tested next: a prime tranche is variable and unlinked, so testing
+ * linkage first would file it as מל"צ and lose the fact that it moves with the
+ * Bank of Israel rate.
  */
 function pathIdOf(t: BankTranche): number {
+  if (t.linkage === "fx") {
+    if (t.fxCurrency === "USD") return PATH_IDS.fxUsd;
+    if (t.fxCurrency === "EUR") return PATH_IDS.fxEur;
+  }
   if (t.rateKind === "prime") return PATH_IDS.prime;
   const linked = t.linkage === "linked";
   if (t.rateKind === "variable") return linked ? PATH_IDS.varLinked : PATH_IDS.varUnlinked;
@@ -255,10 +272,21 @@ function feeOfTranche(t: BankTranche): number | null {
 /** A readable track name when the lender's own wording is missing. */
 function trackLabelOf(t: BankTranche): string {
   if (t.rateKind === "prime") return "פריים";
+  // On a foreign-currency tranche the currency IS the track's name — "משתנה
+  // מט"ח דולר" reads as a variable track that happens to be in dollars, which
+  // is the wrong way round. The rate behaviour is on the row beside it.
+  if (t.linkage === "fx") return FX_LABEL[t.fxCurrency ?? "other"];
   const kind = t.rateKind === "variable" ? "משתנה" : "קבועה";
-  const link = t.linkage === "linked" ? "צמודה" : t.linkage === "fx" ? 'מט"ח' : "לא צמודה";
+  const link = t.linkage === "linked" ? "צמודה" : "לא צמודה";
   return `${kind} ${link}`;
 }
+
+/** The three ways a letter can leave an fx tranche's currency. */
+const FX_LABEL: Record<FxCurrency, string> = {
+  USD: 'מט"ח דולר',
+  EUR: 'מט"ח יורו',
+  other: 'צמודה למט"ח',
+};
 
 /**
  * Build the board from a statement.

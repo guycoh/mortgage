@@ -8,6 +8,7 @@
 // parser /aa4test uses, and nothing is uploaded.
 
 import { paths as STATIC_PATHS } from "@/app/data/paths";
+import { fxCurrencyOf } from "@/lib/fx";
 import type { CreditReport } from "@/lib/credit-parser/types";
 import type { BankStatement } from "@/lib/bank-parser/types";
 import { extractLoans, type ExtractedLoan } from "@/lib/credit-parser/loan-mapping";
@@ -43,13 +44,19 @@ export type ImportedLoan = Loan & {
 
 /* ------------------------------------------------------------------ paths */
 
-/** id → the five canonical tracks, by their short names. */
+/**
+ * id → the canonical tracks, by their short names. The five shekel ones are
+ * rate behaviour × CPI linkage; the two מט"ח ones are a third linkage — the
+ * exchange rate — and the trade names them by the currency, not by the rate.
+ */
 export const PATH_IDS = {
   prime: 1, // פריים
   fixedUnlinked: 2, // קלצ
   fixedLinked: 3, // קצ
   varUnlinked: 4, // מלצ
   varLinked: 5, // מצ
+  fxUsd: 6, // מט"ח דולר
+  fxEur: 7, // מט"ח יורו
 } as const;
 
 /** Long, human names for the short codes the data file uses. */
@@ -59,6 +66,8 @@ export const PATH_LABEL: Record<number, string> = {
   3: "קבועה צמודה",
   4: "משתנה לא צמודה",
   5: "משתנה צמודה",
+  6: 'מט"ח דולר',
+  7: 'מט"ח יורו',
 };
 
 /** The trade's own shorthand — what a broker actually says out loud. */
@@ -68,6 +77,10 @@ export const PATH_SHORT: Record<number, string> = {
   3: 'ק"צ',
   4: 'מל"צ',
   5: 'מ"צ',
+  // The currency alone — the column is sized for "פריים" and the long name
+  // clips. PATH_LABEL keeps 'מט"ח דולר' for the legend and the export.
+  6: "דולר",
+  7: "יורו",
 };
 
 /**
@@ -90,6 +103,8 @@ export const TRACK_HEX: Record<number, string> = {
   3: "#14905a",
   4: "#ad7804",
   5: "#c62370",
+  6: "#a21caf", // מט"ח דולר
+  7: "#4d7c0f", // מט"ח יורו
 };
 
 /** Family colours — must match theme.css. */
@@ -106,6 +121,11 @@ export const FAMILY = {
 export function pathIdFromTrack(track: string | undefined, isMortgage: boolean): number {
   const t = (track ?? "").trim();
   if (!t) return isMortgage ? PATH_IDS.prime : PATH_IDS.fixedUnlinked;
+
+  // Currency before the index: "צמוד דולר" contains צמוד and is not CPI-linked.
+  const fx = fxCurrencyOf(t);
+  if (fx === "USD") return PATH_IDS.fxUsd;
+  if (fx === "EUR") return PATH_IDS.fxEur;
 
   if (/פריים/.test(t)) return PATH_IDS.prime;
 

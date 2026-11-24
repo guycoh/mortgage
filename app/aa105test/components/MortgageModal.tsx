@@ -40,6 +40,7 @@ import { docFromStatement } from "../lib/brief";
 import {
   SEVERITY_LABEL,
   TRACK_COLOR,
+  TRACK_LABEL,
   trackKey,
   type Finding,
   type Severity,
@@ -219,9 +220,11 @@ function feeCell(t: BankTranche, zero: string) {
 function trackName(t: BankTranche): string {
   const raw = (t.rawTrack || "").trim();
   if (raw) return raw.length > 44 ? `${raw.slice(0, 43)}…` : raw;
-  const kind = t.rateKind === "prime" ? "פריים" : t.rateKind === "variable" ? "משתנה" : "קבועה";
-  const link = t.linkage === "linked" ? "צמודה" : t.linkage === "fx" ? 'מט"ח' : "לא צמודה";
-  return `${kind} ${link}`;
+  // The classification, from the one place that holds it — which also means a
+  // foreign-currency tranche is named by its currency ('מט"ח דולר') instead of
+  // by a bare מט"ח, and an unclassifiable one says so instead of being
+  // described as a fixed unlinked track by default.
+  return TRACK_LABEL[trackKey(t)] ?? "לא מסווג";
 }
 
 export default function MortgageModal({

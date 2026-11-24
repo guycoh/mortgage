@@ -121,6 +121,12 @@
   --t3: #14905a; /* קבועה צמודה */
   --t4: #ad7804; /* משתנה לא צמודה */
   --t5: #c62370; /* משתנה צמודה */
+  /* AND THE TWO מט"ח TRACKS — the exchange rate is a third linkage, so they
+     are tracks of their own. They take the two hues the five above and the two
+     families leave free, 213° apart from each other, and their labels name the
+     currency (דולר / יורו) so the dot only has to say "not shekels". */
+  --t6: #a21caf; /* מט"ח דולר */
+  --t7: #4d7c0f; /* מט"ח יורו */
 
   /* status — the only colours on the page that are not violet, orange or grey */
   --pos: #147a45;

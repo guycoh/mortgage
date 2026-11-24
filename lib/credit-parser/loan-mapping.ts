@@ -14,6 +14,7 @@
 import { FREQ_FIXED, FREQ_PRIME, FREQ_UNSTATED } from "../rate-frequency";
 import type { CreditReport, Transaction, InterestTrack } from "./types";
 import { creditShape } from "../payment-shape";
+import { fxCurrencyOf, type FxCurrency } from "../fx";
 
 /** BDI page-2 grouping: the four liability families + a catch-all. */
 export type LiabilityCategory =
@@ -237,7 +238,14 @@ export function liabilityCategory(t: Transaction): LiabilityCategory {
 }
 
 /** Short human name for one interest track: "פריים", "קבועה צמודה", ... */
-function trackName(tr: InterestTrack): string {
+function trackName(tr: InterestTrack, currency = ""): string {
+  // CURRENCY FIRST, before prime and before the index. "צמוד דולר" contains
+  // צמוד, so naming linkage first calls a dollar track "צמודה" and the board
+  // then prices it as a CPI-linked shekel track (see pathIdFromTrack). The
+  // report states the currency twice over — in the track's own הצמדה wording
+  // and in מטבע העסקה, 201-021 — and either one is enough to name the track.
+  const fx = fxCurrencyOf(tr.linkage, tr.type, currency);
+  if (fx) return FX_TRACK_NAME[fx];
   if (tr.anchor.includes("פריים")) return "פריים";
   if (isInterestFree(tr)) return "ללא ריבית";
   const kind = tr.type.includes("משתנה")
@@ -252,6 +260,14 @@ function trackName(tr: InterestTrack): string {
       : "";
   return [kind, linkage].filter(Boolean).join(" ");
 }
+
+const FX_TRACK_NAME: Record<FxCurrency, string> = {
+  USD: 'מט"ח דולר',
+  EUR: 'מט"ח יורו',
+  // Named but unnamed: the board keeps it on a shekel track (there is no
+  // generic מט"ח track to put it on), and the label says what the report said.
+  other: 'צמודה למט"ח',
+};
 
 /**
  * The track that describes the debt: the one carrying the most drawn money.
@@ -268,10 +284,10 @@ function dominantTrack(tracks: InterestTrack[]): InterestTrack | null {
  * Mortgage track/type label: the dominant (highest-utilization) track's name,
  * with a "+N" suffix when the loan is split across several tracks.
  */
-export function trackLabel(tracks: InterestTrack[]): string {
+export function trackLabel(tracks: InterestTrack[], currency = ""): string {
   const top = dominantTrack(tracks);
   if (!top) return "";
-  const name = trackName(top);
+  const name = trackName(top, currency);
   if (!name) return "";
   return tracks.length > 1 ? `${name} +${tracks.length - 1}` : name;
 }
@@ -438,7 +454,7 @@ function deriveLoan(t: Transaction, asOf: Date): ExtractedLoan {
     isMortgage: mortgage,
     isLoanOrMortgage: isLoanOrMortgage(t),
     category: liabilityCategory(t),
-    trackLabel: trackLabel(t.interestTracks),
+    trackLabel: trackLabel(t.interestTracks, t.fields["201-021"] ?? ""),
     purpose: t.fields["201-017"] ?? "",
     // The report has no field for זכאות; it says so in a coded remark instead,
     // and that remark is the only place either document type states it outright

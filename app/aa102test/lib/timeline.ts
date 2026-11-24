@@ -13,14 +13,23 @@ import { asEcon, priceLoan, todayPayment, type Assume, type PricedLoan } from ".
 import { inflationAt } from "./forecast";
 
 /**
- * STACK ORDER. The five track hues are the page's identity and are not up for
+ * STACK ORDER. The track hues are the page's identity and are not up for
  * revision here — but which of them sit next to each other in a stack is. This
  * order keeps every adjacent pair apart for normal vision and clear of the
  * hard floor for the common colour deficiencies (validated with the dataviz
  * palette script; the 6–8 ΔE band is legal with the legend, the tooltip and
  * the surface gaps the chart draws between segments).
+ *
+ * The two מט"ח tracks were inserted into the widest gaps of the five-track
+ * order, which is otherwise untouched: 6 (purple) opens the stack beside 3
+ * (green) and 7 (olive) sits between 5 (magenta) and 2 (teal), so every new
+ * adjacency is at least 105° of hue apart.
+ *
+ * A TRACK MISSING FROM THIS LIST IS MISSING FROM THE CHARTS — the loop below
+ * walks STACK, not the rows — so a new path id has to be added here as well as
+ * to app/data/paths.
  */
-export const STACK: number[] = [3, 1, 5, 2, 4];
+export const STACK: number[] = [6, 3, 1, 5, 7, 2, 4];
 
 /**
  * Month 1's payment on one row, as the grid shows it: the document's printed

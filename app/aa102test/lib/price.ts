@@ -52,7 +52,21 @@ export type PricedLoan = LoanResult & {
 
 type Track = "prime" | "fixed" | "bond_nominal" | "bond_real";
 
-/** Path ids are the static five in app/data/paths: 1 פריים · 2 קל"צ · 3 ק"צ · 4 מל"צ · 5 מ"צ. */
+/**
+ * Path ids are the ones in app/data/paths: 1 פריים · 2 קל"צ · 3 ק"צ · 4 מל"צ ·
+ * 5 מ"צ · 6 מט"ח דולר · 7 מט"ח יורו.
+ *
+ * THE TWO מט"ח TRACKS ARE PRICED "fixed" — the rate as typed, for life — and
+ * that is a statement about what is published, not about the product. Such a
+ * tranche does reprice, off a foreign anchor (Mizrahi's ע.ג דולרית ל-3 ח׳), and
+ * directive 451's curves cover the BoI rate and the shekel bond curve: there is
+ * no forward SOFR or EURIBOR here, and no forward shekel-dollar rate either.
+ * The banks do not forecast them on their own letters — "הריבית הכוללת החזויה
+ * ... כוללים משנים צמודי מט"ח ללא תחזיות" — so holding the rate flat and the
+ * balance in shekels says what the client owes today, and neither this engine
+ * nor the board dresses a currency view up as arithmetic. The row keeps its
+ * anchor, margin and reset interval for the advisor to read.
+ */
 function trackOf(pathId: number): Track {
   if (pathId === 1) return "prime";
   if (pathId === 4) return "bond_nominal";
@@ -60,6 +74,7 @@ function trackOf(pathId: number): Track {
   return "fixed";
 }
 
+/** CPI-linked. A מט"ח track is linked to a currency, which this is not. */
 const isLinkedPath = (pathId: number) => pathId === 3 || pathId === 5;
 
 type Extra = Loan & {

@@ -11,6 +11,7 @@
 // invented number is worse than one made on an acknowledged gap.
 
 import type { FundingKind, PurposeKind } from "./purpose";
+import type { FxCurrency } from "@/lib/fx";
 
 /** Which lender's template produced this. */
 export type BankId = "leumi" | "poalim" | "discount" | "mercantile" | "mizrahi" | "jerusalem" | "fibi";
@@ -31,6 +32,7 @@ export const BANK_LABEL: Record<BankId, string> = {
  */
 export type RateKind = "fixed" | "variable" | "prime" | "unknown";
 export type Linkage = "linked" | "unlinked" | "fx" | "unknown";
+export type { FxCurrency };
 
 /**
  * One tranche of one mortgage — a משנה at Leumi, a מרכיב at Hapoalim, a חלק at
@@ -48,6 +50,14 @@ export interface BankTranche {
   rawTrack: string;
   rateKind: RateKind;
   linkage: Linkage;
+  /**
+   * WHICH currency, on an `fx` tranche — the board has a track per currency
+   * (מט"ח דולר / מט"ח יורו, paths 6 and 7), so "foreign" on its own is not
+   * enough to file one. null on a shekel tranche, and "other" where the letter
+   * says only "נקובה במטבע חוץ" without naming it; an unnamed currency is not
+   * guessed at the dollar (see pathIdOf in ./to-loans).
+   */
+  fxCurrency: FxCurrency | null;
   /** שפיצר / קרן שווה / בולט, as printed. */
   amortization: string;
   /** מטרת ההלוואה in the lender's own words, verbatim. */

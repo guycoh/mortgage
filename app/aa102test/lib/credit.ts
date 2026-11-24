@@ -1,13 +1,14 @@
 // Turns a parsed credit report (חיווי אשראי / דוח ריכוז נתונים) into simulator
 // rows. The report gives us balance, rate, remaining term and a track label per
 // debt; the simulator wants Loan rows carrying a path_id. The only real work is
-// matching the report's Hebrew track wording onto the five standard tracks in
-// app/data/paths.
+// matching the report's Hebrew track wording onto the standard tracks in
+// app/data/paths — the five shekel ones and the two מט"ח ones.
 //
 // Everything runs client-side — the PDF is decoded in the browser by the same
 // parser /aa4test uses, and nothing is uploaded.
 
 import { paths as STATIC_PATHS } from "@/app/data/paths";
+import { fxCurrencyOf } from "@/lib/fx";
 import type { CreditReport } from "@/lib/credit-parser/types";
 import type { BankStatement } from "@/lib/bank-parser/types";
 import { extractLoans, type ExtractedLoan } from "@/lib/credit-parser/loan-mapping";
@@ -377,13 +378,24 @@ export function foldMasterRow(l: ImportedLoan, withFees: boolean, mixId: string)
 
 /* ------------------------------------------------------------------ paths */
 
-/** id → the five canonical tracks, by their short names. */
+/**
+ * id → the canonical tracks, by their short names.
+ *
+ * The five shekel tracks are rate behaviour × CPI linkage. The two מט"ח tracks
+ * are a third linkage — the exchange rate — and they are tracks in their own
+ * right because that is what the trade calls them: nobody says "משתנה לא צמודה
+ * בדולר", they say מט"ח. Fixed-vs-variable is not lost with them, it simply
+ * stops being the thing that names the track; the row still carries its rate,
+ * its anchor, its margin and its reset interval.
+ */
 export const PATH_IDS = {
   prime: 1, // פריים
   fixedUnlinked: 2, // קלצ
   fixedLinked: 3, // קצ
   varUnlinked: 4, // מלצ
   varLinked: 5, // מצ
+  fxUsd: 6, // מט"ח דולר
+  fxEur: 7, // מט"ח יורו
 } as const;
 
 /** Long, human names for the short codes the data file uses. */
@@ -393,6 +405,8 @@ export const PATH_LABEL: Record<number, string> = {
   3: "קבועה צמודה",
   4: "משתנה לא צמודה",
   5: "משתנה צמודה",
+  6: 'מט"ח דולר',
+  7: 'מט"ח יורו',
 };
 
 /** The trade's own shorthand — what a broker actually says out loud. */
@@ -402,7 +416,22 @@ export const PATH_SHORT: Record<number, string> = {
   3: 'ק"צ',
   4: 'מל"צ',
   5: 'מ"צ',
+  // The currency alone, which is what a broker says and what the column can
+  // hold: the מסלול cell is sized for "פריים" (36px) and 'מט"ח דולר' measures
+  // 50 — it clipped to "מט…" at 1280px, where every other track reads whole.
+  // The full name is on the row sheet, the legend and the export.
+  6: "דולר",
+  7: "יורו",
 };
+
+/** Every track id, in declaration order — for whatever iterates the whole set. */
+export const ALL_PATH_IDS: readonly number[] = Object.values(PATH_IDS);
+
+/** The two foreign-currency tracks, for the places that treat them as one kind. */
+export const FX_PATH_IDS: readonly number[] = [PATH_IDS.fxUsd, PATH_IDS.fxEur];
+
+/** True for a מט"ח track — linked to a currency, not to the index. */
+export const isFxPath = (pathId: number) => FX_PATH_IDS.includes(Number(pathId));
 
 /**
  * Where a rate stops being ordinary. A mortgage and a consumer loan live on
@@ -431,7 +460,16 @@ export function rateHeat(rate: number, group: DebtGroup): "hot" | "warm" | null 
  * (how is it priced). They never appear as alternatives to one another —
  * the family is a chip with a word, the track is a dot with a word.
  *
- * Must match --t1..--t5 in theme.css.
+ * THE TWO מט"ח TRACKS take the two hues the five tracks and the two families
+ * leave free — a purple-fuchsia and an olive — rather than two steps of one
+ * violet. They are two currencies, which is two categories and not a ramp, and
+ * placing them 213° apart means neither can be mistaken for the other at 8px.
+ * No dot in the set now sits within 35° of another. The label names the
+ * currency either way (PATH_SHORT: דולר / יורו), because on a letter that
+ * quotes both it is the word an advisor reads and the dot only has to say
+ * "not shekels".
+ *
+ * Must match --t1..--t7 in theme.css.
  */
 export const TRACK_HEX: Record<number, string> = {
   1: "#2563eb", // פריים
@@ -439,6 +477,8 @@ export const TRACK_HEX: Record<number, string> = {
   3: "#14905a", // קבועה צמודה
   4: "#ad7804", // משתנה לא צמודה
   5: "#c62370", // משתנה צמודה
+  6: "#a21caf", // מט"ח דולר
+  7: "#4d7c0f", // מט"ח יורו
 };
 /**
  * Family colours — must match theme.css.
@@ -494,10 +534,21 @@ export const FAMILY = {
  * Map the report's track wording onto a path id. The parser emits labels like
  * "פריים", "קבועה לא צמודה", "משתנה +1" — so test for prime first, then decide
  * fixed-vs-variable and linked-vs-unlinked independently.
+ *
+ * CURRENCY BEFORE EVERYTHING ELSE. "צמוד דולר" contains צמוד and would
+ * otherwise be filed as index-linked — a different risk, a different anchor and
+ * a different track. A foreign currency the document does not name ("צמודה
+ * למטבע חוץ") is left to the shekel tracks rather than guessed at the dollar:
+ * the two מט"ח tracks are the dollar and the euro, and a row that cannot say
+ * which one it is has no business claiming either.
  */
 export function pathIdFromTrack(track: string | undefined, isMortgage: boolean): number {
   const t = (track ?? "").trim();
   if (!t) return isMortgage ? PATH_IDS.prime : PATH_IDS.fixedUnlinked;
+
+  const fx = fxCurrencyOf(t);
+  if (fx === "USD") return PATH_IDS.fxUsd;
+  if (fx === "EUR") return PATH_IDS.fxEur;
 
   if (/פריים/.test(t)) return PATH_IDS.prime;
 

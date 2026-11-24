@@ -19,7 +19,8 @@
 import type { RawPage } from "@/lib/credit-parser/types";
 import { date, has, norm, num, pageLines, pct, type Line } from "../text";
 import { clean, one, readFields } from "../fields";
-import type { BankId, BankLoan, BankStatement, BankTranche, Linkage, RateKind } from "../types";
+import type { BankId, BankLoan, BankStatement, BankTranche, FxCurrency, Linkage, RateKind } from "../types";
+import { fxCurrencyOf } from "@/lib/fx";
 import { BANK_LABEL } from "../types";
 import { classifyPurpose } from "../purpose";
 
@@ -77,7 +78,7 @@ const ALL = [...GENERAL, ...PAYOFF];
  * Prime is not spelled "פריים" here; it shows up as an anchor of "ר.פריים" or a
  * base description mentioning it, so the anchor has to be consulted too.
  */
-function readRate(sugRibit: string, basis: string): { kind: RateKind; linkage: Linkage } {
+function readRate(sugRibit: string, basis: string): { kind: RateKind; linkage: Linkage; fxCurrency: FxCurrency | null } {
   const s = norm(sugRibit);
   const b = norm(basis);
   const prime = /פריים/.test(s) || /פריים/.test(b);
@@ -88,14 +89,19 @@ function readRate(sugRibit: string, basis: string): { kind: RateKind; linkage: L
       : /קבוע/.test(s)
         ? "fixed"
         : "unknown";
-  const linkage: Linkage = /לאצמוד/.test(s)
-    ? "unlinked"
-    : /צמודמדד|צמוד/.test(s)
-      ? "linked"
-      : /מט"ח|דולר|אירו/.test(s)
-        ? "fx"
+  // CURRENCY FIRST, and before the index: "צמוד דולר" contains צמוד, so testing
+  // linkage first files a foreign-currency tranche as CPI-linked — a different
+  // anchor, a different risk and the wrong board track (see pathIdOf in
+  // ../to-loans).
+  const fxCurrency = fxCurrencyOf(s, b);
+  const linkage: Linkage = fxCurrency
+    ? "fx"
+    : /לאצמוד/.test(s)
+      ? "unlinked"
+      : /צמודמדד|צמוד/.test(s)
+        ? "linked"
         : "unknown";
-  return { kind, linkage };
+  return { kind, linkage, fxCurrency };
 }
 
 /** Split the data pages into one block of lines per loan. */
@@ -174,7 +180,7 @@ export function parseDiscount(
     // into a mix would add a tranche the client does not have.
     if (!balance || balance <= 0) continue;
 
-    const { kind, linkage } = readRate(g("סוג ריבית"), g("בסיס לקביעת ריבית"));
+    const { kind, linkage, fxCurrency } = readRate(g("סוג ריבית"), g("בסיס לקביעת ריבית"));
     const months = num(g("יתרת תקופה בחודשים"));
 
     const feeParts = [
@@ -191,6 +197,7 @@ export function parseDiscount(
       rawTrack: g("סוג ריבית"),
       rateKind: kind,
       linkage,
+      fxCurrency,
       amortization: g("שיטת פרעון"),
       purpose: g("מטרת הלוואה"),
       purposeKind: classifyPurpose(g("מטרת הלוואה")),

@@ -22,7 +22,7 @@ const RunoffChart = dynamic(() => import("./RunoffChart"), {
   loading: () => <div className="ink-skel m-3 h-[244px]" />,
 });
 
-const TRACKS = [1, 2, 3, 4, 5] as const;
+const TRACKS = [1, 2, 3, 4, 5, 6, 7] as const;
 
 /* ------------------------------------------------------------- composition */
 

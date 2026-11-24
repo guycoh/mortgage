@@ -263,7 +263,7 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
 
   /* -------------------------------------------------- composition ------ */
 
-  const tracks = [1, 2, 3, 4, 5]
+  const tracks = [1, 2, 3, 4, 5, 6, 7]
     .map((id) => {
       const rows = per.filter((x) => x.l.path_id === id);
       return {

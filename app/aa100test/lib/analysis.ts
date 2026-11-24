@@ -32,6 +32,7 @@ import {
   type ExtractedLoan,
   type LiabilityCategory,
 } from "@/lib/credit-parser/loan-mapping";
+import { fxCurrencyOf } from "@/lib/fx";
 import {
   APPLICATIONS_IN_WINDOW_TRIGGER,
   INQUIRY_WINDOW_MONTHS,
@@ -508,7 +509,15 @@ function weightedRate(rows: { balance: number; rate: number | null }[]): number 
 const BALLOON_RE = /בלון|בולט/;
 const VARIABLE_RE = /משתנה|פריים/;
 
+/**
+ * CPI-linked.
+ *
+ * A מט"ח track is linked to a CURRENCY, and "צמוד דולר" contains צמוד — so it
+ * used to count into the index exposure, which is the one exposure it does not
+ * carry. It is excluded here and named by its own slice below instead.
+ */
 function isLinked(tr: InterestTrack): boolean {
+  if (fxCurrencyOf(tr.linkage, tr.type)) return false;
   return !/לא\s*צמוד/.test(tr.linkage) && tr.linkage.includes("צמוד");
 }
 
@@ -518,6 +527,9 @@ function isVariable(tr: InterestTrack): boolean {
 
 /** "פריים" / "קבועה צמודה" / … — the same wording the ledger uses. */
 function trackSliceLabel(tr: InterestTrack): string {
+  // The currency names the track — see trackName in lib/credit-parser/loan-mapping.
+  const fx = fxCurrencyOf(tr.linkage, tr.type);
+  if (fx) return fx === "USD" ? 'מט"ח דולר' : fx === "EUR" ? 'מט"ח יורו' : 'צמודה למט"ח';
   if (tr.anchor.includes("פריים")) return "פריים";
   if (tr.type.includes("ללא") || tr.type.includes("אפס")) return "ללא ריבית";
   const kind = tr.type.includes("משתנה") ? "משתנה" : tr.type.includes("קבועה") ? "קבועה" : tr.type.trim();
@@ -638,7 +650,7 @@ function toLine(
     arrearsRange: f["201-050"] ?? "",
     firstMiss: f["201-052"] ?? "",
     lastPaid: f["201-053"] ?? "",
-    track: trackLabel(t.interestTracks),
+    track: trackLabel(t.interestTracks, f["201-021"] ?? ""),
     tracks: t.interestTracks,
     collateral: t.collateral,
     remarks: t.remarks,

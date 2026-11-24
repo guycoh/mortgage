@@ -23,7 +23,8 @@
 import type { RawPage } from "@/lib/credit-parser/types";
 import { date, has, norm, num, pageLines, pct, type Line } from "../text";
 import { clean } from "../fields";
-import type { BankLoan, BankStatement, BankTranche, Linkage, RateKind } from "../types";
+import type { BankLoan, BankStatement, BankTranche, FxCurrency, Linkage, RateKind } from "../types";
+import { fxCurrencyOf } from "@/lib/fx";
 import { BANK_LABEL } from "../types";
 import { classifyPurpose } from "../purpose";
 
@@ -61,20 +62,29 @@ function pairs(line: Line): [string, string][] {
  */
 const key = (label: string) => norm(label.replace(/\)[^()]*\(|\([^()]*\)/g, ""));
 
-function readRate(sugRibit: string, linkage: string, baseIndex: number | null): { kind: RateKind; linkage: Linkage } {
+function readRate(
+  sugRibit: string,
+  linkage: string,
+  baseIndex: number | null
+): { kind: RateKind; linkage: Linkage; fxCurrency: FxCurrency | null } {
   const s = norm(sugRibit);
   const kind: RateKind = /פריים/.test(s) ? "prime" : /משתנה/.test(s) ? "variable" : /קבוע/.test(s) ? "fixed" : "unknown";
   // "אופן הצמדה: חודשי" with a base index printed = linked to the CPI. An
   // unlinked tranche prints no index at all.
   const l = norm(linkage);
-  const link: Linkage = /לאצמוד|ללא/.test(l)
-    ? "unlinked"
-    : /מט"ח|דולר|אירו/.test(l)
-      ? "fx"
+  // CURRENCY FIRST, and before the index: "צמוד דולר" contains צמוד, so testing
+  // linkage first files a foreign-currency tranche as CPI-linked — a different
+  // anchor, a different risk and the wrong board track (see pathIdOf in
+  // ../to-loans).
+  const fxCurrency = fxCurrencyOf(l);
+  const link: Linkage = fxCurrency
+    ? "fx"
+    : /לאצמוד|ללא/.test(l)
+      ? "unlinked"
       : l || baseIndex !== null
         ? "linked"
         : "unknown";
-  return { kind, linkage: link };
+  return { kind, linkage: link, fxCurrency };
 }
 
 /**
@@ -150,7 +160,7 @@ export function parseJerusalem(pages: RawPage[]): BankStatement {
     if (!balance || balance <= 0) continue;
 
     const baseIndex = num(g("מדד בסיסי"));
-    const { kind, linkage } = readRate(g("סוג ריבית"), g("אופן הצמדה"), baseIndex);
+    const { kind, linkage, fxCurrency } = readRate(g("סוג ריבית"), g("אופן הצמדה"), baseIndex);
     const accrued = (num(g("ריבית")) ?? 0) + (num(g("הצמדת ריבית")) ?? 0);
 
     const feeParts = [
@@ -172,6 +182,7 @@ export function parseJerusalem(pages: RawPage[]): BankStatement {
       rawTrack: "",
       rateKind: kind,
       linkage,
+      fxCurrency,
       amortization: g("סוג לוח"),
       purpose,
       // "מטרה אחרת" on its own reads as אחר, but the loan type beside it says

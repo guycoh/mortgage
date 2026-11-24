@@ -63,6 +63,24 @@ export function primeByAnchor(st: BankStatement): string[] {
   ];
 }
 
+/**
+ * A foreign-currency part whose currency was never named.
+ *
+ * The board has a track per currency (מט"ח דולר / מט"ח יורו), and an fx part
+ * that cannot say which one it is lands on a shekel track instead — the only
+ * honest place for it, since neither currency is a safe guess. That is a real
+ * loss on a real part, so it is said out loud rather than left to be noticed
+ * from a track label that reads "משתנה לא צמודה" over a dollar debt.
+ */
+export function fxCurrencyNamed(st: BankStatement): string[] {
+  const miss = st.tranches.filter((t) => t.linkage === "fx" && t.fxCurrency !== "USD" && t.fxCurrency !== "EUR");
+  if (!miss.length) return [];
+  const name = (t: BankTranche) => `${t.loanNumber}${t.trancheNumber ? ` חלק ${t.trancheNumber}` : ""}`;
+  return [
+    `${miss.map(name).join(", ")} צמוד למטבע חוץ שהמסמך אינו נוקב בשמו, ולכן המסלול נקבע לפי הריבית וההצמדה בלבד — יש לקבוע את המטבע מול התדפיס.`,
+  ];
+}
+
 /** Level payment on a שפיצר loan. */
 function pmt(balance: number, annualRate: number, n: number): number {
   const i = annualRate / 1200;

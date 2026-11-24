@@ -34,7 +34,8 @@
 import type { RawPage } from "@/lib/credit-parser/types";
 import { date, num, pageLines, pct, signedPct, toDate, paymentsLeft } from "../text";
 import { clean } from "../fields";
-import type { BankLoan, BankStatement, BankTranche, Linkage, RateKind } from "../types";
+import type { BankLoan, BankStatement, BankTranche, FxCurrency, Linkage, RateKind } from "../types";
+import { fxCurrencyOf } from "@/lib/fx";
 import { BANK_LABEL } from "../types";
 import { classifyPurpose } from "../purpose";
 
@@ -107,16 +108,25 @@ function readRate(sugRibit: string, sugHatzmada: string, baseIndex: number | nul
         : resetMonths
           ? "variable"
           : "unknown";
-  const linkage: Linkage = /לא\s*צמוד|ללא\s*הצמדה/.test(sugHatzmada)
-    ? "unlinked"
-    : /מט"ח|דולר|אירו|מטבע|שער/.test(sugHatzmada)
-      ? "fx"
+  // CURRENCY FIRST, and before the index: "צמוד דולר" contains צמוד, so testing
+  // linkage first files a foreign-currency tranche as CPI-linked — a different
+  // anchor, a different risk and the wrong board track (see pathIdOf in
+  // ../to-loans).
+  // "שער"/"מטבע" with no currency named is still foreign — this template says
+  // "צמוד לשער" where the others name the dollar — so it is fx with an unnamed
+  // currency rather than fx with a guessed one.
+  const fxCurrency: FxCurrency | null =
+    fxCurrencyOf(sugHatzmada) ?? (/מטבע|שער/.test(sugHatzmada) ? "other" : null);
+  const linkage: Linkage = fxCurrency
+    ? "fx"
+    : /לא\s*צמוד|ללא\s*הצמדה/.test(sugHatzmada)
+      ? "unlinked"
       : /צמוד|מדד/.test(sugHatzmada) || baseIndex !== null
         ? "linked"
         : sugHatzmada
           ? "unknown"
           : "unlinked";
-  return { kind, linkage };
+  return { kind, linkage, fxCurrency };
 }
 
 /** The FIBI group prints one core template; the signature says which bank. */
@@ -194,7 +204,7 @@ export function parseFibi(pages: RawPage[]): BankStatement {
     const sugRibit = words(bt, String.raw`סוג\s*ריבית`, String.raw`שי?עור\s*התוספת`);
     const baseIndex = num(pick(bt, ["מדד", "יסודי", "לפי", "בסיס"], String.raw`(?:\d{4}[ \t]+)?(\d+\.\d+)`));
     const resetMonths = pickNum(bt, ["תדירות", "שינוי", "הריבית"]);
-    const { kind, linkage } = readRate(sugRibit, sugHatzmada, baseIndex, resetMonths);
+    const { kind, linkage, fxCurrency } = readRate(sugRibit, sugHatzmada, baseIndex, resetMonths);
     const purpose = words(bt, String.raw`מטרת\s*ההלוואה`);
     const marginRaw = pick(bt, ["שי?עור", "התוספת/הפחתה"], SIGNED);
     const margin = kind === "fixed" ? null : signedPct(marginRaw) ?? pct(marginRaw);
@@ -229,6 +239,7 @@ export function parseFibi(pages: RawPage[]): BankStatement {
       rawTrack: clean(`${sugRibit} ${sugHatzmada}`),
       rateKind: kind,
       linkage,
+      fxCurrency,
       amortization: words(bt, String.raw`שיטת\s*פי?רעון\s*ההלוואה`) || clean(loanType.replace(/^פרטית\s*/, "")),
       purpose,
       purposeKind: classifyPurpose(purpose),

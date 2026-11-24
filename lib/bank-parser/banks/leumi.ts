@@ -21,7 +21,8 @@
 import type { RawItem, RawPage } from "@/lib/credit-parser/types";
 import { date, has, norm, num, pageLines, pct, toDate, paymentsLeft, type Line } from "../text";
 import { clean } from "../fields";
-import type { BankLoan, BankStatement, BankTranche, Linkage, RateKind } from "../types";
+import type { BankLoan, BankStatement, BankTranche, FxCurrency, Linkage, RateKind } from "../types";
+import { fxCurrencyOf } from "@/lib/fx";
 import { BANK_LABEL } from "../types";
 import { classifyPurpose } from "../purpose";
 
@@ -163,7 +164,7 @@ function merge(sets: string[][], width: number): string[] {
   return out;
 }
 
-function readRate(sugRibit: string, basis: string): { kind: RateKind; linkage: Linkage } {
+function readRate(sugRibit: string, basis: string): { kind: RateKind; linkage: Linkage; fxCurrency: FxCurrency | null } {
   const t = norm(sugRibit);
   const b = norm(basis);
   // Leumi writes prime into the linkage cell: "פריים-קרן על בסיס שפ".
@@ -174,14 +175,19 @@ function readRate(sugRibit: string, basis: string): { kind: RateKind; linkage: L
       : /קבוע/.test(t)
         ? "fixed"
         : "unknown";
-  const linkage: Linkage = /הצמדהלמדד|צמודמדד/.test(b)
-    ? "linked"
-    : /פריים|לאצמוד|שקל/.test(b)
-      ? "unlinked"
-      : /דולר|אירו|מט"ח/.test(b)
-        ? "fx"
+  // CURRENCY FIRST, and before the index: "צמוד דולר" contains צמוד, so testing
+  // linkage first files a foreign-currency tranche as CPI-linked — a different
+  // anchor, a different risk and the wrong board track (see pathIdOf in
+  // ../to-loans).
+  const fxCurrency = fxCurrencyOf(b);
+  const linkage: Linkage = fxCurrency
+    ? "fx"
+    : /הצמדהלמדד|צמודמדד/.test(b)
+      ? "linked"
+      : /פריים|לאצמוד|שקל/.test(b)
+        ? "unlinked"
         : "unknown";
-  return { kind, linkage };
+  return { kind, linkage, fxCurrency };
 }
 
 export function parseLeumi(pages: RawPage[], dataPages: number[]): BankStatement {
@@ -302,7 +308,9 @@ export function parseLeumi(pages: RawPage[], dataPages: number[]): BankStatement
       const balance = (principal ?? 0) + (indexation ?? 0) || payoff;
       if (!balance || balance <= 0) continue;
 
-      let { kind, linkage } = readRate(g.rateType[c], g.linkage[c]);
+      const read = readRate(g.rateType[c], g.linkage[c]);
+      const { kind, fxCurrency } = read;
+      let linkage = read.linkage;
       if (linkage === "unknown") {
         // This template leaves בסיס הצמדה blank on some tranches. A tranche that
         // is index-linked carries a base index and an indexation balance; one
@@ -325,6 +333,7 @@ export function parseLeumi(pages: RawPage[], dataPages: number[]): BankStatement
         rawTrack: clean(`${g.rateType[c]} ${g.linkage[c]}`),
         rateKind: kind,
         linkage,
+        fxCurrency,
         amortization: g.amort[c],
         purpose,
         purposeKind,

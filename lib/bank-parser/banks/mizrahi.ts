@@ -28,7 +28,8 @@
 import type { RawItem, RawPage } from "@/lib/credit-parser/types";
 import { date, has, norm, num, pageLines, pct, signedPct, toDate, paymentsLeft } from "../text";
 import { clean } from "../fields";
-import type { BankLoan, BankStatement, BankTranche, Linkage, RateKind } from "../types";
+import type { BankLoan, BankStatement, BankTranche, FxCurrency, Linkage, RateKind } from "../types";
+import { fxCurrencyOf } from "@/lib/fx";
 import { BANK_LABEL } from "../types";
 import { classifyFunding, classifyPurpose } from "../purpose";
 
@@ -89,7 +90,7 @@ function readTrack(
   name: string,
   rateType: string,
   linkageField: string
-): { kind: RateKind; linkage: Linkage; resetMonths: number | null } {
+): { kind: RateKind; linkage: Linkage; fxCurrency: FxCurrency | null; resetMonths: number | null } {
   const n = norm(name);
   const t = norm(rateType);
   const l = norm(linkageField);
@@ -106,7 +107,8 @@ function readTrack(
   const src = `${n}${l}`;
   // Currency first: "צמוד אירו" contains צמוד and would otherwise be filed as
   // index-linked, which is a different risk and a different track entirely.
-  const linkage: Linkage = /דולר|אירו|מט"ח|יורו/.test(src)
+  const fxCurrency = fxCurrencyOf(src);
+  const linkage: Linkage = fxCurrency
     ? "fx"
     : /לאצמוד/.test(src)
       ? "unlinked"
@@ -129,7 +131,7 @@ function readTrack(
         ? 1
         : null;
 
-  return { kind, linkage, resetMonths };
+  return { kind, linkage, fxCurrency, resetMonths };
 }
 
 /**
@@ -688,7 +690,7 @@ export function parseMizrahi(pages: RawPage[], dataPages: number[]): BankStateme
     // The part-number box printed beside this cell leaves stray "0 0" runs in
     // front of the description.
     const trackName = clean(readTrackName(page.items).replace(/^[\d\s]+/, ""));
-    const { kind, linkage, resetMonths } = readTrack(trackName, G("סוג הריבית"), G("סוג ההצמדה"));
+    const { kind, linkage, fxCurrency, resetMonths } = readTrack(trackName, G("סוג הריבית"), G("סוג ההצמדה"));
     const endDate = date(G("תאריך סיום חלק זה של ההלוואה"));
     const to = toDate(endDate);
 
@@ -758,6 +760,7 @@ export function parseMizrahi(pages: RawPage[], dataPages: number[]): BankStateme
       rawTrack: trackName,
       rateKind: kind,
       linkage,
+      fxCurrency,
       amortization: G("שיטת פרעון חלק זה בהלוואה"),
       purpose,
       purposeKind,

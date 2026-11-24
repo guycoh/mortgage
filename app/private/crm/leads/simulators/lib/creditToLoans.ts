@@ -8,6 +8,7 @@
 // parser /aa4test uses, and nothing is uploaded.
 
 import { paths as STATIC_PATHS } from "@/app/data/paths";
+import { fxCurrencyOf } from "@/lib/fx";
 import type { CreditReport } from "@/lib/credit-parser/types";
 import { extractLoans, type ExtractedLoan } from "@/lib/credit-parser/loan-mapping";
 import type { Loan } from "../components/LoanTable";
@@ -29,13 +30,19 @@ export type ImportedLoan = Loan & {
 
 /* ------------------------------------------------------------------ paths */
 
-/** id → the five canonical tracks, by their short names. */
+/**
+ * id → the canonical tracks, by their short names. The five shekel ones are
+ * rate behaviour × CPI linkage; the two מט"ח ones are a third linkage — the
+ * exchange rate — and the trade names them by the currency, not by the rate.
+ */
 export const PATH_IDS = {
   prime: 1, // פריים
   fixedUnlinked: 2, // קלצ
   fixedLinked: 3, // קצ
   varUnlinked: 4, // מלצ
   varLinked: 5, // מצ
+  fxUsd: 6, // מט"ח דולר
+  fxEur: 7, // מט"ח יורו
 } as const;
 
 /** Long, human names for the short codes the data file uses. */
@@ -45,6 +52,8 @@ export const PATH_LABEL: Record<number, string> = {
   3: "קבועה צמודה",
   4: "משתנה לא צמודה",
   5: "משתנה צמודה",
+  6: 'מט"ח דולר',
+  7: 'מט"ח יורו',
 };
 
 /** Track colours by path id — one source for dots, dropdowns, charts, ledger bar. */
@@ -54,6 +63,8 @@ export const TRACK_HEX: Record<number, string> = {
   3: "#059669",
   4: "#d97706",
   5: "#db2777",
+  6: "#c026d3", // מט"ח דולר
+  7: "#65a30d", // מט"ח יורו
 };
 
 /**
@@ -64,6 +75,11 @@ export const TRACK_HEX: Record<number, string> = {
 export function pathIdFromTrack(track: string | undefined, isMortgage: boolean): number {
   const t = (track ?? "").trim();
   if (!t) return isMortgage ? PATH_IDS.prime : PATH_IDS.fixedUnlinked;
+
+  // Currency before the index: "צמוד דולר" contains צמוד and is not CPI-linked.
+  const fx = fxCurrencyOf(t);
+  if (fx === "USD") return PATH_IDS.fxUsd;
+  if (fx === "EUR") return PATH_IDS.fxEur;
 
   if (/פריים/.test(t)) return PATH_IDS.prime;
 

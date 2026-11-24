@@ -32,7 +32,8 @@ import {
   type Line,
 } from "../text";
 import { clean } from "../fields";
-import type { BankLoan, BankStatement, BankTranche, Linkage, RateKind } from "../types";
+import type { BankLoan, BankStatement, BankTranche, FxCurrency, Linkage, RateKind } from "../types";
+import { fxCurrencyOf } from "@/lib/fx";
 import { BANK_LABEL } from "../types";
 import { classifyPurpose } from "../purpose";
 
@@ -238,7 +239,11 @@ function field(grid: Grid, label: string): string[] {
   return grid.loanNumbers.map(() => "");
 }
 
-function readRate(rateType: string, basis: string, linkage: string): { kind: RateKind; linkage: Linkage } {
+function readRate(
+  rateType: string,
+  basis: string,
+  linkage: string
+): { kind: RateKind; linkage: Linkage; fxCurrency: FxCurrency | null } {
   const t = norm(rateType);
   const b = norm(basis);
   const l = norm(linkage);
@@ -255,14 +260,19 @@ function readRate(rateType: string, basis: string, linkage: string): { kind: Rat
       : /קבוע/.test(t)
         ? "fixed"
         : "unknown";
-  const lk: Linkage = /לאצמוד/.test(l)
-    ? "unlinked"
-    : /מדדהמחיריםלצרכן|צמוד/.test(l)
-      ? "linked"
-      : /דולר|אירו|מט"ח/.test(l)
-        ? "fx"
+  // CURRENCY FIRST, and before the index: "צמוד דולר" contains צמוד, so testing
+  // linkage first files a foreign-currency tranche as CPI-linked — a different
+  // anchor, a different risk and the wrong board track (see pathIdOf in
+  // ../to-loans).
+  const fxCurrency = fxCurrencyOf(l);
+  const lk: Linkage = fxCurrency
+    ? "fx"
+    : /לאצמוד/.test(l)
+      ? "unlinked"
+      : /מדדהמחיריםלצרכן|צמוד/.test(l)
+        ? "linked"
         : "unknown";
-  return { kind, linkage: lk };
+  return { kind, linkage: lk, fxCurrency };
 }
 
 /**
@@ -335,7 +345,7 @@ export function parsePoalim(pages: RawPage[], dataPages: number[]): BankStatemen
 
     grid.loanNumbers.forEach((loanNumber, c) => {
       if (!loanNumber || !LOAN_RE.test(loanNumber)) return;
-      const { kind, linkage } = readRate(g.rateType[c], g.basis[c], g.linkage[c]);
+      const { kind, linkage, fxCurrency } = readRate(g.rateType[c], g.basis[c], g.linkage[c]);
       const endDate = date(g.end[c]);
       const to = toDate(endDate);
       const t: BankTranche = {
@@ -345,6 +355,7 @@ export function parsePoalim(pages: RawPage[], dataPages: number[]): BankStatemen
         rawTrack: clean(`${g.rateType[c]} ${g.linkage[c]}`),
         rateKind: kind,
         linkage,
+        fxCurrency,
         amortization: g.amort[c],
         // Per מרכיב, and the most specific of the four: "הלוואה לדיור לרכישה".
         purpose: g.purpose[c],

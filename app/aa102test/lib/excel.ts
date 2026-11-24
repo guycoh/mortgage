@@ -19,6 +19,7 @@ import type { Workbook, Worksheet } from "exceljs";
 import { priceLoan, todayPayment, type Assume } from "./price";
 import { schedules } from "@/app/data/amortization_schedules";
 import {
+  ALL_PATH_IDS,
   FAMILY,
   PATH_LABEL,
   isSurety,
@@ -510,7 +511,7 @@ function buildSheet(wb: Workbook, input: ExcelInput): void {
 
   // The client's own mix. A track composition that counts a guaranteed loan is
   // describing a mix the client cannot refinance.
-  const tracks = [1, 2, 3, 4, 5]
+  const tracks = [...ALL_PATH_IDS]
     .map((id) => {
       const rows = owed.filter((x) => x.l.path_id === id);
       return {

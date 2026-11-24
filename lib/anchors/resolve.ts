@@ -15,9 +15,9 @@ import type {
 } from "./types";
 
 /**
- * The board's five canonical tracks (PATH_IDS in app/aa102test/lib/credit).
+ * The board's canonical tracks (PATH_IDS in app/aa102test/lib/credit).
  * Repeated as a local constant rather than imported: lib/ answering an API route
- * should not reach up into a page's module graph for two integers.
+ * should not reach up into a page's module graph for a handful of integers.
  */
 const PATH = {
   prime: 1,
@@ -25,6 +25,8 @@ const PATH = {
   fixedLinked: 3,
   varUnlinked: 4,
   varLinked: 5,
+  fxUsd: 6,
+  fxEur: 7,
 } as const;
 
 /** Which published table this row is priced off, or why none applies. */
@@ -40,6 +42,17 @@ function familyFor(
     return {
       status: "NOT_APPLICABLE",
       reason: "ריבית קבועה — אינה נגזרת מעוגן",
+    };
+  }
+
+  // A מט"ח track IS anchored — off a foreign money-market rate (Mizrahi's
+  // ע.ג דולרית) — but not off anything Bank of Israel publishes, which is the
+  // only thing this registry holds. Said plainly, so the row does not read as
+  // "a track with no anchor" when what it has is an anchor nobody here can date.
+  if (row.pathId === PATH.fxUsd || row.pathId === PATH.fxEur) {
+    return {
+      status: "UNSUPPORTED",
+      reason: 'מסלול מט"ח — העוגן נקבע בשוק המטבע ואינו מתפרסם בטבלאות בנק ישראל',
     };
   }
 

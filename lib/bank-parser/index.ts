@@ -14,7 +14,7 @@ import { parseJerusalem } from "./banks/jerusalem";
 import { parseFibi } from "./banks/fibi";
 import { BANK_LABEL, type BankStatement } from "./types";
 import { pageLines, toDate } from "./text";
-import { primeByAnchor, settlePaymentDay, termAgainstMonthly } from "./checks";
+import { fxCurrencyNamed, primeByAnchor, settlePaymentDay, termAgainstMonthly } from "./checks";
 
 /** True when this looks like a bank mortgage statement at all. */
 export function isBankStatement(pages: RawPage[]): boolean {
@@ -185,7 +185,13 @@ function auditTranches(st: BankStatement): string[] {
 /** Carry the detection's own findings onto the statement. */
 function withMeta(st: BankStatement, det: Detection): BankStatement {
   settlePaymentDay(st);
-  const warnings = [...st.warnings, ...auditTranches(st), ...primeByAnchor(st), ...termAgainstMonthly(st)];
+  const warnings = [
+    ...st.warnings,
+    ...auditTranches(st),
+    ...primeByAnchor(st),
+    ...fxCurrencyNamed(st),
+    ...termAgainstMonthly(st),
+  ];
   if (det.confidence < 0.8) {
     warnings.push(`זיהוי התבנית בביטחון ${Math.round(det.confidence * 100)}% בלבד — כדאי לוודא את הנתונים.`);
   }

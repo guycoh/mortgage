@@ -54,6 +54,7 @@ import {
   boardMonthly,
   feeOf,
   indexationOf,
+  isFxPath,
   isSurety,
   pathIdFromTrack,
   principalOf,
@@ -388,7 +389,13 @@ export default function Ledger({
     // advisor to go and fetch one would be the page inventing a problem. The
     // wording is the resolver's own, so the cell says the same thing whether
     // the answer came from the track picker or from the button.
-    const anchored = pathId !== PATH_IDS.fixedLinked && pathId !== PATH_IDS.fixedUnlinked;
+    //
+    // A מט"ח track IS anchored, off a foreign money-market rate, and that is
+    // just as absent from the registry — so it is not amber either: pointing
+    // the advisor at עדכון עוגנים would point them at a button whose only
+    // possible answer is "unsupported".
+    const anchored =
+      pathId !== PATH_IDS.fixedLinked && pathId !== PATH_IDS.fixedUnlinked && !isFxPath(pathId);
     const from = PATH_SHORT[Number(l.path_id)] ?? "המסלול הקודם";
     const to = PATH_SHORT[pathId] ?? "המסלול החדש";
     patch(id, {
@@ -397,7 +404,9 @@ export default function Ledger({
       ...keepAuto,
       anchor: null,
       anchor_void: anchored || undefined,
-      anchor_note: !anchored
+      anchor_note: isFxPath(pathId)
+        ? 'מסלול מט"ח — העוגן נקבע בשוק המטבע ואינו מתפרסם בטבלאות בנק ישראל'
+        : !anchored
         ? "ריבית קבועה — אינה נגזרת מעוגן"
         : hadAnchor
           ? `העוגן הקודם (${before.toFixed(2)}%) תומחר למסלול ${from} — לחצו עדכון עוגנים כדי לתמחר את ${to}`
