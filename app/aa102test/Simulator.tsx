@@ -38,7 +38,8 @@ import {
 import type { LoanPath } from "@/app/data/hooks/useLoanPaths";
 import { paths as STATIC_PATHS } from "@/app/data/paths";
 import { priceLoan, todayPayment, type Econ } from "./lib/price";
-import { settleBuiltIns } from "./lib/builtin";
+import { settleBuiltIns, wantsLetterCurve } from "./lib/builtin";
+import type { Forecast } from "./lib/forecast";
 import ForecastDialog, { SAVED_FORECASTS_ENABLED, type ForecastState } from "./components/ForecastDialog";
 import ShareOfferDialog from "./components/ShareOfferDialog";
 import Bay from "./components/Bay";
@@ -1175,6 +1176,33 @@ export default function Simulator({
     [activeMixId, reports, mixes, activeForecast]
   );
 
+  /**
+   * A Mizrahi letter's built-in margin is read off the letter itself, against
+   * the BoI forecast release in force on the letter's day (lib/builtin) — so
+   * that release is fetched first. Any failure (BoI down, a slow network) falls
+   * through to the history reading inside applyImport; the import never waits
+   * more than a few seconds for it.
+   */
+  const importDocument = useCallback(
+    async (summary: ImportSummary) => {
+      let s = summary;
+      if (summary.kind === "bank" && summary.reportDate && summary.loans.some(wantsLetterCurve)) {
+        let letter: Forecast | null = null;
+        try {
+          const res = await fetch(`/api/simulator/forecast?at=${encodeURIComponent(summary.reportDate)}`, {
+            signal: AbortSignal.timeout(8_000),
+          });
+          letter = res.ok ? ((await res.json()) as { at: Forecast | null }).at : null;
+        } catch {
+          letter = null;
+        }
+        if (letter) s = { ...summary, loans: settleBuiltIns(summary.loans, activeForecast, letter) };
+      }
+      applyImport(s);
+    },
+    [applyImport, activeForecast]
+  );
+
   /** Start over: drop the reports and give the mix its blank rows back. */
   const clearImport = useCallback(() => {
     setReports([]);
@@ -1661,7 +1689,7 @@ export default function Simulator({
                     mixId={activeMixId}
                     reports={reports}
                     onBoard={loans}
-                    onImport={applyImport}
+                    onImport={importDocument}
                     onClear={() => setAskClear(true)}
                     // The three readings of the loaded document, on the
                     // document's own receipt. A credit report and a bank

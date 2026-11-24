@@ -5,6 +5,7 @@
 //   npx tsx --tsconfig tsconfig.json scripts/snpv-parity.mts            # every captured letter
 //   npx tsx --tsconfig tsconfig.json scripts/snpv-parity.mts "<file>"   # one
 //   ... --rows                                                          # print every tranche
+//   FORECAST=boi ... --gate      # the regression bar: exit 1 if any letter leaves SmartNPV (see the end)
 //
 // The letters and SmartNPV's readings of them live OUTSIDE git, beside the
 // bank-letter corpus: ../Bank-Templates/*.pdf and ../Bank-Templates/snpv/
@@ -70,6 +71,7 @@ const { parseBankStatement } = await import(repo("lib/bank-parser/index.ts"));
 const { bankStatementToLoans } = await import(repo("lib/bank-parser/to-loans.ts"));
 const { priceLoan, todayPayment, anchorReading } = await import(repo("app/aa102test/lib/price.ts"));
 const { settleBuiltIns } = await import(repo("app/aa102test/lib/builtin.ts"));
+const { loadBoi451, releaseOn, forecastFrom451 } = await import(repo("app/aa102test/lib/boi451.ts"));
 const { mixFigures } = await import(repo("app/aa102test/lib/compare-metrics.ts"));
 const { annualIRR } = await import(repo("app/aa102test/lib/yield.ts"));
 
@@ -129,6 +131,10 @@ const f0 = (n: number | null | undefined) => (n == null ? "—" : Math.round(n).
 const f2 = (n: number | null | undefined) => (n == null ? "—" : n.toFixed(2));
 
 const report: any[] = [];
+// BoI's 451 file + calendar, live, as the board reads them. Offline (or NO_451=1)
+// the built-ins fall back to the history reading, exactly as the board would.
+const boi451 = process.env.NO_451 ? null : await loadBoi451(30_000);
+if (!boi451) console.log("(451 file unreachable — built-ins read from the history)");
 let worst = 0;
 
 for (const file of files) {
@@ -138,7 +144,11 @@ for (const file of files) {
 
   const st = parseBankStatement(await pagesOf(file));
   const loans = bankStatementToLoans(st, "mix", file).loans.filter((l: any) => Number(l.amount) > 0 && Number(l.months) > 0);
-  const settled = settleBuiltIns(loans, forecast);
+  // As the import does: a Mizrahi letter's built-in is solved on the 451 release
+  // in force on the letter's own day (lib/builtin, Simulator#importDocument).
+  const letterRow = boi451 ? releaseOn(boi451.rows, boi451.calendar, new RealDate(yy, mm - 1, dd, 12)) : null;
+  const letterCurve = letterRow ? forecastFrom451(letterRow) : null;
+  const settled = settleBuiltIns(loans, forecast, letterCurve);
 
   const ours: Side[] = settled.map((l: any) => {
     const r = priceLoan(l, econ);
@@ -253,3 +263,35 @@ const within = report.filter((r) => Math.abs(r.ours.cost - r.theirs.cost) <= 25)
 console.log(`\n${files.length} letters · ${within} within ₪25 · worst ריבית והצמדה gap ${worst.toFixed(2)}%`);
 if (jsonOut) fs.writeFileSync(jsonOut, JSON.stringify(report, null, 1));
 console.warn = warn;
+
+/* ------------------------------------------------------------------ gate */
+// --gate: the regression bar. Every letter must land on SmartNPV's ריבית והצמדה
+// within GATE_ILS or GATE_PCT, whichever is wider — EXCEPT where SmartNPV itself
+// misreads the letter, each verified against the PDF and named here with the
+// reason, at the size of SmartNPV's error (so a new gap on top still fails).
+// Run it before any push that touches the parsers, the engine or the forecast.
+const GATE_ILS = 50;
+const GATE_PCT = 0.01;
+const SNPV_MISREADS: Record<string, { gap: number; why: string }> = {
+  // Part 13 (ק"צ 2.70%, ends 10/07/2026, ₪830.55/month) is on the letter and in
+  // its own payoff total (₪62,677.73); SmartNPV's import drops it (₪50,976).
+  "file.pdf": { gap: 340, why: "SmartNPV drops part 13 the letter lists" },
+  // Ends 01/03/2034, letter 29/10/2026, the 01/11 payment still due (₪137.72
+  // accrued since 01/10): 89 payments. SmartNPV counts 88 here, though on the
+  // sister letter (19) it counts 01/02/2034 as 88 and 01/05/2027 as 7.
+  "מזרחי דיין file (20).pdf": { gap: 380, why: "SmartNPV counts one payment short" },
+};
+if (args.includes("--gate")) {
+  let bad = 0;
+  for (const r of report) {
+    const gap = r.ours.cost - r.theirs.cost;
+    const known = SNPV_MISREADS[r.file];
+    const limit = known ? Math.abs(known.gap) + GATE_ILS : Math.max(GATE_ILS, (Math.abs(r.theirs.cost) * GATE_PCT) / 100);
+    if (Math.abs(gap) > limit) {
+      bad++;
+      console.log(`GATE FAIL  ${r.file}: ${gap >= 0 ? "+" : ""}${f0(gap)} (limit ±${f0(limit)})${known ? ` — known: ${known.why}` : ""}`);
+    }
+  }
+  console.log(bad ? `\nGATE: ${bad} letter(s) off SmartNPV` : `\nGATE: all ${report.length} letters on SmartNPV (${Object.keys(SNPV_MISREADS).length} known SmartNPV misreads allowed)`);
+  process.exit(bad ? 1 : 0);
+}

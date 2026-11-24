@@ -415,12 +415,24 @@ export function parsePoalim(pages: RawPage[], dataPages: number[]): BankStatemen
       continue;
     }
 
-    const modelled = tranches.map((t) => {
-      const startD = toDate(t.startDate);
-      const paid = startD && asOfDate ? monthsBetween(startD, asOfDate) : 0;
-      const term = startD && toDate(t.endDate) ? monthsBetween(startD, toDate(t.endDate)!) : 0;
-      return outstanding(t.originalAmount ?? 0, t.rate ?? 0, term, paid);
-    });
+    // THE SPLIT: in proportion to each מרכיב's printed original amount — the
+    // rule SmartNPV applies to this letter, to the shekel (bnhp 28/05/2025:
+    // 259/300 of ₪222,089 = ₪191,737; גבאי 04/11/2026: 150/850 of ₪812,793.53 =
+    // ₪143,434.20). The letter prints no per-part balance, so every split is an
+    // estimate; this one is the yardstick advisors compare the board with, and
+    // unlike the run-down model it replaces (still the fallback below) it can
+    // never put a part above its own original amount — the model put a
+    // ₪100,000 prime part at ₪101,782 on the גבאי letter.
+    const originals = tranches.map((t) => t.originalAmount ?? 0);
+    const byOriginal = originals.every((v) => v > 0);
+    const modelled = byOriginal
+      ? originals
+      : tranches.map((t) => {
+          const startD = toDate(t.startDate);
+          const paid = startD && asOfDate ? monthsBetween(startD, asOfDate) : 0;
+          const term = startD && toDate(t.endDate) ? monthsBetween(startD, toDate(t.endDate)!) : 0;
+          return outstanding(t.originalAmount ?? 0, t.rate ?? 0, term, paid);
+        });
     const modelSum = modelled.reduce((s, v) => s + v, 0);
 
     tranches.forEach((t, i) => {
@@ -452,7 +464,7 @@ export function parsePoalim(pages: RawPage[], dataPages: number[]): BankStatemen
 
     if (tranches.length > 1) {
       warnings.push(
-        `הלוואה ${tot.loanNumber}: הבנק אינו מפרט יתרה לכל מרכיב — היתרה חולקה בין ${tranches.length} המרכיבים לפי לוח הסילוקין של כל אחד, וסך החלקים שווה ליתרה המודפסת.`
+        `הלוואה ${tot.loanNumber}: הבנק אינו מפרט יתרה לכל מרכיב — היתרה חולקה בין ${tranches.length} המרכיבים ${byOriginal ? "לפי הסכום המקורי של כל אחד" : "לפי לוח הסילוקין של כל אחד"}, וסך החלקים שווה ליתרה המודפסת.`
       );
     }
 

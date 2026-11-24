@@ -1,5 +1,7 @@
 // תחזית ריבית ואינפלציה — the curves the board prices variable and linked rows on.
 //
+// GET ?at=<date> → { at }: the 451 release in force on that day (a letter's
+//        date), for lib/builtin's solve. Null when the file cannot be read.
 // GET  → { forecast, boi, saved }
 //        `boi` is the Bank of Israel's directive-451 forecast file (lib/boi451):
 //        BoI's own 360-month nominal curve and expected CPI, published on the
@@ -34,7 +36,7 @@ import { ADMIN_COOKIE, verifyAdminCookie } from "@/app/simulator/lib/admin-auth"
 import boiLast from "./boi-last.json";
 import { BOI_SNAPSHOT } from "@/app/aa102test/lib/boi";
 import { snpvForecast } from "@/app/aa102test/lib/snpv-forecast";
-import { fetchBoi451 } from "@/app/aa102test/lib/boi451";
+import { fetchBoi451, fetchBoi451On } from "@/app/aa102test/lib/boi451";
 
 export const dynamic = "force-dynamic";
 // Room for the SmartNPV probe calls (lib/snpv-forecast) on a cold start.
@@ -183,7 +185,25 @@ async function fromSnpv(boi: Forecast | null): Promise<Forecast | null> {
   return value;
 }
 
-export async function GET() {
+/** "dd/mm/yyyy" or "yyyy-mm-dd" → a local date; null when it is neither. */
+function dayOf(s: string): Date | null {
+  const dmy = /^(\d{1,2})[/.](\d{1,2})[/.](\d{4})$/.exec(s);
+  const ymd = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  const [y, m, d] = dmy ? [+dmy[3], +dmy[2], +dmy[1]] : ymd ? [+ymd[1], +ymd[2], +ymd[3]] : [NaN, NaN, NaN];
+  const t = new Date(y, m - 1, d, 12);
+  return Number.isFinite(t.getTime()) && t.getMonth() === m - 1 ? t : null;
+}
+
+export async function GET(req: NextRequest) {
+  // ?at=<a letter's date> → the 451 release in force that day, which the
+  // letter's own projections were computed on (lib/builtin solves against it).
+  const at = req.nextUrl.searchParams.get("at");
+  if (at !== null) {
+    const day = dayOf(at.trim());
+    if (!day) return NextResponse.json({ error: "תאריך לא תקין" }, { status: 400 });
+    const curve = await fetchBoi451On(day);
+    return NextResponse.json({ at: curve }, { headers: { "Cache-Control": "private, max-age=3600" } });
+  }
   const [fit, savedRaw, history] = await Promise.all([fromBoi(), readSaved(), boiHistory()]);
   // The history is the market's past, not a forecast, so every curve carries
   // the same one — a pasted SmartNPV curve judges an old anchor exactly as the
