@@ -293,6 +293,96 @@ function outstanding(original: number, annualRate: number, termMonths: number, p
   return original * ((g - gn) / (g - 1));
 }
 
+/**
+ * A loan's printed קרן and הצמדת קרן, divided between its מרכיבים.
+ *
+ * The letter prints them per LOAN only, but it prints per PART what pins the
+ * split down: each part's own base index (מדד בסיס) beside the last known one.
+ * A part's indexation is its principal × (current / base − 1), so on a linked
+ * loan the parts' principals must add to the printed קרן AND reproduce the
+ * printed הצמדה — two equations, which settle a two-part loan exactly.
+ *
+ *  1. Start from each part's own amortisation (`outstanding`), scaled to the
+ *     printed קרן.
+ *  2. Unlinked or linked: no part above its own original amount — an unlinked
+ *     part cannot owe more than it borrowed, and on the גבאי letter (04/11/2026)
+ *     the plain model put a ₪100,000 prime part taken in 07/2026 at ₪101,782.
+ *  3. Linked, with both indices on every part: the smallest relative change to
+ *     (1–2) that makes Σ principal × (current/base − 1) the printed הצמדה.
+ *
+ * Measured 2026-11-24 on every multi-part linked Poalim loan in ../Bank-Templates:
+ * the model fits the printed indexation within ₪8, splitting by original amount
+ * (SmartNPV's rule) misses by up to ₪38, and on the two-part loans the exact
+ * split sits nearer the model (bnhp: ₪210 off, against ₪510 by original amount).
+ * Step 3 then makes it exact. A correction is refused — the model stands — when
+ * it would move any part by more than a quarter or below zero: then the index
+ * figures were misread, not the arithmetic.
+ */
+function splitLoan(
+  parts: BankTranche[],
+  principal: number,
+  indexation: number,
+  asOf: Date | null
+): { principal: number[]; indexation: number[]; how: "model" | "cpi" } {
+  const n = parts.length;
+  const model = parts.map((t) => {
+    const start = toDate(t.startDate);
+    const end = toDate(t.endDate);
+    const paid = start && asOf ? monthsBetween(start, asOf) : 0;
+    const term = start && end ? monthsBetween(start, end) : 0;
+    return outstanding(t.originalAmount ?? 0, t.rate ?? 0, term, paid);
+  });
+  const mSum = model.reduce((s, v) => s + v, 0);
+  let p = mSum > 0 ? model.map((v) => (v / mSum) * principal) : parts.map(() => principal / n);
+
+  // 2. Cap at the original amount, handing the excess to the parts below theirs.
+  for (let pass = 0; pass < n; pass++) {
+    const cap = parts.map((t) => t.originalAmount ?? Infinity);
+    const over = p.map((v, i) => Math.max(0, v - cap[i]));
+    const excess = over.reduce((s, v) => s + v, 0);
+    if (excess < 0.005) break;
+    const room = p.map((v, i) => (over[i] > 0 ? 0 : v));
+    const roomSum = room.reduce((s, v) => s + v, 0);
+    if (roomSum <= 0) break;
+    p = p.map((v, i) => (over[i] > 0 ? cap[i] : v + (excess * room[i]) / roomSum));
+  }
+
+  // Each part's index ratio, where the letter prints both indices.
+  const k = parts.map((t) => (t.baseIndex && t.currentIndex ? t.currentIndex / t.baseIndex - 1 : NaN));
+  const linked = parts.every((t) => t.linkage === "linked") && k.every(Number.isFinite) && indexation > 0;
+  if (!linked) {
+    // Indexation by balance share, as the printed total is all there is.
+    const s = p.reduce((a, v) => a + v, 0);
+    return { principal: p, indexation: p.map((v) => (s > 0 ? (v / s) * indexation : indexation / n)), how: "model" };
+  }
+
+  // 3. min Σ (pᵢ − qᵢ)²/qᵢ  s.t.  Σ pᵢ = P,  Σ pᵢ kᵢ = I   →   pᵢ = qᵢ (1 + a + b kᵢ).
+  const q = p;
+  const Sq = q.reduce((s, v) => s + v, 0);
+  const Sqk = q.reduce((s, v, i) => s + v * k[i], 0);
+  const Sqkk = q.reduce((s, v, i) => s + v * k[i] * k[i], 0);
+  const det = Sq * Sqkk - Sqk * Sqk;
+  let out = q;
+  let how: "model" | "cpi" = "model";
+  if (n > 1 && Math.abs(det) > 1e-9 * Sq * Sq) {
+    // [Sq Sqk; Sqk Sqkk] [a b]ᵀ = [0, I − Sqk]ᵀ
+    const r = indexation - Sqk;
+    const a = (-Sqk * r) / det;
+    const b = (Sq * r) / det;
+    const fixed = q.map((v, i) => v * (1 + a + b * k[i]));
+    const sane = fixed.every((v, i) => v > 0 && Math.abs(v - q[i]) <= 0.25 * q[i]);
+    if (sane) {
+      out = fixed;
+      how = "cpi";
+    }
+  }
+  // Indexation off each part's own index, scaled onto the printed total (it
+  // already adds up when step 3 ran; this only absorbs the index rounding).
+  const raw = out.map((v, i) => v * k[i]);
+  const rawSum = raw.reduce((s, v) => s + v, 0);
+  return { principal: out, indexation: raw.map((v) => (rawSum > 0 ? (v / rawSum) * indexation : indexation / n)), how };
+}
+
 export function parsePoalim(pages: RawPage[], dataPages: number[]): BankStatement {
   const warnings: string[] = [];
   const first = pageLines(pages[0]);
@@ -415,32 +505,20 @@ export function parsePoalim(pages: RawPage[], dataPages: number[]): BankStatemen
       continue;
     }
 
-    // THE SPLIT: in proportion to each מרכיב's printed original amount — the
-    // rule SmartNPV applies to this letter, to the shekel (bnhp 28/05/2025:
-    // 259/300 of ₪222,089 = ₪191,737; גבאי 04/11/2026: 150/850 of ₪812,793.53 =
-    // ₪143,434.20). The letter prints no per-part balance, so every split is an
-    // estimate; this one is the yardstick advisors compare the board with, and
-    // unlike the run-down model it replaces (still the fallback below) it can
-    // never put a part above its own original amount — the model put a
-    // ₪100,000 prime part at ₪101,782 on the גבאי letter.
-    const originals = tranches.map((t) => t.originalAmount ?? 0);
-    const byOriginal = originals.every((v) => v > 0);
-    const modelled = byOriginal
-      ? originals
-      : tranches.map((t) => {
-          const startD = toDate(t.startDate);
-          const paid = startD && asOfDate ? monthsBetween(startD, asOfDate) : 0;
-          const term = startD && toDate(t.endDate) ? monthsBetween(startD, toDate(t.endDate)!) : 0;
-          return outstanding(t.originalAmount ?? 0, t.rate ?? 0, term, paid);
-        });
-    const modelSum = modelled.reduce((s, v) => s + v, 0);
+    const { principal: split, indexation: splitIdx, how } = splitLoan(tranches, tot.principal ?? 0, tot.indexation ?? 0, asOfDate);
+    // Every other loan-level figure goes by each part's share of the balance.
+    const balances = split.map((p, i) => p + splitIdx[i]);
+    const modelled = balances;
+    const modelSum = balances.reduce((s, v) => s + v, 0);
 
     tranches.forEach((t, i) => {
       const share = modelSum > 0 ? modelled[i] / modelSum : 1 / tranches.length;
-      t.balance = Math.round(loanBalance * share);
-      t.principal = Math.round(loanPrincipal * share);
-      t.deferredInterest = deferred ? Math.round(deferred * share * 100) / 100 : null;
-      t.indexation = Math.round((tot.indexation ?? 0) * share);
+      const dShare = deferred ? deferred * share : 0;
+      t.principal = Math.round(split[i] + dShare);
+      t.indexation = Math.round(splitIdx[i]);
+      // Rounded whole, as before: one-part loans keep their printed figures to the shekel.
+      t.balance = Math.round(split[i] + splitIdx[i] + dShare);
+      t.deferredInterest = deferred ? Math.round(dShare * 100) / 100 : null;
       t.payoff = tot.payoff !== null ? Math.round(tot.payoff * share * 100) / 100 : null;
       t.monthly = tot.monthly !== null ? Math.round(tot.monthly * share * 100) / 100 : null;
       t.breakFee = tot.breakFee !== null ? Math.round(tot.breakFee * share * 100) / 100 : null;
@@ -464,7 +542,7 @@ export function parsePoalim(pages: RawPage[], dataPages: number[]): BankStatemen
 
     if (tranches.length > 1) {
       warnings.push(
-        `הלוואה ${tot.loanNumber}: הבנק אינו מפרט יתרה לכל מרכיב — היתרה חולקה בין ${tranches.length} המרכיבים ${byOriginal ? "לפי הסכום המקורי של כל אחד" : "לפי לוח הסילוקין של כל אחד"}, וסך החלקים שווה ליתרה המודפסת.`
+        `הלוואה ${tot.loanNumber}: הבנק אינו מפרט יתרה לכל מרכיב — היתרה חולקה בין ${tranches.length} המרכיבים ${how === "cpi" ? "לפי לוח הסילוקין של כל אחד, מתואם להפרשי ההצמדה המודפסים ולמדד הבסיס של כל מרכיב" : "לפי לוח הסילוקין של כל אחד"}, וסך החלקים שווה ליתרה המודפסת.`
       );
     }
 
