@@ -13,7 +13,7 @@
 import type { PurposeKind } from "@/lib/bank-parser/purpose";
 
 export type PurposeId =
-  | "housing" // דיור — purchase, build, extension: a mortgage for the home
+  | "housing" // דיור — purchase, build: a mortgage for the home
   | "any" // כל מטרה — secured on the property, spent elsewhere
   | "renovation" // שיפוצים
   | "existing_lien" // שעבוד קיים לטובת נרכש — the old home funds the new one
@@ -87,9 +87,14 @@ export function purposeFrom(
   switch (kind) {
     case "purchase":
     case "build":
-    case "extend":
     case "housing":
       return "housing";
+    // הרחבה (an extension of the home already owned) files under שיפוצים, as
+    // SmartNPV files it: the list has no extension of its own, and money spent
+    // improving a home already owned is the renovation line, not a purchase.
+    // Seen on Mizrahi letters ("מטרת הלוואה: הרחבה"), where SmartNPV shows
+    // שיפוצים. Label only: both are housing to the pricing and the optimizer.
+    case "extend":
     case "renovate":
       return "renovation";
     case "any":
