@@ -1054,14 +1054,27 @@ export default function Simulator({
          of them משותף and announced "N התחייבויות משותפות אוחדו" — a claim that
          a second person's report had agreed, when the advisor had simply
          dropped the file again. A document is the same document when it is the
-         same client's reading of the same day. */
+         same client's reading of the same day.
+
+         A bank letter also has to cover the same loan files. One couple can
+         hold two mortgages at one bank, each with its own payoff letter, both
+         printed the same day under the same names (Mizrahi letters carry no
+         ID number at all), and the second letter used to be refused as "already
+         loaded", leaving half the debt off the board. */
+      const fileSet = (s: ImportSummary) =>
+        (s.bank?.loans ?? [])
+          .map((l) => String(l.loanNumber ?? "").replace(/\D/g, ""))
+          .filter(Boolean)
+          .sort()
+          .join(",");
       const sameDoc = reports.find(
         (r) =>
           (r.clientId && summary.clientId
             ? r.clientId === summary.clientId
             : norm(r.clientName) === norm(summary.clientName)) &&
           r.reportDate === summary.reportDate &&
-          r.kind === summary.kind
+          r.kind === summary.kind &&
+          (summary.kind !== "bank" || !fileSet(r) || !fileSet(summary) || fileSet(r) === fileSet(summary))
       );
       if (sameDoc) {
         track("import", {
@@ -1073,7 +1086,7 @@ export default function Simulator({
         });
         flash4s({
           kind: "err",
-          text: `הדוח הזה כבר טעון — ${summary.clientName || "אותו לקוח"}${summary.reportDate ? `, ${summary.reportDate}` : ""}`,
+          text: `${summary.kind === "bank" ? "המסמך" : "הדוח"} הזה כבר טעון — ${summary.clientName || "אותו לקוח"}${summary.reportDate ? `, ${summary.reportDate}` : ""}`,
         });
         return;
       }
@@ -1165,7 +1178,13 @@ export default function Simulator({
                 kind: "ok",
                 text: `${duplicates === 1 ? "התחייבות אחת משותפת אוחדה" : `${duplicates} התחייבויות משותפות אוחדו`} ולא נספרו פעמיים`,
               }
-            : { kind: "ok", text: "הדוח נוסף — לא נמצאה חפיפה בין הדוחות" }
+            : {
+                kind: "ok",
+                text:
+                  summary.kind === "bank"
+                    ? "המסמך נוסף — לא נמצאה חפיפה בין המסמכים"
+                    : "הדוח נוסף — לא נמצאה חפיפה בין הדוחות",
+              }
         );
       }
       setFlash(true);
