@@ -35,7 +35,7 @@ import {
 } from "@phosphor-icons/react";
 import { schedules } from "@/app/data/amortization_schedules";
 import type { LoanPath } from "@/app/data/hooks/useLoanPaths";
-import { priceLoan, todayPayment, type Assume } from "../lib/price";
+import { anchorReading, asEcon, priceLoan, todayPayment, type Assume } from "../lib/price";
 import Select from "./Select";
 import DateField from "./DateField";
 import { BankIcon } from "./bankIcons";
@@ -542,6 +542,27 @@ export default function Ledger({
     />
   );
 
+  /**
+   * The margin the engine really resets this row on, when the printed anchor
+   * hides part of it (Mizrahi's built-in, lib/builtin); null when the printed
+   * margin is the whole of it. Read through the engine's own anchorReading, so
+   * the grid states the figure priceLoan uses: the settled one from the letter,
+   * or the history estimate on a row that has none (a board saved before the
+   * column, or a hand-typed bond row).
+   */
+  const builtInOf = (loan: ImportedLoan): { builtIn: number; margin: number } | null => {
+    const f = asEcon(annualInflation).forecast;
+    const settled = loan.built_in_margin !== undefined;
+    if (!settled && !f?.history) return null;
+    const r = f ? anchorReading(loan, f) : null;
+    const typedMargin = Number(loan.anchor_margin);
+    if (r && r.builtIn > 0.001) return { builtIn: r.builtIn, margin: r.margin };
+    // No forecast on the board but a settled figure: say it from the row alone.
+    const b = Number(loan.built_in_margin);
+    if (!r && settled && b > 0.001 && Number.isFinite(typedMargin)) return { builtIn: b, margin: typedMargin + b };
+    return null;
+  };
+
   /** The sum spelled out, for the cell's tooltip: anchor + margin = the rate. */
   const anchorTip = (loan: ImportedLoan) => {
     // A row the refresh declined to price says why, and says it here rather than
@@ -559,10 +580,10 @@ export default function Ledger({
     // The letter's anchor hides part of the margin (lib/builtin). The cells keep
     // the letter's two numbers, so the reason the forecast resets higher than
     // עוגן + תוספת has to be said where those numbers are read.
-    const builtIn = Number(loan.built_in_margin);
-    if (loan.built_in_margin !== undefined && builtIn > 0 && loan.anchor_margin !== null && Number.isFinite(Number(loan.anchor_margin)))
+    const hidden = builtInOf(loan);
+    if (hidden)
       parts.push(
-        `העוגן במכתב כולל תוספת מובנית של ${builtIn.toFixed(2)}%, ולכן התוספת בפועל היא ${(Number(loan.anchor_margin) + builtIn).toFixed(2)}% ובכל עדכון הריבית תהיה העוגן החדש ועוד תוספת זו`
+        `העוגן במכתב כולל תוספת מובנית של ${hidden.builtIn.toFixed(2)}%, ולכן התוספת בפועל היא ${hidden.margin.toFixed(2)}% ובכל עדכון הריבית תהיה העוגן החדש ועוד תוספת זו`
       );
     // Where a refreshed anchor came from and how old it is. Both are the point of
     // the button: the value is only worth anything if you can see its date, and an
@@ -1715,10 +1736,25 @@ export default function Ledger({
                                   "0.97 →" reads into the box beside it. Absolute,
                                   like every other note here, so a refreshed row is
                                   never a taller row. */}
-                              {loan.anchor_original !== undefined && loan.anchor_original !== null && (
+                              {loan.anchor_original !== undefined && loan.anchor_original !== null ? (
                                 <span className="lgr-note lgr-note-num lgr-note-was">
                                   {Number(loan.anchor_original).toFixed(2)} →
                                 </span>
+                              ) : (
+                                /* THE MARGIN THE BANK REALLY CHARGES. A Mizrahi
+                                   letter hides part of the margin in its anchor
+                                   (lib/builtin); the two boxes keep the letter's
+                                   numbers, and every reset runs on this one. It
+                                   sat only in the tooltip, so a board read beside
+                                   SmartNPV (which prints the full margin) looked
+                                   wrong on every such row. The refreshed-anchor
+                                   note above takes the same corner and wins; the
+                                   tooltip still says it there. */
+                                builtInOf(loan) !== null && (
+                                  <span className="lgr-note lgr-note-builtin">
+                                    בפועל <b className="lgr-note-num">{builtInOf(loan)!.margin.toFixed(2)}</b>
+                                  </span>
+                                )
                               )}
                             </div>
                           </td>

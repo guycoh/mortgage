@@ -100,6 +100,16 @@ const GRACE = ["grace_full_months", "grace_partial_months"] as const;
 const PRINTED = ["source_monthly", "source_monthly_basis"] as const;
 
 /**
+ * The margin a Mizrahi letter hides inside its printed bond anchor (lib/builtin
+ * in app/aa102test), settled on import off the letter's own projection. Without
+ * it a reloaded row falls back to the history estimate, which misses on some
+ * tranches — so a saved board could reset on a different margin than the one
+ * it was imported with. Null is "never settled", not zero: 0 is a settled
+ * answer (the anchor hides nothing).
+ */
+const BUILTIN = ["built_in_margin"] as const;
+
+/**
  * Flips to false the first time Postgres says the columns aren't there — and
  * stays false for the life of the process. Two consequences worth knowing:
  * a migration applied while the server is up needs a restart to be seen, and
@@ -114,6 +124,7 @@ let hasSplit = true;
 let hasPurpose = true;
 let hasGrace = true;
 let hasPrinted = true;
+let hasBuiltIn = true;
 /**
  * loan_mixes.target_amount — גובה התמהיל, the figure the board's אחוז column
  * allocates against. Same deal as the two above, on the other table: without the
@@ -198,6 +209,7 @@ function toDbRow(loan: Row, mixId: string): Row {
     out.source_monthly = pay !== null && pay > 0 && basis ? pay : null;
     out.source_monthly_basis = pay !== null && pay > 0 && basis ? basis : null;
   }
+  if (hasBuiltIn) out.built_in_margin = numOrNull(loan.built_in_margin);
   return out;
 }
 
@@ -211,6 +223,7 @@ const selectCols = () =>
     ...(hasPurpose ? PURPOSE : []),
     ...(hasGrace ? GRACE : []),
     ...(hasPrinted ? PRINTED : []),
+    ...(hasBuiltIn ? BUILTIN : []),
   ].join(",");
 
 function fromDbRow(row: Row): Row {
@@ -232,6 +245,10 @@ function fromDbRow(row: Row): Row {
   if (row.source_monthly == null) delete out.source_monthly;
   else out.source_monthly = Number(row.source_monthly);
   if (row.source_monthly_basis == null) delete out.source_monthly_basis;
+  // Absent, not null: settleBuiltIn and anchorReading test `=== undefined` to
+  // know a row was never settled and the history estimate applies.
+  if (row.built_in_margin == null) delete out.built_in_margin;
+  else out.built_in_margin = Number(row.built_in_margin);
   delete out.debt_group;
   out.is_guarantor = !!row.is_guarantor;
   out.is_shared = !!row.is_shared;
@@ -266,7 +283,7 @@ export async function loadBoard(lead: number) {
 
   // Retire the newest column set first, then the older ones, so a deployment
   // that is one migration behind loses only what that migration added.
-  for (const retire of [() => (hasPrinted = false), () => (hasGrace = false), () => (hasPurpose = false), () => (hasSplit = false), () => (hasAnchor = false), () => (hasExtra = false)]) {
+  for (const retire of [() => (hasBuiltIn = false), () => (hasPrinted = false), () => (hasGrace = false), () => (hasPurpose = false), () => (hasSplit = false), () => (hasAnchor = false), () => (hasExtra = false)]) {
     if (!loansRes.error || !isMissingColumn(loansRes.error)) break;
     retire();
     loansRes = await supabase.from("loans").select(selectCols()).in("mix_id", ids);
@@ -338,7 +355,7 @@ export async function saveBoard(lead: number, mixes: BoardMix[]) {
       const build = () =>
         (mix.loans ?? []).map((l) => ({ ...toDbRow(l, mix.id), id: l.id as string }));
       let res = await supabase.from("loans").upsert(rows, { onConflict: "id" });
-      for (const retire of [() => (hasPrinted = false), () => (hasGrace = false), () => (hasPurpose = false), () => (hasSplit = false), () => (hasAnchor = false), () => (hasExtra = false)]) {
+      for (const retire of [() => (hasBuiltIn = false), () => (hasPrinted = false), () => (hasGrace = false), () => (hasPurpose = false), () => (hasSplit = false), () => (hasAnchor = false), () => (hasExtra = false)]) {
         if (!res.error || !isMissingColumn(res.error)) break;
         retire();
         res = await supabase.from("loans").upsert(build(), { onConflict: "id" });

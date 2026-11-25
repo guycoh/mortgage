@@ -246,8 +246,10 @@ export type ImportedLoan = Loan & {
    * letter's עוגן + תוספת understate what the bank charges over the market by
    * this much (Mizrahi-Tefahot's pre-2023 bond-anchored tracks — its "תוספת
    * מיכונית"; SmartNPV adds the same figure). The grid keeps the letter's two
-   * numbers; the engine resets on תוספת + this. Session-only, settled on import:
-   * after a reload the engine estimates it from the BoI history instead.
+   * numbers; the engine resets on תוספת + this. Settled on import and saved with
+   * the board (loans.built_in_margin). A row saved before that column existed,
+   * or by a database without it, comes back without the field, and the engine
+   * estimates it from the BoI history instead.
    */
   built_in_margin?: number;
 

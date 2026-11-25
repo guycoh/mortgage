@@ -101,3 +101,13 @@ alter table public.loans
 alter table public.loans
   add column if not exists source_monthly       numeric,
   add column if not exists source_monthly_basis text;
+
+-- תוספת מובנית (Mizrahi's "תוספת מיכונית").
+--
+-- The margin a Mizrahi letter hides inside its printed bond anchor, settled on
+-- import off the letter's own projection (app/aa102test/lib/builtin.ts). The
+-- engine resets the row on anchor_margin + this. Without the column a reloaded
+-- board re-estimates it from BoI history, which can differ from the letter's
+-- figure. Nullable: null is "never settled"; 0 is a settled "hides nothing".
+alter table public.loans
+  add column if not exists built_in_margin numeric;

@@ -2862,6 +2862,16 @@ html:has(.lgr-root) {
    the cell's start edge on the column's own 14px inset. */
 .lgr-note-anchor { left: auto; right: 9px; text-align: right; }
 
+/* בפועל 1.83 — the margin the bank really charges, under the margin field it
+   corrects (the default corner). The word stays RTL; only the figure is
+   isolated, and it carries the weight because it is the number to compare. */
+.lgr-note-builtin { white-space: nowrap; }
+/* .lgr-pair sits on z-index 1 (the refresh bloom is drawn under it), which put
+   it over any note pinned in the same well: the note rendered, but under the
+   margin field. Both notes in this cell go above the pair. */
+.lgr-pair ~ .lgr-note { z-index: 2; }
+.lgr-note-builtin > b { font-weight: 700; color: var(--lgr-2); }
+
 /* ---------------------------------------------------------------- tooltips */
 /* Opens to the row's inside, never past the scroll container, so it cannot be
    clipped by the table's overflow. Delayed, so hovering across a row is quiet. */
